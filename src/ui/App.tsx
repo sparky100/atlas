@@ -25,6 +25,7 @@ import { ElementsPage } from './routes/ElementsPage';
 import { ExternalInterfacesPage } from './routes/ExternalInterfacesPage';
 import { Home } from './routes/Home';
 import { LandscapePage } from './routes/LandscapePage';
+import { ModelRouteGate } from './routes/ModelRouteGate';
 import { ModelHome } from './routes/ModelHome';
 import { ModelSettingsPage } from './routes/ModelSettingsPage';
 import { OrganisationSettingsPage } from './routes/OrganisationSettingsPage';
@@ -72,42 +73,44 @@ export function App() {
             <Route path="/platform-admin" element={<PlatformAdminPage />} />
             <Route path="/o/:orgSlug" element={<OrgHome />} />
             <Route path="/o/:orgSlug/settings" element={<OrganisationSettingsPage />} />
-            <Route path="/o/:orgSlug/m/:modelSlug" element={<ModelHome />} />
-            <Route path="/o/:orgSlug/m/:modelSlug/settings" element={<ModelSettingsPage />} />
-            <Route path="/o/:orgSlug/m/:modelSlug/e/:elementId" element={<ElementPage />} />
-            <Route path="/o/:orgSlug/m/:modelSlug/elements" element={<ElementsPage />} />
-            <Route path="/o/:orgSlug/m/:modelSlug/landscape" element={<LandscapePage />} />
-            <Route path="/o/:orgSlug/m/:modelSlug/capability-map" element={<CapabilityMapPage />} />
-            <Route path="/o/:orgSlug/m/:modelSlug/roadmap" element={<RoadmapPage />} />
-            <Route path="/o/:orgSlug/m/:modelSlug/value-streams" element={<ValueStreamsPage />} />
-            <Route path="/o/:orgSlug/m/:modelSlug/portfolio" element={<PortfolioPage />} />
-            <Route path="/o/:orgSlug/m/:modelSlug/integrations" element={<IntegrationsPage />} />
-            <Route path="/o/:orgSlug/m/:modelSlug/gaps" element={<GapsPage />} />
-            <Route path="/o/:orgSlug/m/:modelSlug/context/:elementId" element={<ContextPage />} />
-            <Route path="/o/:orgSlug/m/:modelSlug/container/:systemId" element={<ContainerPage />} />
-            <Route path="/o/:orgSlug/m/:modelSlug/versions" element={<VersionsPage />} />
-            <Route path="/o/:orgSlug/m/:modelSlug/capture" element={<CaptureJobListPage />} />
-            <Route path="/o/:orgSlug/m/:modelSlug/start" element={<StartRedirect />} />
-            <Route path="/o/:orgSlug/m/:modelSlug/work" element={<WorkPage />} />
-            <Route path="/o/:orgSlug/m/:modelSlug/changes" element={<ChangesPage />} />
-            <Route path="/o/:orgSlug/m/:modelSlug/changes/:branchId" element={<ChangePage />} />
-            <Route path="/o/:orgSlug/m/:modelSlug/projects" element={<ProjectsPage />} />
-            <Route path="/o/:orgSlug/m/:modelSlug/projects/:projectId" element={<ProjectPage />} />
-            <Route path="/o/:orgSlug/m/:modelSlug/decisions" element={<DecisionsPage />} />
-            <Route path="/o/:orgSlug/m/:modelSlug/decisions/:decisionId" element={<DecisionPage />} />
-            <Route path="/o/:orgSlug/m/:modelSlug/decisions/:decisionId/options/:branchId/landscape" element={<DecisionOptionLandscapePage />} />
-            <Route path="/o/:orgSlug/m/:modelSlug/diff" element={<VersionDiffPage />} />
-            <Route path="/o/:orgSlug/m/:modelSlug/review" element={<ReviewQueuePage />} />
-            <Route path="/o/:orgSlug/m/:modelSlug/review/:mergeRequestId" element={<ReviewRequestPage />} />
-            <Route path="/o/:orgSlug/m/:modelSlug/review/capture/:jobId" element={<CaptureReviewPage />} />
-            <Route path="/o/:orgSlug/m/:modelSlug/reports" element={<ReportsPage />} />
-            <Route path="/o/:orgSlug/m/:modelSlug/reports/saved/:id" element={<SavedReportPage kind="report" />} />
-            <Route path="/o/:orgSlug/m/:modelSlug/reports/copies/:id" element={<SavedReportPage kind="copy" />} />
-            <Route path="/o/:orgSlug/m/:modelSlug/reports/dashboards/:id" element={<DashboardPage />} />
-            <Route path="/o/:orgSlug/m/:modelSlug/ask" element={<AskAtlasPage />} />
-            <Route path="/o/:orgSlug/m/:modelSlug/boundary-crossings" element={<BoundaryCrossingsPage />} />
-            <Route path="/o/:orgSlug/m/:modelSlug/external-interfaces" element={<ExternalInterfacesPage />} />
-            <Route path="/o/:orgSlug/m/:modelSlug/duplicates" element={<DuplicatesReportPage />} />
+            <Route element={<ModelRouteGate />}>
+              <Route path="/o/:orgSlug/m/:modelSlug" element={<ModelHome />} />
+              <Route path="/o/:orgSlug/m/:modelSlug/settings" element={<ModelSettingsPage />} />
+              <Route path="/o/:orgSlug/m/:modelSlug/e/:elementId" element={<ElementPage />} />
+              <Route path="/o/:orgSlug/m/:modelSlug/elements" element={<ElementsPage />} />
+              <Route path="/o/:orgSlug/m/:modelSlug/landscape" element={<LandscapePage />} />
+              <Route path="/o/:orgSlug/m/:modelSlug/capability-map" element={<CapabilityMapPage />} />
+              <Route path="/o/:orgSlug/m/:modelSlug/roadmap" element={<RoadmapPage />} />
+              <Route path="/o/:orgSlug/m/:modelSlug/value-streams" element={<ValueStreamsPage />} />
+              <Route path="/o/:orgSlug/m/:modelSlug/portfolio" element={<PortfolioPage />} />
+              <Route path="/o/:orgSlug/m/:modelSlug/integrations" element={<IntegrationsPage />} />
+              <Route path="/o/:orgSlug/m/:modelSlug/gaps" element={<GapsPage />} />
+              <Route path="/o/:orgSlug/m/:modelSlug/context/:elementId" element={<ContextPage />} />
+              <Route path="/o/:orgSlug/m/:modelSlug/container/:systemId" element={<ContainerPage />} />
+              <Route path="/o/:orgSlug/m/:modelSlug/versions" element={<VersionsPage />} />
+              <Route path="/o/:orgSlug/m/:modelSlug/capture" element={<CaptureJobListPage />} />
+              <Route path="/o/:orgSlug/m/:modelSlug/start" element={<StartRedirect />} />
+              <Route path="/o/:orgSlug/m/:modelSlug/work" element={<WorkPage />} />
+              <Route path="/o/:orgSlug/m/:modelSlug/changes" element={<ChangesPage />} />
+              <Route path="/o/:orgSlug/m/:modelSlug/changes/:branchId" element={<ChangePage />} />
+              <Route path="/o/:orgSlug/m/:modelSlug/projects" element={<ProjectsPage />} />
+              <Route path="/o/:orgSlug/m/:modelSlug/projects/:projectId" element={<ProjectPage />} />
+              <Route path="/o/:orgSlug/m/:modelSlug/decisions" element={<DecisionsPage />} />
+              <Route path="/o/:orgSlug/m/:modelSlug/decisions/:decisionId" element={<DecisionPage />} />
+              <Route path="/o/:orgSlug/m/:modelSlug/decisions/:decisionId/options/:branchId/landscape" element={<DecisionOptionLandscapePage />} />
+              <Route path="/o/:orgSlug/m/:modelSlug/diff" element={<VersionDiffPage />} />
+              <Route path="/o/:orgSlug/m/:modelSlug/review" element={<ReviewQueuePage />} />
+              <Route path="/o/:orgSlug/m/:modelSlug/review/:mergeRequestId" element={<ReviewRequestPage />} />
+              <Route path="/o/:orgSlug/m/:modelSlug/review/capture/:jobId" element={<CaptureReviewPage />} />
+              <Route path="/o/:orgSlug/m/:modelSlug/reports" element={<ReportsPage />} />
+              <Route path="/o/:orgSlug/m/:modelSlug/reports/saved/:id" element={<SavedReportPage kind="report" />} />
+              <Route path="/o/:orgSlug/m/:modelSlug/reports/copies/:id" element={<SavedReportPage kind="copy" />} />
+              <Route path="/o/:orgSlug/m/:modelSlug/reports/dashboards/:id" element={<DashboardPage />} />
+              <Route path="/o/:orgSlug/m/:modelSlug/ask" element={<AskAtlasPage />} />
+              <Route path="/o/:orgSlug/m/:modelSlug/boundary-crossings" element={<BoundaryCrossingsPage />} />
+              <Route path="/o/:orgSlug/m/:modelSlug/external-interfaces" element={<ExternalInterfacesPage />} />
+              <Route path="/o/:orgSlug/m/:modelSlug/duplicates" element={<DuplicatesReportPage />} />
+            </Route>
           </Route>
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>

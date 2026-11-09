@@ -99,7 +99,7 @@ import styles from './CapabilityMapPage.module.css';
  */
 export function CapabilityMapPage() {
   const { orgSlug, modelSlug } = useParams<{ orgSlug: string; modelSlug: string }>();
-  const [searchParams] = useSearchParams();
+  const [searchParams, setSearchParams] = useSearchParams();
   const { ref } = useSelectedRef();
   const viewing = isViewingMode(searchParams);
   const { userId } = useAuth();
@@ -183,7 +183,18 @@ export function CapabilityMapPage() {
   // row ever matches it, so it just never renders expanded.
   const [expandedDomainId, setExpandedDomainId] = useState<UUID | null>(() => searchParams.get('domain'));
   const toggleDomain = (id: UUID): void => {
-    setExpandedDomainId((prev) => (prev === id ? null : id));
+    const next = expandedDomainId === id ? null : id;
+    setExpandedDomainId(next);
+    // Kept in the URL too (replace, no new history entry) so Share links to the expanded domain.
+    setSearchParams(
+      (prev) => {
+        const updated = new URLSearchParams(prev);
+        if (next) updated.set('domain', next);
+        else updated.delete('domain');
+        return updated;
+      },
+      { replace: true },
+    );
   };
   // Sprint U4-2a check B5: "Sync descriptions"/"Export as starter map" move
   // from two always-visible buttons of their own into one "⋯" overflow
