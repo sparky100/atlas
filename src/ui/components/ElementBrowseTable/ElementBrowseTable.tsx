@@ -417,7 +417,8 @@ export function ElementBrowseTable({ state, orgSlug, modelSlug, modelId, filenam
         {attest.confirmingId === element.element_id ? 'Confirming…' : '✓ Still accurate'}
       </Button>
     ) : null;
-  const showAttest = bulkEdit?.editing === true && attest !== undefined;
+  // The stale-values list is the one place the button needs no edit mode: confirming is the whole point of that list, so each row offers it directly (still behind the same `canEditBranch` gate — `attest` is only passed for someone who can edit).
+  const showAttest = attest !== undefined && (bulkEdit?.editing === true || findingFilter === 'stale-attributes');
 
   const editableCell = (element: BrowseRow['element'], key: string, customDefinition?: AttributeDefinitionRow) => {
     if (!bulkEdit?.editing) return null;
