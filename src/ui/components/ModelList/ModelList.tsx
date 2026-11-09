@@ -62,7 +62,7 @@ export function ModelList({ orgSlug, models, loading, canCreate, onCreate }: Mod
         <ul className={styles.list}>
           {models.map((model) => (
             <li key={model.id}>
-              <Link className={styles.row} to={`/o/${orgSlug}/m/${model.slug}`}>
+              <Link className={styles.row} to={`/o/${orgSlug}/m/${model.slug}/start`}>
                 <Text as="span" size="lg">
                   {model.name}
                 </Text>

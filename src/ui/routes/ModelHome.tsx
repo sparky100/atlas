@@ -23,6 +23,7 @@ import { useArchitectHomeInsights } from '../home/useArchitectHomeInsights';
 import { useDirectorHome } from '../home/useDirectorHome';
 import { useHomeMode } from '../home/useHomeMode';
 import { useModels } from '../models/useModels';
+import { MakeStartPageButton } from '../profile/MakeStartPageButton';
 import { canArchiveModel, canCreateChangeBranch, canEditOnMain, useMembership } from '../orgs/useMembership';
 import { useOrganisationBySlug } from '../orgs/useOrganisationBySlug';
 import { useRouteTiming } from '../perf/useRouteTiming';
@@ -159,6 +160,7 @@ export function ModelHome() {
           </Text>
           <div className={styles.headerActions}>
             <HomeModeSwitch homeMode={homeMode} onChange={setHomeMode} />
+            <MakeStartPageButton page="home" />
             {canArchiveModel(role) && (
               <div className={styles.menuWrapper}>
                 <button
