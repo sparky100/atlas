@@ -23,6 +23,7 @@ export interface ExternalReferenceAdderProps {
  * change branch, and there is no remove: the list above it is the record.
  */
 export function ExternalReferenceAdder({ modelId, orgId, userId, elementId, onAdded }: ExternalReferenceAdderProps) {
+  const [open, setOpen] = useState(false);
   const [value, setValue] = useState('');
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -39,6 +40,7 @@ export function ExternalReferenceAdder({ modelId, orgId, userId, elementId, onAd
       const source = await getOrCreateManualSource(supabase, { id: crypto.randomUUID(), orgId, modelId, userId });
       await createAlias(supabase, { id: crypto.randomUUID(), orgId, modelId, elementId, aliasValue, aliasType: 'external_ref', sourceId: source.id, createdBy: userId });
       setValue('');
+      setOpen(false);
       onAdded();
     } catch (e) {
       if (e instanceof Error && e.message.includes('aliases_model_id_alias_type_value_idx')) {
@@ -52,10 +54,23 @@ export function ExternalReferenceAdder({ modelId, orgId, userId, elementId, onAd
     }
   }
 
+  if (!open) {
+    return (
+      <Button
+        variant="ghost"
+        onClick={() => {
+          setOpen(true);
+        }}
+      >
+        + Add an external reference
+      </Button>
+    );
+  }
+
   return (
     <div>
       <Text as="label" size="sm" tone="muted">
-        Add an external reference (a backend hostname, or another system's id for this element)
+        External reference: a backend hostname, or another system&rsquo;s id for this element
       </Text>
       <input
         type="text"
