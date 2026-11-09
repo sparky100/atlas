@@ -35,7 +35,7 @@ export function ChangesTabs({ orgSlug, modelSlug, modelId, current }: ChangesTab
         All
       </Link>
       <Link to={`${base}/review`} className={[styles.tab, current === 'review' ? styles.active : ''].filter(Boolean).join(' ')} aria-current={current === 'review' ? 'page' : undefined}>
-        Review queue
+        Waiting for review
         {reviewCount !== null && reviewCount > 0 && (
           <>
             <span className={styles.count} aria-hidden="true">

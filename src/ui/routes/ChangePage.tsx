@@ -6,6 +6,7 @@ import { Button } from '../components/Button/Button';
 import { ModelNav } from '../components/ModelNav/ModelNav';
 import navStyles from '../components/ModelNav/ModelNav.module.css';
 import { Text } from '../components/Text/Text';
+import { ChangeOrigin } from '../changes/ChangeOrigin';
 import { ChangeView } from '../changes/ChangeView';
 import { intentHeaderLine } from '../changes/branchIntent';
 import { ChangeProjectAssignment } from '../projects/ChangeProjectAssignment';
@@ -132,6 +133,7 @@ export function ChangePage() {
               </div>
             )}
           </div>
+          {branch && <ChangeOrigin branch={branch} orgSlug={orgSlug ?? ''} modelSlug={model.slug} />}
           {branch && <ChangeProjectAssignment branch={branch} modelId={model.id} orgSlug={orgSlug ?? ''} modelSlug={model.slug} canEdit={canEdit} onMoved={reloadBranch} />}
           <ChangeView orgId={organisation?.id ?? ''} modelId={model.id} branchId={branchId ?? ''} orgSlug={orgSlug ?? ''} modelSlug={model.slug} role={role} canEdit={canEdit} />
         </main>

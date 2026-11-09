@@ -483,3 +483,17 @@
   position: static;
   margin-left: auto;
 }
+
+/* The "Work" caption is a link to the Work overview — it keeps the caption's look. */
+.groupCaption a,
+.sheetCaption a {
+  color: inherit;
+  text-decoration: none;
+}
+
+.groupCaption a:hover,
+.groupCaption a:focus-visible,
+.sheetCaption a:hover,
+.sheetCaption a:focus-visible {
+  text-decoration: underline;
+}

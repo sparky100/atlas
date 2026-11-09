@@ -103,7 +103,7 @@ export const COLOUR_BY_OPTIONS: { value: ColourByMode; label: string }[] = [
   { value: 'metric:criticality', label: 'Criticality' },
   { value: 'metric:otShare', label: 'OT share' },
   { value: 'metric:fitForPurpose', label: 'Fit' },
-  { value: 'metric:disposition', label: 'Disposition' },
+  { value: 'metric:disposition', label: 'Planned action' },
 ];
 
 export interface TileColour {

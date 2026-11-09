@@ -4,7 +4,9 @@ import { AppHeader } from '../components/AppHeader/AppHeader';
 import { Breadcrumb } from '../components/Breadcrumb/Breadcrumb';
 import { ModelNav } from '../components/ModelNav/ModelNav';
 import navStyles from '../components/ModelNav/ModelNav.module.css';
+import { PageIntro } from '../components/PageIntro/PageIntro';
 import { Text } from '../components/Text/Text';
+import { WORK_COPY } from '../work/workCopy';
 import { parseDecisionPrefillFromSearchParams } from '../decisions/decisionPrefill';
 import { ProjectsView } from '../projects/ProjectsView';
 import { useAuth } from '../auth/useAuth';
@@ -67,6 +69,7 @@ export function ProjectsPage() {
               Projects
             </Text>
           </div>
+          <PageIntro>{WORK_COPY.project}</PageIntro>
           <ProjectsView modelId={model.id} orgId={organisation?.id ?? ''} userId={userId} orgSlug={orgSlug ?? ''} modelSlug={model.slug} canCreate={canCreate} prefill={prefill} />
         </main>
       </div>

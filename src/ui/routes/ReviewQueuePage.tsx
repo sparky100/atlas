@@ -5,7 +5,9 @@ import { Breadcrumb } from '../components/Breadcrumb/Breadcrumb';
 import { EditingBranchBanner } from '../branches/EditingBranchBanner/EditingBranchBanner';
 import { ModelNav } from '../components/ModelNav/ModelNav';
 import navStyles from '../components/ModelNav/ModelNav.module.css';
+import { PageIntro } from '../components/PageIntro/PageIntro';
 import { Text } from '../components/Text/Text';
+import { WORK_COPY } from '../work/workCopy';
 import { ReviewQueueView } from '../reviews/ReviewQueueView';
 import { ChangesTabs } from '../changes/ChangesTabs/ChangesTabs';
 import { useSelectedRef } from '../branches/useSelectedRef';
@@ -49,6 +51,7 @@ export function ReviewQueuePage() {
               Changes
             </Text>
           </div>
+          <PageIntro>{WORK_COPY.review}</PageIntro>
           <ChangesTabs orgSlug={orgSlug ?? ''} modelSlug={model.slug} modelId={model.id} current="review" />
           <ReviewQueueView modelId={model.id} orgId={organisation.id} orgSlug={orgSlug ?? ''} modelSlug={model.slug} />
         </main>

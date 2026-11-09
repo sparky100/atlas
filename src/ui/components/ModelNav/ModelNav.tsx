@@ -275,7 +275,7 @@ export function ModelNav({ orgSlug, modelSlug }: ModelNavProps) {
           <div key={group.caption} className={styles.group}>
             {groupIndex > 0 && <div className={styles.divider} aria-hidden="true" />}
             <Text as="p" size="xs" tone="faint" className={styles.groupCaption}>
-              {group.caption}
+              {group.caption === 'Work' ? <Link to={`/o/${orgSlug}/m/${modelSlug}/work`}>{group.caption}</Link> : group.caption}
             </Text>
             <ul className={styles.list}>
               {group.sections.map((section) => (
@@ -329,7 +329,7 @@ export function ModelNav({ orgSlug, modelSlug }: ModelNavProps) {
             return (
               <div key={group.caption} className={styles.sheetGroup}>
                 <Text as="p" size="xs" tone="faint" className={styles.sheetCaption}>
-                  {group.caption}
+                  {group.caption === 'Work' ? <Link to={`/o/${orgSlug}/m/${modelSlug}/work`}>{group.caption}</Link> : group.caption}
                 </Text>
                 <ul className={styles.sheetList}>
                   {sections.map((section) => (

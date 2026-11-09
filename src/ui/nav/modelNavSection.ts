@@ -27,6 +27,7 @@ export function modelNavSectionFor(modelRelativePath: string): ModelNavSection {
   // F9 step 2 (UI-principles §2.0): the review queue is a tab of Changes, not
   // its own nav item — its list and both detail pages light up Changes.
   if (path.startsWith('/changes') || path.startsWith('/review')) return 'changes';
+  if (path.startsWith('/work')) return 'changes';
   if (path.startsWith('/capture')) return 'capture';
   if (path.startsWith('/projects')) return 'projects';
   if (path.startsWith('/decisions')) return 'decisions';

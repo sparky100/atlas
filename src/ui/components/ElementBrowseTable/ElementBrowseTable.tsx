@@ -116,7 +116,7 @@ const COLUMNS: { key: 'name' | 'type' | 'owner' | 'lifecycle' | 'criticality' | 
   { key: 'owner', label: 'Owner' },
   { key: 'lifecycle', label: 'Lifecycle' },
   { key: 'criticality', label: 'Criticality' },
-  { key: 'disposition', label: 'Disposition' },
+  { key: 'disposition', label: 'Planned action' },
 ];
 
 /** The edit bar's hint mentions the custom column too, when one is shown. */
@@ -449,11 +449,11 @@ export function ElementBrowseTable({ state, orgSlug, modelSlug, modelId, filenam
         </select>
         <select
           className={styles.select}
-          aria-label="Disposition"
+          aria-label="Planned action"
           value={state.dispositionFilter}
           onChange={(e) => { state.setDispositionFilter(e.target.value as DispositionFilter); }}
         >
-          <option value="all">All dispositions</option>
+          <option value="all">Any planned action</option>
           {DISPOSITION_LEVELS.map((level) => (
             <option key={level.key} value={level.key}>
               {level.label}
@@ -537,7 +537,7 @@ export function ElementBrowseTable({ state, orgSlug, modelSlug, modelId, filenam
       {bulkEdit?.editing && (
         <div className={styles.bulkEditBar} role="region" aria-label="Grid editing">
           <Text as="span" size="sm">
-            {bulkEdit.changedCount === 0 ? 'Change any Lifecycle, Criticality or Disposition cell' + (selectedCustomDefinitionLabel(attributeDefinitions, customAttr) ?? '') + ', then save.' : `${String(bulkEdit.changedCount)} ${bulkEdit.changedCount === 1 ? 'change' : 'changes'} not saved yet`}
+            {bulkEdit.changedCount === 0 ? 'Change any Lifecycle, Criticality or Planned action cell' + (selectedCustomDefinitionLabel(attributeDefinitions, customAttr) ?? '') + ', then save.' : `${String(bulkEdit.changedCount)} ${bulkEdit.changedCount === 1 ? 'change' : 'changes'} not saved yet`}
           </Text>
           <Button
             disabled={bulkEdit.changedCount === 0 || bulkEdit.submitting}
