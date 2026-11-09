@@ -39,6 +39,8 @@ export interface UpsertUserPreferencesInput {
   notifyOnReply?: UserPreferencesRow['notify_on_reply'];
   /** Sprint F7 item 3 follow-up (F3a's `review_assigned` kind) — same omitted-leaves-untouched convention. */
   notifyOnReviewAssigned?: UserPreferencesRow['notify_on_review_assigned'];
+  /** Review-assigned email opt-out — same omitted-leaves-untouched convention. */
+  emailOnReviewAssigned?: UserPreferencesRow['email_on_review_assigned'];
   /** V2b: the shared Inspector panel's own collapsed state — same omitted-leaves-untouched convention. */
   inspectorCollapsed?: UserPreferencesRow['inspector_collapsed'];
 }
@@ -64,6 +66,7 @@ export async function upsertUserPreferences(supabase: Client, input: UpsertUserP
   if (input.notifyOnMention !== undefined) patch.notify_on_mention = input.notifyOnMention;
   if (input.notifyOnReply !== undefined) patch.notify_on_reply = input.notifyOnReply;
   if (input.notifyOnReviewAssigned !== undefined) patch.notify_on_review_assigned = input.notifyOnReviewAssigned;
+  if (input.emailOnReviewAssigned !== undefined) patch.email_on_review_assigned = input.emailOnReviewAssigned;
   if (input.inspectorCollapsed !== undefined) patch.inspector_collapsed = input.inspectorCollapsed;
 
   // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment -- untyped client; see module comment.
