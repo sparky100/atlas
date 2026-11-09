@@ -312,18 +312,6 @@ export function ArchitectHome({ data, insights, role, orgSlug, modelSlug, onShow
       ...(canStartDecision(role) ? { singleItemAction: (item: HealthFindingItem) => startDecisionAction(prefillFromCriticalExposedFinding({ id: item.id, name: item.label })) } : {}),
     },
     {
-      // ADR-001 amendment: a replacement is routinely a system with a real
-      // end of life some years out — recording one with no departure plan
-      // is the untracked fact this product exists to catch. Medium: it
-      // doesn't expose anything today, it risks tomorrow's legacy system.
-      key: 'replacement-no-departure-plan',
-      count: insightsData.replacementsWithoutDeparturePlan.length,
-      summary: `${String(insightsData.replacementsWithoutDeparturePlan.length)} ${plural(insightsData.replacementsWithoutDeparturePlan.length, 'replacement', 'replacements')} with no departure plan`,
-      items: elementItems(insightsData.replacementsWithoutDeparturePlan),
-      severity: 'medium',
-      browseHref: browseHref('replacement-no-departure-plan'),
-    },
-    {
       // Labelling only — a crossing missing its *data classification* is
       // Assurance's own finding below, not this one too (found during a
       // walkthrough: the same crossing showed up twice, once in each

@@ -14,7 +14,6 @@ import {
   findCapabilitiesWithNoSupporters,
   findCapabilitiesWithoutOwner,
   findCriticalExposedSystems,
-  findReplacementsWithoutDeparturePlan,
   findCriticalSystemsPastOrNearSupportEnd,
   findCriticalSystemsWithoutBusinessOwner,
   findOutgoingWithoutRetiringChange,
@@ -62,7 +61,6 @@ export function computeFindings({ snapshot, facts, retiredByOpenChanges, now }: 
   out.set('no-technical-owner', findSystemsWithoutTechnicalOwner(systemsAndModules, owns));
   out.set('critical-no-business-owner', findCriticalSystemsWithoutBusinessOwner(systemsAndModules, owns));
   out.set('critical-exposed', findCriticalExposedSystems(systems, now, replacedElementIds(replaces)));
-  out.set('replacement-no-departure-plan', findReplacementsWithoutDeparturePlan(systemsAndModules, replaces));
   out.set('unused-integration-platform', findUnusedIntegrationPlatforms(systems, usesAndFlows, containers));
   out.set('unused-integration-interface', findUnusedIntegrationInterfaces(systems, containers, usesAndFlows));
   out.set('essential-no-technical-owner', findSystemsSupportingEssentialFunctionWithoutTechnicalOwner(systemsAndModules, capabilities, supports, owns));

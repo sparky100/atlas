@@ -12,7 +12,6 @@ import {
   findBoundaryCrossingsMissingVerb,
   findCapabilitiesWithoutOwner,
   findCriticalExposedSystems,
-  findReplacementsWithoutDeparturePlan,
   findCriticalSystemsPastOrNearSupportEnd,
   findOutgoingWithoutRetiringChange,
   listOpenProjectScopeForModel,
@@ -82,8 +81,6 @@ export interface ArchitectHomeInsightsData {
   criticalSystemsWithoutBusinessOwner: ElementsHeadRow[];
   /** Prompt 7k item 1: critical systems whose `plannedEnd` falls within `STALE_AFTER_MONTHS`, with no planned replacement (see `findCriticalExposedSystems`'s own comment on that half). */
   criticalExposedSystems: ElementsHeadRow[];
-  /** ADR-001 amendment: active replacements (systems/modules) that are replacing something but have no `plannedEnd` of their own. */
-  replacementsWithoutDeparturePlan: ElementsHeadRow[];
   /** Prompt 7k item 3's own health finding: `uses`/`flows_to` edges crossing the IT/OT boundary with no verb-phrase label — a labelling concern, kept separate from Assurance's own missing-classification finding below so a crossing missing both isn't shown as the same finding twice (see `findBoundaryCrossingsMissingVerb`'s own doc comment). */
   boundaryCrossingsMissingVerb: BoundaryCrossing[];
   /** Prompt 7k item 4's own health finding: integration platforms with nothing routed via them. */
@@ -233,7 +230,6 @@ export function useArchitectHomeInsights(modelId: UUID, userId: UUID | null): Ar
             systemsWithoutTechnicalOwner: findSystemsWithoutTechnicalOwner([...systems, ...containers], ownsEdges),
             criticalSystemsWithoutBusinessOwner: findCriticalSystemsWithoutBusinessOwner([...systems, ...containers], ownsEdges),
             criticalExposedSystems: findCriticalExposedSystems(systems, new Date(), replacedElementIds(replacesEdges)),
-            replacementsWithoutDeparturePlan: findReplacementsWithoutDeparturePlan([...systems, ...containers], replacesEdges),
             boundaryCrossingsMissingVerb: findBoundaryCrossingsMissingVerb(usesAndFlowsToEdges, usesAndFlowsToEndpointsById),
             unusedIntegrationPlatforms: findUnusedIntegrationPlatforms(systems, usesAndFlowsToEdges, containers),
             unusedIntegrationInterfaces: findUnusedIntegrationInterfaces(systems, containers, usesAndFlowsToEdges),
