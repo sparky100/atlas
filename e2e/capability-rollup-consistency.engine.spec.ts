@@ -104,7 +104,7 @@ test('capability rollup: the same "1 system, 1/7 supported" rollup appears on th
   const directorTile = page.getByRole('link', { name: /Digital Services/ });
   await expect(directorTile).toBeVisible();
   await expect(directorTile.getByText('1 system', { exact: false })).toBeVisible();
-  await expect(directorTile.getByText('1/7 supported')).toBeVisible();
+  await expect(directorTile.getByText('1 of 7 sub-capabilities have a system')).toBeVisible();
 
   // 2) Capability map (capability map density redesign: the domain row's
   // own coverage sentence and supporting-system count are both always

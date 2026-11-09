@@ -113,7 +113,7 @@ test('start a decision from the director door\'s own weak-capability tile', asyn
 
   const tile = page.getByRole('link', { name: /Adult Social Care/ });
   await expect(tile).toBeVisible();
-  await expect(tile.getByText('lifecycle exposure')).toBeVisible();
+  await expect(tile.getByText('retiring system, no replacement')).toBeVisible();
 
   await page.getByRole('link', { name: 'Start a decision →' }).click();
   await expect(page).toHaveURL(/\/decisions\?/);

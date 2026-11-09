@@ -133,7 +133,7 @@ export function DirectorHome({ data, reload, modelId, userId, role, orgSlug, mod
                   {data.exposedCount}
                 </Text>{' '}
                 <Text as="span" tone="muted" size="sm">
-                  {data.exposedCount === 1 ? 'capability' : 'capabilities'} exposed
+                  {data.exposedCount === 1 ? 'capability depends' : 'capabilities depend'} on a retiring system
                 </Text>
               </div>
               <div className={styles.stat}>
@@ -141,7 +141,7 @@ export function DirectorHome({ data, reload, modelId, userId, role, orgSlug, mod
                   {data.unrecordedCount}
                 </Text>{' '}
                 <Text as="span" tone="muted" size="sm">
-                  with nothing recorded
+                  with no system recorded
                 </Text>
               </div>
             </div>
@@ -343,12 +343,12 @@ const NO_IN_HAND: TileInHand = { projects: [], decisions: [] };
 /** How many in-hand items a tile names before "+N more" — a tile is a glance, the project page and the decision list hold the rest. */
 const IN_HAND_SHOWN = 2;
 
-/** A weak tile's "In hand" line: the projects and decisions already addressing it, each a link to its own page — or, plainly, "Nothing in hand". Real links, rendered as siblings after the tile's own primary link (never inside it). */
+/** A weak tile's "In hand" line: the projects and decisions already addressing it, each a link to its own page — or, plainly, "No project or decision yet". Real links, rendered as siblings after the tile's own primary link (never inside it). */
 function TileInHandLine({ inHand, modelHref }: { inHand: TileInHand; modelHref: string }) {
   if (isNothingInHand(inHand)) {
     return (
       <Text as="p" tone="muted" size="xs" className={styles.inHand}>
-        Nothing in hand
+        No project or decision yet
       </Text>
     );
   }
@@ -361,7 +361,7 @@ function TileInHandLine({ inHand, modelHref }: { inHand: TileInHand; modelHref: 
   return (
     <div className={styles.inHand}>
       <Text as="span" tone="muted" size="xs">
-        In hand:
+        Being handled by:
       </Text>
       <ul className={styles.inHandList}>
         {shown.map((item) => (
@@ -401,6 +401,14 @@ const TONE_LABEL: Record<CapabilityTileData['tone'], string> = {
   warn: 'lifecycle exposure',
   info: 'replacement planned',
   neutral: 'nothing recorded',
+};
+
+/** The wording a tile's chip shows. `TONE_LABEL` above stays as the short phrase a started decision's context is pre-filled with. */
+const TONE_CHIP_LABEL: Record<CapabilityTileData['tone'], string> = {
+  ok: 'no known exposure',
+  warn: 'retiring system, no replacement',
+  info: 'replacement planned',
+  neutral: 'no system recorded',
 };
 
 const TONE_CHIP: Record<CapabilityTileData['tone'], ChipTone> = { ok: 'ok', warn: 'warn', info: 'info', neutral: 'neutral' };
@@ -458,10 +466,10 @@ function CapabilityTile({ tile, orgSlug, modelSlug, emphasised, role, inHand }: 
       </Text>
       <Text as="p" tone="muted" size="xs" className={styles.tileFooter}>
         {tile.supportingSystems.length === 0
-          ? 'no known supporters'
-          : `${tile.supportingSystems.length.toString()} ${tile.supportingSystems.length === 1 ? 'system' : 'systems'}${tile.exposedSystems.length > 0 ? ` · ${tile.exposedSystems.length.toString()} exposed` : ''}`}
+          ? 'no system supports this'
+          : `${tile.supportingSystems.length.toString()} ${tile.supportingSystems.length === 1 ? 'system' : 'systems'}${tile.exposedSystems.length > 0 ? ` · ${tile.exposedSystems.length.toString()} retiring` : ''}`}
         {' · '}
-        {tile.supportedCapabilityCount}/{tile.totalCapabilityCount} supported
+        {tile.supportedCapabilityCount} of {tile.totalCapabilityCount} sub-capabilities have a system
       </Text>
       {/* The task's own rule: a real level shows on every tile; the
           gentle "Importance not set" prompt shows only on a flagged
@@ -486,7 +494,7 @@ function CapabilityTile({ tile, orgSlug, modelSlug, emphasised, role, inHand }: 
           was. */}
       {emphasised && (tile.tone !== 'ok' || !tile.isOwned) && (
         <Chip tone={tile.tone === 'ok' ? 'warn' : TONE_CHIP[tile.tone]} glyph={<span className={styles.dot} />}>
-          {tile.tone === 'ok' ? 'no owner' : `${TONE_LABEL[tile.tone]} · ${tile.isOwned ? 'owned' : 'no owner'}`}
+          {tile.tone === 'ok' ? 'no owner' : `${TONE_CHIP_LABEL[tile.tone]} · ${tile.isOwned ? 'owned' : 'no owner'}`}
         </Chip>
       )}
       {/* F6.1: a second, visually distinct pill — its own glyph shape (a
