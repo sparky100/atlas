@@ -113,11 +113,11 @@ test('start a decision from the director door\'s own weak-capability tile', asyn
 
   const tile = page.getByRole('link', { name: /Adult Social Care/ });
   await expect(tile).toBeVisible();
-  await expect(tile.getByText('retiring system, no replacement')).toBeVisible();
+  await expect(page.getByText('retiring, no replacement')).toBeVisible();
 
   await page.getByRole('link', { name: 'Start a decision →' }).click();
   await expect(page).toHaveURL(/\/decisions\?/);
-  await expect(page.getByPlaceholder('Title (e.g. What replaces SAP PM?)')).toHaveValue('What improves Adult Social Care?');
+  await expect(page.getByPlaceholder('Title (e.g. What replaces SAP PM?)')).toHaveValue('Replace Legacy Case System?');
   await expect(page.getByPlaceholder('Context — why this decision needs making')).toHaveValue(/Adult Social Care/);
-  await expect(page.getByPlaceholder('Context — why this decision needs making')).toHaveValue(/lifecycle exposure/);
+  await expect(page.getByPlaceholder('Context — why this decision needs making')).toHaveValue(/end of life/);
 });

@@ -64,6 +64,21 @@ export function prefillFromWeakCapability(capability: { id: UUID; name: string }
   };
 }
 
+/** The director door's tile row for one system at end of life with no replacement recorded: the decision is about that system (and names the capability it supports), not the whole top-level capability. */
+export function prefillFromSystemAtEndOfLife(system: { id: UUID; name: string }, capability: { id: UUID; name: string }, replacementPlanned: boolean): DecisionPrefill {
+  return {
+    title: `Replace ${system.name}?`,
+    statement: replacementPlanned
+      ? `${system.name} is at end of life and supports ${capability.name}; a replacement is planned — a decision is needed to confirm it.`
+      : `${system.name} is at end of life and supports ${capability.name}, with no replacement recorded — a decision is needed on what replaces it.`,
+    sourceFindingKey: 'weak-capability',
+    linkedElements: [
+      { id: system.id, name: system.name },
+      { id: capability.id, name: capability.name },
+    ],
+  };
+}
+
 /**
  * F6.1: the director door's own "poor fit" pill (`DirectorHome.tsx`) —
  * distinct from `prefillFromPoorFitCapabilityFinding` above (the Architect

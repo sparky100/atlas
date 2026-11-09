@@ -4,7 +4,7 @@ import { Link } from 'react-router';
 import { BlueprintFrame } from '../components/BlueprintFrame/BlueprintFrame';
 import { Button } from '../components/Button/Button';
 import { LinkButton } from '../components/Button/LinkButton';
-import { Chip, type ChipTone } from '../components/Chip/Chip';
+import { Chip } from '../components/Chip/Chip';
 import { EmptyState } from '../components/EmptyState/EmptyState';
 import { Text } from '../components/Text/Text';
 import type { UUID } from '../../contracts/delta';
@@ -12,7 +12,7 @@ import type { MemberRole } from '../../db/types';
 import { formatDate } from '../time';
 import { CapabilityMapImportPanel } from '../capabilityMap/CapabilityMapImportPanel';
 import { attributesRecord } from '../elements/attributesRecord';
-import { decisionPrefillToSearchParams, prefillFromCapabilityNoSupportersFinding, prefillFromWeakFitCapabilities, prefillFromWeakCapability } from '../decisions/decisionPrefill';
+import { decisionPrefillToSearchParams, prefillFromCapabilityNoSupportersFinding, prefillFromWeakFitCapabilities, prefillFromSystemAtEndOfLife } from '../decisions/decisionPrefill';
 import { StartDecisionLink } from '../decisions/StartDecisionLink';
 import { importanceLabel } from './capabilityImportance';
 import { compareWeakTiles, formatWeakFitPillLabel, isCapabilityTileWeak, weakFitPillTone } from './capabilityTileFit';
@@ -133,7 +133,7 @@ export function DirectorHome({ data, reload, modelId, userId, role, orgSlug, mod
                   {data.exposedCount}
                 </Text>{' '}
                 <Text as="span" tone="muted" size="sm">
-                  {data.exposedCount === 1 ? 'capability depends' : 'capabilities depend'} on a retiring system
+                  {data.exposedCount === 1 ? 'capability depends' : 'capabilities depend'} on a system at end of life
                 </Text>
               </div>
               <div className={styles.stat}>
@@ -396,22 +396,27 @@ interface CapabilityTileProps {
   inHand: TileInHand;
 }
 
-const TONE_LABEL: Record<CapabilityTileData['tone'], string> = {
-  ok: 'no known exposure',
-  warn: 'lifecycle exposure',
-  info: 'replacement planned',
-  neutral: 'nothing recorded',
-};
-
-/** The wording a tile's chip shows. `TONE_LABEL` above stays as the short phrase a started decision's context is pre-filled with. */
-const TONE_CHIP_LABEL: Record<CapabilityTileData['tone'], string> = {
-  ok: 'no known exposure',
-  warn: 'retiring system, no replacement',
-  info: 'replacement planned',
-  neutral: 'no system recorded',
-};
-
-const TONE_CHIP: Record<CapabilityTileData['tone'], ChipTone> = { ok: 'ok', warn: 'warn', info: 'info', neutral: 'neutral' };
+/** One issue on a weak tile: the item as a link, what is wrong with it beside it, and its own "Start a decision" / "Start a project" (only when nothing is in hand and the person may act). */
+function IssueRow({ item, problem, actions }: { item: { name: string; to: string }; problem: string; actions: { decision: string; project: string | null } | null }) {
+  return (
+    <li>
+      <Link to={item.to}>
+        <Text as="span" size="sm">
+          {item.name}
+        </Text>
+      </Link>{' '}
+      <Text as="span" tone="muted" size="sm">
+        {problem}
+      </Text>
+      {actions !== null && (
+        <div className={styles.tileActions}>
+          <StartDecisionLink href={actions.decision} />
+          {actions.project !== null && <StartProjectLink href={actions.project} />}
+        </div>
+      )}
+    </li>
+  );
+}
 
 function CapabilityTile({ tile, orgSlug, modelSlug, emphasised, role, inHand }: CapabilityTileProps) {
   const href = `/o/${orgSlug}/m/${modelSlug}/e/${tile.capability.element_id}`;
@@ -434,11 +439,10 @@ function CapabilityTile({ tile, orgSlug, modelSlug, emphasised, role, inHand }: 
   // `sourceFindingKey: 'capability-no-supporters'`) rather than the
   // generic weak-capability one.
   const tileCapability = { id: tile.capability.element_id, name: tile.capability.name };
-  const tilePrefill = tile.tone === 'neutral' ? prefillFromCapabilityNoSupportersFinding(tileCapability) : prefillFromWeakCapability(tileCapability, TONE_LABEL[tile.tone]);
-  const startDecisionHref =
-    tile.tone !== 'ok' && canStartDecision(role)
-      ? `/o/${orgSlug}/m/${modelSlug}/decisions?${decisionPrefillToSearchParams(tilePrefill).toString()}`
-      : null;
+  const canAct = tile.tone !== 'ok' && canStartDecision(role);
+  const decisionsBase = `/o/${orgSlug}/m/${modelSlug}/decisions?`;
+  // A "no system recorded" tile is the capability-no-supporters finding, whose one home is this grid since 2026-10-03 (UI-principles §3) — its row keeps that finding's own prefill ("Who supports X?").
+  const noSystemHref = tile.tone === 'neutral' && canAct ? `${decisionsBase}${decisionPrefillToSearchParams(prefillFromCapabilityNoSupportersFinding(tileCapability)).toString()}` : null;
   // F6.1: a second, independent "Start a decision" for the fit reason —
   // concerns are the individual poor-fit capabilities under this tile
   // (`prefillFromWeakFitCapabilities`), never the level-1 tile itself.
@@ -453,11 +457,8 @@ function CapabilityTile({ tile, orgSlug, modelSlug, emphasised, role, inHand }: 
   // UI-principles §3 (2026-10-04): once a project or decision is already
   // addressing this tile, it says so instead of offering to start another.
   const nothingInHand = isNothingInHand(inHand);
-  const decisionActionHrefs = nothingInHand ? [startDecisionHref, startFitDecisionHref].filter((href): href is string => href !== null) : [];
-  // F10 step 7 (ADR-024 §6.4): a weak tile can start a project instead —
-  // the same prefill as its exposure decision, read by the project form.
-  const startProjectHref = nothingInHand && startDecisionHref !== null && canStartProject(role) ? startDecisionHref.replace('/decisions?', '/projects?') : null;
-  const actionCount = decisionActionHrefs.length + (startProjectHref !== null ? 1 : 0);
+  const fitActionHref = nothingInHand ? startFitDecisionHref : null;
+  const rowActions = (href: string | null) => (nothingInHand && href !== null ? { decision: href, project: canStartProject(role) ? href.replace('/decisions?', '/projects?') : null } : null);
   const content = (
     <>
       <span className={styles.statusBar} data-tone={tile.tone} aria-hidden="true" />
@@ -467,7 +468,7 @@ function CapabilityTile({ tile, orgSlug, modelSlug, emphasised, role, inHand }: 
       <Text as="p" tone="muted" size="xs" className={styles.tileFooter}>
         {tile.supportingSystems.length === 0
           ? 'no system supports this'
-          : `${tile.supportingSystems.length.toString()} ${tile.supportingSystems.length === 1 ? 'system' : 'systems'}${tile.exposedSystems.length > 0 ? ` · ${tile.exposedSystems.length.toString()} retiring` : ''}`}
+          : `${tile.supportingSystems.length.toString()} ${tile.supportingSystems.length === 1 ? 'system' : 'systems'}${tile.exposedSystems.length > 0 ? ` · ${tile.exposedSystems.length.toString()} at end of life` : ''}`}
         {' · '}
         {tile.supportedCapabilityCount} of {tile.totalCapabilityCount} sub-capabilities have a system
       </Text>
@@ -479,23 +480,6 @@ function CapabilityTile({ tile, orgSlug, modelSlug, emphasised, role, inHand }: 
         <Text as="p" tone={tile.importance === null ? 'faint' : 'muted'} size="xs" className={styles.tileImportance}>
           {importanceLabel(tile.importance)}
         </Text>
-      )}
-      {/* Ownership is an informational-tier finding (the agreed Health
-          findings severity tiers, ArchitectHome.tsx's own `unowned-
-          capabilities`/`no-technical-owner` checks) — a director doesn't
-          need to worry about it on a card that's otherwise healthy, so it
-          no longer gets its own badge there at all (a well-supported
-          capability with no named owner is architect-level housekeeping,
-          not a director-door weakness). On an emphasised (weak) tile it's
-          still worth knowing, but folded into the one real-weakness chip
-          as trailing text rather than its own separate, equally-coloured
-          pill — two pills read as two equally urgent problems, which
-          "no owner" next to "nothing recorded"/"lifecycle exposure" never
-          was. */}
-      {emphasised && (tile.tone !== 'ok' || !tile.isOwned) && (
-        <Chip tone={tile.tone === 'ok' ? 'warn' : TONE_CHIP[tile.tone]} glyph={<span className={styles.dot} />}>
-          {tile.tone === 'ok' ? 'no owner' : `${TONE_CHIP_LABEL[tile.tone]} · ${tile.isOwned ? 'owned' : 'no owner'}`}
-        </Chip>
       )}
       {/* F6.1: a second, visually distinct pill — its own glyph shape (a
           triangle, not the tone chip's round dot) so the two never read as
@@ -525,25 +509,29 @@ function CapabilityTile({ tile, orgSlug, modelSlug, emphasised, role, inHand }: 
           primary link (never nested inside it, same reasoning as
           `StartDecisionLink` below — an `<a>` cannot legally contain
           another `<a>`). */}
-      {/* Each exposed system is a real link to its own page (siblings of the tile link, never nested in it) so a flagged tile can be followed through to the thing that needs reviewing. */}
-      {tile.exposedSystems.length > 0 && (
+      {/* One row per issue: the item (a real link, a sibling of the tile link, never nested in it), what is wrong with it, and the actions that are about it. */}
+      {(tile.exposedSystems.length > 0 || tile.tone === 'neutral') && (
         <ul className={styles.exposingSystems}>
           {tile.exposedSystems.map((system) => {
             const lifecycleStatus = attributesRecord(system.attributes).lifecycleStatus;
+            const replacementPlanned = tile.tone === 'info';
+            const href = canAct ? `${decisionsBase}${decisionPrefillToSearchParams(prefillFromSystemAtEndOfLife({ id: system.element_id, name: system.name }, tileCapability, replacementPlanned)).toString()}` : null;
             return (
-              <li key={system.element_id}>
-                <Link to={`/o/${orgSlug}/m/${modelSlug}/e/${system.element_id}`}>
-                  <Text as="span" size="sm">
-                    {system.name}
-                  </Text>
-                </Link>{' '}
-                <Text as="span" tone="muted" size="sm">
-                  {typeof lifecycleStatus === 'string' ? lifecycleStatus : ''}
-                </Text>
-              </li>
+              <IssueRow
+                key={system.element_id}
+                item={{ name: system.name, to: `/o/${orgSlug}/m/${modelSlug}/e/${system.element_id}` }}
+                problem={`${typeof lifecycleStatus === 'string' && lifecycleStatus !== '' ? lifecycleStatus : 'at end of life'}, ${replacementPlanned ? 'replacement planned' : 'no replacement'}`}
+                actions={rowActions(href)}
+              />
             );
           })}
+          {tile.tone === 'neutral' && <IssueRow item={{ name: tile.capability.name, to: href }} problem="has no system supporting it" actions={rowActions(noSystemHref)} />}
         </ul>
+      )}
+      {emphasised && !tile.isOwned && (
+        <Text as="p" size="xs" tone="muted" className={styles.tileImportance}>
+          <Link to={href}>No owner recorded</Link>
+        </Text>
       )}
       {tile.weakFitCapabilities.length > 0 && (
         <ul className={styles.fitCapabilityList}>
@@ -559,12 +547,9 @@ function CapabilityTile({ tile, orgSlug, modelSlug, emphasised, role, inHand }: 
         </ul>
       )}
       {emphasised && <TileInHandLine inHand={inHand} modelHref={`/o/${orgSlug}/m/${modelSlug}`} />}
-      {actionCount > 0 && (
+      {fitActionHref !== null && (
         <div className={styles.tileActions}>
-          {decisionActionHrefs.map((href) => (
-            <StartDecisionLink key={href} href={href} />
-          ))}
-          {startProjectHref !== null && <StartProjectLink href={startProjectHref} />}
+          <StartDecisionLink href={fitActionHref} />
         </div>
       )}
     </>

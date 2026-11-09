@@ -6,6 +6,7 @@ import {
   prefillFromCriticalExposedFinding,
   prefillFromCriticalSupportEndFinding,
   prefillFromWeakFitCapabilities,
+  prefillFromSystemAtEndOfLife,
   prefillFromWeakCapability,
 } from './decisionPrefill';
 
@@ -101,5 +102,18 @@ describe('decisionPrefill', () => {
     const params = decisionPrefillToSearchParams(prefillFromCriticalSupportEndFinding({ id: 'sys-1', name: 'SAP PM' }));
     params.append('startElementId', 'sys-2');
     expect(parseDecisionPrefillFromSearchParams(params)).toBeNull();
+  });
+});
+
+describe('prefillFromSystemAtEndOfLife', () => {
+  it('is about the system and names the capability it supports', () => {
+    const prefill = prefillFromSystemAtEndOfLife({ id: 'sys-1', name: 'DUoS Billing Engine' }, { id: 'cap-1', name: 'Customer & Metering' }, false);
+    expect(prefill.title).toBe('Replace DUoS Billing Engine?');
+    expect(prefill.statement).toContain('no replacement recorded');
+    expect(prefill.linkedElements.map((e) => e.id)).toEqual(['sys-1', 'cap-1']);
+  });
+  it('says a replacement is planned when one is', () => {
+    const prefill = prefillFromSystemAtEndOfLife({ id: 'sys-1', name: 'A' }, { id: 'cap-1', name: 'B' }, true);
+    expect(prefill.statement).toContain('a replacement is planned');
   });
 });
