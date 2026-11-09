@@ -201,8 +201,10 @@ export function LandscapePage() {
     () => ({ collapsedLaneKeys: new Set(collapsedLaneKeys), expandedLaneKeys: new Set(expandedLaneKeys), pinnedLaneKeys, hiddenLaneKeys: new Set(hiddenLaneKeys) }),
     [collapsedLaneKeys, expandedLaneKeys, pinnedLaneKeys, hiddenLaneKeys],
   );
+  // People and teams that only own things have no line on this view, so they are hidden unless asked for; same unpersisted shape as `showConnections`.
+  const [showOwners, setShowOwners] = useState(false);
   const displayInput = state.status === 'ready' ? state.data : null;
-  const displayState = useLandscapeDisplay(displayInput, filters, laneDisplay, canvasWidth ?? undefined);
+  const displayState = useLandscapeDisplay(displayInput, filters, laneDisplay, canvasWidth ?? undefined, showOwners);
   // The Inspector's own hide-toggle list needs every lane key+label
   // regardless of hidden state (`layout.ts`'s `listLandscapeLaneOptions`
   // doc comment) — `displayState.display.layout.lanes` alone can't supply
@@ -815,6 +817,8 @@ export function LandscapePage() {
                     onRouteViaPlatformsChange={setRouteViaPlatforms}
                     showConnections={showConnections}
                     onShowConnectionsChange={setShowConnections}
+                    showOwners={showOwners}
+                    onShowOwnersChange={setShowOwners}
                     lanes={displayState.display.layout.lanes}
                     laneOptions={orderedLaneOptions}
                     pinnedLaneKeys={pinnedLaneKeys}

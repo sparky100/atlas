@@ -63,6 +63,9 @@ export interface LandscapeInspectorContentProps {
   onRouteViaPlatformsChange: (value: boolean) => void;
   showConnections: boolean;
   onShowConnectionsChange: (value: boolean) => void;
+  /** Show people and teams that only own things (no `uses`/`flows_to` line) — hidden by default. */
+  showOwners: boolean;
+  onShowOwnersChange: (value: boolean) => void;
   lanes: readonly LandscapeLane[];
   /** Every lane key+label this model could ever place a system in, regardless of hidden state (`layout.ts`'s `listLandscapeLaneOptions`) — `lanes` above alone can't drive this list, since a hidden lane drops out of it entirely with no way back. */
   laneOptions: readonly LandscapeLaneOption[];
@@ -92,6 +95,8 @@ export function LandscapeInspectorContent({
   onRouteViaPlatformsChange,
   showConnections,
   onShowConnectionsChange,
+  showOwners,
+  onShowOwnersChange,
   lanes,
   laneOptions,
   pinnedLaneKeys,
@@ -186,6 +191,18 @@ export function LandscapeInspectorContent({
             />
             <Text as="span" size="sm" tone="muted">
               Show connections
+            </Text>
+          </label>
+          <label className={styles.toggle}>
+            <input
+              type="checkbox"
+              checked={showOwners}
+              onChange={(e) => {
+                onShowOwnersChange(e.target.checked);
+              }}
+            />
+            <Text as="span" size="sm" tone="muted">
+              Show owners (people and teams)
             </Text>
           </label>
           <label className={styles.toggle}>
