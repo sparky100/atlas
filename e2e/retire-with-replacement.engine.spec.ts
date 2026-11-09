@@ -56,7 +56,7 @@ test('retiring a system with a replacement transfers its supports edges and clea
   // 2. Retire the system with a replacement.
   await page.goto(`/o/${orgSlug}/m/${modelSlug}/e/${systemId}?ref=main`);
   await page.getByRole('button', { name: 'Element actions' }).click();
-  await page.getByRole('button', { name: 'Retire…' }).click();
+  await page.getByRole('button', { name: 'Mark as retired…' }).click();
   await page.getByLabel('Planned end').fill(nearPlannedEnd);
   await page.getByRole('button', { name: '+ Replaced by…' }).click();
   await page.getByPlaceholder('Search systems…').fill('New Billing Platform');

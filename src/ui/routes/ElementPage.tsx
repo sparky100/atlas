@@ -48,6 +48,8 @@ import { ProposeChangePicker } from '../home/ProposeChangePicker';
 import { useModels } from '../models/useModels';
 import { canCreateChangeBranch, canEditBranch, canEditValueStreamStructure, useMembership } from '../orgs/useMembership';
 import { canStartProject } from '../orgs/roleGates';
+import { canStartDecision } from '../orgs/useMembership';
+import { startDecisionFromElementHref } from '../decisions/decisionPrefill';
 import { startProjectFromElementHref } from '../projects/projectPrefill';
 import { useAttributeDefinitions } from '../orgs/useAttributeDefinitions';
 import { useOrganisationBySlug } from '../orgs/useOrganisationBySlug';
@@ -378,6 +380,11 @@ export function ElementPage() {
               roadmapHref={
                 state.data.element.element_type === 'capability'
                   ? `/o/${orgSlug ?? ''}/m/${model.slug}/roadmap?${new URLSearchParams({ ...(refQueryParam(ref, viewing) ? Object.fromEntries(new URLSearchParams(refQueryParam(ref, viewing))) : {}), capabilities: state.data.element.element_id }).toString()}`
+                  : undefined
+              }
+              startDecisionHref={
+                canStartDecision(role) && (state.data.element.element_type === 'capability' || state.data.element.element_type === 'system' || state.data.element.element_type === 'container')
+                  ? startDecisionFromElementHref(`/o/${orgSlug ?? ''}/m/${model.slug}/decisions`, { id: state.data.element.element_id, name: state.data.element.name })
                   : undefined
               }
               startProjectHref={
@@ -854,9 +861,9 @@ const PLACEHOLDER_BRANCH: BranchRow = {
 function AliasRows({ elementId, elementName, aliases, aliasSources }: { elementId: UUID; elementName: string; aliases: AliasRow[]; aliasSources: Map<UUID, SourceRow> }) {
   return (
     <>
-      {/* A template code is how Atlas matches a tailored capability back to its starter map — bookkeeping, not something a reader needs (it stays on the alias for matching). */}
+      {/* A template code (how Atlas matches a tailored capability back to its starter map) and a merged element id (what a merge records) are bookkeeping, not something a reader needs — both stay on the alias for matching. */}
       {/* An alternate name equal to the page title adds nothing (an import records the name as its own alias). */}
-      {aliases.filter((alias) => alias.alias_type !== 'template_code' && !(alias.alias_type === 'name' && alias.alias_value.trim().toLowerCase() === elementName.trim().toLowerCase())).map((alias) => {
+      {aliases.filter((alias) => alias.alias_type !== 'template_code' && alias.alias_type !== 'merged_id' && !(alias.alias_type === 'name' && alias.alias_value.trim().toLowerCase() === elementName.trim().toLowerCase())).map((alias) => {
         const fact = aliasAsFact(alias, elementId);
         return <AttributeRow key={alias.id} label={ALIAS_TYPE_LABELS[alias.alias_type]} required={false} fact={fact} source={aliasSources.get(alias.source_id)} />;
       })}

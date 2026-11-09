@@ -33,7 +33,7 @@ test('convert a system into a module of an existing platform, carrying its relat
   await addUsesRelationship(page, 'Customs Clearance', 'submits customs declarations to');
 
   await page.getByRole('button', { name: 'Element actions' }).click();
-  await page.getByRole('button', { name: 'Convert to a module of…' }).click();
+  await page.getByRole('button', { name: 'Make this a module of…' }).click();
   await page.getByPlaceholder('Search for the system this is a module of…').fill('SAP');
   await page.getByRole('button', { name: new RegExp('SAP') }).click();
   await expect(page.getByText('The new module will still use Customs Clearance.')).toBeVisible();

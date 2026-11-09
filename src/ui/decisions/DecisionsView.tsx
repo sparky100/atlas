@@ -80,7 +80,8 @@ export function DecisionsView({ modelId, orgId, userId, orgSlug, modelSlug, canC
                 statement,
                 ownerId,
                 neededBy,
-                ...(prefill ? { sourceFindingKey: prefill.sourceFindingKey } : {}),
+                // An empty key is the element page's own "Start a decision…" (no finding behind it).
+                ...(prefill && prefill.sourceFindingKey !== '' ? { sourceFindingKey: prefill.sourceFindingKey } : {}),
                 links: links.map((l) => ({ linkedType: 'element' as const, linkedId: l.elementId })),
               }).then((decision) => {
                 if (decision) {
