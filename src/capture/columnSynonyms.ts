@@ -61,7 +61,7 @@ const COLUMN_SYNONYMS_RAW: Readonly<Record<ColumnRole, readonly string[]>> = {
   externalOrganisation: ['Operated by', 'Third party', 'External organisation'],
   hostingModel: ['Hosting model', 'Deployment model', 'On-prem/cloud', 'Hosting model (module override)'],
   hostingProvider: ['Hosting provider', 'Data centre', 'Cloud provider', 'Hosting provider (module override)'],
-  disposition: ['TIME', 'Disposition', 'Rationalisation', 'Rationalization', 'TIME category', 'TIME disposition'],
+  disposition: ['TIME', 'Disposition', 'Planned action', 'Rationalisation', 'Rationalization', 'TIME category', 'TIME disposition'],
   // What this product's own export writes an actor's person/team/organisation column as (its "Type" is the element type).
   actorType: ['Actor type'],
   technology: ['Technology', 'Platform', 'Stack'],

@@ -24,7 +24,7 @@ test('bulk edit: change two systems in the Elements grid and save them together'
   await expect(bar.getByRole('button', { name: 'Save 0 changes' })).toBeDisabled();
 
   await page.getByLabel('Criticality for Payroll').selectOption('high');
-  await page.getByLabel('Disposition for Ledger').selectOption('migrate');
+  await page.getByLabel('Planned action for Ledger').selectOption('migrate');
   await expect(bar.getByText('2 changes not saved yet')).toBeVisible();
   await bar.getByRole('button', { name: 'Save 2 changes' }).click();
 

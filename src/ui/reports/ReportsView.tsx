@@ -132,7 +132,7 @@ export function ReportsView({
       />
       <ReportRow
         title="Gaps"
-        description="Systems missing a fit rating, an owner, a run cost, a criticality or a disposition — and a quick way to fill them in."
+        description="Systems missing a fit rating, an owner, a run cost, a criticality or a planned action — and a quick way to fill them in."
         counts={gapLines.length > 0 ? gapLines : ["Nothing missing"]}
         attention={gapLines.length > 0 && portfolio.status === "ready"}
         href={`${base}/gaps`}

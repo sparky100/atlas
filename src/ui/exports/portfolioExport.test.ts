@@ -34,7 +34,7 @@ function row(overrides: Partial<PortfolioRow> = {}): PortfolioRow {
 describe('portfolioExportPlan (F13 step 1)', () => {
   it('stamps the picture with the row count and draws the column headings', () => {
     const plan = portfolioExportPlan([row()], STAMP);
-    expect(texts(plan.shapes)).toEqual(expect.arrayContaining(['Portfolio (1 row) — Acme', 'Name', 'Run cost', 'Disposition', 'Signals', 'Housing CRM']));
+    expect(texts(plan.shapes)).toEqual(expect.arrayContaining(['Portfolio (1 row) — Acme', 'Name', 'Run cost', 'Planned action', 'Signals', 'Housing CRM']));
   });
 
   it('shows unrecorded values the way the table does', () => {
@@ -60,7 +60,7 @@ describe('portfolioExportTable (the Excel export)', () => {
   it('writes the same column headings as the picture, then one untruncated row per portfolio row', () => {
     const long = 'A system with a very long name that the picture would cut short at thirty-two characters';
     const table = portfolioExportTable([row({ name: long })]);
-    expect(table[0]).toEqual(['Name', 'Kind', 'Run cost', 'Fit', 'Criticality', 'Disposition', 'Lifecycle', 'Capabilities', 'Business owner', 'Signals']);
+    expect(table[0]).toEqual(['Name', 'Kind', 'Run cost', 'Fit', 'Criticality', 'Planned action', 'Lifecycle', 'Capabilities', 'Business owner', 'Signals']);
     expect(table[1]?.[0]).toBe(long);
     expect(table).toHaveLength(2);
   });
