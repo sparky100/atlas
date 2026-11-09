@@ -1,0 +1,4 @@
+.intro {
+  margin: calc(-1 * var(--space-2)) 0 var(--space-4);
+  max-width: 70ch;
+}

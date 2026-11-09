@@ -4,7 +4,9 @@ import { AppHeader } from '../components/AppHeader/AppHeader';
 import { Breadcrumb } from '../components/Breadcrumb/Breadcrumb';
 import { ModelNav } from '../components/ModelNav/ModelNav';
 import navStyles from '../components/ModelNav/ModelNav.module.css';
+import { PageIntro } from '../components/PageIntro/PageIntro';
 import { Text } from '../components/Text/Text';
+import { WORK_COPY } from '../work/workCopy';
 import { parseDecisionPrefillFromSearchParams } from '../decisions/decisionPrefill';
 import { DecisionsView } from '../decisions/DecisionsView';
 import { useAuth } from '../auth/useAuth';
@@ -70,6 +72,7 @@ export function DecisionsPage() {
               Decisions
             </Text>
           </div>
+          <PageIntro>{WORK_COPY.decision}</PageIntro>
           <DecisionsView modelId={model.id} orgId={organisation?.id ?? ''} userId={userId} orgSlug={orgSlug ?? ''} modelSlug={model.slug} canCreate={canCreate} prefill={prefill} />
         </main>
       </div>

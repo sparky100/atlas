@@ -17,6 +17,7 @@ import { DecisionPage } from './routes/DecisionPage';
 import { DecisionsPage } from './routes/DecisionsPage';
 import { ProjectPage } from './routes/ProjectPage';
 import { ProjectsPage } from './routes/ProjectsPage';
+import { WorkPage } from './routes/WorkPage';
 import { DuplicatesReportPage } from './routes/DuplicatesReportPage';
 import { ElementPage } from './routes/ElementPage';
 import { ElementsPage } from './routes/ElementsPage';
@@ -85,6 +86,7 @@ export function App() {
             <Route path="/o/:orgSlug/m/:modelSlug/container/:systemId" element={<ContainerPage />} />
             <Route path="/o/:orgSlug/m/:modelSlug/versions" element={<VersionsPage />} />
             <Route path="/o/:orgSlug/m/:modelSlug/capture" element={<CaptureJobListPage />} />
+            <Route path="/o/:orgSlug/m/:modelSlug/work" element={<WorkPage />} />
             <Route path="/o/:orgSlug/m/:modelSlug/changes" element={<ChangesPage />} />
             <Route path="/o/:orgSlug/m/:modelSlug/changes/:branchId" element={<ChangePage />} />
             <Route path="/o/:orgSlug/m/:modelSlug/projects" element={<ProjectsPage />} />

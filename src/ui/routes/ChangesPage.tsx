@@ -4,7 +4,9 @@ import { AppHeader } from '../components/AppHeader/AppHeader';
 import { Breadcrumb } from '../components/Breadcrumb/Breadcrumb';
 import { ModelNav } from '../components/ModelNav/ModelNav';
 import navStyles from '../components/ModelNav/ModelNav.module.css';
+import { PageIntro } from '../components/PageIntro/PageIntro';
 import { Text } from '../components/Text/Text';
+import { WORK_COPY } from '../work/workCopy';
 import { ChangesView } from '../changes/ChangesView';
 import { ChangesTabs } from '../changes/ChangesTabs/ChangesTabs';
 import { useAuth } from '../auth/useAuth';
@@ -66,6 +68,7 @@ export function ChangesPage() {
               Changes
             </Text>
           </div>
+          <PageIntro>{WORK_COPY.change}</PageIntro>
           <ChangesTabs orgSlug={orgSlug ?? ''} modelSlug={model.slug} modelId={model.id} current="all" />
           <ChangesView modelId={model.id} orgId={organisation?.id ?? ''} userId={userId} orgSlug={orgSlug ?? ''} modelSlug={model.slug} canCreate={canCreate} />
         </main>

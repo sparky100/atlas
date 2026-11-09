@@ -62,6 +62,16 @@ export async function getDecision(supabase: Client, decisionId: UUID): Promise<D
   return data as DecisionRow | null;
 }
 
+/** The decision a change is an option of (`decision_links` 'branch' pointing at it), or null when the change doesn't belong to one — used to show where a change came from. */
+export async function getDecisionForOption(supabase: Client, branchId: UUID): Promise<{ id: UUID; title: string } | null> {
+  assertRealId('getDecisionForOption', 'linked_id', branchId);
+  const { data: link, error } = await supabase.from('decision_links').select('decision_id').eq('linked_type', 'branch').eq('linked_id', branchId).limit(1).maybeSingle();
+  if (error) throw new Error(`getDecisionForOption: ${error.message}`);
+  if (!link) return null;
+  const decision = await getDecision(supabase, link.decision_id as UUID);
+  return decision ? { id: decision.id, title: decision.title } : null;
+}
+
 /** Every decision on a model, newest-first — the `/decisions` list's own query (mirrors `listChangeBranches`). */
 export async function listDecisionsForModel(supabase: Client, modelId: UUID): Promise<DecisionRow[]> {
   assertRealId('listDecisionsForModel', 'model_id', modelId);
@@ -178,7 +188,7 @@ export async function listDecisionsLinkingElements(supabase: Client, elementIds:
   const seen = new Set<UUID>();
   const result: ElementDecisionLink[] = [];
   for (const link of linkRows) {
-    const decision = decisionsById.get(link.decision_id);
+    const decision = decisionsById.get((link as { decision_id: UUID }).decision_id);
     if (!decision || seen.has(decision.id)) continue;
     seen.add(decision.id);
     result.push({ decision, linkedElementId: link.linked_id });
