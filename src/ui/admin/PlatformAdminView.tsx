@@ -1,3 +1,4 @@
+import { Loading } from '../components/Loading/Loading';
 import { useId, useState } from 'react';
 import { LLM_PROXY_MODEL_OPTIONS, LLM_PROXY_PROVIDER_OPTIONS, useLlmProxyConfig } from './useLlmProxyConfig';
 import { Button } from '../components/Button/Button';
@@ -65,7 +66,7 @@ export function PlatformAdminView() {
         Application-level overrides for the `llm-proxy` edge function — read by every organisation, not per-org. Falls back to the function&apos;s own Supabase secrets when unset.
       </Text>
 
-      {status === 'loading' && <Text tone="muted">Loading…</Text>}
+      {status === 'loading' && <Loading />}
 
       {status !== 'loading' && (
         <form

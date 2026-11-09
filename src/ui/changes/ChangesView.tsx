@@ -1,3 +1,4 @@
+import { Loading } from '../components/Loading/Loading';
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router';
 import type { UUID } from '../../contracts/delta';
@@ -213,7 +214,7 @@ export function ChangesView({ modelId, orgId, userId, orgSlug, modelSlug, canCre
       <Text as="h2" size="lg">
         Changes
       </Text>
-      {status === 'loading' && <Text tone="muted">Loading…</Text>}
+      {status === 'loading' && <Loading />}
       {/* Item 5: first-time explainer — the model has never had a change,
           not just "this page hasn't loaded any yet" (status !== 'loading'
           already distinguishes that from the ordinary empty-list case

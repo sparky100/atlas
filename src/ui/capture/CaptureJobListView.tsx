@@ -7,6 +7,7 @@
  *
  * PR15 built the review queue — a `parsed` job links to it directly.
  */
+import { Loading } from '../components/Loading/Loading';
 import { useState } from 'react';
 import type { UUID } from '../../contracts/delta';
 import type { CaptureJob, CaptureJobProgress } from '../../contracts/capture';
@@ -77,7 +78,7 @@ export function CaptureJobListView({ modelId, orgId, orgSlug, modelSlug, canCrea
         </Panel>
       )}
 
-      {status === 'loading' && jobs.length === 0 && <Text tone="muted">Loading…</Text>}
+      {status === 'loading' && jobs.length === 0 && <Loading />}
       {error !== null && (
         <Text as="p" size="sm">
           {error}

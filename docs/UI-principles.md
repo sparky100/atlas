@@ -37,7 +37,7 @@ Every model-scoped route renders the same navigation alongside the page, grouped
 | Group | Items |
 | --- | --- |
 | **Model** | Home, Capability map, Landscape, Value streams, Elements |
-| **Analyse** | Portfolio, Integrations, Roadmap, Reports |
+| **Analyse** | Portfolio, Roadmap, Reports (Integrations is a row on the Reports hub, not a rail item) |
 | **Work** | Projects *(F10)*, Changes, Decisions, Capture |
 | **Record** | Versions |
 
@@ -68,7 +68,7 @@ It is chrome, not a per-page affordance — a page never grows its own "back to 
 | `Workflow` | Nav: Value streams |
 | `List` | Nav: Elements *(F9)* |
 | `Wallet` | Nav: Portfolio |
-| `Plug` | Nav: Integrations; marks the managing platform on the Integrations page |
+| `Plug` | Marks the managing platform on the Integrations page |
 | `Milestone` | Nav: Roadmap |
 | `ClipboardList` | Nav: Reports *(F9)* |
 | `FolderKanban` | Nav: Projects *(F10)* |

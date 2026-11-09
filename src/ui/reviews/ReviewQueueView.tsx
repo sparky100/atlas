@@ -1,3 +1,4 @@
+import { Loading } from '../components/Loading/Loading';
 import { Chip } from '../components/Chip/Chip';
 import { EmptyState } from '../components/EmptyState/EmptyState';
 import { LinkButton } from '../components/Button/LinkButton';
@@ -44,7 +45,7 @@ export function ReviewQueueView({ modelId, orgId, orgSlug, modelSlug }: ReviewQu
   const captureDrafts = captureJobs.filter((j) => j.status === 'parsed');
   const duplicateGroups = olderDuplicateDrafts(captureDrafts.filter((j) => canDiscardCaptureJob(role, j, userId)));
 
-  if (state.status === 'loading') return <Text tone="muted">Loading…</Text>;
+  if (state.status === 'loading') return <Loading />;
   if (state.status === 'error') return <Text as="p">{state.message}</Text>;
 
   return (

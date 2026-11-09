@@ -1,3 +1,4 @@
+import { Loading } from '../components/Loading/Loading';
 import { useEffect, useState } from 'react';
 import { useParams } from 'react-router';
 import { getDashboard } from '../../db/reports';
@@ -65,8 +66,8 @@ export function DashboardPage() {
     </div>
   );
 
-  if (orgLoading || modelsLoading || mainLoading || !model || !mainBranch || !organisation) return chrome('Dashboard', <Text tone="muted">Loading…</Text>);
-  if (state.status === 'loading') return chrome('Dashboard', <Text tone="muted">Loading…</Text>);
+  if (orgLoading || modelsLoading || mainLoading || !model || !mainBranch || !organisation) return chrome('Dashboard', <Loading />);
+  if (state.status === 'loading') return chrome('Dashboard', <Loading />);
   if (state.status === 'missing') return chrome('Dashboard', <Text as="p">This dashboard doesn't exist, or you can't see it.</Text>);
   return chrome(
     state.dashboard.name,

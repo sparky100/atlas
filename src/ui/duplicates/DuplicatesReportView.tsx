@@ -13,6 +13,7 @@
  * omitted entirely for them, not shown disabled (this codebase's own
  * convention everywhere else a role gate hides an action).
  */
+import { Loading } from '../components/Loading/Loading';
 import { useState } from 'react';
 import { Link } from 'react-router';
 import type { UUID } from '../../contracts/delta';
@@ -145,7 +146,7 @@ export function DuplicatesReportView({ modelId, orgSlug, modelSlug, searchCommit
         </Text>
       )}
 
-      {status === 'loading' && candidates.length === 0 && <Text tone="muted">Loading…</Text>}
+      {status === 'loading' && candidates.length === 0 && <Loading />}
       {candidates.length === 0 && status !== 'loading' && <EmptyState>No duplicate candidates right now.</EmptyState>}
 
       <ul className={styles.list}>

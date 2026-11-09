@@ -1,3 +1,4 @@
+import { Loading } from '../components/Loading/Loading';
 import { useEffect, useState } from 'react';
 import { Link, useLocation, useNavigate, useParams, useSearchParams } from 'react-router';
 import { ATTRIBUTE_SCHEMA_BY_TYPE, attributeDefinitionToFieldSchema, type AttributeFieldSchema } from '../../contracts/attributeSchema';
@@ -310,7 +311,7 @@ export function ElementPage() {
         <div className={navStyles.body}>
           <ModelNav orgSlug={orgSlug ?? ''} modelSlug={modelSlug ?? ''} />
           <main className={styles.main}>
-            <Text tone="muted">Loading…</Text>
+            <Loading />
           </main>
         </div>
       </div>
@@ -324,7 +325,7 @@ export function ElementPage() {
         <ModelNav orgSlug={orgSlug ?? ''} modelSlug={modelSlug ?? ''} />
         <main className={styles.main}>
         {viewing ? <ViewingBranchBanner activeRef={ref} /> : <EditingBranchBanner activeRef={ref} modelId={model.id} orgSlug={orgSlug ?? ''} modelSlug={model.slug} showModeShortcuts={false} />}
-        {state.status === 'loading' && <Text tone="muted">Loading…</Text>}
+        {state.status === 'loading' && <Loading />}
         {state.status === 'error' && <Text as="p">{state.message}</Text>}
         {state.status === 'refNotFound' && <Text as="p">Nothing here yet.</Text>}
         {state.status === 'notPresentAtRef' && <Text tone="muted">Going back…</Text>}

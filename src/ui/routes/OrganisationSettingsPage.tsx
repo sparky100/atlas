@@ -1,3 +1,4 @@
+import { Loading } from '../components/Loading/Loading';
 import { useParams } from 'react-router';
 import { AppHeader } from '../components/AppHeader/AppHeader';
 import { Text } from '../components/Text/Text';
@@ -24,7 +25,7 @@ export function OrganisationSettingsPage() {
       <div>
         <AppHeader orgId={organisation?.id ?? null} />
         <main className={styles.main}>
-          <Text tone="muted">Loading…</Text>
+          <Loading />
         </main>
       </div>
     );

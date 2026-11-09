@@ -1,3 +1,4 @@
+import { Loading } from '../components/Loading/Loading';
 import { useState } from 'react';
 import type { UUID } from '../../contracts/delta';
 import { Button } from '../components/Button/Button';
@@ -118,7 +119,7 @@ export function VersionsView({ modelId, orgId, userId, orgSlug, modelSlug, canTa
       <Text as="h2" size="lg">
         Tagged versions
       </Text>
-      {status === 'loading' && <Text tone="muted">Loading…</Text>}
+      {status === 'loading' && <Loading />}
       {tags.length === 0 && status !== 'loading' && <EmptyState>No versions tagged yet.</EmptyState>}
       {tags.length > 0 && (
         <ul className={styles.list}>

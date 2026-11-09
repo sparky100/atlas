@@ -5,6 +5,7 @@ import { useBoundaryCrossings } from "../boundaryCrossings/useBoundaryCrossings"
 import { useDuplicateCheck } from "../duplicates/useDuplicateCheck";
 import { useExternalInterfaces } from "../externalInterfaces/useExternalInterfaces";
 import { GAP_KINDS, gapItems, gapSummary } from "../gaps/gaps";
+import { useIntegrations } from "../integrations/useIntegrations";
 import { usePortfolio } from "../portfolio/usePortfolio";
 import type { Ref } from "../../db/ref";
 import { countLine, type ReportCount } from "./reportCounts";
@@ -40,6 +41,7 @@ export function ReportsView({
   const external = useExternalInterfaces(modelId);
   const duplicates = useDuplicateCheck(modelId, mainHeadCommitId);
   const portfolio = usePortfolio(modelId, MAIN_REF, mainHeadCommitId).state;
+  const integrations = useIntegrations(modelId, MAIN_REF, mainHeadCommitId).state;
   const base = `/o/${orgSlug}/m/${modelSlug}`;
 
   const boundaryCount: ReportCount =
@@ -74,8 +76,21 @@ export function ReportsView({
       ? null
       : duplicates.candidates.length;
 
+  const integrationsCount: ReportCount =
+    integrations.status === "ready"
+      ? integrations.data.rows.length
+      : integrations.status === "error"
+        ? "error"
+        : null;
+
   return (
     <ul className={styles.list}>
+      <ReportRow
+        title="Integrations"
+        description="Every system-to-system link: what connects to what, directly or through a platform or interface."
+        counts={[countLine(integrationsCount, "integration", "integrations")]}
+        href={`${base}/integrations`}
+      />
       <ReportRow
         title="Boundary crossings"
         description="Every uses or flows-to link that crosses the IT/OT boundary."

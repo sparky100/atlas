@@ -1,3 +1,4 @@
+import { Loading } from '../components/Loading/Loading';
 import { useEffect, useState } from 'react';
 import { useNavigate, useParams, useSearchParams } from 'react-router';
 import type { UUID } from '../../contracts/delta';
@@ -109,7 +110,7 @@ export function ContextPage() {
         <div className={navStyles.body}>
           <ModelNav orgSlug={orgSlug ?? ''} modelSlug={modelSlug ?? ''} />
           <main className={styles.main}>
-            <Text tone="muted">Loading…</Text>
+            <Loading />
           </main>
         </div>
       </div>
@@ -154,7 +155,7 @@ export function ContextPage() {
           />
         )}
 
-        {state.status === 'loading' && <Text tone="muted">Loading…</Text>}
+        {state.status === 'loading' && <Loading />}
         {state.status === 'error' && <Text as="p">{state.message}</Text>}
         {state.status === 'refNotFound' && <Text as="p">Nothing here yet.</Text>}
         {state.status === 'notPresentAtRef' && <Text tone="muted">Going back…</Text>}

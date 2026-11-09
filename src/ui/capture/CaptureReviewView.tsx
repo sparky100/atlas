@@ -25,6 +25,7 @@
  * rather than gating on the currently-focused candidate's own class, so
  * it fires regardless of which row `j`/`k` last landed on.
  */
+import { Loading } from '../components/Loading/Loading';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router';
 import type { UUID } from '../../contracts/delta';
@@ -292,7 +293,7 @@ export function CaptureReviewView({ modelId, orgId, jobId, reviewQueueHref }: Ca
     });
   }, []);
 
-  if (status === 'loading') return <Text tone="muted">Loading…</Text>;
+  if (status === 'loading') return <Loading />;
   if (status === 'error' || !job) return <Text as="p">{error ?? "Couldn't load this import review."}</Text>;
 
   // A reviewed or discarded job is closed: its decisions are history, not a queue to act on.

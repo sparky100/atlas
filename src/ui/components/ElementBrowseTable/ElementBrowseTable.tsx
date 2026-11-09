@@ -1,3 +1,4 @@
+import { Loading } from '../Loading/Loading';
 import { useId, useLayoutEffect, useRef, useState, type ReactNode } from 'react';
 import { Link } from 'react-router';
 import type { AttributeDefinitionKind } from '../../../contracts/attributeSchema';
@@ -363,7 +364,7 @@ export function ElementBrowseTable({ state, orgSlug, modelSlug, modelId, filenam
     }
   }
 
-  if (state.status === 'loading') return <Text tone="muted">Loading…</Text>;
+  if (state.status === 'loading') return <Loading />;
   if (state.status === 'error') return <Text as="p">{state.message}</Text>;
   if (state.status === 'refNotFound') return <Text as="p">Nothing here yet.</Text>;
 
