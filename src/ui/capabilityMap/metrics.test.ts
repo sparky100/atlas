@@ -435,7 +435,7 @@ describe('disposition colour-by (F11)', () => {
     ]);
     const edges = [supports('sys-1', 'cap-1'), supports('sys-2', 'cap-1'), supports('mod-1', 'cap-1')];
     expect(worstDispositionOf('cap-1', edges, systemsById)).toBe('migrate');
-    expect(tileColourFor('metric:disposition', 'cap-1', edges, systemsById)).toEqual({ tone: 'warn', label: 'Migrate' });
+    expect(tileColourFor('metric:disposition', 'cap-1', edges, systemsById)).toEqual({ tone: 'warn', label: 'Move to another system' });
   });
 
   it('a module with no disposition of its own does not borrow its platform\'s', () => {
@@ -457,6 +457,6 @@ describe('disposition colour-by (F11)', () => {
       ['sys-2', withDisposition(system('sys-2'), 'eliminate')],
     ]);
     const edges = [supports('sys-1', 'cap-l2'), supports('sys-2', 'cap-l3')];
-    expect(aggregateTileColourFor('metric:disposition', ['cap-l2', 'cap-l3'], edges, systemsById)).toEqual({ tone: 'danger', label: 'Eliminate' });
+    expect(aggregateTileColourFor('metric:disposition', ['cap-l2', 'cap-l3'], edges, systemsById)).toEqual({ tone: 'danger', label: 'Switch off' });
   });
 });

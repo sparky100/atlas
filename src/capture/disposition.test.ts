@@ -10,6 +10,10 @@ describe('capture: disposition (F11)', () => {
     expect(parseDisposition('T')).toEqual({ value: 'tolerate', fuzzy: true });
     expect(parseDisposition('Retire')).toEqual({ value: 'eliminate', fuzzy: true });
     expect(parseDisposition('Replace')).toEqual({ value: 'migrate', fuzzy: true });
+    // The exporter writes the plain labels, so the importer takes them back (round trip).
+    expect(parseDisposition('Keep as is')).toEqual({ value: 'tolerate', fuzzy: true });
+    expect(parseDisposition('Move to another system')).toEqual({ value: 'migrate', fuzzy: true });
+    expect(parseDisposition('Switch off')).toEqual({ value: 'eliminate', fuzzy: true });
     expect(parseDisposition('Modernise')).toBeNull();
     expect(parseDisposition('Review')).toBeNull();
   });
