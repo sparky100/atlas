@@ -92,11 +92,10 @@ export function DirectorHome({ data, reload, modelId, userId, role, orgSlug, mod
   // comment); fit itself never becomes part of `tone` (ADR-023).
   // Ordering only (the task's own rule): importance high → low, unset
   // last, then fit/exposure severity, then name — `compareWeakTiles`'s
-  // own doc comment (`capabilityTileFit.ts`). Healthy tiles keep the
-  // existing capability-map tree order; only the weak ones, the ones a
-  // director is actually deciding what to do about, are reordered.
+  // own doc comment (`capabilityTileFit.ts`). Healthy capabilities are not listed here at all —
+  // the capability map shows every capability; this list is only the
+  // ones a director is actually deciding what to do about.
   const weakTiles = data.tiles.filter((t) => isCapabilityTileWeak(t)).sort(compareWeakTiles);
-  const healthyTiles = data.tiles.filter((t) => !isCapabilityTileWeak(t));
 
   return (
     <div className={styles.door}>
@@ -147,12 +146,14 @@ export function DirectorHome({ data, reload, modelId, userId, role, orgSlug, mod
               </div>
             </div>
 
+            {weakTiles.length === 0 && (
+              <Text as="p" tone="muted" size="sm">
+                No capability needs attention. The capability map shows all of them.
+              </Text>
+            )}
             <div className={styles.tileGrid}>
               {weakTiles.map((tile) => (
                 <CapabilityTile key={tile.capability.element_id} tile={tile} orgSlug={orgSlug} modelSlug={modelSlug} emphasised role={role} inHand={data.inHandByTile.get(tile.capability.element_id) ?? NO_IN_HAND} />
-              ))}
-              {healthyTiles.map((tile) => (
-                <CapabilityTile key={tile.capability.element_id} tile={tile} orgSlug={orgSlug} modelSlug={modelSlug} emphasised={false} role={role} inHand={data.inHandByTile.get(tile.capability.element_id) ?? NO_IN_HAND} />
               ))}
             </div>
           </>

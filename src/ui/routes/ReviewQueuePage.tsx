@@ -45,7 +45,7 @@ export function ReviewQueuePage() {
         <ModelNav orgSlug={orgSlug ?? ''} modelSlug={modelSlug ?? ''} />
         <main className={styles.main}>
           <EditingBranchBanner activeRef={ref} modelId={model.id} orgSlug={orgSlug ?? ''} modelSlug={model.slug} showModeShortcuts={false} />
-          <Breadcrumb org={{ label: organisation.name, href: `/o/${orgSlug ?? ''}` }} model={{ label: model.name, href: `/o/${orgSlug ?? ''}/m/${model.slug}` }} refLabel="Review queue" />
+          <Breadcrumb org={{ label: organisation.name, href: `/o/${orgSlug ?? ''}` }} model={{ label: model.name, href: `/o/${orgSlug ?? ''}/m/${model.slug}` }} refLabel="Waiting for review" />
           <div className={styles.header}>
             <Text as="h1" size="2xl">
               Changes

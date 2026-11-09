@@ -164,8 +164,8 @@ test('model nav: five-item bottom bar with a More sheet; every model route withi
   // F9 step 2: the review queue is the Changes page's second tab, not a
   // nav item — reached from Changes, and Changes stays the current item.
   await nav.getByRole('link', { name: 'Changes' }).click();
-  await page.getByRole('navigation', { name: 'Changes views' }).getByRole('link', { name: 'Review queue' }).click();
-  await expect(page.getByRole('navigation', { name: 'Changes views' }).getByRole('link', { name: 'Review queue' })).toHaveAttribute('aria-current', 'page');
+  await page.getByRole('navigation', { name: 'Changes views' }).getByRole('link', { name: 'Waiting for review' }).click();
+  await expect(page.getByRole('navigation', { name: 'Changes views' }).getByRole('link', { name: 'Waiting for review' })).toHaveAttribute('aria-current', 'page');
   await expect(nav.getByRole('link', { name: 'Changes' })).toHaveAttribute('aria-current', 'page');
 
   // Non-adjacent jump — from the review queue straight to the capability

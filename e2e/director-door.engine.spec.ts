@@ -197,17 +197,18 @@ test('director door: weakness grid (warn/info/healthy/unrecorded), what we\'re d
   // Two capabilities are exposed (warn + info both count), one has
   // nothing recorded.
   await expect(page.getByText('2 capabilities depend on a system at end of life')).toBeVisible();
-  await expect(page.getByText('1 with nothing recorded')).toBeVisible();
+  await expect(page.getByText('1 with no system recorded')).toBeVisible();
 
   const revenuesTile = page.getByRole('link', { name: /Revenues and Benefits/ });
   await expect(revenuesTile).toBeVisible();
-  await expect(revenuesTile.getByText('lifecycle exposure')).toBeVisible();
-  await expect(revenuesTile.getByText('Northgate Revenues')).toBeVisible();
+  // The problem is one row beside the system it is about, not a chip on the tile.
+  const revenuesCard = revenuesTile.locator('xpath=..');
+  await expect(revenuesCard.getByText('retiring, no replacement')).toBeVisible();
+  await expect(revenuesCard.getByRole('link', { name: 'Northgate Revenues' })).toBeVisible();
   // What's addressing it: the project scoped to it, linked — and no
   // "Start a decision / project" on this tile any more. (The project's own
   // decision is shown through the project, not again.)
-  const revenuesCard = revenuesTile.locator('xpath=..');
-  await expect(revenuesCard.getByText('In hand:')).toBeVisible();
+  await expect(revenuesCard.getByText('Being handled by:')).toBeVisible();
   await expect(revenuesCard.getByRole('link', { name: 'Project: Revenues replacement' })).toBeVisible();
   await expect(revenuesCard.getByText(/Decision: /)).toHaveCount(0);
   await expect(revenuesCard.getByRole('link', { name: 'Start a decision →' })).toHaveCount(0);
@@ -215,13 +216,14 @@ test('director door: weakness grid (warn/info/healthy/unrecorded), what we\'re d
 
   const socialCareTile = page.getByRole('link', { name: /Adult Social Care/ });
   await expect(socialCareTile).toBeVisible();
-  await expect(socialCareTile.getByText('replacement planned')).toBeVisible();
-  // Nothing names this one: it says so, and still offers to start work.
   const socialCareCard = socialCareTile.locator('xpath=..');
-  await expect(socialCareCard.getByText('Nothing in hand')).toBeVisible();
+  await expect(socialCareCard.getByText('retiring, replacement planned')).toBeVisible();
+  // Nothing names this one: it says so, and still offers to start work.
+  await expect(socialCareCard.getByText('No project or decision yet')).toBeVisible();
   await expect(socialCareCard.getByRole('link', { name: 'Start a decision →' })).toBeVisible();
 
-  await expect(page.getByRole('link', { name: /Waste Collection/ })).toBeVisible();
+  // A healthy capability is not listed here; the capability map shows all of them.
+  await expect(page.getByRole('link', { name: /Waste Collection/ })).toHaveCount(0);
   await expect(page.getByRole('link', { name: /Electoral Services/ })).toBeVisible();
 
   // What we're doing: the project (owner, target date, progress, its
@@ -341,8 +343,8 @@ test('director door: a capability supported only by a container (a platform modu
   const tile = page.getByRole('link', { name: /Customer Contact/ });
   await expect(tile).toBeVisible();
   await expect(tile.getByText('1 system')).toBeVisible();
-  await expect(tile.getByText('no known supporters')).toHaveCount(0);
-  await expect(page.getByText('1 with nothing recorded')).toHaveCount(0);
+  await expect(tile.getByText('no system supports this')).toHaveCount(0);
+  await expect(page.getByText('1 with no system recorded')).toHaveCount(0);
 });
 
 test('director door: the empty-model state offers the real starter-map picker, not a hard-coded sector list', async ({ page }) => {

@@ -134,9 +134,9 @@ test('propose a change from an element page, leave and re-enter it, submit; revi
   const changesTabs = page.getByRole('navigation', { name: 'Changes views' });
   await nav.getByRole('link', { name: 'Changes' }).click();
   await expect(nav.getByRole('link', { name: 'Changes (1 change)' })).toBeVisible();
-  await expect(changesTabs.getByRole('link', { name: 'Review queue (1 waiting)' })).toBeVisible();
-  await changesTabs.getByRole('link', { name: 'Review queue' }).click();
-  await expect(changesTabs.getByRole('link', { name: 'Review queue' })).toHaveAttribute('aria-current', 'page');
+  await expect(changesTabs.getByRole('link', { name: 'Waiting for review (1 waiting)' })).toBeVisible();
+  await changesTabs.getByRole('link', { name: 'Waiting for review' }).click();
+  await expect(changesTabs.getByRole('link', { name: 'Waiting for review' })).toHaveAttribute('aria-current', 'page');
   await expect(nav.getByRole('link', { name: 'Changes' })).toHaveAttribute('aria-current', 'page');
   await page.locator('li', { hasText: changeName }).getByRole('link', { name: 'Review →' }).click();
   await expect(page.getByText('pending', { exact: true }).first()).toBeVisible();
@@ -172,7 +172,7 @@ test('propose a change from an element page, leave and re-enter it, submit; revi
   await architectPage.getByRole('link', { name: orgName }).click();
   await architectPage.getByRole('link', { name: /goldenpath5 Model/ }).click();
   await architectPage.getByRole('navigation', { name: 'Model navigation' }).getByRole('link', { name: 'Changes' }).click();
-  await architectPage.getByRole('navigation', { name: 'Changes views' }).getByRole('link', { name: 'Review queue' }).click();
+  await architectPage.getByRole('navigation', { name: 'Changes views' }).getByRole('link', { name: 'Waiting for review' }).click();
   await architectPage.locator('li', { hasText: changeName }).getByRole('link', { name: 'Review →' }).click();
   const architectApprove = architectPage.getByRole('button', { name: 'Approve' });
   await expect(architectApprove).toBeEnabled();
@@ -181,7 +181,7 @@ test('propose a change from an element page, leave and re-enter it, submit; revi
   await architectContext.close();
 
   await nav.getByRole('link', { name: 'Changes' }).click();
-  await changesTabs.getByRole('link', { name: 'Review queue' }).click();
+  await changesTabs.getByRole('link', { name: 'Waiting for review' }).click();
   await page.locator('li', { hasText: changeName }).getByRole('link', { name: 'Review →' }).click();
   await expect(page.getByText('approved', { exact: true }).first()).toBeVisible();
   await page.getByRole('button', { name: 'Merge' }).click();

@@ -45,7 +45,7 @@ export function ReviewRequestPage() {
           <Breadcrumb
             org={{ label: organisation.name, href: `/o/${orgSlug ?? ''}` }}
             model={{ label: model.name, href: `/o/${orgSlug ?? ''}/m/${model.slug}` }}
-            refLabel="Review queue"
+            refLabel="Waiting for review"
             segments={[{ label: 'Review', href: `/o/${orgSlug ?? ''}/m/${model.slug}/review` }]}
           />
           <div className={styles.header}>

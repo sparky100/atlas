@@ -60,7 +60,7 @@ Elements connect through **relationships**, which you record yourself:
 - **replaces** — one system or module replaces another (recorded when you retire something with a replacement).
 - **enables** — a capability enables a value-stream stage.
 
-Systems carry attributes such as lifecycle (planned, active, retiring, retired), criticality, run cost, disposition, hosting model and provider, IT/OT domain, vendor, version, introduced, planned end and vendor support end. Owners can add **custom attributes** for their organisation (Organisation settings).
+Systems carry attributes such as lifecycle (planned, active, retiring, retired), criticality, run cost, planned action, hosting model and provider, IT/OT domain, vendor, version, introduced, planned end and vendor support end. Owners can add **custom attributes** for their organisation (Organisation settings).
 
 ## Finding your way around
 
@@ -69,9 +69,9 @@ Every model page shares the same navigation, in four groups:
 | Group | Pages |
 |---|---|
 | **Model** | Home, Capability map, Landscape, Value streams, Elements |
-| **Analyse** | Portfolio, Roadmap, Reports |
-| **Work** | Projects, Changes, Decisions, Capture |
-| **Record** | Versions |
+| **Analyse** | Portfolio, Roadmap, Reports, Ask Atlas |
+| **Work** | Projects, Changes, Decisions, Import (the **Work** heading opens a page explaining the three and offering **Start something**) |
+| **Record** | History |
 
 On a phone, the bar at the bottom shows Home, Capabilities, Landscape and Changes; everything else is under **More**. Two items show a number of open items: **Changes** — changes still open (draft, proposed, in review or approved) — and **Decisions** — decisions still proposed. Projects has no number. On a phone, a dot on **More** means Decisions has a number inside it.
 
@@ -87,7 +87,7 @@ On a phone, the bar at the bottom shows Home, Capabilities, Landscape and Change
 
 Home has two views; switch with **Overview** / **My work** at the top. They do different jobs: **Overview** is a briefing on the state of the business — what's weak and what's changing — and **My work** is a worklist for the people who maintain the model — what's waiting, what's part-done, and what's missing or wrong in the model. Anyone can use either — it changes what Home shows, never what you're allowed to do — and Atlas remembers your choice. Until you pick one, Owners and Architects start on My work and everyone else on Overview.
 
-- **Overview** reads top to bottom: **Where are we weak** (capabilities at risk — exposed, with nothing recorded, or with a supporter rated a poor or adequate fit, each rating named on the tile. Each one says what's **in hand** — the open projects and decisions already about that capability, or the system exposing it, each a link — or *Nothing in hand*, and only then offers "Start a decision" and "Start a project"), **What we're doing** — the projects in hand (owner, target date, progress, and any decision overdue) and the open decisions that belong to no project — and **What's recent**: the decisions made and projects closed since the newest version, then the versions themselves. Individual changes don't appear here: a project's changes show as its progress, and a correction or a record of something that already happened is housekeeping, not news. Its only create controls are **Start a project** and **Start a decision**; to start a change, use **Changes** (its form also records something that's already happened) or **Propose a change** on an element page.
+- **Overview** reads top to bottom: **Where to focus** (only the capabilities with a problem — a system at end of life, no system recorded, or a supporter rated a poor or adequate fit; healthy capabilities are on the capability map, not here. Each problem is one row: the system or capability as a link, what is wrong with it, and — only when nothing is in hand — its own "Start a decision" and "Start a project". If a project or decision is already about it, the tile says **Being handled by** and links to it, otherwise *No project or decision yet*), **What we're doing** — the projects in hand (owner, target date, progress, and any decision overdue) and the open decisions that belong to no project — and **What's recent**: the decisions made and projects closed since the newest version, then the versions themselves. Individual changes don't appear here: a project's changes show as its progress, and a correction or a record of something that already happened is housekeeping, not news. Its only create controls are **Start a project** and **Start a decision**; to start a change, use **Changes** (its form also records something that's already happened) or **Propose a change** on an element page.
 - **My work** starts with a row of counts — the review queue, findings needing attention, assurance items, your own open changes, and duplicates flagged — then the review queue, **Health findings** and **Assurance**. Beside them: **My decisions** (open decisions you own, overdue first, each naming its project), **My projects** (projects you're accountable for, with their progress), your own open changes, and recent activity. Each finding names what it found and links to it; many offer **Start a decision →** or **Start a project →** pre-filled from the finding. When nothing is wrong, each group collapses to "N checks clear". Each view links to the other rather than repeating it: capabilities with nothing supporting them, or a supporter rated a poor or adequate fit, show on Overview only, and Overview points to My work for missing owners, links, labels and stale values.
 
 Health findings include: systems not linked to a capability, capabilities with no owner, stale values, critical systems with no business owner or nearing end of life, critical systems near the end of vendor support, relationships missing a verb or a data classification across the IT/OT or enterprise boundary, and systems marked Migrate or Eliminate that nothing is retiring.
@@ -105,18 +105,18 @@ What you can do depends on your role and on whether you're looking at main or a 
 
 ## The Elements page
 
-**Elements** lists everything in the model. Search by name or owner, filter by type, disposition or a custom attribute, or pick a **Finding** to see just the elements a health finding flagged. Sort by any column, and **Export CSV** or **Export XLSX**. The workbook carries each element's **Atlas ID** and its parent (a module's system, a capability's parent capability) and lists every relationship, so it can be brought back in through **Capture**: modules keep their platform and systems keep their capability links.
+**Elements** lists everything in the model. Search by name or owner, filter by type, planned action or a custom attribute, or pick a **Finding** to see just the elements a health finding flagged. Sort by any column, and **Export CSV** or **Export XLSX**. The workbook carries each element's **Atlas ID** and its parent (a module's system, a capability's parent capability) and lists every relationship, so it can be brought back in through **Capture**: modules keep their platform and systems keep their capability links.
 
-- **Edit in grid** turns the Lifecycle, Criticality and Disposition cells (and a custom attribute's column, when one is shown) into editable controls. **Save N changes** records them all as one edit — on main, or in the change you're working in. While editing, each row also has **✓ Still accurate**.
-- **Import…** (architects and owners) takes you to Capture.
+- **Edit in grid** turns the Lifecycle, Criticality and Planned action cells (and a custom attribute's column, when one is shown) into editable controls. **Save N changes** records them all as one edit — on main, or in the change you're working in. While editing, each row also has **✓ Still accurate**.
+- **Import…** (architects and owners) takes you to Import.
 
 ## Bringing data in: capture
 
 Rather than typing your landscape in by hand, you can feed Atlas source material and review what it proposes:
 
-1. Open **Capture** and upload a spreadsheet (CSV or XLSX), a JSON file or a PDF, or paste in free text — meeting notes, an email, anything describing systems, owners or relationships.
+1. Open **Import** and upload a spreadsheet (CSV or XLSX), a JSON file or a PDF, or paste in free text — meeting notes, an email, anything describing systems, owners or relationships.
 2. Atlas reads it (using AI for documents and text), matches what it finds against your model, and produces a **capture draft**: proposed elements, relationships and values, each with a confidence and a note on where in the source it came from. Spreadsheet columns such as "Criticality", "TIME" or "Disposition" are recognised.
-3. Review the draft — from Capture, or the **Review queue** tab of Changes. Accept, reject, edit, split or merge each proposal; the keyboard works too (**j**/**k** to move, **a** accept, **r** reject, **e** edit, **x** to select several). Choose a **target change**, then **Apply decisions** to write the accepted facts into it. On a phone, tick **Select** on rows (or **Select all** on a group) and use **Accept selected** / **Reject selected**. If you rejected everything, there's nothing to apply: the button becomes **Finish review**, which closes the draft without creating a change. To throw a draft away without reviewing it, use **Discard this draft…** on the review page, or **Discard** in the review queue; if the same file was captured several times, the queue offers **Discard N older copies** to keep just the newest.
+3. Review the draft — from Import, or the **Waiting for review** tab of Changes. Accept, reject, edit, split or merge each proposal; the keyboard works too (**j**/**k** to move, **a** accept, **r** reject, **e** edit, **x** to select several). Choose a **target change**, then **Apply decisions** to write the accepted facts into it. On a phone, tick **Select** on rows (or **Select all** on a group) and use **Accept selected** / **Reject selected**. If you rejected everything, there's nothing to apply: the button becomes **Finish review**, which closes the draft without creating a change. To throw a draft away without reviewing it, use **Discard this draft…** on the review page, or **Discard** in the review queue; if the same file was captured several times, the queue offers **Discard N older copies** to keep just the newest.
 
 Nothing reaches your model without this review, and it always lands in a change you then submit like any other.
 
@@ -136,7 +136,7 @@ Every change says **why** it exists:
 **Getting it merged.**
 
 - **Record** and **Correct** changes need one architect or owner: **Approve & merge** on the change page.
-- **Propose** and **Explore** changes go through review: **Submit for review**, pick the reviewers, and they appear in the **Review queue** tab of Changes. Reviewers **Approve**, **Request changes** or **Abstain**; once the required reviewers approve, an architect or owner **Merges**.
+- **Propose** and **Explore** changes go through review: **Submit for review**, pick the reviewers, and they appear in the **Waiting for review** tab of Changes. Reviewers **Approve**, **Request changes** or **Abstain**; once the required reviewers approve, an architect or owner **Merges**.
 - If main moved on meanwhile, the review page shows any conflicts and lets you resolve them and **Push refresh** before merging.
 - A change in review can be **split**, sending some of its edits on ahead as their own change.
 - A change still in draft or proposed can be **cancelled** (with a reason); **Duplicate into a new draft** starts again from it. The Changes page lists open changes (draft, proposed, in review or approved) grouped by intent — the number on the **Changes** menu item is how many there are. Merged, cancelled, and rejected or archived changes each have their own collapsed section at the bottom.
@@ -226,7 +226,7 @@ If you use Claude Desktop, you can ask it about your models directly. **Home →
 - It needs Node.js 20 or later on your computer. If it says you are not signed in, check the email and password in the extension's settings.
 - **Check for updates** (off by default) makes it fetch one small version file when it starts, so it can tell you a newer download exists. It sends nothing about you or your models.
 
-## Disposition (TIME)
+## Planned action (TIME)
 
 Each system can be marked **Tolerate**, **Invest**, **Migrate** or **Eliminate**; a module can set its own, but never takes its platform's. Unset reads **Not assessed**, never Tolerate. Elements and Portfolio show, sort and filter by it; the capability map can be coloured by it; spreadsheet capture reads a "TIME" or "Disposition" column. A system marked Migrate or Eliminate that nothing is retiring — no open change retires it, and it isn't already retiring — is a health finding on Home, linking to its project or offering to start one.
 
@@ -240,7 +240,7 @@ Contributors, architects and owners can comment on elements, relationships, chan
 
 The **bell** in the top bar holds your notifications: when someone @mentions you, replies in a thread you're in, or assigns you as a reviewer. Turn each kind on or off in your profile.
 
-## Versions
+## History
 
 A **version** is a named, permanent snapshot of main at a point in time (e.g. a quarterly baseline) — a tag on that state, not a copy that can drift. On **Versions**, give one a name and an optional note to create it. Open any version read-only with the `[ref]` chip, or **compare two versions** to see what changed between them.
 
