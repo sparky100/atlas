@@ -198,3 +198,26 @@ export function filterOwnsEdgesForSystems(rows: readonly RelationshipsHeadRow[],
   const ids = new Set(systemIds);
   return rows.filter((r) => ids.has(r.to_element_id));
 }
+
+export interface GettingStartedCounts {
+  capabilities: number;
+  systems: number;
+  supportsEdges: number;
+}
+
+/**
+ * Three head-only counts at one commit — what the Home "Get started"
+ * checklist (`src/ui/home/GetStarted.tsx`) reads to tick its own steps.
+ * Count queries only (`head: true`), so nothing grows with model size.
+ */
+export async function countGettingStarted(supabase: Client, commitId: UUID): Promise<GettingStartedCounts> {
+  const elementCount = async (elementType: 'capability' | 'system'): Promise<number> => {
+    const { count, error } = await supabase.from('elements_head').select('element_id', { count: 'exact', head: true }).eq('commit_id', commitId).eq('element_type', elementType);
+    if (error) throw new Error(error.message);
+    return count ?? 0;
+  };
+  const edges = supabase.from('relationships_head').select('relationship_id', { count: 'exact', head: true }).eq('commit_id', commitId).eq('relationship_type', 'supports');
+  const [capabilities, systems, edgeResult] = await Promise.all([elementCount('capability'), elementCount('system'), edges]);
+  if (edgeResult.error) throw new Error(edgeResult.error.message);
+  return { capabilities, systems, supportsEdges: edgeResult.count ?? 0 };
+}
