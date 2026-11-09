@@ -1,4 +1,4 @@
-import { ClipboardList, Ellipsis, FolderKanban, GitBranch, History, Home, List, Search, Map, Milestone, Scale, Sparkles, Upload, Wallet, Workflow, Grid as GridIcon, type LucideIcon } from 'lucide-react';
+import { ClipboardList, Ellipsis, FolderKanban, GitBranch, History, Home, LayoutDashboard, List, Search, Map, Milestone, Scale, Sparkles, Upload, Wallet, Workflow, Grid as GridIcon, type LucideIcon } from 'lucide-react';
 import { useEffect, useId, useRef, useState } from 'react';
 import { Link, useLocation, useSearchParams } from 'react-router';
 import { Chip } from '../Chip/Chip';
@@ -26,7 +26,7 @@ type RealSection = Exclude<ModelNavSection, null>;
 const NAV_GROUPS: { caption: string; sections: RealSection[] }[] = [
   { caption: 'Model', sections: ['home', 'capability-map', 'landscape', 'value-streams', 'elements'] },
   { caption: 'Analyse', sections: ['portfolio', 'roadmap', 'reports', 'ask'] },
-  { caption: 'Work', sections: ['projects', 'changes', 'decisions', 'capture'] },
+  { caption: 'Work', sections: ['work', 'projects', 'changes', 'decisions', 'capture'] },
   { caption: 'Record', sections: ['versions'] },
 ];
 
@@ -40,6 +40,7 @@ const SECTION_LABELS: Record<RealSection, string> = {
   'value-streams': 'Value streams',
   elements: 'Elements',
   portfolio: 'Portfolio',
+  work: 'Work overview',
   changes: 'Changes',
   capture: 'Import',
   projects: 'Projects',
@@ -71,6 +72,7 @@ const SECTION_ICONS: Record<RealSection, LucideIcon> = {
   'value-streams': Workflow,
   elements: List,
   portfolio: Wallet,
+  work: LayoutDashboard,
   changes: GitBranch,
   capture: Upload,
   projects: FolderKanban,
@@ -275,7 +277,7 @@ export function ModelNav({ orgSlug, modelSlug }: ModelNavProps) {
           <div key={group.caption} className={styles.group}>
             {groupIndex > 0 && <div className={styles.divider} aria-hidden="true" />}
             <Text as="p" size="xs" tone="faint" className={styles.groupCaption}>
-              {group.caption === 'Work' ? <Link to={`/o/${orgSlug}/m/${modelSlug}/work`}>{group.caption}</Link> : group.caption}
+              {group.caption}
             </Text>
             <ul className={styles.list}>
               {group.sections.map((section) => (
@@ -329,7 +331,7 @@ export function ModelNav({ orgSlug, modelSlug }: ModelNavProps) {
             return (
               <div key={group.caption} className={styles.sheetGroup}>
                 <Text as="p" size="xs" tone="faint" className={styles.sheetCaption}>
-                  {group.caption === 'Work' ? <Link to={`/o/${orgSlug}/m/${modelSlug}/work`}>{group.caption}</Link> : group.caption}
+                  {group.caption}
                 </Text>
                 <ul className={styles.sheetList}>
                   {sections.map((section) => (
@@ -383,6 +385,8 @@ function sectionPath(section: RealSection): string {
       return 'changes';
     case 'capture':
       return 'capture';
+    case 'work':
+      return 'work';
     case 'projects':
       return 'projects';
     case 'decisions':
