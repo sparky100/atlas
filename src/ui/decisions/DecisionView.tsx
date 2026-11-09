@@ -20,6 +20,7 @@ import { canAddDecisionConcern, canCancelDecision, canChooseDecisionOption, canC
 import { useMembers } from '../orgs/useMembers';
 import type { AlsoAffectedElement } from './alsoAffected';
 import { DecisionCriteriaGrid, type DecisionCriteriaOption } from './DecisionCriteriaGrid';
+import { DecisionGoLive } from './DecisionGoLive';
 import { DecisionLinkPicker } from './DecisionLinkPicker';
 import { decisionStatusLabel, decisionStatusTone } from './decisionStatus';
 import { cancelDecision, createDecisionLink, updateDecision } from '../../db/decisions';
@@ -126,6 +127,7 @@ export function DecisionView({ modelId, decisionId, orgId, orgSlug, modelSlug, r
   const canAddOption = canCreateChangeBranch(role) && decision.status === 'proposed';
   const canChoose = canChooseDecisionOption(role) && decision.status === 'proposed';
   const canRate = canRateDecisionOption(role, decision);
+  const chosenBranch = decision.branch_id !== null ? linkedBranchesById.get(decision.branch_id) : undefined;
 
   // Prompt pack F3 PR6's "Export as ADR markdown" — assembled from data
   // this page has already loaded (no second round trip).
@@ -420,6 +422,18 @@ export function DecisionView({ modelId, decisionId, orgId, orgSlug, modelSlug, r
         )}
         {optionsState.error !== null && <Text as="p">{optionsState.error}</Text>}
       </Panel>
+
+      {decision.status === 'accepted' && chosenBranch !== undefined && (
+        <DecisionGoLive
+          branch={chosenBranch}
+          canEdit={canCreateChangeBranch(role)}
+          onSaved={refreshOptionsAndArguments}
+          onWorkOnChange={(branchId) => {
+            setRef({ kind: 'branch', branchId });
+            void navigate(`/o/${orgSlug}/m/${modelSlug}/changes/${branchId}`);
+          }}
+        />
+      )}
 
       {comparisonOptions.length > 0 && (
         <Panel>
