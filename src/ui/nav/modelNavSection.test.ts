@@ -17,8 +17,8 @@ describe('modelNavSectionFor', () => {
     expect(modelNavSectionFor('/container/abc')).toBe('landscape');
   });
 
-  it('matches integrations', () => {
-    expect(modelNavSectionFor('/integrations')).toBe('integrations');
+  it('files integrations under Reports', () => {
+    expect(modelNavSectionFor('/integrations')).toBe('reports');
   });
 
   it('matches Ask Atlas', () => {

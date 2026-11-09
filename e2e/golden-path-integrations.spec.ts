@@ -19,8 +19,9 @@ test('a direct link between two systems is listed on the Integrations page', asy
   await addUsesRelationship(page, 'Council Tax System', 'shares address data with');
 
   await goToModelHome(page);
-  await clickNavItem(page, 'Integrations');
-  await expectNavCurrent(page, 'Integrations');
+  await clickNavItem(page, 'Reports');
+  await page.getByRole('link', { name: /Integrations/ }).click();
+  await expectNavCurrent(page, 'Reports');
   await expect(page.getByRole('heading', { name: 'Integrations' })).toBeVisible();
 
   // The link is listed, and says plainly that no platform manages it.
