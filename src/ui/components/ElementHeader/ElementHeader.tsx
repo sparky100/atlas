@@ -181,7 +181,6 @@ export interface ElementHeaderProps {
  */
 export function ElementHeader({ element, existsFact, existsSource, onEdit, onConfirmStillAccurate, confirming, onProposeChange, rename, onRetire, onRemoveFromModel, onMerge, onConvertToModule, onDeactivate, onReactivate, readOnlyReason, interfacePlatform, contextHref, roadmapHref, startProjectHref }: ElementHeaderProps) {
   const [menuOpen, setMenuOpen] = useState(false);
-  const [copied, setCopied] = useState(false);
   const menuId = useId();
   const menuRef = useRef<HTMLDivElement>(null);
   const [menuShift, setMenuShift] = useState(0);
@@ -212,19 +211,6 @@ export function ElementHeader({ element, existsFact, existsSource, onEdit, onCon
   const version = typeof attrs.version === 'string' ? attrs.version : null;
   const isExternal = attrs.isExternal === true;
   const externalOrganisation = typeof attrs.externalOrganisation === 'string' ? attrs.externalOrganisation : null;
-
-  async function copyId() {
-    try {
-      await navigator.clipboard.writeText(element.element_id);
-      setCopied(true);
-      setTimeout(() => {
-        setCopied(false);
-      }, 1500);
-    } catch {
-      // Clipboard access can be denied (permissions, insecure context) —
-      // not worth surfacing as an error for a copy-to-clipboard nicety.
-    }
-  }
 
   const renaming = rename !== undefined && rename.status !== 'idle';
 
@@ -272,6 +258,9 @@ export function ElementHeader({ element, existsFact, existsSource, onEdit, onCon
               // are unchanged whether or not the viewer can rename.
               <button type="button" className={styles.titleButton} onClick={rename.startRenaming}>
                 {element.name}
+                <span className={styles.titlePencil} aria-hidden="true">
+                  ✎
+                </span>
               </button>
             ) : (
               element.name
@@ -331,24 +320,6 @@ export function ElementHeader({ element, existsFact, existsSource, onEdit, onCon
             <span aria-hidden="true">⋯</span>
           </button>
           <div id={menuId} ref={menuRef} className={[styles.menu, menuOpen ? styles.open : ''].filter(Boolean).join(' ')} style={menuShift !== 0 ? { transform: `translateX(${String(menuShift)}px)` } : undefined}>
-            {rename && !renaming && (
-              <button
-                type="button"
-                className={styles.menuItem}
-                onClick={() => {
-                  setMenuOpen(false);
-                  rename.startRenaming();
-                }}
-              >
-                <Text as="span">Rename</Text>
-              </button>
-            )}
-            <button type="button" className={styles.menuItem} onClick={() => void copyId()}>
-              <Text as="span">{copied ? 'Copied' : 'Copy element ID'}</Text>
-              <Text mono size="sm" tone="muted" as="span">
-                {element.element_id.slice(0, 8)}…
-              </Text>
-            </button>
             {startProjectHref && (
               <Link
                 to={startProjectHref}
@@ -360,6 +331,7 @@ export function ElementHeader({ element, existsFact, existsSource, onEdit, onCon
                 <Text as="span">Start a project…</Text>
               </Link>
             )}
+            {startProjectHref && (onRetire ?? onMerge ?? onConvertToModule) && <div className={styles.menuDivider} role="separator" />}
             {onRetire && (
               <button
                 type="button"

@@ -115,6 +115,35 @@
   text-align: left;
 }
 
+.menuItem {
+  text-decoration: none;
+  color: inherit;
+}
+
+.menuDivider {
+  height: var(--border-width);
+  background: var(--border);
+  margin: var(--space-1) 0;
+}
+
+.titlePencil {
+  margin-left: var(--space-2);
+  font-size: 0.6em;
+  opacity: 0;
+  color: var(--text-muted);
+}
+
+.titleButton:hover .titlePencil,
+.titleButton:focus-visible .titlePencil {
+  opacity: 1;
+}
+
+@media (max-width: 768px) {
+  .titlePencil {
+    opacity: 0.7;
+  }
+}
+
 .menuItem:hover {
   background: var(--bg-subtle);
 }
