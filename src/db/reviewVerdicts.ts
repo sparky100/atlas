@@ -9,6 +9,7 @@
  * whether their approval is required; the RPC wire shape (`user_id`/
  * `required`) is mapped here, not leaked into callers.
  */
+import { sendReviewEmail } from './reviewEmail';
 import type { UUID } from '../contracts/delta';
 import type { Client } from './client';
 import type { MergeRequestRow, ReviewVerdict, ReviewVerdictRow } from './types';
@@ -43,5 +44,8 @@ export async function setReviewers(supabase: Client, mergeRequestId: UUID, revie
   // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment -- untyped client; see branches.ts's module comment.
   const { data, error } = await supabase.schema('atlas').rpc('set_reviewers', { p_merge_request_id: mergeRequestId, p_reviewers: toReviewerWire(reviewers) });
   if (error) throw new Error(`setReviewers: ${error.message}`);
-  return data as MergeRequestRow;
+  const row = data as MergeRequestRow;
+  // Newly added reviewers just got their assignment — email them (best-effort, never throws; already-emailed ones are skipped).
+  await sendReviewEmail(supabase, row.id);
+  return row;
 }

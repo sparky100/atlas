@@ -510,6 +510,15 @@ describe('repository layer against a real local Supabase', () => {
       await expect(upsertUserPreferences(alice.client, { userId: alice.id, capabilityMapColourBy: 'metric:notAMode' as never })).rejects.toThrow();
     });
 
+    it('email_on_review_assigned defaults to true, round-trips false, and leaves notify_on_review_assigned alone', async () => {
+      const created = await upsertUserPreferences(alice.client, { userId: alice.id, theme: 'dark' });
+      expect(created.email_on_review_assigned).toBe(true);
+      const off = await upsertUserPreferences(alice.client, { userId: alice.id, emailOnReviewAssigned: false });
+      expect(off.email_on_review_assigned).toBe(false);
+      expect(off.notify_on_review_assigned).toBe(true);
+      expect((await getUserPreferences(alice.client, alice.id))?.email_on_review_assigned).toBe(false);
+    });
+
     it("bob cannot read alice's preferences, and cannot write a row under her id (RLS is user-scoped, not org-scoped)", async () => {
       expect(await getUserPreferences(bob.client, alice.id)).toBeNull();
       await expect(upsertUserPreferences(bob.client, { userId: alice.id, theme: 'light' })).rejects.toThrow();

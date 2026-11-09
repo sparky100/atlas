@@ -396,6 +396,8 @@ export interface NotificationRow {
   comment_id: UUID | null;
   /** F3a: set only for `review_assigned` notifications, null for comment mention/reply notifications. */
   merge_request_id: UUID | null;
+  /** Review email: when the review_assigned email went out (set only by the send-review-email edge function); null otherwise. */
+  emailed_at: string | null;
   read_at: string | null;
   created_at: string;
 }

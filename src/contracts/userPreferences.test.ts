@@ -106,6 +106,18 @@ describe('notification preferences wire <-> row (Sprint F7 item 3)', () => {
   });
 });
 
+describe('emailOnReviewAssigned wire <-> row', () => {
+  it('defaults to true and carries false through independently of notifyOnReviewAssigned', () => {
+    expect(defaultUserPreferences('u1', true).emailOnReviewAssigned).toBe(true);
+    const prefs = { ...defaultUserPreferences('u1', true), emailOnReviewAssigned: false };
+    const row = toUserPreferencesRow(prefs);
+    expect(row.email_on_review_assigned).toBe(false);
+    expect(row.notify_on_review_assigned).toBe(true);
+    expect(fromUserPreferencesRow(row).emailOnReviewAssigned).toBe(false);
+    expect(fromUserPreferencesRow(row).notifyOnReviewAssigned).toBe(true);
+  });
+});
+
 describe('inspectorCollapsed wire <-> row (V2b)', () => {
   it('defaults to false — open is the sensible starting point for everyone', () => {
     expect(defaultUserPreferences('u1', false).inspectorCollapsed).toBe(false);
