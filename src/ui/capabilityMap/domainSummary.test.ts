@@ -39,7 +39,7 @@ describe('domainCoverageSummary', () => {
 
   it('uses singular "capability has" when the total is exactly one', () => {
     expect(domainCoverageSummary(1, 1)).toBe('1 of 1 capability has a system');
-    expect(domainCoverageSummary(0, 1)).toBe('0 of 1 capability has a supporting system');
+    expect(domainCoverageSummary(0, 1)).toBe('0 of 1 capability has a system');
   });
 });
 
