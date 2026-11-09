@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import type { ElementsHeadRow, RelationshipsHeadRow } from '../../contracts/rows';
 import type { UUID } from '../../contracts/delta';
 import { reportError } from '../errors/errorBannerStore';
-import { EMPTY_LANDSCAPE_FILTERS, filterLandscapeSystems, hasActiveLandscapeFilters, laneKeysBySystemId, type LandscapeFilters } from './landscapeFilter';
+import { EMPTY_LANDSCAPE_FILTERS, filterLandscapeSystems, hasActiveLandscapeFilters, laneKeysBySystemId, visibleLandscapeActors, type LandscapeFilters } from './landscapeFilter';
 import { computeLandscapeGroups, type LandscapeGroups } from './landscapeGroups';
 import { EMPTY_LANE_DISPLAY, groupSystemsByLane, type LandscapeLaneDisplayOptions, type LandscapeLayout } from './layout';
 import { computeLandscapeLayoutInWorker } from './layoutWorkerClient';
@@ -55,6 +55,7 @@ export function useLandscapeDisplay(
   filters: LandscapeFilters = EMPTY_LANDSCAPE_FILTERS,
   laneDisplay: LandscapeLaneDisplayOptions = EMPTY_LANE_DISPLAY,
   layoutWidthHint?: number,
+  showOwners = true,
 ): LandscapeDisplayState {
   const [state, setState] = useState<LandscapeDisplayState>({ status: 'loading' });
 
@@ -80,7 +81,7 @@ export function useLandscapeDisplay(
 
     async function compute(): Promise<void> {
       const allSystems = [...currentData.systemsById.values()];
-      const allActors = [...currentData.actorsById.values()];
+      const allActors = visibleLandscapeActors([...currentData.actorsById.values()], currentData.edges, showOwners);
       const grouping = groupSystemsByLane(allSystems, currentData.supportsEdges, currentData.l1AncestorByCapabilityId);
       const systems = hasActiveLandscapeFilters(filters) ? filterLandscapeSystems(allSystems, filters, laneKeysBySystemId(grouping)) : allSystems;
 
@@ -105,7 +106,7 @@ export function useLandscapeDisplay(
     return () => {
       cancelled = true;
     };
-  }, [data, filters, laneDisplay, layoutWidthHint]);
+  }, [data, filters, laneDisplay, layoutWidthHint, showOwners]);
 
   return state;
 }

@@ -11,7 +11,7 @@
  * geometry all correctly reflect the reduced set (`useLandscapeDisplay.ts`).
  */
 import type { Criticality, LifecycleStatus, SystemDomain, SystemKind, UUID } from '../../contracts/delta';
-import type { ElementsHeadRow } from '../../contracts/rows';
+import type { ElementsHeadRow, RelationshipsHeadRow } from '../../contracts/rows';
 import { attributesRecord } from '../elements/attributesRecord';
 import { domainOf } from '../elements/systemDomain';
 import { kindOf } from '../elements/systemKind';
@@ -99,4 +99,16 @@ export function laneKeysBySystemId(grouping: Pick<LandscapeSystemGrouping, 'byLa
     result.set(ref.elementId, set);
   }
   return result;
+}
+
+/**
+ * People and teams that only own things have no `uses`/`flows_to` line, so
+ * on the landscape they float unconnected. They are shown only when asked
+ * for (`showOwners`); an external organisation, and any actor an edge
+ * actually touches, always stays.
+ */
+export function visibleLandscapeActors(actors: readonly ElementsHeadRow[], edges: readonly RelationshipsHeadRow[], showOwners: boolean): ElementsHeadRow[] {
+  if (showOwners) return [...actors];
+  const connectedIds = new Set(edges.flatMap((e) => [e.from_element_id, e.to_element_id]));
+  return actors.filter((a) => connectedIds.has(a.element_id) || attributesRecord(a.attributes).isExternal === true);
 }

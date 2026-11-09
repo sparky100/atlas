@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import type { ElementsHeadRow } from '../../contracts/rows';
-import { EMPTY_LANDSCAPE_FILTERS, filterLandscapeSystems, hasActiveLandscapeFilters, laneKeysBySystemId, matchesLandscapeFilters, type LandscapeFilters } from './landscapeFilter';
+import type { ElementsHeadRow, RelationshipsHeadRow } from '../../contracts/rows';
+import { EMPTY_LANDSCAPE_FILTERS, filterLandscapeSystems, hasActiveLandscapeFilters, laneKeysBySystemId, matchesLandscapeFilters, visibleLandscapeActors, type LandscapeFilters } from './landscapeFilter';
 import { computeLandscapeLayout, groupSystemsByLane } from './layout';
 
 function system(id: string, name: string, attributes: Record<string, unknown> = {}): ElementsHeadRow {
@@ -117,5 +117,20 @@ describe('laneKeysBySystemId', () => {
     const grouping = groupSystemsByLane([sys], edges, l1);
     const laneKeys = laneKeysBySystemId(grouping);
     expect(matchesLandscapeFilters(sys, { ...EMPTY_LANDSCAPE_FILTERS, capabilityIds: ['cap-a'] }, laneKeys.get('sys-1'))).toBe(true);
+  });
+});
+
+describe('visibleLandscapeActors', () => {
+  const owner = actor('a1', 'Head of Control');
+  const connected = actor('a2', 'Control Room');
+  const external: ElementsHeadRow = { ...actor('a3', 'Ofgem'), attributes: { isExternal: true, subtype: 'organisation' } };
+  const edge: RelationshipsHeadRow = { relationship_id: 'r1', relationship_type: 'uses', from_element_id: 'a2', to_element_id: 's1', attributes: {}, exists_delta_id: 'd-r1' } as unknown as RelationshipsHeadRow;
+
+  it('hides an actor that only owns things, but keeps one a line touches and every external organisation', () => {
+    expect(visibleLandscapeActors([owner, connected, external], [edge], false).map((a) => a.name)).toEqual(['Control Room', 'Ofgem']);
+  });
+
+  it('shows every actor when owners are requested', () => {
+    expect(visibleLandscapeActors([owner, connected, external], [edge], true)).toHaveLength(3);
   });
 });
