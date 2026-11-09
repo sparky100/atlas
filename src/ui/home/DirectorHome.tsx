@@ -16,7 +16,7 @@ import { attributesRecord } from '../elements/attributesRecord';
 import { decisionPrefillToSearchParams, prefillFromCapabilityNoSupportersFinding, prefillFromWeakFitCapabilities, prefillFromSystemAtEndOfLife } from '../decisions/decisionPrefill';
 import { StartDecisionLink } from '../decisions/StartDecisionLink';
 import { importanceLabel } from './capabilityImportance';
-import { compareWeakTiles, formatWeakFitPillLabel, isCapabilityTileWeak, weakFitPillTone } from './capabilityTileFit';
+import { compareWeakTiles, formatWeakFitPillLabel, isCapabilityTileWeak, tileSeverity, weakFitPillTone } from './capabilityTileFit';
 import { ValueStreamsOutcomeView } from '../valueStreams/ValueStreamsOutcomeView';
 import { canStartDecision } from '../orgs/useMembership';
 import { canStartProject } from '../orgs/roleGates';
@@ -426,7 +426,7 @@ function CapabilityTile({ tile, orgSlug, modelSlug, emphasised, role, inHand }: 
   // tile — `buildCapabilityTiles` (`modelHome.ts`) sets `tone: 'neutral'`
   // exactly when `supportingSystems.length === 0`, so this reuses that
   // existing classification rather than re-deriving it from the list.
-  const isWeak = tile.tone === 'neutral';
+  const severity = tileSeverity(tile);
   // Prompt pack F3 PR6: F3's own second named golden path, "from the
   // director door's weak-capability tile, start a decision" — gated on
   // the tile's own exposure tone specifically (not `emphasised`, which
@@ -463,7 +463,8 @@ function CapabilityTile({ tile, orgSlug, modelSlug, emphasised, role, inHand }: 
   const rowActions = (href: string | null) => (nothingInHand && href !== null ? { decision: href, project: canStartProject(role) ? href.replace('/decisions?', '/projects?') : null } : null);
   const content = (
     <>
-      <span className={styles.statusBar} data-tone={tile.tone} aria-hidden="true" />
+      <span className={styles.statusBar} data-tone={severity.tone} aria-hidden="true" />
+      <Chip tone={severity.tone}>{severity.label}</Chip>
       <Text as="p" size="lg" className={styles.tileName}>
         {tile.capability.name}
       </Text>
@@ -489,7 +490,7 @@ function CapabilityTile({ tile, orgSlug, modelSlug, emphasised, role, inHand }: 
           "never colour alone"). Rendered off `weakFitCapabilities` directly,
           not `emphasised` — the instruction's own "independently of tone". */}
       {tile.weakFitCapabilities.length > 0 && (
-        <Chip tone={weakFitPillTone(tile.weakFitAllReplacementPlanned, tile.weakFitCapabilities.length - tile.adequateFitCount)} glyph={<span className={styles.fitGlyph} aria-hidden="true" />}>
+        <Chip tone={weakFitPillTone(tile.weakFitAllReplacementPlanned)} glyph={<span className={styles.fitGlyph} aria-hidden="true" />}>
           {formatWeakFitPillLabel(tile.weakFitCapabilities.length - tile.adequateFitCount, tile.adequateFitCount, tile.weakFitAllReplacementPlanned)}
         </Chip>
       )}
@@ -557,5 +558,5 @@ function CapabilityTile({ tile, orgSlug, modelSlug, emphasised, role, inHand }: 
     </>
   );
 
-  return <div className={[styles.tileWrapper, isWeak ? styles.tileWeak : ''].filter(Boolean).join(' ')}>{emphasised ? <BlueprintFrame>{body}</BlueprintFrame> : body}</div>;
+  return <div className={styles.tileWrapper}>{body}</div>;
 }

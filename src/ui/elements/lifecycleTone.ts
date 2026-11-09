@@ -8,7 +8,7 @@ import type { ChipTone } from '../components/Chip/Chip';
  * here once a third caller needed it, same as attributesRecord.ts's own
  * history.
  */
-export const LIFECYCLE_TONE: Record<LifecycleStatus, ChipTone> = { planned: 'info', active: 'ok', retiring: 'warn', retired: 'neutral' };
+export const LIFECYCLE_TONE: Record<LifecycleStatus, ChipTone> = { planned: 'info', active: 'ok', retiring: 'warn', retired: 'danger' };
 
 /**
  * `planned → active → retiring → retired`, as a sortable order rather than

@@ -260,7 +260,7 @@ describe('tileColourFor', () => {
 
   it('colours by the oldest lifecycle stage using the same tone lifecycle chips use elsewhere', () => {
     const systemsById = new Map([['sys-1', system('sys-1', 'retired')]]);
-    expect(tileColourFor('metric:oldestLifecycleStage', 'cap-1', [supports('sys-1', 'cap-1')], systemsById)).toEqual({ tone: 'neutral', label: 'retired' });
+    expect(tileColourFor('metric:oldestLifecycleStage', 'cap-1', [supports('sys-1', 'cap-1')], systemsById)).toEqual({ tone: 'danger', label: 'retired' });
   });
 
   it('colours lifecycle exposure danger only once a supporting system is actually exposed', () => {
@@ -289,7 +289,7 @@ describe('tileColourFor', () => {
       ['sys-2', system('sys-2')],
     ]);
     const edges = [supports('sys-1', 'cap-1'), supports('sys-2', 'cap-1')];
-    expect(tileColourFor('metric:otShare', 'cap-1', edges, systemsById)).toEqual({ tone: 'warn', label: '1/2 systems OT' });
+    expect(tileColourFor('metric:otShare', 'cap-1', edges, systemsById)).toEqual({ tone: 'neutral', label: '1/2 systems OT' });
   });
 
   it('OT share: silent (no tone/label) when nothing supporting is OT — unlike coverage, zero is the ordinary case here', () => {
@@ -299,7 +299,7 @@ describe('tileColourFor', () => {
 
   it('fit: colours by the worst-of fitForPurpose rating among supporting edges (poor → danger)', () => {
     const edges = [supports('sys-1', 'cap-1', 'adequate'), supports('sys-2', 'cap-1', 'poor')];
-    expect(tileColourFor('metric:fitForPurpose', 'cap-1', edges, new Map())).toEqual({ tone: 'danger', label: 'poor' });
+    expect(tileColourFor('metric:fitForPurpose', 'cap-1', edges, new Map())).toEqual({ tone: 'warn', label: 'poor' });
   });
 
   it('fit: no tone when no supporting edge has a recorded fitForPurpose', () => {
@@ -349,7 +349,7 @@ describe('aggregateTileColourFor (Sprint U4-1 C3 review note: L1 group header)',
       ['sys-2', system('sys-2', 'retired')],
     ]);
     const edges = [supports('sys-1', 'cap-1'), supports('sys-2', 'cap-2')];
-    expect(aggregateTileColourFor('metric:oldestLifecycleStage', ['cap-1', 'cap-2'], edges, systemsById)).toEqual({ tone: 'neutral', label: 'retired' });
+    expect(aggregateTileColourFor('metric:oldestLifecycleStage', ['cap-1', 'cap-2'], edges, systemsById)).toEqual({ tone: 'danger', label: 'retired' });
   });
 
   it('coverage: fraction-supported, not worst-of-children — the tone reflects the real fraction, but the label states it in words, never the digits (`computeCapabilityRollup`\'s own supportedCapabilityCount/totalCapabilityCount is the one place that fraction is printed as a number, in the always-on group header line — this chip used to duplicate it)', () => {
@@ -382,7 +382,7 @@ describe('aggregateTileColourFor (Sprint U4-1 C3 review note: L1 group header)',
       ['sys-3', system('sys-3', undefined, undefined, undefined, 'ot')],
     ]);
     const edges = [supports('sys-1', 'cap-1'), supports('sys-2', 'cap-1'), supports('sys-3', 'cap-2')];
-    expect(aggregateTileColourFor('metric:otShare', ['cap-1', 'cap-2'], edges, systemsById)).toEqual({ tone: 'warn', label: '2/3 systems OT' });
+    expect(aggregateTileColourFor('metric:otShare', ['cap-1', 'cap-2'], edges, systemsById)).toEqual({ tone: 'neutral', label: '2/3 systems OT' });
   });
 
   it('OT share: silent when nothing in the group is OT', () => {
@@ -392,7 +392,7 @@ describe('aggregateTileColourFor (Sprint U4-1 C3 review note: L1 group header)',
 
   it('fit: worst-of-children — one poor-rated edge on any descendant makes the whole group read as poor', () => {
     const edges = [supports('sys-1', 'cap-1', 'excellent'), supports('sys-2', 'cap-2', 'poor')];
-    expect(aggregateTileColourFor('metric:fitForPurpose', ['cap-1', 'cap-2'], edges, new Map())).toEqual({ tone: 'danger', label: 'poor' });
+    expect(aggregateTileColourFor('metric:fitForPurpose', ['cap-1', 'cap-2'], edges, new Map())).toEqual({ tone: 'warn', label: 'poor' });
   });
 
   it('fit: silent when nothing in the group has a recorded fitForPurpose', () => {
@@ -435,7 +435,7 @@ describe('disposition colour-by (F11)', () => {
     ]);
     const edges = [supports('sys-1', 'cap-1'), supports('sys-2', 'cap-1'), supports('mod-1', 'cap-1')];
     expect(worstDispositionOf('cap-1', edges, systemsById)).toBe('migrate');
-    expect(tileColourFor('metric:disposition', 'cap-1', edges, systemsById)).toEqual({ tone: 'warn', label: 'Move to another system' });
+    expect(tileColourFor('metric:disposition', 'cap-1', edges, systemsById)).toEqual({ tone: 'info', label: 'Move to another system' });
   });
 
   it('a module with no disposition of its own does not borrow its platform\'s', () => {
@@ -457,6 +457,6 @@ describe('disposition colour-by (F11)', () => {
       ['sys-2', withDisposition(system('sys-2'), 'eliminate')],
     ]);
     const edges = [supports('sys-1', 'cap-l2'), supports('sys-2', 'cap-l3')];
-    expect(aggregateTileColourFor('metric:disposition', ['cap-l2', 'cap-l3'], edges, systemsById)).toEqual({ tone: 'danger', label: 'Switch off' });
+    expect(aggregateTileColourFor('metric:disposition', ['cap-l2', 'cap-l3'], edges, systemsById)).toEqual({ tone: 'info', label: 'Switch off' });
   });
 });

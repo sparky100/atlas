@@ -305,7 +305,7 @@ export function tileColourFor(mode: ColourByMode, capabilityId: UUID, supportsEd
     }
     case 'metric:otShare': {
       const { ot, total } = otShareOf(capabilityId, supportsEdges, systemsById);
-      return ot === 0 ? { tone: undefined, label: undefined } : { tone: 'warn', label: `${String(ot)}/${String(total)} systems OT` };
+      return ot === 0 ? { tone: undefined, label: undefined } : { tone: 'neutral', label: `${String(ot)}/${String(total)} systems OT` };
     }
     case 'metric:fitForPurpose': {
       const worst = worstFitForPurpose(capabilityId, supportsEdges);
@@ -388,7 +388,7 @@ export function aggregateTileColourFor(mode: ColourByMode, descendantCapabilityI
         ot += share.ot;
         total += share.total;
       }
-      return ot === 0 ? { tone: undefined, label: undefined } : { tone: 'warn', label: `${String(ot)}/${String(total)} systems OT` };
+      return ot === 0 ? { tone: undefined, label: undefined } : { tone: 'neutral', label: `${String(ot)}/${String(total)} systems OT` };
     }
     case 'metric:fitForPurpose': {
       const worst = worstFitForPurposeAcross(descendantCapabilityIds, supportsEdges);

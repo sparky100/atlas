@@ -29,8 +29,8 @@ describe('landscapeTileColourFor (Prompt 7k item 1)', () => {
     expect(landscapeTileColourFor('metric:hostingModel', system())).toEqual({ tone: undefined, label: undefined });
   });
 
-  it('domain (Prompt 7k item 3): colours by the recorded domain, warn for ot, info for hybrid', () => {
-    expect(landscapeTileColourFor('metric:domain', system({ domain: 'ot' }))).toEqual({ tone: 'warn', label: 'ot' });
+  it('domain (Prompt 7k item 3): colours by the recorded domain, blue (informational) for ot and hybrid, neutral for it', () => {
+    expect(landscapeTileColourFor('metric:domain', system({ domain: 'ot' }))).toEqual({ tone: 'info', label: 'ot' });
     expect(landscapeTileColourFor('metric:domain', system({ domain: 'hybrid' }))).toEqual({ tone: 'info', label: 'hybrid' });
   });
 

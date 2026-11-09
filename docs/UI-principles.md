@@ -543,6 +543,20 @@ Warn and danger deliberately share hue families with diff-changed and diff-remov
 
 **Confidence dots** use `--text` filled / `--border-strong` empty, no colour: confidence is a count, not a judgement.
 
+### 8.4a What each status colour means (2026-11-09)
+
+One meaning per colour, everywhere a status chip, stripe or colour-by uses it. Always with a word beside it, never colour alone.
+
+| Tone | Token | Means | Examples |
+|---|---|---|---|
+| Green | `ok` | Healthy, good, done | Active system, Invest, good or excellent fit, approved or merged change, closed project |
+| Amber | `warn` | Needs attention soon | Retiring system, high criticality, adequate or poor fit, project on hold, changes requested |
+| Red | `danger` | A problem now | Retired system, critical, rejected change |
+| Blue | `info` | In progress or informational, never a risk | Planned system, Keep as is, Move to another system, Switch off, change in review, active project, replacement planned |
+| Grey | `neutral` | Not assessed, inactive or ended | Draft, no system recorded, cancelled, low criticality, IT/OT domain |
+
+A mapping that needs a new meaning picks the tone from this table rather than the nearest-looking colour; `src/ui/elements/statusToneMeaning.test.ts` pins the shared mappings so a drift fails a test. The IT/OT colour-by on the landscape is the one exception: it exists to tell domains apart, so non-IT tiles read blue.
+
 ### 8.5 Element type glyphs
 
 One glyph per type, fixed, used in breadcrumbs, canvas, lists, badges: capability `◫`, system `▣`, container `▢`, actor `◉` (person) / `◎` (team). External elements get a dotted outline on the glyph. Relationship types on canvas: `supports` never drawn as an edge (it is the landscape's lane structure); `uses` solid arrow; `flows_to` solid arrow with a small `⇢` label glyph; `owns` never drawn on canvas (shown on the element page). One arrowhead style. See §9.
