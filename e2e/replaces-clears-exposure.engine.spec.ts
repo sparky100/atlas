@@ -3,10 +3,9 @@
  * planned replacement" means. Seeds a critical system near its planned end
  * that keeps its own `supports` edge (no transfer, unlike "Retire…" with a
  * replacement — `retire-with-replacement.engine.spec.ts`) plus an active
- * replacement with no `plannedEnd`, so the only thing that can clear the
- * exposure is the `replaces` edge itself, then checks the capability map's
- * Lifecycle exposure colour-by, the critical-exposed finding and the new
- * "replacement with no departure plan" finding.
+ * replacement, so the only thing that can clear the exposure is the
+ * `replaces` edge itself, then checks the capability map's Lifecycle
+ * exposure colour-by and the critical-exposed finding.
  *
  * Same "needs a real Supabase" limitation as every Playwright test here.
  */
@@ -23,7 +22,7 @@ function isoDateDaysFromNow(days: number): string {
   return d.toISOString().slice(0, 10);
 }
 
-test('a replaces edge clears exposure and an active replacement with no plannedEnd is flagged', async ({ page }) => {
+test('a replaces edge clears lifecycle exposure on the map and in the critical-exposed finding', async ({ page }) => {
   const env = loadEnv();
   const fixture = await bootstrapChangeBranchFixture(page, env, 'replaces-exposure', 'Legacy Billing System');
   const { signedIn, orgSlug, modelId, modelSlug, systemId, seedSourceId, main, seedCommitId } = fixture;
@@ -80,9 +79,4 @@ test('a replaces edge clears exposure and an active replacement with no plannedE
   await page.goto(`/o/${orgSlug}/m/${modelSlug}/elements?filter=critical-exposed`);
   await expect(page.getByRole('link', { name: 'Legacy Billing System' })).toHaveCount(0);
 
-  // 4. The replacement is active with no planned end of its own — flagged on Home and in the Elements filter.
-  await page.goto(`/o/${orgSlug}/m/${modelSlug}`);
-  await expect(page.getByText('1 replacement with no departure plan', { exact: true })).toBeVisible();
-  await page.goto(`/o/${orgSlug}/m/${modelSlug}/elements?filter=replacement-no-departure-plan`);
-  await expect(page.getByRole('link', { name: 'New Billing Platform' })).toBeVisible();
 });

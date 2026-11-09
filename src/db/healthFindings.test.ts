@@ -16,7 +16,6 @@ import {
   findExternalOrganisationAccess,
   findFlowsToPlatformInsteadOfModule,
   findPlatformSupportsThatShouldMoveToModule,
-  findReplacementsWithoutDeparturePlan,
   findSystemsSupportingEssentialFunctionWithoutTechnicalOwner,
   findSystemsWithoutCapability,
   findSystemsWithoutTechnicalOwner,
@@ -407,38 +406,6 @@ describe('findCriticalExposedSystems (Prompt 7k item 1)', () => {
   it('does not flag a system with a recorded replacement, however near or past its plannedEnd (ADR-001 amendment)', () => {
     const systems = [system('sys-1', { criticality: 'critical', plannedEnd: '2026-01-01' }), system('sys-2', { criticality: 'critical', plannedEnd: '2027-01-01' })];
     expect(findCriticalExposedSystems(systems, now, new Set(['sys-1'])).map((s) => s.element_id)).toEqual(['sys-2']);
-  });
-});
-
-describe('findReplacementsWithoutDeparturePlan (ADR-001 amendment)', () => {
-  const edges = [relationship('r1', 'replaces', 'new', 'old')];
-
-  it('flags an active replacement with no plannedEnd', () => {
-    expect(findReplacementsWithoutDeparturePlan([system('new', { lifecycleStatus: 'active' }), system('old', { lifecycleStatus: 'retiring' })], edges).map((e) => e.element_id)).toEqual(['new']);
-  });
-
-  it('does not flag a replacement that has a plannedEnd', () => {
-    expect(findReplacementsWithoutDeparturePlan([system('new', { lifecycleStatus: 'active', plannedEnd: '2035-01-01' })], edges)).toEqual([]);
-  });
-
-  it('does not flag a replacement that is not active yet (planned) or already ending (retiring)', () => {
-    expect(findReplacementsWithoutDeparturePlan([system('new', { lifecycleStatus: 'planned' })], edges)).toEqual([]);
-    expect(findReplacementsWithoutDeparturePlan([system('new', { lifecycleStatus: 'retiring' })], edges)).toEqual([]);
-  });
-
-  it('checks the replacement (from side), never the retiring element', () => {
-    // `old` is active with no plannedEnd, but it is the retiring side — not flagged.
-    expect(findReplacementsWithoutDeparturePlan([system('new', { lifecycleStatus: 'planned' }), system('old', { lifecycleStatus: 'active' })], edges)).toEqual([]);
-  });
-
-  it('lists a replacement once however many elements it replaces (consolidation)', () => {
-    const two = [relationship('r1', 'replaces', 'new', 'old-1'), relationship('r2', 'replaces', 'new', 'old-2')];
-    expect(findReplacementsWithoutDeparturePlan([system('new', { lifecycleStatus: 'active' })], two).map((e) => e.element_id)).toEqual(['new']);
-  });
-
-  it('flags a replacement module (container) too, and ignores non-replaces edges and edges whose replacement is not in the list', () => {
-    const mixed = [relationship('r1', 'replaces', 'mod', 'old'), relationship('r2', 'supports', 'sys-x', 'cap'), relationship('r3', 'replaces', 'ghost', 'old')];
-    expect(findReplacementsWithoutDeparturePlan([container('mod', 'plat', { lifecycleStatus: 'active' })], mixed).map((e) => e.element_id)).toEqual(['mod']);
   });
 });
 

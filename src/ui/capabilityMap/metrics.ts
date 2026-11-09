@@ -38,8 +38,7 @@
  *   system with a live `replaces` edge into it (`replacedIds`, from
  *   `replacedElementIds` — the retiring side) never counts as exposed,
  *   however near or past its own `plannedEnd`. Existence-only: the
- *   replacement's own lifecycle is a separate concern
- *   (`findReplacementsWithoutDeparturePlan`, `src/db/healthFindings.ts`).
+ *   replacement's own lifecycle is deliberately not considered.
  *   A caller that passes no `replacedIds` gets the plain `plannedEnd` read.
  * - **Criticality** (`criticality`): the most-severe `criticality` value
  *   (`low` < `medium` < `high` < `critical`) among a capability's

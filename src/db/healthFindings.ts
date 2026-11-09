@@ -621,9 +621,9 @@ export function findCriticalSystemsWithoutBusinessOwner(elements: readonly Eleme
  * `replacedIds` (the retiring side of a live `replaces` edge,
  * `replacedElementIds`) never counts as exposed, however near or past its
  * own `plannedEnd`. Existence-only, same as `lifecycleExposure`'s own
- * version of this check — the replacement's own lifecycle is
- * `findReplacementsWithoutDeparturePlan`'s separate finding. A caller that
- * passes no `replacedIds` gets the plain `plannedEnd` read.
+ * version of this check — the replacement's own lifecycle is deliberately
+ * not considered. A caller that passes no `replacedIds` gets the plain
+ * `plannedEnd` read.
  */
 export function findCriticalExposedSystems(systems: readonly ElementsHeadRow[], now: Date = new Date(), replacedIds?: ReadonlySet<UUID>): ElementsHeadRow[] {
   return systems.filter((system) => {
@@ -636,33 +636,6 @@ export function findCriticalExposedSystems(systems: readonly ElementsHeadRow[], 
     if (Number.isNaN(plannedEnd.getTime())) return false;
     return monthsUntil(plannedEnd, now) <= STALE_AFTER_MONTHS;
   });
-}
-
-/**
- * ADR-001 amendment's own finding: a `replaces` edge whose *replacement*
- * (`fromElementId`, never the retiring `toElementId`) is `active` with no
- * `plannedEnd` recorded — today's fix silently becoming tomorrow's
- * forgotten legacy system. Returns the replacement elements (what the
- * Elements list can display), one per replacement however many elements it
- * replaces. A replacement that is itself `planned`/`retiring`/`retired`, or
- * has a `plannedEnd`, is not flagged; an edge whose replacement isn't in
- * `elements` (retracted, or not a system/module) is skipped. Deliberately
- * independent of `findCriticalExposedSystems`: this checks the replacement's
- * own lifecycle, not whether the retiring system still reads exposed.
- */
-export function findReplacementsWithoutDeparturePlan(elements: readonly ElementsHeadRow[], replacesEdges: readonly RelationshipsHeadRow[]): ElementsHeadRow[] {
-  const byId = new Map(elements.map((e) => [e.element_id, e]));
-  const flagged = new Map<UUID, ElementsHeadRow>();
-  for (const edge of replacesEdges) {
-    if (edge.relationship_type !== 'replaces') continue;
-    const replacement = byId.get(edge.from_element_id);
-    if (!replacement || flagged.has(replacement.element_id)) continue;
-    const attrs = attributesRecord(replacement.attributes);
-    if (attrs.lifecycleStatus !== 'active') continue;
-    if (typeof attrs.plannedEnd === 'string' && attrs.plannedEnd.trim() !== '') continue;
-    flagged.set(replacement.element_id, replacement);
-  }
-  return [...flagged.values()];
 }
 
 /**

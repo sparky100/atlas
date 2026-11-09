@@ -64,8 +64,7 @@ export function replacedElementIds(edges: readonly RelationshipsHeadRow[]): Set<
  * fact: a system in `replacedIds` (the retiring side of a live `replaces`
  * edge, `replacedElementIds`) never counts as exposed, however near or
  * past its own `plannedEnd`. Existence-only — the replacement's own
- * lifecycle is `findReplacementsWithoutDeparturePlan`'s concern, not this
- * check's. `replacedIds` is optional so a caller that hasn't loaded
+ * lifecycle is deliberately not considered. `replacedIds` is optional so a caller that hasn't loaded
  * `replaces` edges keeps the plain `plannedEnd` reading. The reusable core
  * `lifecycleExposure` delegates to (and that the decision page's "Trigger
  * resolved" row, `whatChangesRows.ts`, also calls directly against a

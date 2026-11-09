@@ -18,7 +18,6 @@ import {
   findCriticalExposedSystems,
   findCriticalSystemsPastOrNearSupportEnd,
   findCriticalSystemsWithoutBusinessOwner,
-  findReplacementsWithoutDeparturePlan,
   findPlatformSupportsThatShouldMoveToModule,
   findSystemsSupportingEssentialFunctionWithoutTechnicalOwner,
   findSystemsWithoutCapability,
@@ -71,8 +70,6 @@ export type ElementBrowseFilter =
   | 'no-technical-owner'
   | 'critical-no-business-owner'
   | 'critical-exposed'
-  /** ADR-001 amendment: active replacements with no `plannedEnd` of their own (`findReplacementsWithoutDeparturePlan`). */
-  | 'replacement-no-departure-plan'
   | 'unused-integration-platform'
   /** ADR-026: interfaces on an integration platform nothing flows via (`findUnusedIntegrationInterfaces`). */
   | 'unused-integration-interface'
@@ -306,11 +303,6 @@ export function useElementBrowse(
         const systems = elements.filter((e) => e.element_type === 'system');
         const replacesEdges = await getReplacesEdges();
         ids = new Set(findCriticalExposedSystems(systems, new Date(), replacedElementIds(replacesEdges)).map((e) => e.element_id));
-      } else if (filter === 'replacement-no-departure-plan') {
-        const systems = elements.filter((e) => e.element_type === 'system');
-        const containers = elements.filter((e) => e.element_type === 'container');
-        const replacesEdges = await getReplacesEdges();
-        ids = new Set(findReplacementsWithoutDeparturePlan([...systems, ...containers], replacesEdges).map((e) => e.element_id));
       } else if (filter === 'unused-integration-platform') {
         const systems = elements.filter((e) => e.element_type === 'system');
         const usesAndFlowsToEdges = await getUsesAndFlowsToEdges();
