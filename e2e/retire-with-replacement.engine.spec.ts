@@ -51,7 +51,7 @@ test('retiring a system with a replacement transfers its supports edges and clea
   await page.goto(`/o/${orgSlug}/m/${modelSlug}/capability-map`);
   await page.getByLabel('Colour by').selectOption('metric:lifecycleExposure');
   await expect(page.getByText('Billing', { exact: true })).toBeVisible();
-  await expect(page.getByText('exposed')).toBeVisible();
+  await expect(page.getByText('end of life')).toBeVisible();
 
   // 2. Retire the system with a replacement.
   await page.goto(`/o/${orgSlug}/m/${modelSlug}/e/${systemId}?ref=main`);
@@ -84,5 +84,5 @@ test('retiring a system with a replacement transfers its supports edges and clea
   await page.goto(`/o/${orgSlug}/m/${modelSlug}/capability-map`);
   await page.getByLabel('Colour by').selectOption('metric:lifecycleExposure');
   await expect(page.getByText('Billing', { exact: true })).toBeVisible();
-  await expect(page.getByText('exposed')).toHaveCount(0);
+  await expect(page.getByText('end of life')).toHaveCount(0);
 });

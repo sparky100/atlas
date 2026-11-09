@@ -6,6 +6,7 @@ import type { UUID } from '../../contracts/delta';
 import type { ElementsHeadRow } from '../../contracts/rows';
 import { AppHeader } from '../components/AppHeader/AppHeader';
 import { Breadcrumb, type BreadcrumbSegment } from '../components/Breadcrumb/Breadcrumb';
+import { domainCoverageSummary } from '../capabilityMap/domainSummary';
 import { Chip } from '../components/Chip/Chip';
 import { Button } from '../components/Button/Button';
 import { CommentsPanel } from '../components/CommentsPanel/CommentsPanel';
@@ -496,7 +497,7 @@ export function LandscapePage() {
           {capability && capabilityLandscapeState.status === 'ready' && (
             <div className={styles.actions}>
               <Chip tone={capabilityLandscapeState.data.rollup.supportedCapabilityCount === 0 ? 'warn' : 'neutral'}>
-                {capabilityLandscapeState.data.rollup.supportedCapabilityCount}/{capabilityLandscapeState.data.rollup.totalCapabilityCount} capabilities supported
+                {domainCoverageSummary(capabilityLandscapeState.data.rollup.supportedCapabilityCount, capabilityLandscapeState.data.rollup.totalCapabilityCount)}
               </Chip>
               {capabilityLandscapeState.data.rollup.isOwned ? (
                 <Chip tone="ok">owned</Chip>

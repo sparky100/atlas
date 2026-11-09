@@ -104,14 +104,14 @@ test('capability rollup: the same "1 system, 1/7 supported" rollup appears on th
   const directorTile = page.getByRole('link', { name: /Digital Services/ });
   await expect(directorTile).toBeVisible();
   await expect(directorTile.getByText('1 system', { exact: false })).toBeVisible();
-  await expect(directorTile.getByText('1 of 7 sub-capabilities have a system')).toBeVisible();
+  await expect(directorTile.getByText('1 of 7 capabilities have a system')).toBeVisible();
 
   // 2) Capability map (capability map density redesign: the domain row's
   // own coverage sentence and supporting-system count are both always
   // visible, collapsed or not — no expand needed to see the rollup).
   await page.goto(`/o/${orgSlug}/m/${modelSlug}/capability-map`);
   await expect(page.getByText('Digital Services', { exact: true })).toBeVisible();
-  await expect(page.getByText('1 of 7 capabilities have a supporting system')).toBeVisible();
+  await expect(page.getByText('1 of 7 capabilities have a system')).toBeVisible();
   await expect(page.getByText('1 system', { exact: true })).toBeVisible();
 
   // 3) Same page, narrower viewport (<768px) — one accordion model at
@@ -119,13 +119,13 @@ test('capability rollup: the same "1 system, 1/7 supported" rollup appears on th
   await page.setViewportSize({ width: 390, height: 844 });
   await page.reload();
   await expect(page.getByText('Digital Services', { exact: true })).toBeVisible();
-  await expect(page.getByText('1 of 7 capabilities have a supporting system')).toBeVisible();
+  await expect(page.getByText('1 of 7 capabilities have a system')).toBeVisible();
   await expect(page.getByText('1 system', { exact: true })).toBeVisible();
 
   // 4) Capability-scoped landscape (`/landscape?capability=`).
   await page.setViewportSize({ width: 1280, height: 900 });
   await page.goto(`/o/${orgSlug}/m/${modelSlug}/landscape?capability=${rootId}`);
   await expect(page.getByText('Systems supporting Digital Services (1)')).toBeVisible();
-  await expect(page.getByText('1/7 capabilities supported')).toBeVisible();
+  await expect(page.getByText('1 of 7 capabilities have a system')).toBeVisible();
   await expect(page.getByText('Housing Portal')).toBeVisible();
 });

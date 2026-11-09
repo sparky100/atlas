@@ -33,12 +33,12 @@ describe('domainCoverageSegments', () => {
 
 describe('domainCoverageSummary', () => {
   it('pluralizes "capabilities have" for a count other than one', () => {
-    expect(domainCoverageSummary(5, 7)).toBe('5 of 7 capabilities have a supporting system');
-    expect(domainCoverageSummary(0, 3)).toBe('0 of 3 capabilities have a supporting system');
+    expect(domainCoverageSummary(5, 7)).toBe('5 of 7 capabilities have a system');
+    expect(domainCoverageSummary(0, 3)).toBe('0 of 3 capabilities have a system');
   });
 
   it('uses singular "capability has" when the total is exactly one', () => {
-    expect(domainCoverageSummary(1, 1)).toBe('1 of 1 capability has a supporting system');
+    expect(domainCoverageSummary(1, 1)).toBe('1 of 1 capability has a system');
     expect(domainCoverageSummary(0, 1)).toBe('0 of 1 capability has a supporting system');
   });
 });

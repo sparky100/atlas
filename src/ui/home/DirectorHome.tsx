@@ -4,6 +4,7 @@ import { Link } from 'react-router';
 import { BlueprintFrame } from '../components/BlueprintFrame/BlueprintFrame';
 import { Button } from '../components/Button/Button';
 import { LinkButton } from '../components/Button/LinkButton';
+import { domainCoverageSummary } from '../capabilityMap/domainSummary';
 import { Chip } from '../components/Chip/Chip';
 import { EmptyState } from '../components/EmptyState/EmptyState';
 import { Text } from '../components/Text/Text';
@@ -470,7 +471,7 @@ function CapabilityTile({ tile, orgSlug, modelSlug, emphasised, role, inHand }: 
           ? 'no system supports this'
           : `${tile.supportingSystems.length.toString()} ${tile.supportingSystems.length === 1 ? 'system' : 'systems'}${tile.exposedSystems.length > 0 ? ` · ${tile.exposedSystems.length.toString()} at end of life` : ''}`}
         {' · '}
-        {tile.supportedCapabilityCount} of {tile.totalCapabilityCount} sub-capabilities have a system
+        {domainCoverageSummary(tile.supportedCapabilityCount, tile.totalCapabilityCount)}
       </Text>
       {/* The task's own rule: a real level shows on every tile; the
           gentle "Importance not set" prompt shows only on a flagged
