@@ -98,7 +98,7 @@ import type { CapabilityMapColourByMode as ColourByMode } from '../../contracts/
 export const COLOUR_BY_OPTIONS: { value: ColourByMode; label: string }[] = [
   { value: 'metric:supportingSystemCount', label: 'Coverage (supporting-system count)' },
   { value: 'metric:oldestLifecycleStage', label: 'Oldest lifecycle stage' },
-  { value: 'metric:lifecycleExposure', label: 'Lifecycle exposure' },
+  { value: 'metric:lifecycleExposure', label: 'Retirement risk' },
   { value: 'metric:criticality', label: 'Criticality' },
   { value: 'metric:otShare', label: 'OT share' },
   { value: 'metric:fitForPurpose', label: 'Fit' },
@@ -297,7 +297,7 @@ export function tileColourFor(mode: ColourByMode, capabilityId: UUID, supportsEd
     }
     case 'metric:lifecycleExposure': {
       const exposed = lifecycleExposure(capabilityId, supportsEdges, systemsById, new Date(), replacedIds);
-      return exposed ? { tone: 'danger', label: 'exposed' } : { tone: undefined, label: undefined };
+      return exposed ? { tone: 'danger', label: 'end of life' } : { tone: undefined, label: undefined };
     }
     case 'metric:criticality': {
       const worst = worstCriticality(capabilityId, supportsEdges, systemsById);
@@ -370,7 +370,7 @@ export function aggregateTileColourFor(mode: ColourByMode, descendantCapabilityI
     }
     case 'metric:lifecycleExposure': {
       const exposed = descendantCapabilityIds.some((id) => lifecycleExposure(id, supportsEdges, systemsById, new Date(), replacedIds));
-      return exposed ? { tone: 'danger', label: 'exposed' } : { tone: undefined, label: undefined };
+      return exposed ? { tone: 'danger', label: 'end of life' } : { tone: undefined, label: undefined };
     }
     case 'metric:criticality': {
       let worst: Criticality | null = null;

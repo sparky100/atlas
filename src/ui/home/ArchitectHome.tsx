@@ -617,7 +617,7 @@ export function ArchitectHome({ data, insights, role, orgSlug, modelSlug, onShow
         <div className={styles.main}>
           <Panel>
             <Text as="h2" size="xl" className={styles.sectionTitle}>
-              Review queue
+              Waiting for review
             </Text>
             {data.oldestReviewItem ? (
               <Link to={`/o/${orgSlug}/m/${modelSlug}/review/${data.oldestReviewItem.id}`}>

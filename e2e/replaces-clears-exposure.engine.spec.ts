@@ -51,7 +51,7 @@ test('a replaces edge clears lifecycle exposure on the map and in the critical-e
 
   await page.goto(`/o/${orgSlug}/m/${modelSlug}/capability-map`);
   await page.getByLabel('Colour by').selectOption('metric:lifecycleExposure');
-  await expect(page.getByText('exposed')).toBeVisible();
+  await expect(page.getByText('end of life')).toBeVisible();
   await page.goto(`/o/${orgSlug}/m/${modelSlug}/elements?filter=critical-exposed`);
   await expect(page.getByRole('link', { name: 'Legacy Billing System' })).toBeVisible();
 
@@ -75,7 +75,7 @@ test('a replaces edge clears lifecycle exposure on the map and in the critical-e
   await page.goto(`/o/${orgSlug}/m/${modelSlug}/capability-map`);
   await page.getByLabel('Colour by').selectOption('metric:lifecycleExposure');
   await expect(page.getByText('Billing', { exact: true })).toBeVisible();
-  await expect(page.getByText('exposed')).toHaveCount(0);
+  await expect(page.getByText('end of life')).toHaveCount(0);
   await page.goto(`/o/${orgSlug}/m/${modelSlug}/elements?filter=critical-exposed`);
   await expect(page.getByRole('link', { name: 'Legacy Billing System' })).toHaveCount(0);
 

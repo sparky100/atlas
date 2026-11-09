@@ -63,7 +63,7 @@ test('a platform\'s modules get their own capability-lane tiles, the platform la
   await page.goto(`/o/${orgSlug}/m/${modelSlug}/capability-map`);
   await page.getByLabel('Colour by').selectOption('metric:lifecycleExposure');
   await expect(page.getByText('Asset Management', { exact: true })).toBeVisible();
-  await expect(page.getByText('exposed')).toBeVisible();
+  await expect(page.getByText('end of life')).toBeVisible();
 
   // 2. Narrow-viewport landscape: both modules get their own tile in their
   // own capability's lane, labelled "SAP · FI"/"SAP · PM"; SAP itself
@@ -110,5 +110,5 @@ test('a platform\'s modules get their own capability-lane tiles, the platform la
   await page.goto(`/o/${orgSlug}/m/${modelSlug}/capability-map`);
   await page.getByLabel('Colour by').selectOption('metric:lifecycleExposure');
   await expect(page.getByText('Asset Management', { exact: true })).toBeVisible();
-  await expect(page.getByText('exposed')).toHaveCount(0);
+  await expect(page.getByText('end of life')).toHaveCount(0);
 });

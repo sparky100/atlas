@@ -207,14 +207,14 @@ test('capability map: an L1 whose only exposed capability sits at L3 still shows
   await page.goto(`/o/${orgSlug}/m/${modelSlug}/capability-map`);
   await expect(page.getByRole('button', { name: /Digital Services/ })).toBeVisible();
 
-  await page.getByLabel('Colour by').selectOption({ label: 'Lifecycle exposure' });
+  await page.getByLabel('Colour by').selectOption({ label: 'Retirement risk' });
 
   // The domain header shows "exposed" without ever being expanded to
   // reveal the L2/L3 that's actually the source of it — the aggregate is
   // computed over the already-loaded tree, not derived from what's
   // currently visible on screen.
   await expect(page.getByText('Repairs')).toHaveCount(0);
-  await expect(page.getByText('exposed')).toBeVisible();
+  await expect(page.getByText('end of life')).toBeVisible();
 
   // No underline on the domain's own "Open →" link, once expanded (the
   // review note's other ask — the collapsed header itself has no link at

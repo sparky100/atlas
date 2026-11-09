@@ -24,9 +24,9 @@ export function domainCoverageSegments(subtreeCapabilityIds: readonly UUID[], su
   }));
 }
 
-/** "5 of 7 capabilities have a supporting system" — the collapsed domain row's own plain-text count, worded as a sentence rather than the old "X/Y supported" fraction, from the same rollup numbers (`supportedCapabilityCount`/`totalCapabilityCount`). */
+/** "5 of 7 capabilities have a system" — the collapsed domain row's own plain-text count, worded as a sentence rather than the old "X/Y supported" fraction, from the same rollup numbers (`supportedCapabilityCount`/`totalCapabilityCount`). */
 export function domainCoverageSummary(supportedCount: number, totalCount: number): string {
-  return `${String(supportedCount)} of ${String(totalCount)} capabilit${totalCount === 1 ? 'y has' : 'ies have'} a supporting system`;
+  return `${String(supportedCount)} of ${String(totalCount)} capabilit${totalCount === 1 ? 'y has' : 'ies have'} a system`;
 }
 
 /**

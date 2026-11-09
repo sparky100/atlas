@@ -59,11 +59,11 @@ test('setting importance on weak capabilities reorders Director home\'s weak til
 
   await goToModelHome(page);
   await switchToDirectorView(page);
-  await expect(page.getByText('Where are we weak')).toBeVisible();
+  await expect(page.getByText('Where to focus')).toBeVisible();
 
   // All three are weak (no supporting systems at all) and reordered:
   // Cap High first, Cap Low second, Cap Unset last.
-  const weakSectionText = await page.getByRole('region', { name: 'Where are we weak' }).innerText();
+  const weakSectionText = await page.getByRole('region', { name: 'Where to focus' }).innerText();
   const highIndex = weakSectionText.indexOf('Cap High');
   const lowIndex = weakSectionText.indexOf('Cap Low');
   const unsetIndex = weakSectionText.indexOf('Cap Unset');

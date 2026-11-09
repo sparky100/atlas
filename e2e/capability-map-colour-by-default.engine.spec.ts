@@ -137,7 +137,7 @@ test('colour-by remembers the last choice per user, across a reload, instead of 
   // systems defaults to Coverage.
   await expect(page.getByLabel('Colour by')).toHaveValue('metric:supportingSystemCount');
 
-  await page.getByLabel('Colour by').selectOption({ label: 'Lifecycle exposure' });
+  await page.getByLabel('Colour by').selectOption({ label: 'Retirement risk' });
   await expect(page.getByLabel('Colour by')).toHaveValue('metric:lifecycleExposure');
 
   await page.reload();

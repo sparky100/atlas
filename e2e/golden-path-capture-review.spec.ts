@@ -242,7 +242,7 @@ test('reject everything by tap, finish the review with no change, and discard a 
   await runCapture();
   await goToModelHome(page);
   await clickNavItem(page, 'Changes');
-  await page.getByRole('link', { name: /Review queue/ }).click();
+  await page.getByRole('link', { name: /Waiting for review/ }).click();
   await expect(page.getByRole('heading', { name: 'Import drafts' })).toBeVisible();
   await page.getByRole('button', { name: 'Discard', exact: true }).click();
   await page.getByRole('button', { name: 'Confirm discard' }).click();
