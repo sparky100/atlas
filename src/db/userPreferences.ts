@@ -19,6 +19,8 @@ export interface UpsertUserPreferencesInput {
   homeMode?: UserPreferencesRow['home_mode'];
   density?: UserPreferencesRow['density'];
   theme?: UserPreferencesRow['theme'];
+  /** Where the app opens — same omitted-leaves-untouched convention. */
+  startPage?: UserPreferencesRow['start_page'];
   /** Sprint U4-1 C4's "remember last choice per user" — omitted (not `null`) leaves any previously-saved choice untouched; a caller that wants to explicitly reset it back to "no override" would need a different signature, which nothing today needs. */
   capabilityMapColourBy?: UserPreferencesRow['capability_map_colour_by'];
   /** Prompt 7k item 1: the landscape's own colour-by mode — same omitted-leaves-untouched convention as `capabilityMapColourBy`. */
@@ -37,6 +39,8 @@ export interface UpsertUserPreferencesInput {
   notifyOnReply?: UserPreferencesRow['notify_on_reply'];
   /** Sprint F7 item 3 follow-up (F3a's `review_assigned` kind) — same omitted-leaves-untouched convention. */
   notifyOnReviewAssigned?: UserPreferencesRow['notify_on_review_assigned'];
+  /** Review-assigned email opt-out — same omitted-leaves-untouched convention. */
+  emailOnReviewAssigned?: UserPreferencesRow['email_on_review_assigned'];
   /** V2b: the shared Inspector panel's own collapsed state — same omitted-leaves-untouched convention. */
   inspectorCollapsed?: UserPreferencesRow['inspector_collapsed'];
 }
@@ -52,6 +56,7 @@ export async function upsertUserPreferences(supabase: Client, input: UpsertUserP
   if (input.homeMode !== undefined) patch.home_mode = input.homeMode;
   if (input.density !== undefined) patch.density = input.density;
   if (input.theme !== undefined) patch.theme = input.theme;
+  if (input.startPage !== undefined) patch.start_page = input.startPage;
   if (input.capabilityMapColourBy !== undefined) patch.capability_map_colour_by = input.capabilityMapColourBy;
   if (input.landscapeColourBy !== undefined) patch.landscape_colour_by = input.landscapeColourBy;
   if (input.landscapeCollapsedLaneKeys !== undefined) patch.landscape_collapsed_lane_keys = input.landscapeCollapsedLaneKeys;
@@ -61,6 +66,7 @@ export async function upsertUserPreferences(supabase: Client, input: UpsertUserP
   if (input.notifyOnMention !== undefined) patch.notify_on_mention = input.notifyOnMention;
   if (input.notifyOnReply !== undefined) patch.notify_on_reply = input.notifyOnReply;
   if (input.notifyOnReviewAssigned !== undefined) patch.notify_on_review_assigned = input.notifyOnReviewAssigned;
+  if (input.emailOnReviewAssigned !== undefined) patch.email_on_review_assigned = input.emailOnReviewAssigned;
   if (input.inspectorCollapsed !== undefined) patch.inspector_collapsed = input.inspectorCollapsed;
 
   // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment -- untyped client; see module comment.

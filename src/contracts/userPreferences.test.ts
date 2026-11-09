@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { defaultUserPreferences, fromUserPreferencesRow, toUserPreferencesRow } from './userPreferences';
+import { defaultUserPreferences, fromUserPreferencesRow, resolveStartPage, START_PAGES, toUserPreferencesRow } from './userPreferences';
 
 describe('defaultUserPreferences', () => {
   it('gives owners/architects the architect door and everyone else the director door', () => {
@@ -106,6 +106,18 @@ describe('notification preferences wire <-> row (Sprint F7 item 3)', () => {
   });
 });
 
+describe('emailOnReviewAssigned wire <-> row', () => {
+  it('defaults to true and carries false through independently of notifyOnReviewAssigned', () => {
+    expect(defaultUserPreferences('u1', true).emailOnReviewAssigned).toBe(true);
+    const prefs = { ...defaultUserPreferences('u1', true), emailOnReviewAssigned: false };
+    const row = toUserPreferencesRow(prefs);
+    expect(row.email_on_review_assigned).toBe(false);
+    expect(row.notify_on_review_assigned).toBe(true);
+    expect(fromUserPreferencesRow(row).emailOnReviewAssigned).toBe(false);
+    expect(fromUserPreferencesRow(row).notifyOnReviewAssigned).toBe(true);
+  });
+});
+
 describe('inspectorCollapsed wire <-> row (V2b)', () => {
   it('defaults to false — open is the sensible starting point for everyone', () => {
     expect(defaultUserPreferences('u1', false).inspectorCollapsed).toBe(false);
@@ -122,5 +134,27 @@ describe('inspectorCollapsed wire <-> row (V2b)', () => {
     const row = toUserPreferencesRow(defaultUserPreferences('u1', true));
     expect(row.inspector_collapsed).toBe(false);
     expect(fromUserPreferencesRow(row).inspectorCollapsed).toBe(false);
+  });
+});
+
+describe('startPage wire <-> row', () => {
+  it('is null until chosen, so the role decides', () => {
+    expect(defaultUserPreferences('u1', true).startPage).toBeNull();
+    expect(resolveStartPage(null, true)).toBe('home');
+    expect(resolveStartPage(null, false)).toBe('capability-map');
+  });
+
+  it('a saved choice wins over the role default', () => {
+    expect(resolveStartPage('landscape', true)).toBe('landscape');
+    expect(resolveStartPage('home', false)).toBe('home');
+  });
+
+  it('carries every start page through toUserPreferencesRow/fromUserPreferencesRow unchanged', () => {
+    for (const startPage of START_PAGES) {
+      const row = toUserPreferencesRow({ ...defaultUserPreferences('u1', false), startPage });
+      expect(row.start_page).toBe(startPage);
+      expect(fromUserPreferencesRow(row).startPage).toBe(startPage);
+    }
+    expect(toUserPreferencesRow(defaultUserPreferences('u1', false)).start_page).toBeNull();
   });
 });

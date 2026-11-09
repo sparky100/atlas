@@ -5,8 +5,9 @@ import { useNavigate } from 'react-router';
 import type { UUID } from '../../contracts/delta';
 import { listChangeBranches } from '../../db/branches';
 import { listDecisionsForModel } from '../../db/decisions';
+import { listProjectsForModel } from '../../db/projects';
 import { refParamOf, type Ref } from '../../db/ref';
-import type { BranchRow, DecisionRow } from '../../db/types';
+import type { BranchRow, DecisionRow, ProjectRow } from '../../db/types';
 import { useEditingBranch } from '../branches/useEditingBranch';
 import { useMainBranch } from '../branches/useMainBranch';
 import { ElementTypeGlyph } from '../components/ElementTypeGlyph/ElementTypeGlyph';
@@ -16,6 +17,7 @@ import { reportError } from '../errors/errorBannerStore';
 import { useHomeSearch } from '../home/useHomeSearch';
 import { supabase } from '../supabaseClient';
 import { decisionStatusLabel } from '../decisions/decisionStatus';
+import { projectStatusLabel } from '../projects/projectModel';
 import { matchTitled } from './searchAnywhereMatch';
 import styles from './SearchDialog.module.css';
 
@@ -29,7 +31,7 @@ export interface SearchDialogProps {
 
 interface Option {
   id: string;
-  group: 'Elements' | 'Changes' | 'Decisions' | 'Pages';
+  group: 'Elements' | 'Changes' | 'Decisions' | 'Projects' | 'Pages';
   label: string;
   detail: string;
   href: string;
@@ -41,7 +43,7 @@ interface Option {
  * opened by Ctrl/⌘-K or the nav's Search button, over the model's
  * elements (name and aliases — the same pool and ranking Home's search
  * box uses, `useHomeSearch`, overlaid with the change being edited),
- * changes and decisions. Grouped by kind, fully keyboard-operable (arrows
+ * changes, decisions and projects. Grouped by kind, fully keyboard-operable (arrows
  * move, Enter opens, Esc closes — the native `<dialog>`'s own cancel), and
  * every result opens its canonical URL; an element opens at the current
  * ref. Rows come from RLS-scoped reads, so a viewer is never shown a
@@ -107,23 +109,26 @@ function SearchBody({
   const search = useHomeSearch(mainHeadCommitId, modelId, branchCommitId);
   const [changes, setChanges] = useState<BranchRow[] | null>(null);
   const [decisions, setDecisions] = useState<DecisionRow[] | null>(null);
+  const [projects, setProjects] = useState<ProjectRow[] | null>(null);
   // The highlight belongs to the query it was set for, so a new query starts
   // at the first result again without an effect to reset it.
   const [highlight, setHighlight] = useState({ query: '', index: 0 });
 
   useEffect(() => {
     let cancelled = false;
-    Promise.all([listChangeBranches(supabase, modelId), listDecisionsForModel(supabase, modelId)])
-      .then(([branchRows, decisionRows]) => {
+    Promise.all([listChangeBranches(supabase, modelId), listDecisionsForModel(supabase, modelId), listProjectsForModel(supabase, modelId)])
+      .then(([branchRows, decisionRows, projectRows]) => {
         if (cancelled) return;
         setChanges(branchRows);
         setDecisions(decisionRows);
+        setProjects(projectRows);
       })
       .catch((e: unknown) => {
-        reportError("Couldn't load changes and decisions to search.", e);
+        reportError("Couldn't load changes, decisions and projects to search.", e);
         if (!cancelled) {
           setChanges([]);
           setDecisions([]);
+          setProjects([]);
         }
       });
     return () => {
@@ -151,10 +156,14 @@ function SearchBody({
       (decisions ?? []).map((decision) => ({ decision, texts: [decision.title] })),
       query,
     ).map(({ decision }) => ({ id: `d-${decision.id}`, group: 'Decisions', label: decision.title, detail: `decision · ${decisionStatusLabel(decision.status)}`, href: `${base}/decisions/${decision.id}` }));
+    const projectOptions: Option[] = matchTitled(
+      (projects ?? []).map((project) => ({ project, texts: [project.title] })),
+      query,
+    ).map(({ project }) => ({ id: `pr-${project.id}`, group: 'Projects', label: project.title, detail: `project · ${projectStatusLabel(project.status)}`, href: `${base}/projects/${project.id}` }));
     // F15: the one place to jump straight to Ask Atlas — shown when the query matches "ask", "atlas" or "question".
     const pageOptions: Option[] = matchTitled([{ texts: ['Ask Atlas', 'ask a question', 'ai assistant'] }], query).length > 0 ? [{ id: 'p-ask', group: 'Pages', label: 'Ask Atlas', detail: 'page · ask a question about this model', href: `${base}/ask` }] : [];
-    return [...elementOptions, ...changeOptions, ...decisionOptions, ...pageOptions];
-  }, [search.results, changes, decisions, query, base, activeRef]);
+    return [...elementOptions, ...changeOptions, ...decisionOptions, ...projectOptions, ...pageOptions];
+  }, [search.results, changes, decisions, projects, query, base, activeRef]);
 
   const activeIndex = highlight.query === query ? highlight.index : 0;
   const setActiveIndex = (update: (index: number) => number) => {
@@ -168,9 +177,9 @@ function SearchBody({
     void navigate(option.href);
   };
 
-  const loading = query.trim() !== '' && (search.status === 'loading' || changes === null || decisions === null);
+  const loading = query.trim() !== '' && (search.status === 'loading' || changes === null || decisions === null || projects === null);
   const activeOption = options.at(Math.min(activeIndex, options.length - 1));
-  const groups = (['Elements', 'Changes', 'Decisions', 'Pages'] as const).map((group) => ({ group, items: options.filter((o) => o.group === group) })).filter((g) => g.items.length > 0);
+  const groups = (['Elements', 'Changes', 'Decisions', 'Projects', 'Pages'] as const).map((group) => ({ group, items: options.filter((o) => o.group === group) })).filter((g) => g.items.length > 0);
 
   return (
     <div className={styles.body}>
@@ -180,12 +189,12 @@ function SearchBody({
           className={styles.input}
           type="text"
           role="combobox"
-          aria-label="Search elements, changes and decisions"
+          aria-label="Search elements, changes, decisions and projects"
           aria-expanded={options.length > 0}
           aria-controls={listboxId}
           aria-autocomplete="list"
           aria-activedescendant={activeOption ? `${optionIdPrefix}-${activeOption.id}` : undefined}
-          placeholder="Search elements, changes and decisions…"
+          placeholder="Search elements, changes, decisions and projects…"
           // eslint-disable-next-line jsx-a11y/no-autofocus -- opening this dialog is the request to type a search.
           autoFocus
           value={query}

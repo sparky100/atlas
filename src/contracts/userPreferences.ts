@@ -14,6 +14,17 @@ import type { UUID } from './delta';
 export const HOME_MODES = ['director', 'architect'] as const;
 export type HomeMode = (typeof HOME_MODES)[number];
 
+/** Where the app opens when a person enters a model. `home` is the Overview / My work page (its own switch, `HomeMode`, still decides which of the two it shows). */
+export const START_PAGES = ['home', 'capability-map', 'landscape'] as const;
+export type StartPage = (typeof START_PAGES)[number];
+
+/**
+ * The start page when none has been saved: owners and architects — the people who maintain the model — start on Home; everyone else (contributors and viewers, who mostly read it) starts on the capability map. Pure, so the same rule is used by the redirect and by the settings screen.
+ */
+export function resolveStartPage(saved: StartPage | null, isOwnerOrArchitect: boolean): StartPage {
+  return saved ?? (isOwnerOrArchitect ? 'home' : 'capability-map');
+}
+
 export const DENSITY_PREFERENCES = ['comfortable', 'compact'] as const;
 export type DensityPreference = (typeof DENSITY_PREFERENCES)[number];
 
@@ -68,6 +79,8 @@ export interface UserPreferences {
   homeMode: HomeMode;
   density: DensityPreference;
   theme: ThemePreference;
+  /** `null` means no choice saved yet — `resolveStartPage` derives the default from the person's role, the same "context this table alone doesn't have" reasoning as `capabilityMapColourBy`. */
+  startPage: StartPage | null;
   /**
    * `null` — the common case — means no explicit choice has ever been
    * saved: the capability map computes a model-aware default instead
@@ -126,6 +139,8 @@ export interface UserPreferences {
    * first added, hence the separate migration).
    */
   notifyOnReviewAssigned: boolean;
+  /** Whether being assigned as a reviewer also sends this user an email (the in-app notification is `notifyOnReviewAssigned`'s). */
+  emailOnReviewAssigned: boolean;
   /**
    * V2b: the shared Inspector panel's (`src/ui/components/Inspector`)
    * resting collapse state — see the migration's own column comment
@@ -145,6 +160,7 @@ export interface UserPreferencesRow {
   home_mode: HomeMode;
   density: DensityPreference;
   theme: ThemePreference;
+  start_page: StartPage | null;
   capability_map_colour_by: CapabilityMapColourByMode | null;
   landscape_colour_by: LandscapeColourByMode | null;
   landscape_collapsed_lane_keys: LandscapeLaneKeyList | null;
@@ -154,6 +170,7 @@ export interface UserPreferencesRow {
   notify_on_mention: boolean;
   notify_on_reply: boolean;
   notify_on_review_assigned: boolean;
+  email_on_review_assigned: boolean;
   inspector_collapsed: boolean;
   updated_at: string;
 }
@@ -164,6 +181,7 @@ export function toUserPreferencesRow(prefs: UserPreferences): UserPreferencesRow
     home_mode: prefs.homeMode,
     density: prefs.density,
     theme: prefs.theme,
+    start_page: prefs.startPage,
     capability_map_colour_by: prefs.capabilityMapColourBy,
     landscape_colour_by: prefs.landscapeColourBy,
     landscape_collapsed_lane_keys: prefs.landscapeCollapsedLaneKeys,
@@ -173,6 +191,7 @@ export function toUserPreferencesRow(prefs: UserPreferences): UserPreferencesRow
     notify_on_mention: prefs.notifyOnMention,
     notify_on_reply: prefs.notifyOnReply,
     notify_on_review_assigned: prefs.notifyOnReviewAssigned,
+    email_on_review_assigned: prefs.emailOnReviewAssigned,
     inspector_collapsed: prefs.inspectorCollapsed,
     updated_at: prefs.updatedAt,
   };
@@ -184,6 +203,7 @@ export function fromUserPreferencesRow(row: UserPreferencesRow): UserPreferences
     homeMode: row.home_mode,
     density: row.density,
     theme: row.theme,
+    startPage: row.start_page,
     capabilityMapColourBy: row.capability_map_colour_by,
     landscapeColourBy: row.landscape_colour_by,
     landscapeCollapsedLaneKeys: row.landscape_collapsed_lane_keys,
@@ -193,6 +213,7 @@ export function fromUserPreferencesRow(row: UserPreferencesRow): UserPreferences
     notifyOnMention: row.notify_on_mention,
     notifyOnReply: row.notify_on_reply,
     notifyOnReviewAssigned: row.notify_on_review_assigned,
+    emailOnReviewAssigned: row.email_on_review_assigned,
     inspectorCollapsed: row.inspector_collapsed,
     updatedAt: row.updated_at,
   };
@@ -214,6 +235,7 @@ export function defaultUserPreferences(userId: UUID, isOwnerOrArchitect: boolean
     homeMode: isOwnerOrArchitect ? 'architect' : 'director',
     density: DEFAULT_DENSITY,
     theme: DEFAULT_THEME,
+    startPage: null,
     capabilityMapColourBy: null,
     landscapeColourBy: null,
     landscapeCollapsedLaneKeys: null,
@@ -223,6 +245,7 @@ export function defaultUserPreferences(userId: UUID, isOwnerOrArchitect: boolean
     notifyOnMention: true,
     notifyOnReply: true,
     notifyOnReviewAssigned: true,
+    emailOnReviewAssigned: true,
     inspectorCollapsed: false,
     updatedAt: new Date(0).toISOString(),
   };

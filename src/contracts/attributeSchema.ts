@@ -200,22 +200,23 @@ export const ANNUAL_RUN_COST_HELP = "Annual cost that stops if this is retired. 
 
 /**
  * F11: TIME disposition's four values — the single declaration of keys and
- * labels, in the order the edit control lists them (Tolerate, Invest,
- * Migrate, Eliminate: TIME's own reading order), consumed by
+ * labels, in the order the edit control lists them (TIME's own reading
+ * order: Tolerate, Invest, Migrate, Eliminate). The stored keys keep those
+ * TIME names; the labels are plain English, consumed by
  * `SYSTEM_META`/`CONTAINER_META` and `src/ui/elements/disposition.ts`.
  */
 export const DISPOSITION_LEVELS = [
-  { key: 'tolerate', label: 'Tolerate' },
+  { key: 'tolerate', label: 'Keep as is' },
   { key: 'invest', label: 'Invest' },
-  { key: 'migrate', label: 'Migrate' },
-  { key: 'eliminate', label: 'Eliminate' },
+  { key: 'migrate', label: 'Move to another system' },
+  { key: 'eliminate', label: 'Switch off' },
 ] as const satisfies readonly { key: Disposition; label: string }[];
 
 export const DISPOSITION_OPTIONS = DISPOSITION_LEVELS.map((level) => level.key) as readonly Disposition[];
 
 export const DISPOSITION_LABELS: Readonly<Record<Disposition, string>> = Object.fromEntries(DISPOSITION_LEVELS.map((level) => [level.key, level.label])) as Readonly<Record<Disposition, string>>;
 
-export const DISPOSITION_HELP = 'What we intend to do with this: keep it as it is (Tolerate), develop it (Invest), move it to something else (Migrate), or retire it (Eliminate).';
+export const DISPOSITION_HELP = 'What we intend to do with this: keep it as it is, invest in it, move it to another system, or switch it off.';
 
 const SYSTEM_META: Record<keyof SystemAttributes, AttributeFieldMeta> = {
   lifecycleStatus: { label: 'Lifecycle', required: true, kind: 'enum', options: LIFECYCLE_STATUS_OPTIONS },

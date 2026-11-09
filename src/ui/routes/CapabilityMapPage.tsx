@@ -11,6 +11,7 @@ import { ModelNav } from '../components/ModelNav/ModelNav';
 import navStyles from '../components/ModelNav/ModelNav.module.css';
 import { Text } from '../components/Text/Text';
 import { useAuth } from '../auth/useAuth';
+import { MakeStartPageButton } from '../profile/MakeStartPageButton';
 import { EditingBranchBanner } from '../branches/EditingBranchBanner/EditingBranchBanner';
 import { ViewingBranchBanner } from '../branches/ViewingBranchBanner/ViewingBranchBanner';
 import { hintedModelId, useMainBranch } from '../branches/useMainBranch';
@@ -269,6 +270,7 @@ export function CapabilityMapPage() {
           <Text as="h1" size="2xl">
             Capability map
           </Text>
+          <MakeStartPageButton page="capability-map" />
           {/* F13 step 1: a stamped picture of the map as shown — open to every member, unlike the editing actions beside it. */}
           {state.status === 'ready' && state.data.tree.l1.length > 0 && (
             <div className={styles.actions}>

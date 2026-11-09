@@ -6,6 +6,7 @@ import type { UUID } from '../../contracts/delta';
 import type { ElementsHeadRow } from '../../contracts/rows';
 import { AppHeader } from '../components/AppHeader/AppHeader';
 import { Breadcrumb, type BreadcrumbSegment } from '../components/Breadcrumb/Breadcrumb';
+import { MakeStartPageButton } from '../profile/MakeStartPageButton';
 import { domainCoverageSummary } from '../capabilityMap/domainSummary';
 import { Chip } from '../components/Chip/Chip';
 import { Button } from '../components/Button/Button';
@@ -493,6 +494,7 @@ export function LandscapePage() {
           <Text as="h1" size="2xl" className={styles.title}>
             {capability ? `Systems supporting ${capability.name}${capabilityLandscapeState.status === 'ready' ? ` (${String(capabilityLandscapeState.data.rows.count)})` : ''}` : 'Landscape'}
           </Text>
+          {!capability && <MakeStartPageButton page="landscape" />}
           {/* Capability rollup: the same "N/M supported" fraction and owner-coverage badge every level-1 tile surface shows — see `capabilityRollup.ts`'s own module comment. Shown only once the rollup is known and only while genuinely scoped to a real capability (never for the ordinary lane-based Landscape). */}
           {capability && capabilityLandscapeState.status === 'ready' && (
             <div className={styles.actions}>

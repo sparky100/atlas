@@ -381,3 +381,26 @@ itself has been run for real and produces a clean bundle (no unresolved
 specifiers); the deploy this section's bundling fix targets has not yet
 been re-attempted end to end after the fix — do that once before relying on
 this in production.
+
+## `send-review-email`
+
+Emails each reviewer who has just been assigned to a change (submit for
+review, or an edit to the reviewer set), with a link to that review. The
+in-app notification is unchanged and still the primary signal; this adds the
+email. Triggered by the app (`src/db/reviewEmail.ts`, called from
+`submitMergeRequest` and `setReviewers`), best-effort — a failed send never
+fails the submit.
+
+Holds the **service-role** key (a reviewer's address lives in `auth.users`,
+not readable by members). It authorises by hand first: the caller must see
+the merge request through RLS and be its requester or an owner/architect.
+Recipients are never taken from the request: only people with an un-emailed
+`review_assigned` notification who haven't switched off
+`user_preferences.email_on_review_assigned` (Profile → Notifications).
+`notifications.emailed_at` prevents double sends.
+
+Secrets: `RESEND_API_KEY`, `RESEND_FROM_ADDRESS` (shared with
+`send-invite-email`) and **`ATLAS_APP_URL`** (new; the app's public base URL,
+no trailing slash, e.g. `https://atlas.simmodlr.app`). Deploy with
+`supabase functions deploy send-review-email`. Live delivery was not
+verified in the build sandbox (no Resend key): confirm once for real.

@@ -21,6 +21,7 @@
  * own only ever resolves against whatever schema the client is scoped to
  * (public by default) — see src/db/commits.ts's own note on this.
  */
+import { sendReviewEmail } from './reviewEmail';
 import type { Delta, UUID } from '../contracts/delta';
 import { fromRefreshBranchResult, toRefreshBranchParams, type RefreshBranchCommitInput, type ResolvedConflictWireRow } from '../contracts/rows';
 import { listOwnDeltas } from '../engine/branch';
@@ -125,7 +126,10 @@ export async function submitMergeRequest(supabase: Client, id: UUID, branchId: U
     p_reviewers: reviewers ? reviewers.map((r) => ({ user_id: r.userId, required: r.required })) : null,
   });
   if (error) throw new Error(`submitMergeRequest: ${error.message}`);
-  return data as MergeRequestRow;
+  const row = data as MergeRequestRow;
+  // Reviewers were assigned in that same call — email them now (best-effort, never throws).
+  if (reviewers && reviewers.length > 0) await sendReviewEmail(supabase, row.id);
+  return row;
 }
 
 /** Reopens an open request for edits (SPEC §7.4's implementation note) — a reviewer asking for changes, or the requester themselves reopening a stale/conflicted request to fix it. Moves the request to `changes_requested` and its branch back to `draft`. */

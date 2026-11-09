@@ -9,6 +9,8 @@ export interface NotificationPreferences {
   notifyOnReply: boolean;
   /** F7 item 3 follow-up: added once F3a's `review_assigned` notification kind actually shipped. */
   notifyOnReviewAssigned: boolean;
+  /** Also email me (with a link) when I'm assigned as a reviewer. */
+  emailOnReviewAssigned: boolean;
 }
 
 export interface UseNotificationPreferencesResult {
@@ -17,9 +19,10 @@ export interface UseNotificationPreferencesResult {
   setNotifyOnMention: (value: boolean) => void;
   setNotifyOnReply: (value: boolean) => void;
   setNotifyOnReviewAssigned: (value: boolean) => void;
+  setEmailOnReviewAssigned: (value: boolean) => void;
 }
 
-const DEFAULTS: NotificationPreferences = { notifyOnMention: true, notifyOnReply: true, notifyOnReviewAssigned: true };
+const DEFAULTS: NotificationPreferences = { notifyOnMention: true, notifyOnReply: true, notifyOnReviewAssigned: true, emailOnReviewAssigned: true };
 
 /**
  * Sprint F7 item 3 — same load-then-write shape `useLandscapeColourByPreference.ts`
@@ -46,7 +49,7 @@ export function useNotificationPreferences(userId: UUID | null): UseNotification
     getUserPreferences(supabase, userId)
       .then((row) => {
         if (cancelled) return;
-        setSaved(row ? { notifyOnMention: row.notify_on_mention, notifyOnReply: row.notify_on_reply, notifyOnReviewAssigned: row.notify_on_review_assigned } : DEFAULTS);
+        setSaved(row ? { notifyOnMention: row.notify_on_mention, notifyOnReply: row.notify_on_reply, notifyOnReviewAssigned: row.notify_on_review_assigned, emailOnReviewAssigned: row.email_on_review_assigned } : DEFAULTS);
       })
       .catch((e: unknown) => {
         reportError("Couldn't load your notification preferences.", e);
@@ -96,5 +99,17 @@ export function useNotificationPreferences(userId: UUID | null): UseNotification
     [userId],
   );
 
-  return { preferences, loading, setNotifyOnMention, setNotifyOnReply, setNotifyOnReviewAssigned };
+  const setEmailOnReviewAssigned = useCallback(
+    (value: boolean) => {
+      setSaved((prev) => ({ ...(prev ?? DEFAULTS), emailOnReviewAssigned: value }));
+      if (userId) {
+        upsertUserPreferences(supabase, { userId, emailOnReviewAssigned: value }).catch((e: unknown) => {
+          reportError("Couldn't save your notification preference.", e);
+        });
+      }
+    },
+    [userId],
+  );
+
+  return { preferences, loading, setNotifyOnMention, setNotifyOnReply, setNotifyOnReviewAssigned, setEmailOnReviewAssigned };
 }

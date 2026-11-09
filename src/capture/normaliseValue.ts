@@ -92,6 +92,7 @@ const DISPOSITION_SYNONYMS: Readonly<Record<string, Disposition>> = {
   t: 'tolerate',
   retain: 'tolerate',
   keep: 'tolerate',
+  'keep as is': 'tolerate',
   maintain: 'tolerate',
   i: 'invest',
   grow: 'invest',
@@ -99,9 +100,11 @@ const DISPOSITION_SYNONYMS: Readonly<Record<string, Disposition>> = {
   m: 'migrate',
   replace: 'migrate',
   replatform: 'migrate',
+  'move to another system': 'migrate',
   e: 'eliminate',
   retire: 'eliminate',
   decommission: 'eliminate',
+  'switch off': 'eliminate',
   sunset: 'eliminate',
 };
 

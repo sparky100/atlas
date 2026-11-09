@@ -355,7 +355,7 @@ export function ArchitectHome({ data, insights, role, orgSlug, modelSlug, onShow
       // action opens that project — or starts one when there is none.
       key: 'outgoing-no-retiring-change',
       count: insightsData.outgoingWithoutRetiringChange.length,
-      summary: `${String(insightsData.outgoingWithoutRetiringChange.length)} ${plural(insightsData.outgoingWithoutRetiringChange.length, 'system', 'systems')} marked Migrate or Eliminate with no open change retiring ${insightsData.outgoingWithoutRetiringChange.length === 1 ? 'it' : 'them'}`,
+      summary: `${String(insightsData.outgoingWithoutRetiringChange.length)} ${plural(insightsData.outgoingWithoutRetiringChange.length, 'system', 'systems')} planned to move or switch off with no open change retiring ${insightsData.outgoingWithoutRetiringChange.length === 1 ? 'it' : 'them'}`,
       items: insightsData.outgoingWithoutRetiringChange.map((el) => {
         const project = insightsData.projectByElementId.get(el.element_id);
         return { id: el.element_id, label: project ? `${el.name} (project: ${project.projectTitle})` : el.name };

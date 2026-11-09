@@ -23,7 +23,7 @@ describe('disposition attribute (F11)', () => {
     expect(dispositionOf(row('container', {}))).toBeNull();
     expect(dispositionOf(row('system', { disposition: 'keep' }))).toBeNull();
     expect(dispositionLabel(null)).toBe('Not assessed');
-    expect(dispositionLabel('eliminate')).toBe('Eliminate');
+    expect(dispositionLabel('eliminate')).toBe('Switch off');
   });
 
   it('worst-of is eliminate > migrate > tolerate > invest, skipping unset', () => {

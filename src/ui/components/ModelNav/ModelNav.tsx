@@ -13,6 +13,7 @@ import { useSelectedRef } from '../../branches/useSelectedRef';
 import { isViewingMode } from '../../branches/viewingMode';
 import { refLabelOf, refQueryParam } from '../../../db/ref';
 import { modelNavSectionFor, type ModelNavSection } from '../../nav/modelNavSection';
+import { OPEN_SEARCH_EVENT } from '../../search/openSearchEvent';
 import styles from './ModelNav.module.css';
 
 export interface ModelNavProps {
@@ -192,9 +193,16 @@ export function ModelNav({ orgSlug, modelSlug }: ModelNavProps) {
       setMoreOpenAt(null);
       setSearchOpenAt(pathnameRef.current);
     };
+    // The header's own Search button (phones — see `AppHeader`) asks for the same dialog.
+    const onOpenRequest = () => {
+      setMoreOpenAt(null);
+      setSearchOpenAt(pathnameRef.current);
+    };
     window.addEventListener('keydown', onKeyDown);
+    window.addEventListener(OPEN_SEARCH_EVENT, onOpenRequest);
     return () => {
       window.removeEventListener('keydown', onKeyDown);
+      window.removeEventListener(OPEN_SEARCH_EVENT, onOpenRequest);
     };
   }, []);
   const sheetRef = useRef<HTMLDivElement>(null);

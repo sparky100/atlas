@@ -7,7 +7,7 @@
 import { expect, test, type Page } from '@playwright/test';
 import { addSystemFromHome, clickNavItem, goToModelHome, retireElement, signUpCreateOrgAndModel } from './fixtures/goldenPath';
 
-const SUMMARY = /marked Migrate or Eliminate with no open change retiring/;
+const SUMMARY = /planned to move or switch off with no open change retiring/;
 
 function isoDateDaysFromNow(days: number): string {
   const d = new Date();
@@ -28,7 +28,7 @@ test('disposition: Migrate raises a finding, a project retires the system, the f
   await page.getByRole('button', { name: '✎ Edit' }).click();
   await page.getByLabel('Planned action').selectOption('migrate');
   await page.getByRole('button', { name: 'Save' }).click();
-  await expect(page.getByText('Migrate', { exact: true }).first()).toBeVisible();
+  await expect(page.getByText('Move to another system', { exact: true }).first()).toBeVisible();
 
   // 2. Home shows the finding, naming the system.
   await goToModelHome(page);
@@ -42,17 +42,17 @@ test('disposition: Migrate raises a finding, a project retires the system, the f
   // 3. Start a project from it: the form opens already filled in.
   await card.getByRole('link', { name: 'Start a project →' }).click();
   await expect(page.getByRole('heading', { name: 'Start a project' })).toBeVisible();
-  await expect(page.getByLabel('Project title')).toHaveValue('Migrate Legacy Payroll');
+  await expect(page.getByLabel('Project title')).toHaveValue('Move Legacy Payroll to another system');
   await expect(page.getByRole('button', { name: 'Remove Legacy Payroll' })).toBeVisible();
   await page.getByLabel('Owner').selectOption({ index: 1 });
   await page.getByRole('button', { name: 'Start project' }).click();
-  await expect(page.getByRole('heading', { name: 'Migrate Legacy Payroll', level: 1 })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Move Legacy Payroll to another system', level: 1 })).toBeVisible();
 
   // While nothing retires it, the finding stays — now pointing at the project.
   await goToModelHome(page);
-  await expect(healthPanel(page).getByText(/Legacy Payroll \(project: Migrate Legacy Payroll\)/)).toBeVisible();
-  await healthPanel(page).getByRole('link', { name: 'Open Migrate Legacy Payroll →' }).click();
-  await expect(page.getByRole('heading', { name: 'Migrate Legacy Payroll', level: 1 })).toBeVisible();
+  await expect(healthPanel(page).getByText(/Legacy Payroll \(project: Move Legacy Payroll to another system\)/)).toBeVisible();
+  await healthPanel(page).getByRole('link', { name: 'Open Move Legacy Payroll to another system →' }).click();
+  await expect(page.getByRole('heading', { name: 'Move Legacy Payroll to another system', level: 1 })).toBeVisible();
 
   // 4. A record change inside the project retires the system.
   await page.getByLabel('New change name').fill('retire-legacy-payroll');
@@ -63,7 +63,7 @@ test('disposition: Migrate raises a finding, a project retires the system, the f
 
   await goToModelHome(page);
   await page.getByPlaceholder('Search or create a capability, system, or actor…').fill('Legacy Payroll');
-  // Inside the search results: My work also links "Migrate Legacy Payroll"
+  // Inside the search results: My work also links "Move Legacy Payroll to another system"
   // (My projects), which an unscoped name match would hit too.
   await page.getByRole('list', { name: 'Search results' }).getByRole('link', { name: 'Legacy Payroll' }).click();
   await expect(page.getByRole('heading', { name: 'Legacy Payroll' })).toBeVisible();
@@ -77,7 +77,7 @@ test('disposition: Migrate raises a finding, a project retires the system, the f
 
   // 6. Submit and merge (record: one approver); the finding stays clear on main.
   await clickNavItem(page, 'Projects');
-  await page.getByRole('link', { name: 'Open Migrate Legacy Payroll' }).click();
+  await page.getByRole('link', { name: 'Open Move Legacy Payroll to another system' }).click();
   await page.getByRole('region', { name: 'Chosen design' }).getByRole('link', { name: 'retire-legacy-payroll' }).click();
   await page.getByRole('button', { name: 'Submit for review' }).click();
   // The change and its review request each carry a "proposed" chip once submitted.
