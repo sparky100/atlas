@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import {
+import { startDecisionFromElementHref,
   decisionPrefillToSearchParams,
   parseDecisionPrefillFromSearchParams,
   prefillFromCapabilityNoSupportersFinding,
@@ -115,5 +115,14 @@ describe('prefillFromSystemAtEndOfLife', () => {
   it('says a replacement is planned when one is', () => {
     const prefill = prefillFromSystemAtEndOfLife({ id: 'sys-1', name: 'A' }, { id: 'cap-1', name: 'B' }, true);
     expect(prefill.statement).toContain('a replacement is planned');
+  });
+});
+
+describe('startDecisionFromElementHref', () => {
+  it('links the element, asks a question about it, and carries no finding key', () => {
+    const href = startDecisionFromElementHref('/o/acme/m/main/decisions', { id: 'el-1', name: 'Legacy CRM' });
+    const [path, query] = href.split('?');
+    expect(path).toBe('/o/acme/m/main/decisions');
+    expect(parseDecisionPrefillFromSearchParams(new URLSearchParams(query))).toEqual({ title: 'What should we do about Legacy CRM?', statement: '', sourceFindingKey: '', linkedElements: [{ id: 'el-1', name: 'Legacy CRM' }] });
   });
 });

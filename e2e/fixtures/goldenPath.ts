@@ -288,7 +288,7 @@ export async function renameElement(page: Page, newName: string): Promise<void> 
 /** Retire the element on the currently-open element page, with a planned end date and (optionally) a replacement picked by name. */
 export async function retireElement(page: Page, plannedEndIsoDate: string, replacementNameMatch?: string): Promise<void> {
   await page.getByRole('button', { name: 'Element actions' }).click();
-  await page.getByRole('button', { name: 'Retire…' }).click();
+  await page.getByRole('button', { name: 'Mark as retired…' }).click();
   await page.getByLabel('Planned end').fill(plannedEndIsoDate);
   if (replacementNameMatch) {
     await page.getByRole('button', { name: '+ Replaced by…' }).click();
@@ -314,7 +314,7 @@ export async function removeElementFromModel(page: Page): Promise<void> {
  */
 export async function mergeElementInto(page: Page, targetNameMatch: string, rationale: string): Promise<void> {
   await page.getByRole('button', { name: 'Element actions' }).click();
-  await page.getByRole('button', { name: 'Merge into…' }).click();
+  await page.getByRole('button', { name: 'Merge a duplicate into…' }).click();
   await page.getByPlaceholder('Search for the element to merge into…').fill(targetNameMatch);
   await page.getByRole('button', { name: new RegExp(targetNameMatch) }).click();
   await page.getByLabel('Why are these the same real thing?').fill(rationale);

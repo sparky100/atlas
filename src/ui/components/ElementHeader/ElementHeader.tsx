@@ -96,6 +96,8 @@ export interface ElementHeaderProps {
    * already uses for its own children check.
    */
   onConvertToModule?: (() => void) | undefined;
+  /** "Start a decision…" with this element linked — a `/decisions?…` link, present for the same element types and a role that may start a decision. */
+  startDecisionHref?: string | undefined;
   /** F10 step 7 (ADR-024 §6.4): "Start a project…" with this element as declared scope — a `/projects?…` link, present only for a capability, system or container and a role that may start one. */
   startProjectHref?: string | null | undefined;
   /**
@@ -179,7 +181,7 @@ export interface ElementHeaderProps {
  * and adds "Retire…" (`onRetire`, system only) — both live in this same
  * overflow menu, not a standalone row.
  */
-export function ElementHeader({ element, existsFact, existsSource, onEdit, onConfirmStillAccurate, confirming, onProposeChange, rename, onRetire, onRemoveFromModel, onMerge, onConvertToModule, onDeactivate, onReactivate, readOnlyReason, interfacePlatform, contextHref, roadmapHref, startProjectHref }: ElementHeaderProps) {
+export function ElementHeader({ element, existsFact, existsSource, onEdit, onConfirmStillAccurate, confirming, onProposeChange, rename, onRetire, onRemoveFromModel, onMerge, onConvertToModule, onDeactivate, onReactivate, readOnlyReason, interfacePlatform, contextHref, roadmapHref, startProjectHref, startDecisionHref }: ElementHeaderProps) {
   const [menuOpen, setMenuOpen] = useState(false);
   const menuId = useId();
   const menuRef = useRef<HTMLDivElement>(null);
@@ -320,6 +322,17 @@ export function ElementHeader({ element, existsFact, existsSource, onEdit, onCon
             <span aria-hidden="true">⋯</span>
           </button>
           <div id={menuId} ref={menuRef} className={[styles.menu, menuOpen ? styles.open : ''].filter(Boolean).join(' ')} style={menuShift !== 0 ? { transform: `translateX(${String(menuShift)}px)` } : undefined}>
+            {startDecisionHref && (
+              <Link
+                to={startDecisionHref}
+                className={styles.menuItem}
+                onClick={() => {
+                  setMenuOpen(false);
+                }}
+              >
+                <Text as="span">Start a decision…</Text>
+              </Link>
+            )}
             {startProjectHref && (
               <Link
                 to={startProjectHref}
@@ -331,7 +344,7 @@ export function ElementHeader({ element, existsFact, existsSource, onEdit, onCon
                 <Text as="span">Start a project…</Text>
               </Link>
             )}
-            {startProjectHref && (onRetire ?? onMerge ?? onConvertToModule) && <div className={styles.menuDivider} role="separator" />}
+            {(startProjectHref ?? startDecisionHref) && (onRetire ?? onMerge ?? onConvertToModule) && <div className={styles.menuDivider} role="separator" />}
             {onRetire && (
               <button
                 type="button"
@@ -341,7 +354,12 @@ export function ElementHeader({ element, existsFact, existsSource, onEdit, onCon
                   onRetire();
                 }}
               >
-                <Text as="span">Retire…</Text>
+                <span className={styles.menuItemText}>
+                  <Text as="span">Mark as retired…</Text>
+                  <Text as="span" size="xs" tone="muted">
+                    Keeps its history; it shows as retired.
+                  </Text>
+                </span>
               </button>
             )}
             {onMerge && (
@@ -353,7 +371,12 @@ export function ElementHeader({ element, existsFact, existsSource, onEdit, onCon
                   onMerge();
                 }}
               >
-                <Text as="span">Merge into…</Text>
+                <span className={styles.menuItemText}>
+                  <Text as="span">Merge a duplicate into…</Text>
+                  <Text as="span" size="xs" tone="muted">
+                    For two records of the same thing.
+                  </Text>
+                </span>
               </button>
             )}
             {onConvertToModule && (
@@ -365,7 +388,12 @@ export function ElementHeader({ element, existsFact, existsSource, onEdit, onCon
                   onConvertToModule();
                 }}
               >
-                <Text as="span">Convert to a module of…</Text>
+                <span className={styles.menuItemText}>
+                  <Text as="span">Make this a module of…</Text>
+                  <Text as="span" size="xs" tone="muted">
+                    Move it inside a platform.
+                  </Text>
+                </span>
               </button>
             )}
             {onDeactivate && (
@@ -401,7 +429,12 @@ export function ElementHeader({ element, existsFact, existsSource, onEdit, onCon
                   onRemoveFromModel();
                 }}
               >
-                <Text as="span">Remove from model…</Text>
+                <span className={styles.menuItemText}>
+                  <Text as="span">Remove from model…</Text>
+                  <Text as="span" size="xs" tone="muted">
+                    For something added by mistake.
+                  </Text>
+                </span>
               </button>
             )}
           </div>

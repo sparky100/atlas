@@ -179,3 +179,9 @@ export function parseDecisionPrefillFromSearchParams(params: URLSearchParams): D
   const linkedElements: DecisionPrefillLinkedElement[] = ids.map((id, index) => ({ id, name: names[index] ?? '' }));
   return { title, statement, sourceFindingKey, linkedElements };
 }
+
+/** The element page's own "Start a decision…": that element linked, its name in a question as the starting title, no finding key (empty — no finding is behind it). */
+export function startDecisionFromElementHref(decisionsHref: string, element: { id: UUID; name: string }): string {
+  const params = decisionPrefillToSearchParams({ title: `What should we do about ${element.name}?`, statement: '', sourceFindingKey: '', linkedElements: [{ id: element.id, name: element.name }] });
+  return `${decisionsHref}?${params.toString()}`;
+}
