@@ -17,7 +17,7 @@ const FIELD_LABELS: Readonly<Record<string, string>> = {
   owner: 'Owner',
   lifecycle: 'Lifecycle',
   criticality: 'Criticality',
-  disposition: 'Disposition',
+  disposition: 'Planned action',
   cost: 'Run cost',
   fit: 'Fit',
   capabilities: 'Capabilities served',

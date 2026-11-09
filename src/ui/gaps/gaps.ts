@@ -86,7 +86,7 @@ export function gapSummary(kind: GapKind, items: readonly GapItem[]): string {
     case 'criticality':
       return `${things('system has', 'systems have')} no criticality`;
     case 'disposition':
-      return `${things('system is', 'systems are')} not assessed for disposition`;
+      return `${things('system is', 'systems are')} missing a planned action`;
   }
 }
 
@@ -102,7 +102,7 @@ export function gapItemQuestion(item: GapItem): string {
     case 'criticality':
       return `How critical is ${item.name}?`;
     case 'disposition':
-      return `What's the disposition for ${item.name}?`;
+      return `What's the planned action for ${item.name}?`;
   }
 }
 
@@ -118,6 +118,6 @@ export function gapDoneSummary(kind: GapKind): string {
     case 'criticality':
       return 'Every system has a criticality';
     case 'disposition':
-      return 'Every system has a disposition';
+      return 'Every system has a planned action';
   }
 }

@@ -234,7 +234,7 @@ const SYSTEM_META: Record<keyof SystemAttributes, AttributeFieldMeta> = {
   // other judged enum on a system) in SYSTEM_ORDER below; labels/help/
   // "Not entered" empty state all via the meta members added for it.
   annualRunCost: { label: 'Run cost', required: false, kind: 'enum', options: ANNUAL_RUN_COST_OPTIONS, optionLabels: ANNUAL_RUN_COST_LABELS, help: ANNUAL_RUN_COST_HELP, emptyLabel: 'Not entered' },
-  disposition: { label: 'Disposition', required: false, kind: 'enum', options: DISPOSITION_OPTIONS, optionLabels: DISPOSITION_LABELS, help: DISPOSITION_HELP, emptyLabel: 'Not assessed' },
+  disposition: { label: 'Planned action', required: false, kind: 'enum', options: DISPOSITION_OPTIONS, optionLabels: DISPOSITION_LABELS, help: DISPOSITION_HELP, emptyLabel: 'Not assessed' },
   hostingModel: { label: 'Hosting model', required: false, kind: 'enum', options: HOSTING_MODEL_OPTIONS },
   hostingProvider: { label: 'Hosting provider', required: false, kind: 'text' },
   domain: { label: 'Domain', required: false, kind: 'enum', options: DOMAIN_OPTIONS },
@@ -296,7 +296,7 @@ const CONTAINER_META: Record<keyof ContainerAttributes, AttributeFieldMeta> = {
   annualRunCost: { label: 'Run cost', required: false, kind: 'enum', options: ANNUAL_RUN_COST_OPTIONS, optionLabels: ANNUAL_RUN_COST_LABELS, help: ANNUAL_RUN_COST_HELP, emptyLabel: 'Not entered' },
   // F11: a module's own disposition, never inherited from its platform —
   // so, like run cost, not labelled "(module override)" of an inherited value.
-  disposition: { label: 'Disposition', required: false, kind: 'enum', options: DISPOSITION_OPTIONS, optionLabels: DISPOSITION_LABELS, help: DISPOSITION_HELP, emptyLabel: 'Not assessed' },
+  disposition: { label: 'Planned action', required: false, kind: 'enum', options: DISPOSITION_OPTIONS, optionLabels: DISPOSITION_LABELS, help: DISPOSITION_HELP, emptyLabel: 'Not assessed' },
   hostingModel: { label: 'Hosting model (module override)', required: false, kind: 'enum', options: HOSTING_MODEL_OPTIONS },
   hostingProvider: { label: 'Hosting provider (module override)', required: false, kind: 'text' },
   domain: { label: 'Domain (module override)', required: false, kind: 'enum', options: DOMAIN_OPTIONS },

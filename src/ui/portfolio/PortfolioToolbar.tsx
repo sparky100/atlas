@@ -128,7 +128,7 @@ export function PortfolioToolbar({ sortKey, sortDirection, onSortChange, filters
       </label>
 
       <label className={styles.field}>
-        <span>Disposition</span>
+        <span>Planned action</span>
         <select
           className={styles.select}
           value={filters.disposition}
@@ -136,7 +136,7 @@ export function PortfolioToolbar({ sortKey, sortDirection, onSortChange, filters
             onFiltersChange({ ...filters, disposition: e.target.value as PortfolioFilters['disposition'] });
           }}
         >
-          <option value="all">All dispositions</option>
+          <option value="all">Any planned action</option>
           {DISPOSITION_LEVELS.map((level) => (
             <option key={level.key} value={level.key}>
               {level.label}

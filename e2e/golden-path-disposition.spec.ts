@@ -26,7 +26,7 @@ test('disposition: Migrate raises a finding, a project retires the system, the f
   // 1. A system, marked Migrate through the ordinary Attributes editor.
   await addSystemFromHome(page, { name: 'Legacy Payroll', description: 'The payroll system being moved off.' });
   await page.getByRole('button', { name: '✎ Edit' }).click();
-  await page.getByLabel('Disposition').selectOption('migrate');
+  await page.getByLabel('Planned action').selectOption('migrate');
   await page.getByRole('button', { name: 'Save' }).click();
   await expect(page.getByText('Migrate', { exact: true }).first()).toBeVisible();
 

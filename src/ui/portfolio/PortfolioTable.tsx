@@ -32,7 +32,7 @@ const COLUMNS: { key: PortfolioSortKey; label: string }[] = [
   { key: 'cost', label: 'Run cost' },
   { key: 'fit', label: 'Fit' },
   { key: 'criticality', label: 'Criticality' },
-  { key: 'disposition', label: 'Disposition' },
+  { key: 'disposition', label: 'Planned action' },
   { key: 'lifecycle', label: 'Lifecycle' },
   { key: 'capabilities', label: 'Capabilities served' },
   { key: 'owner', label: 'Business owner' },
