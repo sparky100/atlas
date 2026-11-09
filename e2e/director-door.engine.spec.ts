@@ -196,7 +196,7 @@ test('director door: weakness grid (warn/info/healthy/unrecorded), what we\'re d
   await expect(page.getByRole('heading', { name: 'Where are we weak' })).toBeVisible();
   // Two capabilities are exposed (warn + info both count), one has
   // nothing recorded.
-  await expect(page.getByText('2 capabilities exposed')).toBeVisible();
+  await expect(page.getByText('2 capabilities depend on a retiring system')).toBeVisible();
   await expect(page.getByText('1 with nothing recorded')).toBeVisible();
 
   const revenuesTile = page.getByRole('link', { name: /Revenues and Benefits/ });

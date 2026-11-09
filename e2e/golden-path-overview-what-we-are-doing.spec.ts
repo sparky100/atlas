@@ -79,7 +79,7 @@ test("a weak tile says what's in hand: nothing at first, then the project starte
   // A capability nothing supports is weak; nothing is addressing it yet.
   await showOverview(page);
   const tileCard = page.getByRole('link', { name: /Housing Repairs/ }).first().locator('xpath=..');
-  await expect(tileCard.getByText('Nothing in hand')).toBeVisible();
+  await expect(tileCard.getByText('No project or decision yet')).toBeVisible();
 
   // Start a project from the tile itself — its scope is already the capability.
   await tileCard.getByRole('link', { name: 'Start a project →' }).click();
@@ -91,8 +91,8 @@ test("a weak tile says what's in hand: nothing at first, then the project starte
   // Back on Overview: the tile names the project and offers nothing to start.
   await showOverview(page);
   const card = page.getByRole('link', { name: /Housing Repairs/ }).first().locator('xpath=..');
-  await expect(card.getByText('In hand:')).toBeVisible();
-  await expect(card.getByText('Nothing in hand')).toHaveCount(0);
+  await expect(card.getByText('Being handled by:')).toBeVisible();
+  await expect(card.getByText('No project or decision yet')).toHaveCount(0);
   await expect(card.getByRole('link', { name: 'Start a project →' })).toHaveCount(0);
   await expect(card.getByRole('link', { name: 'Start a decision →' })).toHaveCount(0);
 
