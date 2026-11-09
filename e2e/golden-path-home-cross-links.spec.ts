@@ -30,7 +30,7 @@ test('a capability with no supporters shows on Overview only, and each Home view
 
   await page.getByRole('button', { name: 'Where capabilities are weak is on Overview →' }).click();
   await expect(overview).toHaveAttribute('aria-pressed', 'true');
-  await expect(page.getByRole('heading', { name: 'Where are we weak' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Where to focus' })).toBeVisible();
   await expect(page.getByText(capabilityName, { exact: true })).toBeVisible();
 
   // And back: Overview points to My work for the model-quality findings.

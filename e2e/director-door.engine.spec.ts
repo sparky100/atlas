@@ -193,7 +193,7 @@ test('director door: weakness grid (warn/info/healthy/unrecorded), what we\'re d
   // switch to director.
   await page.getByRole('button', { name: 'Overview', exact: true }).click();
 
-  await expect(page.getByRole('heading', { name: 'Where are we weak' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Where to focus' })).toBeVisible();
   // Two capabilities are exposed (warn + info both count), one has
   // nothing recorded.
   await expect(page.getByText('2 capabilities depend on a retiring system')).toBeVisible();
@@ -337,7 +337,7 @@ test('director door: a capability supported only by a container (a platform modu
   await page.goto(`/o/${orgSlug}/m/${modelSlug}`);
   await page.getByRole('button', { name: 'Overview', exact: true }).click();
 
-  await expect(page.getByRole('heading', { name: 'Where are we weak' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Where to focus' })).toBeVisible();
   const tile = page.getByRole('link', { name: /Customer Contact/ });
   await expect(tile).toBeVisible();
   await expect(tile.getByText('1 system')).toBeVisible();

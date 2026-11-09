@@ -127,7 +127,7 @@ test('front doors and browse: both doors render for a seeded model, switching pe
   // the exposed capability's own tile, naming the retiring system that
   // exposes it, plus the "N capabilities exposed" summary chip.
   await page.getByRole('button', { name: 'Overview', exact: true }).click();
-  await expect(page.getByRole('heading', { name: 'Where are we weak' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Where to focus' })).toBeVisible();
   await expect(page.getByRole('link', { name: /Billing/ })).toBeVisible();
   await expect(page.getByText('1 capability exposed')).toBeVisible();
   await expect(page.getByText('lifecycle exposure')).toBeVisible();

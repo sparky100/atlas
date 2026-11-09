@@ -99,10 +99,10 @@ export function DirectorHome({ data, reload, modelId, userId, role, orgSlug, mod
 
   return (
     <div className={styles.door}>
-      <section aria-label="Where are we weak">
+      <section aria-label="Where to focus">
         <div className={styles.sectionHeader}>
           <Text as="h2" size="xl" className={styles.sectionTitle}>
-            Where are we weak
+            Where to focus
           </Text>
           <Link to={capabilityMapHref} className={styles.sectionLink}>
             <Text as="span" size="sm">
