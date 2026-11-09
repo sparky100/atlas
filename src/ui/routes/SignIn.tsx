@@ -9,7 +9,7 @@ import { Text } from '../components/Text/Text';
 import styles from './SignIn.module.css';
 
 interface LocationState {
-  from?: { pathname: string };
+  from?: { pathname: string; search?: string; hash?: string };
 }
 
 type Mode = 'signIn' | 'signUp' | 'magicLink' | 'forgotPassword';
@@ -46,7 +46,9 @@ export function SignIn() {
   const [actionSent, setActionSent] = useState(false);
 
   if (status === 'signedIn') {
-    const from = (location.state as LocationState | null)?.from?.pathname ?? '/';
+    const fromLocation = (location.state as LocationState | null)?.from;
+    // Keep the whole address, not just the path: a shared link carries its view state in the query string (nav/shareLink.ts).
+    const from = fromLocation?.pathname ? `${fromLocation.pathname}${fromLocation.search ?? ''}${fromLocation.hash ?? ''}` : '/';
     return <Navigate to={from} replace />;
   }
 

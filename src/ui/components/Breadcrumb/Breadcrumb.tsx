@@ -1,5 +1,6 @@
 import { Link } from 'react-router';
 import { Chip } from '../Chip/Chip';
+import { ShareButton } from '../ShareButton/ShareButton';
 import { Text } from '../Text/Text';
 import styles from './Breadcrumb.module.css';
 
@@ -57,6 +58,7 @@ export function Breadcrumb({ org, model, refLabel, segments = [] }: BreadcrumbPr
           </Link>
         </span>
       ))}
+      <ShareButton />
     </nav>
   );
 }
