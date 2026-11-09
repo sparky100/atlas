@@ -12,6 +12,7 @@ import {
   fromUserPreferencesRow,
   HOME_MODES,
   LANDSCAPE_COLOUR_BY_MODES,
+  START_PAGES,
   THEME_PREFERENCES,
   toUserPreferencesRow,
   type UserPreferences,
@@ -44,6 +45,7 @@ const userPreferencesArb: fc.Arbitrary<UserPreferences> = fc.record({
   // V2b: same "always a real boolean, never nullable" shape as the notify
   // fields above.
   inspectorCollapsed: fc.boolean(),
+  startPage: fc.option(fc.constantFrom(...START_PAGES), { nil: null }),
   updatedAt: fc.date({ noInvalidDate: true }).map((d) => d.toISOString()),
 });
 

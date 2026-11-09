@@ -17,13 +17,17 @@ describe('groupChangesList', () => {
     b('proposed', 'proposed', 'correct'),
   ];
 
-  it('groups only open changes by intent, in intent order', () => {
+  it('lists submitted changes (proposed, in review, approved) as waiting for review', () => {
+    expect(groupChangesList(branches).waitingForReview.map((x) => x.id)).toEqual(['prop-review', 'exp-approved', 'proposed']);
+  });
+
+  it('groups only drafts by intent, in intent order', () => {
     const { openByIntent } = groupChangesList(branches);
     expect(openByIntent.map((g) => [g.intent, g.branches.map((x) => x.id)])).toEqual([
       ['record', ['rec-draft']],
-      ['propose', ['prop-review']],
-      ['correct', ['proposed']],
-      ['explore', ['exp-draft', 'exp-approved']],
+      ['propose', []],
+      ['correct', []],
+      ['explore', ['exp-draft']],
     ]);
   });
 
@@ -36,7 +40,7 @@ describe('groupChangesList', () => {
 
   it('accounts for every change exactly once', () => {
     const g = groupChangesList(branches);
-    const all = [...g.openByIntent.flatMap((x) => x.branches), ...g.merged, ...g.cancelled, ...g.closed];
+    const all = [...g.waitingForReview, ...g.openByIntent.flatMap((x) => x.branches), ...g.merged, ...g.cancelled, ...g.closed];
     expect(all).toHaveLength(branches.length);
   });
 });

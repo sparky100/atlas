@@ -142,8 +142,8 @@ export function prefillFromWeakStage(stage: { id: UUID; name: string }, toneLabe
  */
 export function prefillFromOutgoingDisposition(element: { id: UUID; name: string }, disposition: 'migrate' | 'eliminate'): DecisionPrefill {
   return {
-    title: disposition === 'migrate' ? `Migrate ${element.name}` : `Eliminate ${element.name}`,
-    statement: `${element.name} is marked ${disposition === 'migrate' ? 'Migrate' : 'Eliminate'}, with no open change retiring it yet.`,
+    title: disposition === 'migrate' ? `Move ${element.name} to another system` : `Switch off ${element.name}`,
+    statement: `${element.name} is planned to ${disposition === 'migrate' ? 'move to another system' : 'be switched off'}, with no open change retiring it yet.`,
     sourceFindingKey: 'outgoing-no-retiring-change',
     linkedElements: [{ id: element.id, name: element.name }],
   };

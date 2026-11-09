@@ -160,6 +160,7 @@ Per-person UI preferences. Keyed on the user, not the membership: preferences fo
 | `density` | text | not null default `'comfortable'`, `check (density in ('comfortable','compact'))` |
 | `theme` | text | not null default `'system'`, `check (theme in ('system','light','dark'))` |
 | `capability_map_colour_by` | text | nullable, no default, `check (capability_map_colour_by in ('none','metric:supportingSystemCount','metric:oldestLifecycleStage','metric:lifecycleExposure'))` — Sprint U4-1 C4 |
+| `start_page` | text | nullable, no default, `check (start_page in ('home','capability-map','landscape'))` — `20261109010000_user_preferences_start_page.sql`; where the app opens when this person enters a model. Null means the role decides (owner/architect: home; everyone else: capability-map) |
 | `inspector_collapsed` | boolean | not null default false — V2b, `20260917040000_inspector_collapsed_preference.sql`; the shared Inspector panel's resting collapse state (overridden live by focus — see that migration's own column comment) |
 | `updated_at` | timestamptz | not null default now() |
 

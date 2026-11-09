@@ -46,3 +46,10 @@
   background: var(--bg-subtle);
   color: var(--text);
 }
+
+/* The header Search button is for phones; from 769px up the nav rail has its own Search item and Ctrl/⌘-K. */
+@media (min-width: 769px) {
+  .searchToggle {
+    display: none;
+  }
+}

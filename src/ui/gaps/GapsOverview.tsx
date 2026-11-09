@@ -9,7 +9,7 @@ const GAP_DESCRIPTIONS: Record<GapKind, string> = {
   owner: 'Who is accountable for each system.',
   'run-cost': 'What each system or module costs to run — Portfolio’s cost signals need it.',
   criticality: 'How much each system matters if it fails.',
-  disposition: 'Tolerate, Invest, Migrate or Eliminate.',
+  disposition: 'Keep as is, Invest, Move to another system or Switch off.',
 };
 
 /** F12 step 2: one row per gap with its count, and a way into its walk. A gap with nothing missing still shows, as done. */

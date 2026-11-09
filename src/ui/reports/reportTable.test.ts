@@ -17,7 +17,7 @@ describe('resultToTable', () => {
   });
   it('shows stored keys as words a reader would use', () => {
     expect(reportValueLabel('cost', '50k_250k')).toBe('£50k–£250k');
-    expect(reportValueLabel('disposition', 'eliminate')).toBe('Eliminate');
+    expect(reportValueLabel('disposition', 'eliminate')).toBe('Switch off');
     expect(reportValueLabel('kind', 'module')).toBe('Module');
     expect(reportValueLabel('lifecycle', 'retiring')).toBe('Retiring');
     expect(reportValueLabel('costCentre', 'a_1')).toBe('a_1');

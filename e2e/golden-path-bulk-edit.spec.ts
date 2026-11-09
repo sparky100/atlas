@@ -34,7 +34,7 @@ test('bulk edit: change two systems in the Elements grid and save them together'
   // Rows are table cells at 1280 and cards at 390 — never the toolbar's own filter options.
   const rows = page.locator('td, li');
   await expect(rows.getByText('high', { exact: true }).first()).toBeVisible();
-  await expect(rows.getByText('Migrate', { exact: true }).first()).toBeVisible();
+  await expect(rows.getByText('Move to another system', { exact: true }).first()).toBeVisible();
 
   // Each system's own page shows its new value.
   await page.getByRole('link', { name: /Payroll/ }).first().click();

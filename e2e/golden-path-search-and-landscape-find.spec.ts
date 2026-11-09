@@ -33,7 +33,7 @@ test('search anywhere finds a module by platform and name, and the landscape can
   // 1. Search anywhere, by the platform and module together — the module's own name is just "FI", which many platforms share.
   await goToModelHome(page);
   await openSearch(page);
-  await page.getByLabel('Search elements, changes and decisions').fill('SAP FI');
+  await page.getByLabel('Search elements, changes, decisions and projects').fill('SAP FI');
   const moduleOption = page.getByRole('option', { name: /\bFI\b/ });
   await expect(moduleOption).toBeVisible();
   await moduleOption.click();

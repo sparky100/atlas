@@ -342,7 +342,7 @@ describe('Disposition (F11, TIME)', () => {
     for (const type of ['system', 'container'] as const) {
       const field = ATTRIBUTE_SCHEMA_BY_TYPE[type].find((f) => f.key === 'disposition');
       expect(field).toMatchObject({ label: 'Planned action', required: false, kind: 'enum', options: ['tolerate', 'invest', 'migrate', 'eliminate'], emptyLabel: 'Not assessed' });
-      expect(field?.optionLabels).toEqual({ tolerate: 'Tolerate', invest: 'Invest', migrate: 'Migrate', eliminate: 'Eliminate' });
+      expect(field?.optionLabels).toEqual({ tolerate: 'Keep as is', invest: 'Invest', migrate: 'Move to another system', eliminate: 'Switch off' });
     }
     expect(ATTRIBUTE_SCHEMA_BY_TYPE.capability.some((f) => f.key === 'disposition')).toBe(false);
     expect(ATTRIBUTE_SCHEMA_BY_TYPE.actor.some((f) => f.key === 'disposition')).toBe(false);

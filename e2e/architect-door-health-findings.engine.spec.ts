@@ -417,7 +417,7 @@ test('S1 item 7: a model with nothing to flag collapses each group to one "N che
   await healthClear.click();
   await expect(page.getByText('0 systems not linked to a capability', { exact: true })).toBeVisible();
   await expect(page.getByText('0 capabilities with no owner', { exact: true })).toBeVisible();
-  await expect(page.getByText('0 systems marked Migrate or Eliminate with no open change retiring them', { exact: true })).toBeVisible();
+  await expect(page.getByText('0 systems planned to move or switch off with no open change retiring them', { exact: true })).toBeVisible();
   // Assurance's own line is still collapsed — expanding one group doesn't
   // expand the other.
   await expect(page.getByText(/supporting an essential function/)).toHaveCount(0);

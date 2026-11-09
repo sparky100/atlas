@@ -1,8 +1,9 @@
 import { useState, type ReactNode } from 'react';
-import { CircleHelp } from 'lucide-react';
-import { Link } from 'react-router';
+import { CircleHelp, Search } from 'lucide-react';
+import { Link, useParams } from 'react-router';
 import type { HelpContext } from '../../help/helpAssistantPrompt';
 import { HelpPanel } from '../../help/HelpPanel';
+import { OPEN_SEARCH_EVENT } from '../../search/openSearchEvent';
 import { NotificationTray } from '../NotificationTray/NotificationTray';
 import { Text } from '../Text/Text';
 import { UserMenu } from '../UserMenu/UserMenu';
@@ -33,6 +34,8 @@ export interface AppHeaderProps {
 
 export function AppHeader({ children, orgId = null, helpContext }: AppHeaderProps) {
   const [helpOpen, setHelpOpen] = useState(false);
+  // A model page: search anywhere is one tap here on a phone (the rail's Search button is two taps away, inside More).
+  const { modelSlug } = useParams<{ modelSlug: string }>();
 
   return (
     <header className={styles.header}>
@@ -48,6 +51,19 @@ export function AppHeader({ children, orgId = null, helpContext }: AppHeaderProp
         {/* The shared simmodlr header pattern (Loop, Flow, Lens, Compass,
             Atlas): [bell] [? Help] [avatar + name] [⚙ Settings] [•••] —
             the last three are UserMenu's own cluster. */}
+        {modelSlug !== undefined && (
+          <button
+            type="button"
+            className={[styles.helpToggle, styles.searchToggle].join(" ")}
+            aria-label="Search"
+            title="Search"
+            onClick={() => {
+              window.dispatchEvent(new Event(OPEN_SEARCH_EVENT));
+            }}
+          >
+            <Search size={18} aria-hidden="true" />
+          </button>
+        )}
         <NotificationTray />
         {orgId !== null && (
           <button type="button" className={styles.helpToggle} aria-label="Help" title="Help" onClick={() => { setHelpOpen(true); }}>

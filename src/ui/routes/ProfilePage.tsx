@@ -4,6 +4,7 @@ import { EmptyState } from '../components/EmptyState/EmptyState';
 import { Text } from '../components/Text/Text';
 import { useAuth } from '../auth/useAuth';
 import { useOwnProfile } from '../auth/useOwnProfile';
+import { StartPagePanel } from '../profile/StartPagePanel';
 import { NotificationPreferencesPanel } from '../profile/NotificationPreferencesPanel';
 import { ProfileView } from '../profile/ProfileView';
 import styles from './ProfilePage.module.css';
@@ -35,6 +36,7 @@ export function ProfilePage() {
         {!loading && profile && userId && (
           <>
             <ProfileView profile={profile} userId={userId} onSaved={refresh} />
+            <StartPagePanel userId={userId} />
             <NotificationPreferencesPanel userId={userId} />
           </>
         )}
