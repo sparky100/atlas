@@ -109,7 +109,7 @@ test('start a decision from the director door\'s own weak-capability tile', asyn
 
   await page.goto(`/o/${orgSlug}/m/${modelSlug}`);
   await page.getByRole('button', { name: 'Overview', exact: true }).click();
-  await expect(page.getByRole('heading', { name: 'Where are we weak' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Where to focus' })).toBeVisible();
 
   const tile = page.getByRole('link', { name: /Adult Social Care/ });
   await expect(tile).toBeVisible();
