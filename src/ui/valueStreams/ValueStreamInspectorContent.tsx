@@ -12,15 +12,8 @@ import { lifecycleToneFor } from '../elements/lifecycleTone';
 import type { MemberRole } from '../../db/types';
 import { canStartDecision } from '../orgs/useMembership';
 import { valueStreamInspectorEnablingCapabilities, valueStreamInspectorParentStream } from './valueStreamInspectorSelection';
-import type { ValueStreamStageRollup, ValueStreamTone } from './valueStreamRollup';
+import { stageToneLabel, VALUE_STREAM_TONE_LABEL, type ValueStreamStageRollup, type ValueStreamTone } from './valueStreamRollup';
 import styles from './ValueStreamInspectorContent.module.css';
-
-const TONE_LABEL: Record<ValueStreamTone, string> = {
-  ok: '', // nothing to say when there is no known exposure — the green dot is enough
-  warn: 'lifecycle exposure',
-  info: 'replacement planned',
-  neutral: 'nothing recorded',
-};
 
 const TONE_CHIP: Record<ValueStreamTone, ChipTone> = { ok: 'ok', warn: 'warn', info: 'info', neutral: 'neutral' };
 
@@ -46,9 +39,11 @@ export function ValueStreamInspectorContent({ selectedStage, valueStreamsById, t
   const parentStream = selectedStage ? valueStreamInspectorParentStream(selectedStage.stage, valueStreamsById) : null;
   const enablingCapabilities = selectedStage ? valueStreamInspectorEnablingCapabilities(selectedStage, tilesByCapabilityId) : [];
 
+  const stageDescription = selectedStage ? attributesRecord(selectedStage.stage.attributes).description : undefined;
+
   const startDecisionHref =
     selectedStage && canStartDecision(role)
-      ? `${decisionsHref}?${decisionPrefillToSearchParams(prefillFromWeakStage({ id: selectedStage.stage.element_id, name: selectedStage.stage.name }, TONE_LABEL[selectedStage.tone])).toString()}`
+      ? `${decisionsHref}?${decisionPrefillToSearchParams(prefillFromWeakStage({ id: selectedStage.stage.element_id, name: selectedStage.stage.name }, stageToneLabel(selectedStage.tone, selectedStage.enablingCapabilityIds.length))).toString()}`
       : null;
 
   return (
@@ -58,11 +53,16 @@ export function ValueStreamInspectorContent({ selectedStage, valueStreamsById, t
           <Text as="p" size="sm" tone="muted">
             {parentStream ? parentStream.name : 'Value stream'} › {selectedStage.stage.name}
           </Text>
+          {typeof stageDescription === 'string' && stageDescription.trim() !== '' && (
+            <Text as="p" size="sm">
+              {stageDescription}
+            </Text>
+          )}
           <div className={styles.attributeRow}>
             <Text as="span" size="sm" tone="muted">
               Status
             </Text>
-            {TONE_LABEL[selectedStage.tone] !== '' && <Chip tone={TONE_CHIP[selectedStage.tone]}>{TONE_LABEL[selectedStage.tone]}</Chip>}
+            {stageToneLabel(selectedStage.tone, selectedStage.enablingCapabilityIds.length) !== '' && <Chip tone={TONE_CHIP[selectedStage.tone]}>{stageToneLabel(selectedStage.tone, selectedStage.enablingCapabilityIds.length)}</Chip>}
           </div>
           {selectedStage.fitForPurpose !== null && (
             <div className={styles.attributeRow}>
@@ -87,7 +87,7 @@ export function ValueStreamInspectorContent({ selectedStage, valueStreamsById, t
                   <li key={tile.capability.element_id}>
                     <div className={styles.attributeRow}>
                       <Link to={elementHref(tile.capability.element_id)}>{tile.capability.name}</Link>
-                      {TONE_LABEL[tile.tone] !== '' && <Chip tone={TONE_CHIP[tile.tone]}>{TONE_LABEL[tile.tone]}</Chip>}
+                      {VALUE_STREAM_TONE_LABEL[tile.tone] !== '' && <Chip tone={TONE_CHIP[tile.tone]}>{VALUE_STREAM_TONE_LABEL[tile.tone]}</Chip>}
                     </div>
                     {tile.supportingSystems.length > 0 && (
                       <ul className={styles.systemList}>

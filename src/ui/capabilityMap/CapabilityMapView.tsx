@@ -265,10 +265,13 @@ export function CapabilityMapView({
  */
 export function LandscapeZoomLink({ capabilityId, count, orgSlug, modelSlug, refParam }: { capabilityId: UUID; count: number; orgSlug: string; modelSlug: string; refParam: string }) {
   if (count === 0) {
+    // A gap is a flag, so it links straight to where it is fixed: the capability's own page, where a supporting system is added.
     return (
-      <Text as="span" tone="faint" size="sm">
-        no systems
-      </Text>
+      <Link to={`/o/${orgSlug}/m/${modelSlug}/e/${capabilityId}`} className={styles.zoomLink}>
+        <Text as="span" tone="faint" size="sm">
+          no systems — add one →
+        </Text>
+      </Link>
     );
   }
   const href = `/o/${orgSlug}/m/${modelSlug}/landscape?${refParam}&capability=${capabilityId}`;
@@ -465,6 +468,13 @@ function DomainSection({
             </Link>
             <LandscapeZoomLink capabilityId={column.capability.element_id} count={count} orgSlug={orgSlug} modelSlug={modelSlug} refParam={refParam} />
             <EnablesStagesCount count={enablesCountById.get(column.capability.element_id) ?? 0} />
+            {!rollup.isOwned && (
+              <Link to={`/o/${orgSlug}/m/${modelSlug}/e/${column.capability.element_id}`} className={styles.zoomLink}>
+                <Text as="span" size="sm" tone="muted">
+                  no owner recorded — add one →
+                </Text>
+              </Link>
+            )}
             {onInspectClick && <InspectButton name={column.capability.name} onClick={() => { onInspectClick(column.capability.element_id); }} />}
             {reorderCapability && <ReorderButtons elementType="capability" element={column.capability} previous={previousSibling} next={nextSibling} siblings={siblings} context={reorderCapability} />}
           </div>

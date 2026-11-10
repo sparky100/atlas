@@ -511,9 +511,9 @@ export function buildTriggerResolvedRow(id: string, groupLabel: string, mainSyst
 
 const VALUE_STREAM_TONE_LABEL: Record<ValueStreamTone, string> = {
   ok: 'no known exposure',
-  warn: 'lifecycle exposure',
+  warn: 'end of life',
   info: 'replacement planned',
-  neutral: 'nothing recorded',
+  neutral: 'no system supports this',
 };
 
 /** "Not reached" is a real, comparable state distinct from every `ValueStreamTone` — an option reaching a stream main never touched (or vice versa) is exactly the comparison this row exists to show, not a blank cell to hide (`ValueStreamComparisonRow`'s own doc comment in `compareOptions.ts`). */

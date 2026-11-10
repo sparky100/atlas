@@ -399,7 +399,7 @@ describe('buildValueStreamRow / valueStreamToneLabel', () => {
     const optionRow: Pick<OptionComparisonRow, 'affectedValueStreams'> = { affectedValueStreams: [{ stream, tone: 'warn' }] };
     const row = buildValueStreamRow('vs1', 'Outage response', mainRow, new Map([['b1', optionRow]]));
     expect(row.main.display).toBe('not reached');
-    expect(row.options.get('b1')).toEqual({ display: 'not reached → lifecycle exposure', changed: true });
+    expect(row.options.get('b1')).toEqual({ display: 'not reached → end of life', changed: true });
   });
 
   it('collapses when both sides reach the stream with the same tone', () => {

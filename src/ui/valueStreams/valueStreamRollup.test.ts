@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { ElementsHeadRow } from '../../contracts/rows';
-import { stagesOf, streamsOf } from './valueStreamRollup';
+import { stageToneLabel, stagesOf, streamsOf, VALUE_STREAM_TONE_LABEL } from './valueStreamRollup';
 
 function element(elementId: string, name: string, parentId: string | null, order?: number): ElementsHeadRow {
   return { element_id: elementId, element_type: 'value_stream', name, parent_id: parentId, attributes: order === undefined ? {} : { order }, exists_delta_id: `create-${elementId}` };
@@ -30,5 +30,18 @@ describe('streamsOf / stagesOf', () => {
   it('a stream with no stages returns an empty list', () => {
     const streamA = element('vs-a', 'Alpha', null);
     expect(stagesOf(streamA, [streamA])).toEqual([]);
+  });
+});
+
+describe('value stream tone wording', () => {
+  it('uses the same plain words as the rest of the app and nothing for a healthy stage', () => {
+    expect(VALUE_STREAM_TONE_LABEL.warn).toBe('end of life');
+    expect(VALUE_STREAM_TONE_LABEL.ok).toBe('');
+  });
+
+  it('tells a stage nobody delivers apart from one whose capabilities have no system', () => {
+    expect(stageToneLabel('neutral', 0)).toBe('no capability delivers this');
+    expect(stageToneLabel('neutral', 2)).toBe('no system supports this');
+    expect(stageToneLabel('warn', 0)).toBe('end of life');
   });
 });
