@@ -2,6 +2,7 @@ import { Loading } from '../components/Loading/Loading';
 import { ModelEmptyState } from '../components/EmptyState/ModelEmptyState';
 import { useState } from 'react';
 import { useParams, useSearchParams } from 'react-router';
+import { Button } from '../components/Button/Button';
 import type { UUID } from '../../contracts/delta';
 import { AppHeader } from '../components/AppHeader/AppHeader';
 import { Breadcrumb } from '../components/Breadcrumb/Breadcrumb';
@@ -28,6 +29,7 @@ import { useRouteTiming } from '../perf/useRouteTiming';
 import { useValueStreams } from '../valueStreams/useValueStreams';
 import { ValueStreamInspectorContent } from '../valueStreams/ValueStreamInspectorContent';
 import { ValueStreamsMobileList } from '../valueStreams/ValueStreamsMobileList';
+import { ValueStreamsMatrixView } from '../valueStreams/ValueStreamsMatrixView';
 import { ValueStreamsView } from '../valueStreams/ValueStreamsView';
 import styles from './ValueStreamsPage.module.css';
 
@@ -48,7 +50,7 @@ import styles from './ValueStreamsPage.module.css';
  */
 export function ValueStreamsPage() {
   const { orgSlug, modelSlug } = useParams<{ orgSlug: string; modelSlug: string }>();
-  const [searchParams] = useSearchParams();
+  const [searchParams, setSearchParams] = useSearchParams();
   const { ref } = useSelectedRef();
   const viewing = isViewingMode(searchParams);
   const { userId } = useAuth();
@@ -70,6 +72,19 @@ export function ValueStreamsPage() {
   useRouteTiming('value-streams', state.status === 'ready');
 
   const narrow = useIsNarrowViewport(768);
+  // "Streams" (a row of stages per stream) or "Capabilities by stage" (the cross-map). Kept in the URL so a link opens the same layout.
+  const matrixLayout = searchParams.get('layout') === 'matrix';
+  const setLayout = (next: 'streams' | 'matrix'): void => {
+    setSearchParams(
+      (prev) => {
+        const updated = new URLSearchParams(prev);
+        if (next === 'matrix') updated.set('layout', 'matrix');
+        else updated.delete('layout');
+        return updated;
+      },
+      { replace: true },
+    );
+  };
   const [selectedStageId, setSelectedStageId] = useState<UUID | null>(null);
   const { collapsed: inspectorCollapsed, setCollapsed: setInspectorCollapsed } = useInspectorCollapsedPreference(userId);
 
@@ -130,9 +145,22 @@ export function ValueStreamsPage() {
           {state.status === 'loading' && <Loading />}
           {state.status === 'error' && <Text as="p">{state.message}</Text>}
           {state.status === 'refNotFound' && <ModelEmptyState orgSlug={orgSlug ?? ''} modelSlug={modelSlug ?? ''} />}
-          {state.status === 'ready' && !narrow && (
+          {state.status === 'ready' && !narrow && state.data.rows.length > 0 && (
+            <div role="group" aria-label="Value stream layout" className={styles.layoutToggle}>
+              <Button variant={matrixLayout ? 'ghost' : 'secondary'} aria-pressed={!matrixLayout} onClick={() => { setLayout('streams'); }}>
+                Streams
+              </Button>
+              <Button variant={matrixLayout ? 'secondary' : 'ghost'} aria-pressed={matrixLayout} onClick={() => { setLayout('matrix'); }}>
+                Capabilities by stage
+              </Button>
+            </div>
+          )}
+          {state.status === 'ready' && !narrow && matrixLayout && state.data.rows.length > 0 && (
+            <ValueStreamsMatrixView rows={state.data.rows} tilesByCapabilityId={state.data.tilesByCapabilityId} elementHref={elementHref} />
+          )}
+          {state.status === 'ready' && !narrow && !(matrixLayout && state.data.rows.length > 0) && (
             <div className={styles.row}>
-              <ValueStreamsView rows={state.data.rows} selectedStageId={selectedStageId} onInspectStage={setSelectedStageId} />
+              <ValueStreamsView rows={state.data.rows} selectedStageId={selectedStageId} onInspectStage={setSelectedStageId} tilesByCapabilityId={state.data.tilesByCapabilityId} />
               <Inspector
                 collapsed={inspectorCollapsed}
                 onToggleCollapsed={() => {

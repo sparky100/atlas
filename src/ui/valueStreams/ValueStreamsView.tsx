@@ -2,6 +2,7 @@ import { Link } from 'react-router';
 import type { UUID } from '../../contracts/delta';
 import { CollapsibleSection } from '../components/CollapsibleSection/CollapsibleSection';
 import { Text } from '../components/Text/Text';
+import type { CapabilityTileData } from '../../db/modelHome';
 import type { ValueStreamRow } from './useValueStreams';
 import { stageToneLabel, VALUE_STREAM_TONE_LABEL } from './valueStreamRollup';
 import { attributesRecord } from '../elements/attributesRecord';
@@ -15,6 +16,8 @@ export interface ValueStreamsViewProps {
   compact?: boolean;
   /** Required in `compact` mode — builds each stage tile's own element-page href. */
   elementHref?: (id: UUID) => string;
+  /** When given, each stage tile names the capabilities that deliver it, so the stage-to-capability link is visible without opening the inspector. */
+  tilesByCapabilityId?: ReadonlyMap<UUID, CapabilityTileData>;
 }
 
 /**
@@ -32,7 +35,7 @@ export interface ValueStreamsViewProps {
  * "collapsed, not hidden" treatment `RelationshipsSection.tsx`'s own
  * retracted rows use elsewhere in this codebase.
  */
-export function ValueStreamsView({ rows, selectedStageId, onInspectStage, compact, elementHref }: ValueStreamsViewProps) {
+export function ValueStreamsView({ rows, selectedStageId, onInspectStage, compact, elementHref, tilesByCapabilityId }: ValueStreamsViewProps) {
   const active = rows.filter((row) => !row.inactive);
   const inactive = rows.filter((row) => row.inactive);
 
@@ -47,13 +50,13 @@ export function ValueStreamsView({ rows, selectedStageId, onInspectStage, compac
   return (
     <div className={styles.streams}>
       {active.map((row) => (
-        <StreamRow key={row.stream.element_id} row={row} selectedStageId={selectedStageId} onInspectStage={onInspectStage} compact={compact} elementHref={elementHref} />
+        <StreamRow key={row.stream.element_id} row={row} selectedStageId={selectedStageId} onInspectStage={onInspectStage} compact={compact} elementHref={elementHref} tilesByCapabilityId={tilesByCapabilityId} />
       ))}
       {inactive.length > 0 && (
         <CollapsibleSection title={`Inactive (${String(inactive.length)})`} defaultOpen={false}>
           <div className={styles.streams}>
             {inactive.map((row) => (
-              <StreamRow key={row.stream.element_id} row={row} selectedStageId={selectedStageId} onInspectStage={onInspectStage} compact={compact} elementHref={elementHref} />
+              <StreamRow key={row.stream.element_id} row={row} selectedStageId={selectedStageId} onInspectStage={onInspectStage} compact={compact} elementHref={elementHref} tilesByCapabilityId={tilesByCapabilityId} />
             ))}
           </div>
         </CollapsibleSection>
@@ -62,7 +65,7 @@ export function ValueStreamsView({ rows, selectedStageId, onInspectStage, compac
   );
 }
 
-function StreamRow({ row, selectedStageId, onInspectStage, compact, elementHref }: { row: ValueStreamRow; selectedStageId: UUID | null | undefined; onInspectStage: ((stageId: UUID) => void) | undefined; compact: boolean | undefined; elementHref: ((id: UUID) => string) | undefined }) {
+function StreamRow({ row, selectedStageId, onInspectStage, compact, elementHref, tilesByCapabilityId }: { tilesByCapabilityId: ReadonlyMap<UUID, CapabilityTileData> | undefined; row: ValueStreamRow; selectedStageId: UUID | null | undefined; onInspectStage: ((stageId: UUID) => void) | undefined; compact: boolean | undefined; elementHref: ((id: UUID) => string) | undefined }) {
   const description = attributesRecord(row.stream.attributes).description;
   return (
     <div className={styles.streamRow}>
@@ -98,6 +101,11 @@ function StreamRow({ row, selectedStageId, onInspectStage, compact, elementHref 
                 {stageToneLabel(stage.tone, stage.enablingCapabilityIds.length) !== '' && (
                   <Text as="span" size="xs" tone="muted">{stageToneLabel(stage.tone, stage.enablingCapabilityIds.length)}</Text>
                 )}
+                {tilesByCapabilityId && stage.enablingCapabilityIds.length > 0 && (
+                  <Text as="span" size="xs" tone="muted">
+                    {delivererNames(stage.enablingCapabilityIds, tilesByCapabilityId)}
+                  </Text>
+                )}
               </>
             );
             if (compact && elementHref) {
@@ -125,4 +133,11 @@ function StreamRow({ row, selectedStageId, onInspectStage, compact, elementHref 
       </div>
     </div>
   );
+}
+
+/** "Connections, Wayleaves +2 more" — the first few capability names, so the tile stays small. */
+function delivererNames(ids: readonly UUID[], tilesByCapabilityId: ReadonlyMap<UUID, CapabilityTileData>): string {
+  const names = ids.map((id) => tilesByCapabilityId.get(id)?.capability.name).filter((name): name is string => name !== undefined);
+  const shown = names.slice(0, 3).join(', ');
+  return names.length > 3 ? `${shown} +${String(names.length - 3)} more` : shown;
 }

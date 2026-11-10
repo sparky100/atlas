@@ -36,3 +36,8 @@
     align-items: stretch;
   }
 }
+
+.layoutToggle {
+  display: flex;
+  gap: var(--space-1);
+}

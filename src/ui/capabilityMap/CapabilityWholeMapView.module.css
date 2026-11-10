@@ -1,0 +1,126 @@
+.wrapper {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  min-width: 0;
+}
+
+.summary {
+  min-height: 1.5rem;
+}
+
+.legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-3);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.legendItem {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+}
+
+.swatch {
+  width: 12px;
+  height: 12px;
+  border-radius: 3px;
+  background: var(--surface);
+  border: var(--border-width) solid var(--border-strong);
+}
+
+.swatch[data-tone='warn'] {
+  background: var(--status-weak-bg);
+  border-color: var(--status-warn);
+}
+.swatch[data-tone='danger'] {
+  background: var(--status-strong-bg);
+  border-color: var(--status-danger);
+}
+.swatch[data-tone='info'] {
+  background: var(--surface);
+  border-color: var(--status-info);
+}
+
+/* One column per top-level area; they flow to as many columns as fit, so the whole map is one page on a wide screen and a stack on a phone. */
+.grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(210px, 1fr));
+  gap: var(--space-3);
+  align-items: start;
+}
+
+.column {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  min-width: 0;
+}
+
+.domainLink {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: var(--space-2);
+  border-radius: var(--radius-sm);
+  border: var(--border-width) solid var(--border-strong);
+  border-left-width: 4px;
+  background: var(--bg-subtle);
+  color: inherit;
+  text-decoration: none;
+}
+
+.domainName {
+  font-weight: 600;
+}
+
+.tiles {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.tile {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: var(--space-1) var(--space-2);
+  border-radius: var(--radius-sm);
+  border: var(--border-width) solid var(--border);
+  border-left-width: 4px;
+  background: var(--surface);
+  color: inherit;
+  text-decoration: none;
+}
+
+.tile:hover,
+.domainLink:hover {
+  border-color: var(--border-strong);
+}
+
+.tile:focus-visible,
+.domainLink:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+}
+
+.tile[data-tone='warn'],
+.domainLink[data-tone='warn'] {
+  background: var(--status-weak-bg);
+  border-left-color: var(--status-warn);
+}
+.tile[data-tone='danger'],
+.domainLink[data-tone='danger'] {
+  background: var(--status-strong-bg);
+  border-left-color: var(--status-danger);
+}
+.tile[data-tone='info'],
+.domainLink[data-tone='info'] {
+  border-left-color: var(--status-info);
+}

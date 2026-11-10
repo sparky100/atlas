@@ -117,3 +117,15 @@
     align-items: stretch;
   }
 }
+
+/* List / Whole map toggle above the map; the map column keeps `.mapRow`'s "first child grows" rule. */
+.mapColumn {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.layoutToggle {
+  display: flex;
+  gap: var(--space-1);
+}
