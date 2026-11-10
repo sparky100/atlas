@@ -418,35 +418,40 @@
       "name": "Customer Acquisition",
       "level": 2,
       "order": 10,
-      "parentCode": "9"
+      "parentCode": "9",
+      "description": "Attracting prospective customers and converting them into applications for accounts, loans or policies."
     },
     {
       "code": "9.2",
       "name": "Know Your Customer & Identity Checks",
       "level": 2,
       "order": 20,
-      "parentCode": "9"
+      "parentCode": "9",
+      "description": "Verifying who a customer is and checking them against identity and eligibility rules before onboarding."
     },
     {
       "code": "9.3",
       "name": "Account & Policy Opening",
       "level": 2,
       "order": 30,
-      "parentCode": "9"
+      "parentCode": "9",
+      "description": "Setting up the account or policy and its terms once a customer has been accepted."
     },
     {
       "code": "9.4",
       "name": "Consent & Preferences",
       "level": 2,
       "order": 40,
-      "parentCode": "9"
+      "parentCode": "9",
+      "description": "Recording what each customer has agreed to and how they want to be contacted, and honouring it."
     },
     {
       "code": "9.5",
       "name": "Customer Servicing & Contact",
       "level": 2,
       "order": 50,
-      "parentCode": "9"
+      "parentCode": "9",
+      "description": "Handling day-to-day customer requests and changes across branch, phone, digital and intermediary channels."
     },
     {
       "code": "10",
@@ -461,35 +466,40 @@
       "name": "Product Design & Management",
       "level": 2,
       "order": 10,
-      "parentCode": "10"
+      "parentCode": "10",
+      "description": "Designing, launching and managing the range of financial products across their life."
     },
     {
       "code": "10.2",
       "name": "Pricing & Underwriting",
       "level": 2,
       "order": 20,
-      "parentCode": "10"
+      "parentCode": "10",
+      "description": "Setting prices, premiums and terms by assessing the risk each customer or policy represents."
     },
     {
       "code": "10.3",
       "name": "Credit & Risk Decisioning",
       "level": 2,
       "order": 30,
-      "parentCode": "10"
+      "parentCode": "10",
+      "description": "Deciding whether and on what terms to lend or insure, using credit and risk assessments."
     },
     {
       "code": "10.4",
       "name": "Distribution & Broker Channels",
       "level": 2,
       "order": 40,
-      "parentCode": "10"
+      "parentCode": "10",
+      "description": "Managing the branches, brokers, agents and online channels through which products are sold."
     },
     {
       "code": "10.5",
       "name": "Fair Value & Product Governance",
       "level": 2,
       "order": 50,
-      "parentCode": "10"
+      "parentCode": "10",
+      "description": "Showing that products deliver fair value to customers and are governed through their life."
     },
     {
       "code": "11",
@@ -504,35 +514,40 @@
       "name": "Payments Processing",
       "level": 2,
       "order": 10,
-      "parentCode": "11"
+      "parentCode": "11",
+      "description": "Receiving, validating and sending customer payments through payment schemes and clearing services."
     },
     {
       "code": "11.2",
       "name": "Cards & Digital Wallets",
       "level": 2,
       "order": 20,
-      "parentCode": "11"
+      "parentCode": "11",
+      "description": "Issuing and supporting cards and digital wallets, and authorising the transactions made with them."
     },
     {
       "code": "11.3",
       "name": "Account & Ledger Management",
       "level": 2,
       "order": 30,
-      "parentCode": "11"
+      "parentCode": "11",
+      "description": "Keeping the accounts and ledgers that record every balance and transaction accurately."
     },
     {
       "code": "11.4",
       "name": "Reconciliation & Settlement",
       "level": 2,
       "order": 40,
-      "parentCode": "11"
+      "parentCode": "11",
+      "description": "Matching payments and balances between internal records and external parties, and settling the differences."
     },
     {
       "code": "11.5",
       "name": "Open Banking & APIs",
       "level": 2,
       "order": 50,
-      "parentCode": "11"
+      "parentCode": "11",
+      "description": "Securely sharing customer data and payment services with authorised third parties through standard interfaces."
     },
     {
       "code": "12",
@@ -547,35 +562,40 @@
       "name": "Loan Origination & Servicing",
       "level": 2,
       "order": 10,
-      "parentCode": "12"
+      "parentCode": "12",
+      "description": "Assessing loan applications, paying out funds and administering loans until they are repaid."
     },
     {
       "code": "12.2",
       "name": "Claims Intake & Assessment",
       "level": 2,
       "order": 20,
-      "parentCode": "12"
+      "parentCode": "12",
+      "description": "Receiving insurance claims and assessing cover, validity and loss."
     },
     {
       "code": "12.3",
       "name": "Claims Settlement & Recovery",
       "level": 2,
       "order": 30,
-      "parentCode": "12"
+      "parentCode": "12",
+      "description": "Paying valid claims and recovering costs from third parties or salvage."
     },
     {
       "code": "12.4",
       "name": "Arrears & Collections",
       "level": 2,
       "order": 40,
-      "parentCode": "12"
+      "parentCode": "12",
+      "description": "Contacting customers who miss payments, agreeing repayment arrangements and recovering what is owed."
     },
     {
       "code": "12.5",
       "name": "Customer Vulnerability & Support",
       "level": 2,
       "order": 50,
-      "parentCode": "12"
+      "parentCode": "12",
+      "description": "Identifying customers in vulnerable circumstances and adjusting how they are treated and supported."
     },
     {
       "code": "13",
@@ -590,41 +610,47 @@
       "name": "Anti-Money Laundering & Sanctions",
       "level": 2,
       "order": 10,
-      "parentCode": "13"
+      "parentCode": "13",
+      "description": "Screening customers and payments against money-laundering rules and sanctions lists, and reporting suspicious activity."
     },
     {
       "code": "13.2",
       "name": "Fraud Detection & Prevention",
       "level": 2,
       "order": 20,
-      "parentCode": "13"
+      "parentCode": "13",
+      "description": "Detecting, investigating and preventing fraudulent applications, payments and claims."
     },
     {
       "code": "13.3",
       "name": "Regulatory Reporting",
       "level": 2,
       "order": 30,
-      "parentCode": "13"
+      "parentCode": "13",
+      "description": "Preparing and submitting the returns and data that regulators require."
     },
     {
       "code": "13.4",
       "name": "Capital & Liquidity Management",
       "level": 2,
       "order": 40,
-      "parentCode": "13"
+      "parentCode": "13",
+      "description": "Holding enough capital and liquid funds to meet obligations and regulatory requirements."
     },
     {
       "code": "13.5",
       "name": "Complaints & Redress",
       "level": 2,
       "order": 50,
-      "parentCode": "13"
+      "parentCode": "13",
+      "description": "Receiving and resolving customer complaints and putting right any harm caused."
     }
   ],
   "valueStreams": [
     {
       "code": "vs1",
       "name": "Join & Verify",
+      "description": "Starts when a person applies for a product. Ends when their identity is verified and the account or policy is open.",
       "order": 10,
       "stages": [
         {
@@ -657,6 +683,7 @@
     {
       "code": "vs2",
       "name": "Pay & Move Money",
+      "description": "Starts when a customer or business asks to make a payment. Ends when the payment is settled and recorded.",
       "order": 20,
       "stages": [
         {
@@ -682,6 +709,7 @@
     {
       "code": "vs3",
       "name": "Borrow or Claim",
+      "description": "Starts when a customer applies for a loan or makes a claim. Ends when funds are paid and support continues until it is closed.",
       "order": 30,
       "stages": [
         {
@@ -717,6 +745,7 @@
     {
       "code": "vs4",
       "name": "Stay Safe & Compliant",
+      "description": "Starts when activity looks suspicious or a regulatory duty falls due. Ends when it is investigated and reported.",
       "order": 40,
       "stages": [
         {

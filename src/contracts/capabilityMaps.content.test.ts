@@ -87,6 +87,20 @@ describe('content/capability-maps (validated through parseCapabilityMapContent)'
     expect(level1(electricity.content)).toEqual(level1(utility.content));
   });
 
+  it.each(maps.map((m) => [m.label, m] as const))('%s: every capability has a one-sentence definition', (_label, map) => {
+    for (const item of map.content.items) {
+      const text = item.description?.trim() ?? '';
+      expect(text, `${map.label}: ${item.code} ${item.name} has no definition`).not.toBe('');
+      expect(text.endsWith('.'), `${map.label}: ${item.code} definition should end with a full stop`).toBe(true);
+    }
+  });
+
+  it.each(maps.map((m) => [m.label, m] as const))('%s: every value stream says when it starts and ends', (_label, map) => {
+    for (const stream of map.content.valueStreams) {
+      expect(stream.description, `${map.label}: stream ${stream.name} has no description`).toMatch(/^Starts when .+\. Ends (when|with) .+\.$/);
+    }
+  });
+
   it('every map stays at draft until a named human reviewer replaces the placeholder', () => {
     for (const map of maps) {
       const placeholder = map.content.sources.some((s) => /pending human review/i.test(s.reviewedBy));

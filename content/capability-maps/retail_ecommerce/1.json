@@ -418,35 +418,40 @@
       "name": "Range Planning",
       "level": 2,
       "order": 10,
-      "parentCode": "9"
+      "parentCode": "9",
+      "description": "Deciding which products to sell, in which quantities and where."
     },
     {
       "code": "9.2",
       "name": "Supplier & Buying Management",
       "level": 2,
       "order": 20,
-      "parentCode": "9"
+      "parentCode": "9",
+      "description": "Choosing suppliers, negotiating terms and placing buying orders."
     },
     {
       "code": "9.3",
       "name": "Pricing & Promotions",
       "level": 2,
       "order": 30,
-      "parentCode": "9"
+      "parentCode": "9",
+      "description": "Setting prices and running promotions to meet sales and margin goals."
     },
     {
       "code": "9.4",
       "name": "Demand Forecasting",
       "level": 2,
       "order": 40,
-      "parentCode": "9"
+      "parentCode": "9",
+      "description": "Predicting how much of each product customers will buy, by place and time."
     },
     {
       "code": "9.5",
       "name": "Product Information Management",
       "level": 2,
       "order": 50,
-      "parentCode": "9"
+      "parentCode": "9",
+      "description": "Maintaining accurate descriptions, images and attributes for every product."
     },
     {
       "code": "10",
@@ -461,35 +466,40 @@
       "name": "Inventory & Replenishment",
       "level": 2,
       "order": 10,
-      "parentCode": "10"
+      "parentCode": "10",
+      "description": "Tracking stock levels and ordering more to keep products available without overstocking."
     },
     {
       "code": "10.2",
       "name": "Warehouse Operations",
       "level": 2,
       "order": 20,
-      "parentCode": "10"
+      "parentCode": "10",
+      "description": "Receiving, storing, picking and packing goods in distribution centres."
     },
     {
       "code": "10.3",
       "name": "Transport & Delivery",
       "level": 2,
       "order": 30,
-      "parentCode": "10"
+      "parentCode": "10",
+      "description": "Moving stock to stores and orders to customers' homes."
     },
     {
       "code": "10.4",
       "name": "Click & Collect and Returns",
       "level": 2,
       "order": 40,
-      "parentCode": "10"
+      "parentCode": "10",
+      "description": "Letting customers collect orders in store and return unwanted goods."
     },
     {
       "code": "10.5",
       "name": "Supplier Collaboration & Logistics",
       "level": 2,
       "order": 50,
-      "parentCode": "10"
+      "parentCode": "10",
+      "description": "Working with suppliers and carriers on deliveries, forecasts and shared stock information."
     },
     {
       "code": "11",
@@ -504,35 +514,40 @@
       "name": "Store Labour Scheduling",
       "level": 2,
       "order": 10,
-      "parentCode": "11"
+      "parentCode": "11",
+      "description": "Planning store staff to match expected trade."
     },
     {
       "code": "11.2",
       "name": "Point of Sale",
       "level": 2,
       "order": 20,
-      "parentCode": "11"
+      "parentCode": "11",
+      "description": "Taking payment for goods in store and recording each sale."
     },
     {
       "code": "11.3",
       "name": "Store Stock & Availability",
       "level": 2,
       "order": 30,
-      "parentCode": "11"
+      "parentCode": "11",
+      "description": "Keeping shelves stocked and showing accurate availability in store."
     },
     {
       "code": "11.4",
       "name": "Loss Prevention",
       "level": 2,
       "order": 40,
-      "parentCode": "11"
+      "parentCode": "11",
+      "description": "Reducing stock loss from theft, error and damage."
     },
     {
       "code": "11.5",
       "name": "Store Estate & Format",
       "level": 2,
       "order": 50,
-      "parentCode": "11"
+      "parentCode": "11",
+      "description": "Deciding where stores are, how big they are and how they are laid out."
     },
     {
       "code": "12",
@@ -547,35 +562,40 @@
       "name": "Website & App Experience",
       "level": 2,
       "order": 10,
-      "parentCode": "12"
+      "parentCode": "12",
+      "description": "Providing the website and mobile app that customers browse and buy from."
     },
     {
       "code": "12.2",
       "name": "Online Basket & Checkout",
       "level": 2,
       "order": 20,
-      "parentCode": "12"
+      "parentCode": "12",
+      "description": "Letting customers build an order and pay for it online."
     },
     {
       "code": "12.3",
       "name": "Search & Personalisation",
       "level": 2,
       "order": 30,
-      "parentCode": "12"
+      "parentCode": "12",
+      "description": "Helping customers find products and showing them relevant offers."
     },
     {
       "code": "12.4",
       "name": "Marketplace Management",
       "level": 2,
       "order": 40,
-      "parentCode": "12"
+      "parentCode": "12",
+      "description": "Selling through third-party marketplaces and managing those listings."
     },
     {
       "code": "12.5",
       "name": "Order Management",
       "level": 2,
       "order": 50,
-      "parentCode": "12"
+      "parentCode": "12",
+      "description": "Taking online orders and tracking them from purchase to delivery."
     },
     {
       "code": "13",
@@ -590,41 +610,47 @@
       "name": "Customer Data & Segmentation",
       "level": 2,
       "order": 10,
-      "parentCode": "13"
+      "parentCode": "13",
+      "description": "Holding a single view of each customer and grouping customers by behaviour and need."
     },
     {
       "code": "13.2",
       "name": "Loyalty & Offers",
       "level": 2,
       "order": 20,
-      "parentCode": "13"
+      "parentCode": "13",
+      "description": "Running the loyalty scheme and offers that reward repeat custom."
     },
     {
       "code": "13.3",
       "name": "Marketing & Campaigns",
       "level": 2,
       "order": 30,
-      "parentCode": "13"
+      "parentCode": "13",
+      "description": "Planning and running marketing activity across channels."
     },
     {
       "code": "13.4",
       "name": "Payments & Fraud",
       "level": 2,
       "order": 40,
-      "parentCode": "13"
+      "parentCode": "13",
+      "description": "Accepting payments securely and detecting fraudulent transactions."
     },
     {
       "code": "13.5",
       "name": "Customer Service & Returns Support",
       "level": 2,
       "order": 50,
-      "parentCode": "13"
+      "parentCode": "13",
+      "description": "Answering customer questions and resolving problems with orders and returns."
     }
   ],
   "valueStreams": [
     {
       "code": "vs1",
       "name": "Plan to Shelf",
+      "description": "Starts when a range is planned. Ends when stock is bought, priced and on the shelf.",
       "order": 10,
       "stages": [
         {
@@ -659,6 +685,7 @@
     {
       "code": "vs2",
       "name": "Click to Door",
+      "description": "Starts when a customer browses online. Ends when the order is bought and delivered.",
       "order": 20,
       "stages": [
         {
@@ -692,7 +719,8 @@
     },
     {
       "code": "vs3",
-      "name": "Store Trading",
+      "name": "Trade in Store",
+      "description": "Starts when a customer enters a store. Ends when they are served and stock losses are prevented.",
       "order": 30,
       "stages": [
         {
@@ -717,7 +745,8 @@
     },
     {
       "code": "vs4",
-      "name": "Know & Reward",
+      "name": "Know & Reward Customers",
+      "description": "Starts when customer data is captured. Ends when customers are rewarded and re-engaged.",
       "order": 40,
       "stages": [
         {

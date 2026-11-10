@@ -4,7 +4,7 @@
   "status": "draft",
   "title": "Retail Energy Supplier",
   "summary": "Capabilities of a domestic and SME electricity and gas supplier: acquisition, switching, metering data, billing, debt, trading and settlement, and industry compliance.",
-  "sourceDescription": "Starter capability map for a UK retail energy supplier, drafted for the Atlas demo organisation. Vocabulary drawn from public Ofgem licence conditions, the Balancing and Settlement Code, MHHS programme and SMETS2 / DCC documentation (consulted, not copied). Draft only \u2014 not yet reviewed by a domain expert.",
+  "sourceDescription": "Starter capability map for a UK retail energy supplier, drafted for the Atlas demo organisation. Vocabulary drawn from public Ofgem licence conditions, the Balancing and Settlement Code, MHHS programme and SMETS2 / DCC documentation (consulted, not copied). Draft only — not yet reviewed by a domain expert.",
   "sources": [
     {
       "citation": "Ofgem supply licence conditions, BSC/MHHS programme and DCC documentation (consulted for vocabulary; not copied)",
@@ -418,28 +418,32 @@
       "name": "Price Comparison & Aggregator Channels",
       "level": 2,
       "order": 10,
-      "parentCode": "9"
+      "parentCode": "9",
+      "description": "Winning customers through price comparison sites and other third-party channels."
     },
     {
       "code": "9.2",
       "name": "Direct Digital Sales",
       "level": 2,
       "order": 20,
-      "parentCode": "9"
+      "parentCode": "9",
+      "description": "Selling to customers directly through the supplier's own website, app and phone."
     },
     {
       "code": "9.3",
       "name": "Tariff Design & Pricing",
       "level": 2,
       "order": 30,
-      "parentCode": "9"
+      "parentCode": "9",
+      "description": "Setting tariffs and prices that cover costs and comply with the price cap."
     },
     {
       "code": "9.4",
       "name": "Product & Proposition Management",
       "level": 2,
       "order": 40,
-      "parentCode": "9"
+      "parentCode": "9",
+      "description": "Designing and managing the products and offers customers can choose."
     },
     {
       "code": "10",
@@ -454,28 +458,32 @@
       "name": "Switching & Registration",
       "level": 2,
       "order": 10,
-      "parentCode": "10"
+      "parentCode": "10",
+      "description": "Moving customers to the supplier and registering them with the industry."
     },
     {
       "code": "10.2",
       "name": "Credit & Identity Checks",
       "level": 2,
       "order": 20,
-      "parentCode": "10"
+      "parentCode": "10",
+      "description": "Checking new customers' credit and identity before supply begins."
     },
     {
       "code": "10.3",
       "name": "Welcome & Contract Management",
       "level": 2,
       "order": 30,
-      "parentCode": "10"
+      "parentCode": "10",
+      "description": "Welcoming customers, issuing their contract and managing it through its term."
     },
     {
       "code": "10.4",
       "name": "Smart Meter Installation Booking",
       "level": 2,
       "order": 40,
-      "parentCode": "10"
+      "parentCode": "10",
+      "description": "Arranging for smart meters to be installed at customers' premises."
     },
     {
       "code": "11",
@@ -490,35 +498,40 @@
       "name": "Meter Data Management",
       "level": 2,
       "order": 10,
-      "parentCode": "11"
+      "parentCode": "11",
+      "description": "Collecting, validating and storing the meter readings used for billing and settlement."
     },
     {
       "code": "11.2",
       "name": "Smart Meter Communications (DCC)",
       "level": 2,
       "order": 20,
-      "parentCode": "11"
+      "parentCode": "11",
+      "description": "Using the national smart meter communications network to read and control meters."
     },
     {
       "code": "11.3",
       "name": "Meter Reading & Estimation",
       "level": 2,
       "order": 30,
-      "parentCode": "11"
+      "parentCode": "11",
+      "description": "Obtaining actual readings and estimating usage when none is available."
     },
     {
       "code": "11.4",
       "name": "Meter Asset Management",
       "level": 2,
       "order": 40,
-      "parentCode": "11"
+      "parentCode": "11",
+      "description": "Tracking the meters the supplier is responsible for and their installation and condition."
     },
     {
       "code": "11.5",
       "name": "Half-Hourly Data Collection & Aggregation",
       "level": 2,
       "order": 50,
-      "parentCode": "11"
+      "parentCode": "11",
+      "description": "Collecting half-hourly consumption data and combining it for settlement."
     },
     {
       "code": "12",
@@ -533,28 +546,32 @@
       "name": "Bill Calculation & Production",
       "level": 2,
       "order": 10,
-      "parentCode": "12"
+      "parentCode": "12",
+      "description": "Working out what each customer owes and producing accurate bills."
     },
     {
       "code": "12.2",
       "name": "Payments & Direct Debit",
       "level": 2,
       "order": 20,
-      "parentCode": "12"
+      "parentCode": "12",
+      "description": "Taking payment by direct debit and other methods and recording what is received."
     },
     {
       "code": "12.3",
       "name": "Billing Exceptions & Adjustments",
       "level": 2,
       "order": 30,
-      "parentCode": "12"
+      "parentCode": "12",
+      "description": "Correcting billing errors and applying credits, refunds and adjustments."
     },
     {
       "code": "12.4",
       "name": "Revenue Assurance",
       "level": 2,
       "order": 40,
-      "parentCode": "12"
+      "parentCode": "12",
+      "description": "Checking that all energy supplied is correctly billed and paid for."
     },
     {
       "code": "13",
@@ -569,35 +586,40 @@
       "name": "Customer Service & Contact",
       "level": 2,
       "order": 10,
-      "parentCode": "13"
+      "parentCode": "13",
+      "description": "Answering customer questions and resolving problems through all contact channels."
     },
     {
       "code": "13.2",
       "name": "Complaints & Ombudsman",
       "level": 2,
       "order": 20,
-      "parentCode": "13"
+      "parentCode": "13",
+      "description": "Handling complaints, including those referred to the energy ombudsman."
     },
     {
       "code": "13.3",
       "name": "Vulnerable Customer Support",
       "level": 2,
       "order": 30,
-      "parentCode": "13"
+      "parentCode": "13",
+      "description": "Identifying customers in vulnerable circumstances and adjusting how they are treated and supported."
     },
     {
       "code": "13.4",
       "name": "Priority Services Register",
       "level": 2,
       "order": 40,
-      "parentCode": "13"
+      "parentCode": "13",
+      "description": "Keeping the register of customers who need extra help and acting on it."
     },
     {
       "code": "13.5",
       "name": "Debt Management & Collections",
       "level": 2,
       "order": 50,
-      "parentCode": "13"
+      "parentCode": "13",
+      "description": "Managing customers' arrears, agreeing repayment and recovering what is owed."
     },
     {
       "code": "14",
@@ -612,35 +634,40 @@
       "name": "Energy Procurement & Hedging",
       "level": 2,
       "order": 10,
-      "parentCode": "14"
+      "parentCode": "14",
+      "description": "Buying energy ahead of demand and hedging the supplier's exposure to price changes."
     },
     {
       "code": "14.2",
       "name": "Demand Forecasting",
       "level": 2,
       "order": 20,
-      "parentCode": "14"
+      "parentCode": "14",
+      "description": "Predicting how much energy customers will use to guide buying."
     },
     {
       "code": "14.3",
       "name": "Wholesale Settlement (BSC)",
       "level": 2,
       "order": 30,
-      "parentCode": "14"
+      "parentCode": "14",
+      "description": "Settling the energy used each day with industry under the balancing and settlement code."
     },
     {
       "code": "14.4",
       "name": "Market-wide Half-Hourly Settlement (MHHS)",
       "level": 2,
       "order": 40,
-      "parentCode": "14"
+      "parentCode": "14",
+      "description": "Settling energy using half-hourly data for every customer under the market-wide reform."
     },
     {
       "code": "14.5",
       "name": "Imbalance & Position Management",
       "level": 2,
       "order": 50,
-      "parentCode": "14"
+      "parentCode": "14",
+      "description": "Managing the gap between energy bought and energy used and the cost of correcting it."
     },
     {
       "code": "15",
@@ -655,28 +682,32 @@
       "name": "Ofgem Regulatory Reporting",
       "level": 2,
       "order": 10,
-      "parentCode": "15"
+      "parentCode": "15",
+      "description": "Reporting to the energy regulator as the supply licence requires."
     },
     {
       "code": "15.2",
       "name": "Industry Codes Compliance",
       "level": 2,
       "order": 20,
-      "parentCode": "15"
+      "parentCode": "15",
+      "description": "Meeting the obligations of the industry codes the supplier has signed up to."
     },
     {
       "code": "15.3",
       "name": "Environmental & Social Obligations",
       "level": 2,
       "order": 30,
-      "parentCode": "15"
+      "parentCode": "15",
+      "description": "Delivering government schemes for energy efficiency, carbon and social support."
     },
     {
       "code": "15.4",
       "name": "Price Cap Compliance",
       "level": 2,
       "order": 40,
-      "parentCode": "15"
+      "parentCode": "15",
+      "description": "Keeping customer prices within the cap set by the regulator."
     },
     {
       "code": "16",
@@ -691,27 +722,31 @@
       "name": "Smart Tariffs & Home Energy Services",
       "level": 2,
       "order": 10,
-      "parentCode": "16"
+      "parentCode": "16",
+      "description": "Offering time-of-use tariffs and services that help customers understand and manage their energy."
     },
     {
       "code": "16.2",
       "name": "EV & Heat Pump Propositions",
       "level": 2,
       "order": 20,
-      "parentCode": "16"
+      "parentCode": "16",
+      "description": "Offering electric vehicle and heat pump tariffs, installation and services."
     },
     {
       "code": "16.3",
       "name": "Flexibility & Demand-Side Response",
       "level": 2,
       "order": 30,
-      "parentCode": "16"
+      "parentCode": "16",
+      "description": "Rewarding customers for shifting when they use energy and selling that flexibility."
     }
   ],
   "valueStreams": [
     {
       "code": "vs1",
       "name": "Acquire & Onboard",
+      "description": "Starts when a prospect enquires or switches. Ends when they are registered, welcomed and have a smart meter booked.",
       "order": 10,
       "stages": [
         {
@@ -747,6 +782,7 @@
     {
       "code": "vs2",
       "name": "Meter to Cash",
+      "description": "Starts when meter data is collected. Ends when the bill is issued and payment is collected.",
       "order": 20,
       "stages": [
         {
@@ -783,6 +819,7 @@
     {
       "code": "vs3",
       "name": "Care & Support",
+      "description": "Starts when a customer contacts us. Ends when the issue is resolved and vulnerable customers are protected.",
       "order": 30,
       "stages": [
         {
@@ -808,6 +845,7 @@
     {
       "code": "vs4",
       "name": "Trade & Settle",
+      "description": "Starts when demand is forecast. Ends when the energy is bought and settled with the industry.",
       "order": 40,
       "stages": [
         {

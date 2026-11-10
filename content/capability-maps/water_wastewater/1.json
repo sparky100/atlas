@@ -418,35 +418,40 @@
       "name": "Water Resource Planning",
       "level": 2,
       "order": 10,
-      "parentCode": "9"
+      "parentCode": "9",
+      "description": "Planning how to secure enough raw water for the long term, accounting for growth and climate."
     },
     {
       "code": "9.2",
       "name": "Abstraction & Reservoir Management",
       "level": 2,
       "order": 20,
-      "parentCode": "9"
+      "parentCode": "9",
+      "description": "Managing the abstraction of water from rivers and boreholes and its storage in reservoirs."
     },
     {
       "code": "9.3",
       "name": "Water Treatment Operations",
       "level": 2,
       "order": 30,
-      "parentCode": "9"
+      "parentCode": "9",
+      "description": "Running treatment works that make raw water safe to drink."
     },
     {
       "code": "9.4",
       "name": "Water Quality Monitoring & Compliance",
       "level": 2,
       "order": 40,
-      "parentCode": "9"
+      "parentCode": "9",
+      "description": "Sampling and testing water and demonstrating it meets drinking water standards."
     },
     {
       "code": "9.5",
       "name": "Drought & Demand Management",
       "level": 2,
       "order": 50,
-      "parentCode": "9"
+      "parentCode": "9",
+      "description": "Managing supply during dry periods and encouraging customers to use less water."
     },
     {
       "code": "10",
@@ -461,35 +466,40 @@
       "name": "Network Modelling & Hydraulics",
       "level": 2,
       "order": 10,
-      "parentCode": "10"
+      "parentCode": "10",
+      "description": "Modelling how water flows through the network to plan operations and investment."
     },
     {
       "code": "10.2",
       "name": "Leakage Detection & Control",
       "level": 2,
       "order": 20,
-      "parentCode": "10"
+      "parentCode": "10",
+      "description": "Finding, locating and fixing leaks, and tracking how much water is lost."
     },
     {
       "code": "10.3",
       "name": "Pressure & Flow Management",
       "level": 2,
       "order": 30,
-      "parentCode": "10"
+      "parentCode": "10",
+      "description": "Controlling pressure and flow so supply is steady and damage to pipes is limited."
     },
     {
       "code": "10.4",
       "name": "Mains Repair & Renewal",
       "level": 2,
       "order": 40,
-      "parentCode": "10"
+      "parentCode": "10",
+      "description": "Repairing and replacing pipes, valves and other network assets."
     },
     {
       "code": "10.5",
       "name": "Bursts & Supply Interruption Response",
       "level": 2,
       "order": 50,
-      "parentCode": "10"
+      "parentCode": "10",
+      "description": "Responding to bursts and keeping customers supplied or restoring their supply."
     },
     {
       "code": "11",
@@ -504,35 +514,40 @@
       "name": "Sewer Network Operations",
       "level": 2,
       "order": 10,
-      "parentCode": "11"
+      "parentCode": "11",
+      "description": "Operating and maintaining the sewers that carry wastewater away."
     },
     {
       "code": "11.2",
       "name": "Wastewater Treatment",
       "level": 2,
       "order": 20,
-      "parentCode": "11"
+      "parentCode": "11",
+      "description": "Treating wastewater so it can be returned safely to the environment."
     },
     {
       "code": "11.3",
       "name": "Storm Overflow & Pollution Management",
       "level": 2,
       "order": 30,
-      "parentCode": "11"
+      "parentCode": "11",
+      "description": "Reducing storm overflow discharges and responding to pollution incidents."
     },
     {
       "code": "11.4",
       "name": "Sludge & Biosolids Management",
       "level": 2,
       "order": 40,
-      "parentCode": "11"
+      "parentCode": "11",
+      "description": "Treating and disposing of or reusing the sludge produced by wastewater treatment."
     },
     {
       "code": "11.5",
       "name": "Environmental Permitting & Monitoring",
       "level": 2,
       "order": 50,
-      "parentCode": "11"
+      "parentCode": "11",
+      "description": "Holding environmental permits and monitoring the effect of discharges."
     },
     {
       "code": "12",
@@ -547,35 +562,40 @@
       "name": "Customer Contact & Self-Service",
       "level": 2,
       "order": 10,
-      "parentCode": "12"
+      "parentCode": "12",
+      "description": "Handling customer contact and enabling customers to manage their account online."
     },
     {
       "code": "12.2",
       "name": "Metering & Meter Reading",
       "level": 2,
       "order": 20,
-      "parentCode": "12"
+      "parentCode": "12",
+      "description": "Fitting, maintaining and reading customer meters."
     },
     {
       "code": "12.3",
       "name": "Billing & Collections",
       "level": 2,
       "order": 30,
-      "parentCode": "12"
+      "parentCode": "12",
+      "description": "Producing bills and collecting payment, including from customers in arrears."
     },
     {
       "code": "12.4",
       "name": "Affordability & Priority Services",
       "level": 2,
       "order": 40,
-      "parentCode": "12"
+      "parentCode": "12",
+      "description": "Helping customers who struggle to pay and supporting those who need extra care."
     },
     {
       "code": "12.5",
       "name": "Retail Market (Business Customers)",
       "level": 2,
       "order": 50,
-      "parentCode": "12"
+      "parentCode": "12",
+      "description": "Serving business customers who are able to choose their retailer."
     },
     {
       "code": "13",
@@ -590,41 +610,47 @@
       "name": "Ofwat Performance Reporting",
       "level": 2,
       "order": 10,
-      "parentCode": "13"
+      "parentCode": "13",
+      "description": "Measuring and reporting performance against the regulator's commitments."
     },
     {
       "code": "13.2",
       "name": "Drinking Water Inspectorate Compliance",
       "level": 2,
       "order": 20,
-      "parentCode": "13"
+      "parentCode": "13",
+      "description": "Meeting the drinking water inspectorate's requirements and reporting on water quality."
     },
     {
       "code": "13.3",
       "name": "Price Review & Business Plan",
       "level": 2,
       "order": 30,
-      "parentCode": "13"
+      "parentCode": "13",
+      "description": "Preparing the business plan and evidence for each price review."
     },
     {
       "code": "13.4",
       "name": "Asset Management Plan & Investment",
       "level": 2,
       "order": 40,
-      "parentCode": "13"
+      "parentCode": "13",
+      "description": "Planning the investment needed to maintain and improve the assets over the long term."
     },
     {
       "code": "13.5",
       "name": "Dam & Reservoir Safety",
       "level": 2,
       "order": 50,
-      "parentCode": "13"
+      "parentCode": "13",
+      "description": "Meeting the safety duties that apply to dams and reservoirs."
     }
   ],
   "valueStreams": [
     {
       "code": "vs1",
       "name": "Source to Tap",
+      "description": "Starts when raw water is sourced. Ends when treated water reaches customers' taps.",
       "order": 10,
       "stages": [
         {
@@ -652,6 +678,7 @@
     {
       "code": "vs2",
       "name": "Find & Fix Leaks",
+      "description": "Starts when a leak is suspected. Ends when it is found and fixed.",
       "order": 20,
       "stages": [
         {
@@ -676,6 +703,7 @@
     {
       "code": "vs3",
       "name": "Return to Environment",
+      "description": "Starts when wastewater is collected. Ends when it is treated and returned to the environment.",
       "order": 30,
       "stages": [
         {
@@ -701,6 +729,7 @@
     {
       "code": "vs4",
       "name": "Meter to Cash",
+      "description": "Starts when water use is measured. Ends when the bill is issued and paid.",
       "order": 40,
       "stages": [
         {

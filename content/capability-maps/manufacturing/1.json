@@ -418,35 +418,40 @@
       "name": "Product Lifecycle Management",
       "level": 2,
       "order": 10,
-      "parentCode": "9"
+      "parentCode": "9",
+      "description": "Managing product definitions, versions and documents from concept through to withdrawal."
     },
     {
       "code": "9.2",
       "name": "Engineering Change Management",
       "level": 2,
       "order": 20,
-      "parentCode": "9"
+      "parentCode": "9",
+      "description": "Controlling proposed changes to a product design and recording their impact before approval."
     },
     {
       "code": "9.3",
       "name": "Bill of Materials Management",
       "level": 2,
       "order": 30,
-      "parentCode": "9"
+      "parentCode": "9",
+      "description": "Maintaining the structured list of parts, materials and quantities that make up each product."
     },
     {
       "code": "9.4",
       "name": "Simulation & Testing",
       "level": 2,
       "order": 40,
-      "parentCode": "9"
+      "parentCode": "9",
+      "description": "Predicting and proving product behaviour through simulation, prototypes and test."
     },
     {
       "code": "9.5",
       "name": "Regulatory & Standards Compliance",
       "level": 2,
       "order": 50,
-      "parentCode": "9"
+      "parentCode": "9",
+      "description": "Making sure products meet the regulations and standards that apply to them."
     },
     {
       "code": "10",
@@ -461,35 +466,40 @@
       "name": "Demand & Capacity Planning",
       "level": 2,
       "order": 10,
-      "parentCode": "10"
+      "parentCode": "10",
+      "description": "Forecasting demand and matching it to available capacity, materials and labour."
     },
     {
       "code": "10.2",
       "name": "Production Scheduling",
       "level": 2,
       "order": 20,
-      "parentCode": "10"
+      "parentCode": "10",
+      "description": "Sequencing orders across lines and machines to meet delivery dates."
     },
     {
       "code": "10.3",
       "name": "Shop Floor Execution",
       "level": 2,
       "order": 30,
-      "parentCode": "10"
+      "parentCode": "10",
+      "description": "Running production orders on the shop floor and recording what is made."
     },
     {
       "code": "10.4",
       "name": "Traceability & Genealogy",
       "level": 2,
       "order": 40,
-      "parentCode": "10"
+      "parentCode": "10",
+      "description": "Recording which materials, machines and people went into each batch or unit."
     },
     {
       "code": "10.5",
       "name": "Process Control & Automation",
       "level": 2,
       "order": 50,
-      "parentCode": "10"
+      "parentCode": "10",
+      "description": "Monitoring and adjusting machines and processes so they run within set limits."
     },
     {
       "code": "11",
@@ -504,35 +514,40 @@
       "name": "Quality Management",
       "level": 2,
       "order": 10,
-      "parentCode": "11"
+      "parentCode": "11",
+      "description": "Defining quality plans and standards and monitoring performance against them."
     },
     {
       "code": "11.2",
       "name": "Inspection & Non-Conformance",
       "level": 2,
       "order": 20,
-      "parentCode": "11"
+      "parentCode": "11",
+      "description": "Checking products against specification and handling those that fail."
     },
     {
       "code": "11.3",
       "name": "Supplier Quality",
       "level": 2,
       "order": 30,
-      "parentCode": "11"
+      "parentCode": "11",
+      "description": "Assessing and improving the quality of what suppliers deliver."
     },
     {
       "code": "11.4",
       "name": "Calibration & Audit",
       "level": 2,
       "order": 40,
-      "parentCode": "11"
+      "parentCode": "11",
+      "description": "Keeping measuring equipment accurate and checking that quality procedures are followed."
     },
     {
       "code": "11.5",
       "name": "Product Recall Management",
       "level": 2,
       "order": 50,
-      "parentCode": "11"
+      "parentCode": "11",
+      "description": "Identifying affected products and withdrawing or correcting them when a defect is found."
     },
     {
       "code": "12",
@@ -547,35 +562,40 @@
       "name": "Preventive & Predictive Maintenance",
       "level": 2,
       "order": 10,
-      "parentCode": "12"
+      "parentCode": "12",
+      "description": "Planning servicing and repairs, based on schedules and equipment condition, to avoid breakdowns."
     },
     {
       "code": "12.2",
       "name": "Spare Parts Management",
       "level": 2,
       "order": 20,
-      "parentCode": "12"
+      "parentCode": "12",
+      "description": "Holding and issuing the spare parts needed to keep equipment running."
     },
     {
       "code": "12.3",
       "name": "Equipment Performance Monitoring",
       "level": 2,
       "order": 30,
-      "parentCode": "12"
+      "parentCode": "12",
+      "description": "Measuring how well equipment is running, how often it stops and why."
     },
     {
       "code": "12.4",
       "name": "Energy & Utilities Management",
       "level": 2,
       "order": 40,
-      "parentCode": "12"
+      "parentCode": "12",
+      "description": "Managing and reducing the energy, water and other utilities that production consumes."
     },
     {
       "code": "12.5",
-      "name": "Health & Safety on the Line",
+      "name": "Plant Health & Safety",
       "level": 2,
       "order": 50,
-      "parentCode": "12"
+      "parentCode": "12",
+      "description": "Keeping people safe around plant and equipment and meeting health and safety duties."
     },
     {
       "code": "13",
@@ -590,41 +610,47 @@
       "name": "Supplier Management & Sourcing",
       "level": 2,
       "order": 10,
-      "parentCode": "13"
+      "parentCode": "13",
+      "description": "Choosing, contracting with and managing the suppliers of materials and components."
     },
     {
       "code": "13.2",
       "name": "Materials Planning",
       "level": 2,
       "order": 20,
-      "parentCode": "13"
+      "parentCode": "13",
+      "description": "Working out which materials are needed, in what quantity and by when."
     },
     {
       "code": "13.3",
       "name": "Warehousing & Inventory",
       "level": 2,
       "order": 30,
-      "parentCode": "13"
+      "parentCode": "13",
+      "description": "Storing materials and finished goods and keeping accurate stock records."
     },
     {
       "code": "13.4",
       "name": "Outbound Logistics",
       "level": 2,
       "order": 40,
-      "parentCode": "13"
+      "parentCode": "13",
+      "description": "Moving finished goods to customers and distribution points."
     },
     {
       "code": "13.5",
       "name": "Order Management & Customer Delivery",
       "level": 2,
       "order": 50,
-      "parentCode": "13"
+      "parentCode": "13",
+      "description": "Taking customer orders and managing them through to delivery and invoicing."
     }
   ],
   "valueStreams": [
     {
       "code": "vs1",
       "name": "Design to Release",
+      "description": "Starts when a new product or change is proposed. Ends when the design is verified and released to production.",
       "order": 10,
       "stages": [
         {
@@ -658,6 +684,7 @@
     {
       "code": "vs2",
       "name": "Plan to Produce",
+      "description": "Starts when demand is forecast. Ends when orders are scheduled and made.",
       "order": 20,
       "stages": [
         {
@@ -692,6 +719,7 @@
     {
       "code": "vs3",
       "name": "Assure Quality",
+      "description": "Starts when production output or supplier deliveries are checked. Ends when they meet specification or non-conformances are under control.",
       "order": 30,
       "stages": [
         {
@@ -716,6 +744,7 @@
     {
       "code": "vs4",
       "name": "Source to Deliver",
+      "description": "Starts when materials are sourced. Ends when finished goods are stored and shipped to the customer.",
       "order": 40,
       "stages": [
         {
