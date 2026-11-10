@@ -26,6 +26,23 @@ export type ValueStreamTone = CapabilityTileData['tone'];
 /** Index = severity, worst last — `warn` outranks `neutral` outranks `info` outranks `ok` (ADR-023's own stated order). */
 export const TONE_SEVERITY: readonly ValueStreamTone[] = ['ok', 'info', 'neutral', 'warn'];
 
+/**
+ * The words a value stream screen uses for each tone — the same plain wording
+ * Overview, the capability map and Landscape use ("end of life"). `ok` has
+ * nothing to say: only problems get a label.
+ */
+export const VALUE_STREAM_TONE_LABEL: Record<ValueStreamTone, string> = {
+  ok: '',
+  warn: 'end of life',
+  info: 'replacement planned',
+  neutral: 'no system supports this',
+};
+
+/** A stage's own label: a stage that no capability delivers says so, rather than the capability-level "no system supports this". */
+export function stageToneLabel(tone: ValueStreamTone, enablingCapabilityCount: number): string {
+  return tone === 'neutral' && enablingCapabilityCount === 0 ? 'no capability delivers this' : VALUE_STREAM_TONE_LABEL[tone];
+}
+
 /** The worst (highest-severity) tone among `tones`, or `undefined` if the list is empty — callers that have their own "nothing here" tone (a stage with no enabling capability reads `neutral`, not "undefined") supply it themselves rather than this function guessing one. */
 export function worstTone(tones: readonly ValueStreamTone[]): ValueStreamTone | undefined {
   let worst: ValueStreamTone | undefined;

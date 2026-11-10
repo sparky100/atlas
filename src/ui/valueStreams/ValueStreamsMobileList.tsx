@@ -4,15 +4,8 @@ import type { UUID } from '../../contracts/delta';
 import { CollapsibleSection } from '../components/CollapsibleSection/CollapsibleSection';
 import { Text } from '../components/Text/Text';
 import type { ValueStreamRow } from './useValueStreams';
-import type { ValueStreamStageRollup, ValueStreamTone } from './valueStreamRollup';
+import { stageToneLabel, VALUE_STREAM_TONE_LABEL, type ValueStreamStageRollup } from './valueStreamRollup';
 import styles from './ValueStreamsMobileList.module.css';
-
-const TONE_LABEL: Record<ValueStreamTone, string> = {
-  ok: '', // nothing to say when there is no known exposure — the green dot is enough
-  warn: 'lifecycle exposure',
-  info: 'replacement planned',
-  neutral: 'nothing recorded',
-};
 
 export interface ValueStreamsMobileListProps {
   rows: readonly ValueStreamRow[];
@@ -50,8 +43,8 @@ export function ValueStreamsMobileList({ rows, selectedStageId, onSelectStage, r
         meta={
           <span className={styles.factIndicator}>
             <span className={styles.factDot} data-tone={row.rollup.tone} aria-hidden="true" />
-            {TONE_LABEL[row.rollup.tone] !== '' && (
-              <Text as="span" size="xs" tone="muted">{TONE_LABEL[row.rollup.tone]}</Text>
+            {VALUE_STREAM_TONE_LABEL[row.rollup.tone] !== '' && (
+              <Text as="span" size="xs" tone="muted">{VALUE_STREAM_TONE_LABEL[row.rollup.tone]}</Text>
             )}
           </span>
         }
@@ -81,8 +74,8 @@ export function ValueStreamsMobileList({ rows, selectedStageId, onSelectStage, r
                 <Text as="span" size="sm">
                   {stage.stage.name}
                 </Text>
-                {TONE_LABEL[stage.tone] !== '' && (
-                  <Text as="span" size="xs" tone="muted">{TONE_LABEL[stage.tone]}</Text>
+                {stageToneLabel(stage.tone, stage.enablingCapabilityIds.length) !== '' && (
+                  <Text as="span" size="xs" tone="muted">{stageToneLabel(stage.tone, stage.enablingCapabilityIds.length)}</Text>
                 )}
               </button>
               {selectedStageId === stage.stage.element_id && <div className={styles.detail}>{renderStageDetail(stage)}</div>}

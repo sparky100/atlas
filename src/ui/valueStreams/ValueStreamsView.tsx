@@ -3,15 +3,9 @@ import type { UUID } from '../../contracts/delta';
 import { CollapsibleSection } from '../components/CollapsibleSection/CollapsibleSection';
 import { Text } from '../components/Text/Text';
 import type { ValueStreamRow } from './useValueStreams';
-import type { ValueStreamTone } from './valueStreamRollup';
+import { stageToneLabel, VALUE_STREAM_TONE_LABEL } from './valueStreamRollup';
+import { attributesRecord } from '../elements/attributesRecord';
 import styles from './ValueStreamsView.module.css';
-
-const TONE_LABEL: Record<ValueStreamTone, string> = {
-  ok: '', // nothing to say when there is no known exposure — the green dot is enough
-  warn: 'lifecycle exposure',
-  info: 'replacement planned',
-  neutral: 'nothing recorded',
-};
 
 export interface ValueStreamsViewProps {
   rows: readonly ValueStreamRow[];
@@ -69,6 +63,7 @@ export function ValueStreamsView({ rows, selectedStageId, onInspectStage, compac
 }
 
 function StreamRow({ row, selectedStageId, onInspectStage, compact, elementHref }: { row: ValueStreamRow; selectedStageId: UUID | null | undefined; onInspectStage: ((stageId: UUID) => void) | undefined; compact: boolean | undefined; elementHref: ((id: UUID) => string) | undefined }) {
+  const description = attributesRecord(row.stream.attributes).description;
   return (
     <div className={styles.streamRow}>
       <div className={styles.streamHeader}>
@@ -77,11 +72,16 @@ function StreamRow({ row, selectedStageId, onInspectStage, compact, elementHref 
         </Text>
         <span className={styles.factIndicator}>
           <span className={styles.factDot} data-tone={row.rollup.tone} aria-hidden="true" />
-          {TONE_LABEL[row.rollup.tone] !== '' && (
-            <Text as="span" size="sm" tone="muted">{TONE_LABEL[row.rollup.tone]}</Text>
+          {VALUE_STREAM_TONE_LABEL[row.rollup.tone] !== '' && (
+            <Text as="span" size="sm" tone="muted">{VALUE_STREAM_TONE_LABEL[row.rollup.tone]}</Text>
           )}
         </span>
       </div>
+      {typeof description === 'string' && description.trim() !== '' && (
+        <Text as="p" size="sm" tone="muted">
+          {description}
+        </Text>
+      )}
       <div className={styles.stages}>
         {row.stages.length === 0 ? (
           <Text as="p" size="sm" tone="muted">
@@ -95,8 +95,8 @@ function StreamRow({ row, selectedStageId, onInspectStage, compact, elementHref 
                 <Text as="span" size="sm" className={styles.stageName}>
                   {stage.stage.name}
                 </Text>
-                {TONE_LABEL[stage.tone] !== '' && (
-                  <Text as="span" size="xs" tone="muted">{TONE_LABEL[stage.tone]}</Text>
+                {stageToneLabel(stage.tone, stage.enablingCapabilityIds.length) !== '' && (
+                  <Text as="span" size="xs" tone="muted">{stageToneLabel(stage.tone, stage.enablingCapabilityIds.length)}</Text>
                 )}
               </>
             );

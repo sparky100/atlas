@@ -122,6 +122,17 @@ passes the parser can't fail the database):
   a process (a verb phrase, a lifecycle step) or an org unit (a team, a
   department). `docs/review/capability-maps.md` lists the ones that look
   wrong.
+- Definitions are enforced by `capabilityMaps.content.test.ts`: every
+  capability, at every level, has a one-sentence definition ending in a full
+  stop. Write what the capability is able to do, starting with an -ing verb
+  where natural ("Setting prices…"), about 8–18 words.
+- Value streams are end-to-end journeys seen from the person or party they
+  serve (a customer, patient, tenant, the regulator), named as a verb phrase
+  ("Look After Customers", "Pay the council") or "X to Y" ("Meter to Cash") —
+  never a group of capabilities ("Data", "DSO"). Stages are short verb or
+  verb–noun labels in the order work happens. Every stream carries a
+  description in the form "Starts when …. Ends when/with ….", also enforced
+  by the test.
 - Shared capabilities use identical wording in every map: Finance, Human
   Resources, Procurement, Information Management, Customer Contact,
   Estates, Digital & Technology, Governance & Assurance.

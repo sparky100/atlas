@@ -418,35 +418,40 @@
       "name": "Timetable Planning",
       "level": 2,
       "order": 10,
-      "parentCode": "9"
+      "parentCode": "9",
+      "description": "Designing the timetable of services that will run for each period."
     },
     {
       "code": "9.2",
       "name": "Train Path & Capacity Allocation",
       "level": 2,
       "order": 20,
-      "parentCode": "9"
+      "parentCode": "9",
+      "description": "Agreeing which train paths and network capacity each service may use."
     },
     {
       "code": "9.3",
       "name": "Rolling Stock Diagramming",
       "level": 2,
       "order": 30,
-      "parentCode": "9"
+      "parentCode": "9",
+      "description": "Assigning trains and vehicles to the services they will operate."
     },
     {
       "code": "9.4",
       "name": "Crew Rostering",
       "level": 2,
       "order": 40,
-      "parentCode": "9"
+      "parentCode": "9",
+      "description": "Planning which drivers and train crew work each service within working-time rules."
     },
     {
       "code": "9.5",
       "name": "Performance & Delay Attribution",
       "level": 2,
       "order": 50,
-      "parentCode": "9"
+      "parentCode": "9",
+      "description": "Recording delays and agreeing which party is responsible for them."
     },
     {
       "code": "10",
@@ -461,35 +466,40 @@
       "name": "Real-Time Service Control",
       "level": 2,
       "order": 10,
-      "parentCode": "10"
+      "parentCode": "10",
+      "description": "Monitoring and managing trains and staff in real time to keep services on time."
     },
     {
       "code": "10.2",
       "name": "Disruption & Contingency Management",
       "level": 2,
       "order": 20,
-      "parentCode": "10"
+      "parentCode": "10",
+      "description": "Responding to incidents and disruption and restoring normal service."
     },
     {
       "code": "10.3",
       "name": "Station Operations",
       "level": 2,
       "order": 30,
-      "parentCode": "10"
+      "parentCode": "10",
+      "description": "Running stations safely day to day, including customer information and passenger flow."
     },
     {
       "code": "10.4",
       "name": "Depot & Stabling Operations",
       "level": 2,
       "order": 40,
-      "parentCode": "10"
+      "parentCode": "10",
+      "description": "Managing train movements, stabling and preparation at depots and sidings."
     },
     {
       "code": "10.5",
-      "name": "Network Rail Interface",
+      "name": "Infrastructure Manager Interface",
       "level": 2,
       "order": 50,
-      "parentCode": "10"
+      "parentCode": "10",
+      "description": "Coordinating with the infrastructure manager on access, possessions and day-to-day operation of the network."
     },
     {
       "code": "11",
@@ -504,35 +514,40 @@
       "name": "Fleet Maintenance Planning",
       "level": 2,
       "order": 10,
-      "parentCode": "11"
+      "parentCode": "11",
+      "description": "Scheduling servicing and overhauls so enough trains are available."
     },
     {
       "code": "11.2",
       "name": "Condition Monitoring & Diagnostics",
       "level": 2,
       "order": 20,
-      "parentCode": "11"
+      "parentCode": "11",
+      "description": "Using sensor and inspection data to detect faults and predict failures."
     },
     {
       "code": "11.3",
       "name": "Infrastructure Inspection & Renewal",
       "level": 2,
       "order": 30,
-      "parentCode": "11"
+      "parentCode": "11",
+      "description": "Inspecting track, structures and signalling and planning repairs and renewals."
     },
     {
       "code": "11.4",
       "name": "Spares & Depot Logistics",
       "level": 2,
       "order": 40,
-      "parentCode": "11"
+      "parentCode": "11",
+      "description": "Managing the spare parts and materials that depots need to keep trains running."
     },
     {
       "code": "11.5",
       "name": "Accessibility & Station Assets",
       "level": 2,
       "order": 50,
-      "parentCode": "11"
+      "parentCode": "11",
+      "description": "Maintaining lifts, ramps, platforms and other assets that people rely on to travel."
     },
     {
       "code": "12",
@@ -547,35 +562,40 @@
       "name": "Fares & Ticketing",
       "level": 2,
       "order": 10,
-      "parentCode": "12"
+      "parentCode": "12",
+      "description": "Setting fares and ticket rules, and selling and validating tickets."
     },
     {
       "code": "12.2",
       "name": "Journey Planning & Passenger Information",
       "level": 2,
       "order": 20,
-      "parentCode": "12"
+      "parentCode": "12",
+      "description": "Giving passengers accurate information on services, delays and routes before and during a journey."
     },
     {
       "code": "12.3",
       "name": "Retail Channels & Smart Ticketing",
       "level": 2,
       "order": 30,
-      "parentCode": "12"
+      "parentCode": "12",
+      "description": "Selling tickets through stations, websites, apps and smartcards."
     },
     {
       "code": "12.4",
       "name": "Delay Repay & Compensation",
       "level": 2,
       "order": 40,
-      "parentCode": "12"
+      "parentCode": "12",
+      "description": "Assessing and paying compensation to passengers for delayed or cancelled journeys."
     },
     {
       "code": "12.5",
       "name": "Accessibility & Assisted Travel",
       "level": 2,
       "order": 50,
-      "parentCode": "12"
+      "parentCode": "12",
+      "description": "Helping disabled and less mobile passengers to travel, including booking assistance."
     },
     {
       "code": "13",
@@ -590,41 +610,47 @@
       "name": "Safety Management System",
       "level": 2,
       "order": 10,
-      "parentCode": "13"
+      "parentCode": "13",
+      "description": "Operating the procedures, roles and records that control safety risk."
     },
     {
       "code": "13.2",
       "name": "Incident Investigation",
       "level": 2,
       "order": 20,
-      "parentCode": "13"
+      "parentCode": "13",
+      "description": "Investigating accidents and near misses and acting on what is found."
     },
     {
       "code": "13.3",
       "name": "Railway Group Standards Compliance",
       "level": 2,
       "order": 30,
-      "parentCode": "13"
+      "parentCode": "13",
+      "description": "Meeting the mandatory standards that apply to railway operation."
     },
     {
       "code": "13.4",
       "name": "Licence & Franchise Reporting",
       "level": 2,
       "order": 40,
-      "parentCode": "13"
+      "parentCode": "13",
+      "description": "Meeting the reporting and performance obligations in the operator's licence or contract."
     },
     {
       "code": "13.5",
       "name": "Security & Emergency Planning",
       "level": 2,
       "order": 50,
-      "parentCode": "13"
+      "parentCode": "13",
+      "description": "Protecting passengers, staff and assets from security threats and preparing for emergencies."
     }
   ],
   "valueStreams": [
     {
       "code": "vs1",
       "name": "Plan the Service",
+      "description": "Starts when the timetable is planned. Ends when trains and crew are assigned to every service.",
       "order": 10,
       "stages": [
         {
@@ -650,6 +676,7 @@
     {
       "code": "vs2",
       "name": "Run the Day",
+      "description": "Starts when the day's services begin. Ends when disruption is recovered and normal running resumes.",
       "order": 20,
       "stages": [
         {
@@ -675,6 +702,7 @@
     {
       "code": "vs3",
       "name": "Keep It Moving",
+      "description": "Starts when trains or infrastructure need maintenance. Ends when they are safe and available for service.",
       "order": 30,
       "stages": [
         {
@@ -700,6 +728,7 @@
     {
       "code": "vs4",
       "name": "Travel with Confidence",
+      "description": "Starts when a passenger plans a journey. Ends when they have travelled and received any help or compensation due.",
       "order": 40,
       "stages": [
         {

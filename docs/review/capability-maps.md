@@ -427,9 +427,9 @@ Directing the organisation and assuring that it is well run, lawful and accounta
 
 ## Electricity Network Operator — electricity_network v4 (draft, 13 level-1, 84 items)
 
-Adds value streams — Getting Connected, Customer Experience, Grid Digitalisation, DSO, Capital Delivery, Asset Management, Field Operations and Data — grouping v3 capabilities by the outcome they deliver.
+Adds value streams — Getting Connected, Look After Customers, Digitise the Grid, Run the Local Energy System, Plan to Build, Keep Assets Healthy, Deliver Field Work and Manage & Use Data — grouping v3 capabilities by the outcome they deliver.
 
-Starter capability map for an electricity network operator, v4: adds value streams (ADR-023), each a two-level outcome grouping (stream → stages, stages enabled by v3 capabilities by name). Streams: Getting Connected, Customer Experience, Grid Digitalisation, DSO, Capital Delivery, Asset Management, Field Operations, Data. Capability items are unchanged from v3 (codes 1-13). Stream content was drafted this sprint (F6) for the reviewer; reviewed by Simon Parkinson, 2026-09-21.
+Starter capability map for an electricity network operator, v4: adds value streams (ADR-023), each a two-level outcome grouping (stream → stages, stages enabled by v3 capabilities by name). Streams: Getting Connected, Look After Customers, Digitise the Grid, Run the Local Energy System, Plan to Build, Keep Assets Healthy, Deliver Field Work, Manage & Use Data. Capability items are unchanged from v3 (codes 1-13). Stream content was drafted this sprint (F6) for the reviewer; reviewed by Simon Parkinson, 2026-09-21. Stream names and descriptions revised 2026-11-10 (Claude Code, for consistency across maps); pending re-review.
 
 Sources:
 
@@ -578,60 +578,60 @@ Value streams:
 
 ### vs1. Getting Connected
 
-_No definition._
+Starts when a customer or developer asks for a new or changed connection. Ends when it is energised and the customer is set up for billing and settlement.
 
 - **vs1.1 Apply & Quote** — _No definition._ — enabled by Connection Quotations
 - **vs1.2 Design & Offer** — _No definition._ — enabled by Connections
 - **vs1.3 Build & Connect** — _No definition._ — enabled by Capital Projects & Construction
 - **vs1.4 Energise & Settle** — _No definition._ — enabled by Connections, Billing & Settlement
 
-### vs2. Customer Experience
+### vs2. Look After Customers
 
-_No definition._
+Starts when a customer contacts us or loses supply. Ends when the issue is resolved, supply is restored and the account is correct.
 
 - **vs2.1 Contact & Resolve** — _No definition._ — enabled by Contact Channels, Case & Request Tracking, Complaints & Feedback
 - **vs2.2 Priority & Vulnerability** — _No definition._ — enabled by Priority Services Register, Vulnerable Customer Support
 - **vs2.3 Interruption & Restoration** — _No definition._ — enabled by Outage & Fault Management, Guaranteed Standards Payments
 - **vs2.4 Account & Billing** — _No definition._ — enabled by Billing & Settlement
 
-### vs3. Grid Digitalisation
+### vs3. Digitise the Grid
 
-_No definition._
+Starts when the network needs better visibility and control. Ends with secure, automated operation that uses trusted network data.
 
 - **vs3.1 Network Data & Insight** — _No definition._ — enabled by Smart Metering Data, Network Asset Health Indices, Analytics & Business Intelligence
 - **vs3.2 Digital Platforms** — _No definition._ — enabled by Application Delivery & Support, Enterprise Architecture & Standards
 - **vs3.3 Automation & Control** — _No definition._ — enabled by Control Room & Real-Time Operations, Distribution System Operation
 - **vs3.4 Cyber Resilience** — _No definition._ — enabled by Cyber Security & Resilience
 
-### vs4. DSO
+### vs4. Run the Local Energy System
 
-_No definition._
+Starts when local network constraints need flexibility. Ends with flexibility bought, scheduled and charged for in the market.
 
 - **vs4.1 Flexibility Procurement** — _No definition._ — enabled by Flexibility Markets
 - **vs4.2 Local System Planning** — _No definition._ — enabled by Network Planning & Load Forecasting, Network Investment Planning
 - **vs4.3 Access & Charging** — _No definition._ — enabled by Network Access & Charging
 - **vs4.4 Market Integration** — _No definition._ — enabled by Industry Codes Compliance
 
-### vs5. Capital Delivery
+### vs5. Plan to Build
 
-_No definition._
+Starts when an investment need is agreed. Ends when the new assets are built, consented and commissioned.
 
 - **vs5.1 Investment Planning** — _No definition._ — enabled by Network Investment Planning
 - **vs5.2 Design & Procurement** — _No definition._ — enabled by Capital Projects & Construction, Tendering & Contract Award
 - **vs5.3 Construction & Commissioning** — _No definition._ — enabled by Capital Projects & Construction
 - **vs5.4 Consents & Wayleaves** — _No definition._ — enabled by Land, Wayleaves & Consents
 
-### vs6. Asset Management
+### vs6. Keep Assets Healthy
 
-_No definition._
+Starts when asset condition and risk are assessed. Ends with inspections, maintenance and investment that keep assets safe and reliable.
 
 - **vs6.1 Asset Health & Risk** — _No definition._ — enabled by Network Asset Health Indices, Substation & Circuit Condition Monitoring
 - **vs6.2 Inspection & Maintenance** — _No definition._ — enabled by Asset Inspection & Maintenance, Planned Maintenance & Inspection
 - **vs6.3 Investment Planning** — _No definition._ — enabled by Network Investment Planning
 
-### vs7. Field Operations
+### vs7. Deliver Field Work
 
-_No definition._
+Starts when a job is raised. Ends when it is completed safely by our own or contractor crews and closed.
 
 - **vs7.1 Work Scheduling & Dispatch** — _No definition._ — enabled by Field Workforce Scheduling & Dispatch
 - **vs7.2 Streetworks & Permits** — _No definition._ — enabled by Streetworks & Permits
@@ -639,9 +639,9 @@ _No definition._
 - **vs7.4 Contractor Delivery** — _No definition._ — enabled by Contractor Management
 - **vs7.5 Safety & Environment** — _No definition._ — enabled by Health, Safety & Environment
 
-### vs8. Data
+### vs8. Manage & Use Data
 
-_No definition._
+Starts when data is created or collected. Ends with governed, protected data used for reporting and insight.
 
 - **vs8.1 Data Governance** — _No definition._ — enabled by Data Governance & Quality
 - **vs8.2 Records & Information Rights** — _No definition._ — enabled by Records Management, Information Rights & Access
@@ -662,51 +662,51 @@ Sources:
 
 Acquiring customers and verifying who they are.
 
-- **9.1 Customer Acquisition** — _No definition._
-- **9.2 Know Your Customer & Identity Checks** — _No definition._
-- **9.3 Account & Policy Opening** — _No definition._
-- **9.4 Consent & Preferences** — _No definition._
-- **9.5 Customer Servicing & Contact** — _No definition._
+- **9.1 Customer Acquisition** — Attracting prospective customers and converting them into applications for accounts, loans or policies.
+- **9.2 Know Your Customer & Identity Checks** — Verifying who a customer is and checking them against identity and eligibility rules before onboarding.
+- **9.3 Account & Policy Opening** — Setting up the account or policy and its terms once a customer has been accepted.
+- **9.4 Consent & Preferences** — Recording what each customer has agreed to and how they want to be contacted, and honouring it.
+- **9.5 Customer Servicing & Contact** — Handling day-to-day customer requests and changes across branch, phone, digital and intermediary channels.
 
 ### 10. Products & Pricing
 
 Designing, pricing and managing the financial products offered.
 
-- **10.1 Product Design & Management** — _No definition._
-- **10.2 Pricing & Underwriting** — _No definition._
-- **10.3 Credit & Risk Decisioning** — _No definition._
-- **10.4 Distribution & Broker Channels** — _No definition._
-- **10.5 Fair Value & Product Governance** — _No definition._
+- **10.1 Product Design & Management** — Designing, launching and managing the range of financial products across their life.
+- **10.2 Pricing & Underwriting** — Setting prices, premiums and terms by assessing the risk each customer or policy represents.
+- **10.3 Credit & Risk Decisioning** — Deciding whether and on what terms to lend or insure, using credit and risk assessments.
+- **10.4 Distribution & Broker Channels** — Managing the branches, brokers, agents and online channels through which products are sold.
+- **10.5 Fair Value & Product Governance** — Showing that products deliver fair value to customers and are governed through their life.
 
 ### 11. Payments & Transactions
 
 Moving and recording money safely and on time.
 
-- **11.1 Payments Processing** — _No definition._
-- **11.2 Cards & Digital Wallets** — _No definition._
-- **11.3 Account & Ledger Management** — _No definition._
-- **11.4 Reconciliation & Settlement** — _No definition._
-- **11.5 Open Banking & APIs** — _No definition._
+- **11.1 Payments Processing** — Receiving, validating and sending customer payments through payment schemes and clearing services.
+- **11.2 Cards & Digital Wallets** — Issuing and supporting cards and digital wallets, and authorising the transactions made with them.
+- **11.3 Account & Ledger Management** — Keeping the accounts and ledgers that record every balance and transaction accurately.
+- **11.4 Reconciliation & Settlement** — Matching payments and balances between internal records and external parties, and settling the differences.
+- **11.5 Open Banking & APIs** — Securely sharing customer data and payment services with authorised third parties through standard interfaces.
 
 ### 12. Lending & Claims
 
 Making loans and handling insurance claims and collections.
 
-- **12.1 Loan Origination & Servicing** — _No definition._
-- **12.2 Claims Intake & Assessment** — _No definition._
-- **12.3 Claims Settlement & Recovery** — _No definition._
-- **12.4 Arrears & Collections** — _No definition._
-- **12.5 Customer Vulnerability & Support** — _No definition._
+- **12.1 Loan Origination & Servicing** — Assessing loan applications, paying out funds and administering loans until they are repaid.
+- **12.2 Claims Intake & Assessment** — Receiving insurance claims and assessing cover, validity and loss.
+- **12.3 Claims Settlement & Recovery** — Paying valid claims and recovering costs from third parties or salvage.
+- **12.4 Arrears & Collections** — Contacting customers who miss payments, agreeing repayment arrangements and recovering what is owed.
+- **12.5 Customer Vulnerability & Support** — Identifying customers in vulnerable circumstances and adjusting how they are treated and supported.
 
 ### 13. Financial Crime & Regulatory Risk
 
 Detecting crime and meeting prudential and conduct rules.
 
-- **13.1 Anti-Money Laundering & Sanctions** — _No definition._
-- **13.2 Fraud Detection & Prevention** — _No definition._
-- **13.3 Regulatory Reporting** — _No definition._
-- **13.4 Capital & Liquidity Management** — _No definition._
-- **13.5 Complaints & Redress** — _No definition._
+- **13.1 Anti-Money Laundering & Sanctions** — Screening customers and payments against money-laundering rules and sanctions lists, and reporting suspicious activity.
+- **13.2 Fraud Detection & Prevention** — Detecting, investigating and preventing fraudulent applications, payments and claims.
+- **13.3 Regulatory Reporting** — Preparing and submitting the returns and data that regulators require.
+- **13.4 Capital & Liquidity Management** — Holding enough capital and liquid funds to meet obligations and regulatory requirements.
+- **13.5 Complaints & Redress** — Receiving and resolving customer complaints and putting right any harm caused.
 
 ### 1. Finance
 
@@ -793,7 +793,7 @@ Value streams:
 
 ### vs1. Join & Verify
 
-_No definition._
+Starts when a person applies for a product. Ends when their identity is verified and the account or policy is open.
 
 - **vs1.1 Acquire** — _No definition._ — enabled by Customer Acquisition, Distribution & Broker Channels
 - **vs1.2 Verify** — _No definition._ — enabled by Know Your Customer & Identity Checks
@@ -801,14 +801,14 @@ _No definition._
 
 ### vs2. Pay & Move Money
 
-_No definition._
+Starts when a customer or business asks to make a payment. Ends when the payment is settled and recorded.
 
 - **vs2.1 Initiate** — _No definition._ — enabled by Payments Processing, Cards & Digital Wallets
 - **vs2.2 Settle** — _No definition._ — enabled by Account & Ledger Management, Reconciliation & Settlement
 
 ### vs3. Borrow or Claim
 
-_No definition._
+Starts when a customer applies for a loan or makes a claim. Ends when funds are paid and support continues until it is closed.
 
 - **vs3.1 Assess** — _No definition._ — enabled by Credit & Risk Decisioning, Pricing & Underwriting, Claims Intake & Assessment
 - **vs3.2 Fund or Pay Out** — _No definition._ — enabled by Loan Origination & Servicing, Claims Settlement & Recovery
@@ -816,7 +816,7 @@ _No definition._
 
 ### vs4. Stay Safe & Compliant
 
-_No definition._
+Starts when activity looks suspicious or a regulatory duty falls due. Ends when it is investigated and reported.
 
 - **vs4.1 Detect** — _No definition._ — enabled by Anti-Money Laundering & Sanctions, Fraud Detection & Prevention
 - **vs4.2 Report** — _No definition._ — enabled by Regulatory Reporting, Capital & Liquidity Management
@@ -1093,7 +1093,7 @@ Value streams:
 
 ### vs1. Learn & Achieve
 
-_No definition._
+Starts when a course is designed. Ends when students are assessed, awarded and the course meets quality standards.
 
 - **vs1.1 Design & Deliver** — _No definition._ — enabled by Curriculum & Programme Design, Timetabling & Teaching Provision
 - **vs1.2 Assess & Award** — _No definition._ — enabled by Assessment & Award
@@ -1101,7 +1101,7 @@ _No definition._
 
 ### vs2. Research & Innovate
 
-_No definition._
+Starts when research is funded. Ends when results are published, commercialised or the researcher is trained.
 
 - **vs2.1 Funding & Governance** — _No definition._ — enabled by Research Funding & Grants, Research Governance & Integrity
 - **vs2.2 Conduct & Commercialise** — _No definition._ — enabled by Knowledge Exchange & Commercialisation, Research Infrastructure
@@ -1109,7 +1109,7 @@ _No definition._
 
 ### vs3. Student Lifecycle
 
-_No definition._
+Starts when a person applies to study. Ends when they progress through their course and succeed.
 
 - **vs3.1 Apply & Enrol** — _No definition._ — enabled by Applications & Offers, Enrolment & Induction
 - **vs3.2 Study & Support** — _No definition._ — enabled by Wellbeing & Counselling, Student Finance & Funding
@@ -1385,7 +1385,7 @@ Value streams:
 
 ### vs1. Find & Move In
 
-_No definition._
+Starts when someone applies for a home. Ends when they have signed up and the previous home is ready to let again.
 
 - **vs1.1 Apply & Allocate** — _No definition._ — enabled by Allocations & Lettings
 - **vs1.2 Letting & Sign-Up** — _No definition._ — enabled by Tenancy Management
@@ -1393,7 +1393,7 @@ _No definition._
 
 ### vs2. Live & Sustain
 
-_No definition._
+Starts when a tenancy begins. Ends with rent managed, repairs done and the home kept safe.
 
 - **vs2.1 Rent & Charges** — _No definition._ — enabled by Rent & Service Charge Collection
 - **vs2.2 Repairs & Maintenance** — _No definition._ — enabled by Responsive Repairs, Planned & Cyclical Maintenance
@@ -1401,7 +1401,7 @@ _No definition._
 
 ### vs3. Support & Improve
 
-_No definition._
+Starts when a tenant needs help or support. Ends when it is resolved and the community is better for it.
 
 - **vs3.1 Money & Welfare** — _No definition._ — enabled by Welfare & Money Advice
 - **vs3.2 Neighbourhood & ASB** — _No definition._ — enabled by Anti-Social Behaviour & Neighbourhood Standards
@@ -1681,7 +1681,7 @@ Value streams:
 
 ### vs1. Apply for a service
 
-_No definition._
+Starts when someone applies for a council service. Ends when a decision is made and the award or permit is issued.
 
 - **vs1.1 Apply & Verify** — _No definition._ — enabled by Identity & Account Verification, Contact Channels
 - **vs1.2 Assessment & Planning** — _No definition._ — enabled by Needs Assessment & Care Planning, Council Tax Support
@@ -1690,7 +1690,7 @@ _No definition._
 
 ### vs2. Report a problem
 
-_No definition._
+Starts when someone reports a problem. Ends when it is investigated, resolved and closed.
 
 - **vs2.1 Report & Track** — _No definition._ — enabled by Case & Request Tracking, Contact Channels
 - **vs2.2 Investigate** — _No definition._ — enabled by Environmental Health & Trading Standards, Complaints & Feedback
@@ -1698,7 +1698,7 @@ _No definition._
 
 ### vs3. Pay the council
 
-_No definition._
+Starts when a bill is issued. Ends when it is paid, or reduced where the person qualifies for support.
 
 - **vs3.1 Billing & Statements** — _No definition._ — enabled by Council Tax & Business Rates
 - **vs3.2 Payments & Collections** — _No definition._ — enabled by Payments & Receivables
@@ -1706,7 +1706,7 @@ _No definition._
 
 ### vs4. Get support
 
-_No definition._
+Starts when someone asks for care or support. Ends when a plan is in place or early help or protection has been put in place.
 
 - **vs4.1 Assess & Refer** — _No definition._ — enabled by Needs Assessment & Care Planning, Safeguarding & Children's Social Care
 - **vs4.2 Care & Support Planning** — _No definition._ — enabled by Commissioned Care & Support, Direct Payments & Personal Budgets
@@ -1986,7 +1986,7 @@ Value streams:
 
 ### vs1. Apply for a service
 
-_No definition._
+Starts when someone applies for a council service. Ends when a decision is made and the award or permit is issued.
 
 - **vs1.1 Apply & Verify** — _No definition._ — enabled by Identity & Account Verification, Contact Channels
 - **vs1.2 Application Assessment** — _No definition._ — enabled by Council Tax Reduction, Housing Benefit, Scottish Welfare Fund
@@ -1995,7 +1995,7 @@ _No definition._
 
 ### vs2. Report a problem
 
-_No definition._
+Starts when someone reports a problem. Ends when it is investigated, resolved and closed.
 
 - **vs2.1 Report & Track** — _No definition._ — enabled by Case & Request Tracking, Contact Channels
 - **vs2.2 Investigate** — _No definition._ — enabled by Environmental Health & Trading Standards, Complaints & Feedback
@@ -2003,7 +2003,7 @@ _No definition._
 
 ### vs3. Pay the council
 
-_No definition._
+Starts when a bill is issued. Ends when it is paid, or reduced where the person qualifies for support.
 
 - **vs3.1 Billing & Statements** — _No definition._ — enabled by Council Tax & Non-Domestic Rates
 - **vs3.2 Payments & Collections** — _No definition._ — enabled by Payments & Receivables
@@ -2011,7 +2011,7 @@ _No definition._
 
 ### vs4. Get support
 
-_No definition._
+Starts when someone asks for care or support. Ends when a plan is in place and housing or other help is arranged.
 
 - **vs4.1 Assess & Refer** — _No definition._ — enabled by Adult Social Care & Support, Children & Families Social Work
 - **vs4.2 Care & Support Planning** — _No definition._ — enabled by Self-Directed Support, Health & Social Care Integration
@@ -2031,51 +2031,51 @@ Sources:
 
 Designing products and managing their definition through life.
 
-- **9.1 Product Lifecycle Management** — _No definition._
-- **9.2 Engineering Change Management** — _No definition._
-- **9.3 Bill of Materials Management** — _No definition._
-- **9.4 Simulation & Testing** — _No definition._
-- **9.5 Regulatory & Standards Compliance** — _No definition._
+- **9.1 Product Lifecycle Management** — Managing product definitions, versions and documents from concept through to withdrawal.
+- **9.2 Engineering Change Management** — Controlling proposed changes to a product design and recording their impact before approval.
+- **9.3 Bill of Materials Management** — Maintaining the structured list of parts, materials and quantities that make up each product.
+- **9.4 Simulation & Testing** — Predicting and proving product behaviour through simulation, prototypes and test.
+- **9.5 Regulatory & Standards Compliance** — Making sure products meet the regulations and standards that apply to them.
 
 ### 10. Production Planning & Execution
 
 Planning what to make and running the shop floor to deliver it.
 
-- **10.1 Demand & Capacity Planning** — _No definition._
-- **10.2 Production Scheduling** — _No definition._
-- **10.3 Shop Floor Execution** — _No definition._
-- **10.4 Traceability & Genealogy** — _No definition._
-- **10.5 Process Control & Automation** — _No definition._
+- **10.1 Demand & Capacity Planning** — Forecasting demand and matching it to available capacity, materials and labour.
+- **10.2 Production Scheduling** — Sequencing orders across lines and machines to meet delivery dates.
+- **10.3 Shop Floor Execution** — Running production orders on the shop floor and recording what is made.
+- **10.4 Traceability & Genealogy** — Recording which materials, machines and people went into each batch or unit.
+- **10.5 Process Control & Automation** — Monitoring and adjusting machines and processes so they run within set limits.
 
 ### 11. Quality & Compliance
 
 Making sure products meet specification and standards.
 
-- **11.1 Quality Management** — _No definition._
-- **11.2 Inspection & Non-Conformance** — _No definition._
-- **11.3 Supplier Quality** — _No definition._
-- **11.4 Calibration & Audit** — _No definition._
-- **11.5 Product Recall Management** — _No definition._
+- **11.1 Quality Management** — Defining quality plans and standards and monitoring performance against them.
+- **11.2 Inspection & Non-Conformance** — Checking products against specification and handling those that fail.
+- **11.3 Supplier Quality** — Assessing and improving the quality of what suppliers deliver.
+- **11.4 Calibration & Audit** — Keeping measuring equipment accurate and checking that quality procedures are followed.
+- **11.5 Product Recall Management** — Identifying affected products and withdrawing or correcting them when a defect is found.
 
 ### 12. Maintenance & Asset Performance
 
 Keeping plant and equipment available and safe.
 
-- **12.1 Preventive & Predictive Maintenance** — _No definition._
-- **12.2 Spare Parts Management** — _No definition._
-- **12.3 Equipment Performance Monitoring** — _No definition._
-- **12.4 Energy & Utilities Management** — _No definition._
-- **12.5 Health & Safety on the Line** — _No definition._
+- **12.1 Preventive & Predictive Maintenance** — Planning servicing and repairs, based on schedules and equipment condition, to avoid breakdowns.
+- **12.2 Spare Parts Management** — Holding and issuing the spare parts needed to keep equipment running.
+- **12.3 Equipment Performance Monitoring** — Measuring how well equipment is running, how often it stops and why.
+- **12.4 Energy & Utilities Management** — Managing and reducing the energy, water and other utilities that production consumes.
+- **12.5 Plant Health & Safety** — Keeping people safe around plant and equipment and meeting health and safety duties.
 
 ### 13. Supply Chain & Logistics
 
 Sourcing materials and delivering finished goods.
 
-- **13.1 Supplier Management & Sourcing** — _No definition._
-- **13.2 Materials Planning** — _No definition._
-- **13.3 Warehousing & Inventory** — _No definition._
-- **13.4 Outbound Logistics** — _No definition._
-- **13.5 Order Management & Customer Delivery** — _No definition._
+- **13.1 Supplier Management & Sourcing** — Choosing, contracting with and managing the suppliers of materials and components.
+- **13.2 Materials Planning** — Working out which materials are needed, in what quantity and by when.
+- **13.3 Warehousing & Inventory** — Storing materials and finished goods and keeping accurate stock records.
+- **13.4 Outbound Logistics** — Moving finished goods to customers and distribution points.
+- **13.5 Order Management & Customer Delivery** — Taking customer orders and managing them through to delivery and invoicing.
 
 ### 1. Finance
 
@@ -2162,7 +2162,7 @@ Value streams:
 
 ### vs1. Design to Release
 
-_No definition._
+Starts when a new product or change is proposed. Ends when the design is verified and released to production.
 
 - **vs1.1 Design** — _No definition._ — enabled by Product Lifecycle Management, Bill of Materials Management
 - **vs1.2 Verify** — _No definition._ — enabled by Simulation & Testing, Regulatory & Standards Compliance
@@ -2170,7 +2170,7 @@ _No definition._
 
 ### vs2. Plan to Produce
 
-_No definition._
+Starts when demand is forecast. Ends when orders are scheduled and made.
 
 - **vs2.1 Plan** — _No definition._ — enabled by Demand & Capacity Planning, Materials Planning
 - **vs2.2 Schedule** — _No definition._ — enabled by Production Scheduling
@@ -2178,14 +2178,14 @@ _No definition._
 
 ### vs3. Assure Quality
 
-_No definition._
+Starts when production output or supplier deliveries are checked. Ends when they meet specification or non-conformances are under control.
 
 - **vs3.1 Inspect** — _No definition._ — enabled by Quality Management, Inspection & Non-Conformance
 - **vs3.2 Control Suppliers** — _No definition._ — enabled by Supplier Quality
 
 ### vs4. Source to Deliver
 
-_No definition._
+Starts when materials are sourced. Ends when finished goods are stored and shipped to the customer.
 
 - **vs4.1 Source** — _No definition._ — enabled by Supplier Management & Sourcing
 - **vs4.2 Store** — _No definition._ — enabled by Warehousing & Inventory
@@ -2326,9 +2326,9 @@ Directing the organisation and assuring that it is well run, lawful and accounta
 
 ## NHS Board or Trust — nhs v2 (draft, 12 level-1, 73 items)
 
-Adds value streams — Patient Journey, Quality & Safety, and Diagnosis & Treatment Support — grouping v1 capabilities by the outcome patients experience.
+Adds value streams — Patient Journey, Learn & Improve Care, and Diagnose & Treat — grouping v1 capabilities by the outcome patients experience.
 
-Starter capability map for an NHS board or trust, v2: adds value streams (ADR-023) — Patient Journey, Quality & Safety, Diagnosis & Treatment Support — grouping v1 capabilities by the outcome patients experience. Capability items are unchanged from v1 (codes 1-12). Stream content was drafted this sprint (F6) for the reviewer; reviewed by Simon Parkinson, 2026-09-21.
+Starter capability map for an NHS board or trust, v2: adds value streams (ADR-023) — Patient Journey, Learn & Improve Care, Diagnose & Treat — grouping v1 capabilities by the outcome patients experience. Capability items are unchanged from v1 (codes 1-12). Stream content was drafted this sprint (F6) for the reviewer; reviewed by Simon Parkinson, 2026-09-21. Stream names and descriptions revised 2026-11-10 (Claude Code, for consistency across maps); pending re-review.
 
 Sources:
 
@@ -2461,23 +2461,23 @@ Value streams:
 
 ### vs1. Patient Journey
 
-_No definition._
+Starts when a patient is referred. Ends when they are discharged and recovering.
 
 - **vs1.1 Referral & Booking** — _No definition._ — enabled by Planned & Elective Care, Primary Care Interface
 - **vs1.2 Care Delivery** — _No definition._ — enabled by Urgent & Emergency Care, Planned & Elective Care
 - **vs1.3 Discharge & Recovery** — _No definition._ — enabled by Community & Intermediate Care
 
-### vs2. Quality & Safety
+### vs2. Learn & Improve Care
 
-_No definition._
+Starts when an incident or a clinical question arises. Ends when the lesson is learned and care is improved.
 
 - **vs2.1 Incident & Learning** — _No definition._ — enabled by Incident Reporting & Learning
 - **vs2.2 Clinical Effectiveness** — _No definition._ — enabled by Clinical Audit & Effectiveness, Clinical Governance
 - **vs2.3 Infection Prevention** — _No definition._ — enabled by Infection Prevention & Control
 
-### vs3. Diagnosis & Treatment Support
+### vs3. Diagnose & Treat
 
-_No definition._
+Starts when a clinician requests a test or treatment. Ends when results, medicines or equipment are delivered to the patient.
 
 - **vs3.1 Imaging & Labs** — _No definition._ — enabled by Imaging, Laboratory Medicine
 - **vs3.2 Medicines** — _No definition._ — enabled by Pharmacy & Medicines Optimisation
@@ -2727,7 +2727,7 @@ Value streams:
 
 ### vs1. Shape Policy
 
-_No definition._
+Starts when a policy need is identified. Ends when policy or guidance is published.
 
 - **vs1.1 Evidence & Analysis** — _No definition._ — enabled by Evidence & Research
 - **vs1.2 Design & Appraise** — _No definition._ — enabled by Policy Design & Appraisal, Impact Assessment
@@ -2735,14 +2735,14 @@ _No definition._
 
 ### vs2. Engage the Public
 
-_No definition._
+Starts when the body needs to inform or ask the public. Ends when communications and consultation responses are acted on.
 
 - **vs2.1 Communicate** — _No definition._ — enabled by Media & Public Affairs, Digital Content & Publishing
 - **vs2.2 Consult** — _No definition._ — enabled by Public Consultation, Stakeholder & Partnership Engagement
 
 ### vs3. Fund Outcomes
 
-_No definition._
+Starts when a funding scheme is designed. Ends when awards are made, monitored and assured.
 
 - **vs3.1 Design Scheme** — _No definition._ — enabled by Scheme Design & Eligibility
 - **vs3.2 Assess & Award** — _No definition._ — enabled by Application Assessment & Award
@@ -2762,51 +2762,51 @@ Sources:
 
 Deciding which services run, when, and with which resources.
 
-- **9.1 Timetable Planning** — _No definition._
-- **9.2 Train Path & Capacity Allocation** — _No definition._
-- **9.3 Rolling Stock Diagramming** — _No definition._
-- **9.4 Crew Rostering** — _No definition._
-- **9.5 Performance & Delay Attribution** — _No definition._
+- **9.1 Timetable Planning** — Designing the timetable of services that will run for each period.
+- **9.2 Train Path & Capacity Allocation** — Agreeing which train paths and network capacity each service may use.
+- **9.3 Rolling Stock Diagramming** — Assigning trains and vehicles to the services they will operate.
+- **9.4 Crew Rostering** — Planning which drivers and train crew work each service within working-time rules.
+- **9.5 Performance & Delay Attribution** — Recording delays and agreeing which party is responsible for them.
 
 ### 10. Operations & Control
 
 Running the service in real time and recovering from disruption.
 
-- **10.1 Real-Time Service Control** — _No definition._
-- **10.2 Disruption & Contingency Management** — _No definition._
-- **10.3 Station Operations** — _No definition._
-- **10.4 Depot & Stabling Operations** — _No definition._
-- **10.5 Network Rail Interface** — _No definition._
+- **10.1 Real-Time Service Control** — Monitoring and managing trains and staff in real time to keep services on time.
+- **10.2 Disruption & Contingency Management** — Responding to incidents and disruption and restoring normal service.
+- **10.3 Station Operations** — Running stations safely day to day, including customer information and passenger flow.
+- **10.4 Depot & Stabling Operations** — Managing train movements, stabling and preparation at depots and sidings.
+- **10.5 Infrastructure Manager Interface** — Coordinating with the infrastructure manager on access, possessions and day-to-day operation of the network.
 
 ### 11. Fleet & Infrastructure Maintenance
 
 Keeping trains, track and stations safe and reliable.
 
-- **11.1 Fleet Maintenance Planning** — _No definition._
-- **11.2 Condition Monitoring & Diagnostics** — _No definition._
-- **11.3 Infrastructure Inspection & Renewal** — _No definition._
-- **11.4 Spares & Depot Logistics** — _No definition._
-- **11.5 Accessibility & Station Assets** — _No definition._
+- **11.1 Fleet Maintenance Planning** — Scheduling servicing and overhauls so enough trains are available.
+- **11.2 Condition Monitoring & Diagnostics** — Using sensor and inspection data to detect faults and predict failures.
+- **11.3 Infrastructure Inspection & Renewal** — Inspecting track, structures and signalling and planning repairs and renewals.
+- **11.4 Spares & Depot Logistics** — Managing the spare parts and materials that depots need to keep trains running.
+- **11.5 Accessibility & Station Assets** — Maintaining lifts, ramps, platforms and other assets that people rely on to travel.
 
 ### 12. Passengers & Ticketing
 
 Informing, ticketing and supporting people who travel.
 
-- **12.1 Fares & Ticketing** — _No definition._
-- **12.2 Journey Planning & Passenger Information** — _No definition._
-- **12.3 Retail Channels & Smart Ticketing** — _No definition._
-- **12.4 Delay Repay & Compensation** — _No definition._
-- **12.5 Accessibility & Assisted Travel** — _No definition._
+- **12.1 Fares & Ticketing** — Setting fares and ticket rules, and selling and validating tickets.
+- **12.2 Journey Planning & Passenger Information** — Giving passengers accurate information on services, delays and routes before and during a journey.
+- **12.3 Retail Channels & Smart Ticketing** — Selling tickets through stations, websites, apps and smartcards.
+- **12.4 Delay Repay & Compensation** — Assessing and paying compensation to passengers for delayed or cancelled journeys.
+- **12.5 Accessibility & Assisted Travel** — Helping disabled and less mobile passengers to travel, including booking assistance.
 
 ### 13. Safety & Regulatory Assurance
 
 Managing safety risk and meeting licence and regulator obligations.
 
-- **13.1 Safety Management System** — _No definition._
-- **13.2 Incident Investigation** — _No definition._
-- **13.3 Railway Group Standards Compliance** — _No definition._
-- **13.4 Licence & Franchise Reporting** — _No definition._
-- **13.5 Security & Emergency Planning** — _No definition._
+- **13.1 Safety Management System** — Operating the procedures, roles and records that control safety risk.
+- **13.2 Incident Investigation** — Investigating accidents and near misses and acting on what is found.
+- **13.3 Railway Group Standards Compliance** — Meeting the mandatory standards that apply to railway operation.
+- **13.4 Licence & Franchise Reporting** — Meeting the reporting and performance obligations in the operator's licence or contract.
+- **13.5 Security & Emergency Planning** — Protecting passengers, staff and assets from security threats and preparing for emergencies.
 
 ### 1. Finance
 
@@ -2893,28 +2893,28 @@ Value streams:
 
 ### vs1. Plan the Service
 
-_No definition._
+Starts when the timetable is planned. Ends when trains and crew are assigned to every service.
 
 - **vs1.1 Plan** — _No definition._ — enabled by Timetable Planning, Train Path & Capacity Allocation
 - **vs1.2 Resource** — _No definition._ — enabled by Rolling Stock Diagramming, Crew Rostering
 
 ### vs2. Run the Day
 
-_No definition._
+Starts when the day's services begin. Ends when disruption is recovered and normal running resumes.
 
 - **vs2.1 Control** — _No definition._ — enabled by Real-Time Service Control, Station Operations
 - **vs2.2 Recover** — _No definition._ — enabled by Disruption & Contingency Management, Performance & Delay Attribution
 
 ### vs3. Keep It Moving
 
-_No definition._
+Starts when trains or infrastructure need maintenance. Ends when they are safe and available for service.
 
 - **vs3.1 Maintain Fleet** — _No definition._ — enabled by Fleet Maintenance Planning, Condition Monitoring & Diagnostics, Depot & Stabling Operations
 - **vs3.2 Maintain Infrastructure** — _No definition._ — enabled by Infrastructure Inspection & Renewal
 
 ### vs4. Travel with Confidence
 
-_No definition._
+Starts when a passenger plans a journey. Ends when they have travelled and received any help or compensation due.
 
 - **vs4.1 Plan Journey** — _No definition._ — enabled by Journey Planning & Passenger Information
 - **vs4.2 Buy** — _No definition._ — enabled by Fares & Ticketing, Retail Channels & Smart Ticketing
@@ -2934,51 +2934,51 @@ Sources:
 
 Deciding what to sell, at what price, and in which stores and channels.
 
-- **9.1 Range Planning** — _No definition._
-- **9.2 Supplier & Buying Management** — _No definition._
-- **9.3 Pricing & Promotions** — _No definition._
-- **9.4 Demand Forecasting** — _No definition._
-- **9.5 Product Information Management** — _No definition._
+- **9.1 Range Planning** — Deciding which products to sell, in which quantities and where.
+- **9.2 Supplier & Buying Management** — Choosing suppliers, negotiating terms and placing buying orders.
+- **9.3 Pricing & Promotions** — Setting prices and running promotions to meet sales and margin goals.
+- **9.4 Demand Forecasting** — Predicting how much of each product customers will buy, by place and time.
+- **9.5 Product Information Management** — Maintaining accurate descriptions, images and attributes for every product.
 
 ### 10. Supply Chain & Fulfilment
 
 Getting stock from suppliers to customers efficiently.
 
-- **10.1 Inventory & Replenishment** — _No definition._
-- **10.2 Warehouse Operations** — _No definition._
-- **10.3 Transport & Delivery** — _No definition._
-- **10.4 Click & Collect and Returns** — _No definition._
-- **10.5 Supplier Collaboration & Logistics** — _No definition._
+- **10.1 Inventory & Replenishment** — Tracking stock levels and ordering more to keep products available without overstocking.
+- **10.2 Warehouse Operations** — Receiving, storing, picking and packing goods in distribution centres.
+- **10.3 Transport & Delivery** — Moving stock to stores and orders to customers' homes.
+- **10.4 Click & Collect and Returns** — Letting customers collect orders in store and return unwanted goods.
+- **10.5 Supplier Collaboration & Logistics** — Working with suppliers and carriers on deliveries, forecasts and shared stock information.
 
 ### 11. Store Operations
 
 Running physical stores and the people and stock in them.
 
-- **11.1 Store Labour Scheduling** — _No definition._
-- **11.2 Point of Sale** — _No definition._
-- **11.3 Store Stock & Availability** — _No definition._
-- **11.4 Loss Prevention** — _No definition._
-- **11.5 Store Estate & Format** — _No definition._
+- **11.1 Store Labour Scheduling** — Planning store staff to match expected trade.
+- **11.2 Point of Sale** — Taking payment for goods in store and recording each sale.
+- **11.3 Store Stock & Availability** — Keeping shelves stocked and showing accurate availability in store.
+- **11.4 Loss Prevention** — Reducing stock loss from theft, error and damage.
+- **11.5 Store Estate & Format** — Deciding where stores are, how big they are and how they are laid out.
 
 ### 12. Digital Commerce
 
 Selling through websites, apps and marketplaces.
 
-- **12.1 Website & App Experience** — _No definition._
-- **12.2 Online Basket & Checkout** — _No definition._
-- **12.3 Search & Personalisation** — _No definition._
-- **12.4 Marketplace Management** — _No definition._
-- **12.5 Order Management** — _No definition._
+- **12.1 Website & App Experience** — Providing the website and mobile app that customers browse and buy from.
+- **12.2 Online Basket & Checkout** — Letting customers build an order and pay for it online.
+- **12.3 Search & Personalisation** — Helping customers find products and showing them relevant offers.
+- **12.4 Marketplace Management** — Selling through third-party marketplaces and managing those listings.
+- **12.5 Order Management** — Taking online orders and tracking them from purchase to delivery.
 
 ### 13. Customer & Loyalty
 
 Knowing customers, rewarding them and handling payments.
 
-- **13.1 Customer Data & Segmentation** — _No definition._
-- **13.2 Loyalty & Offers** — _No definition._
-- **13.3 Marketing & Campaigns** — _No definition._
-- **13.4 Payments & Fraud** — _No definition._
-- **13.5 Customer Service & Returns Support** — _No definition._
+- **13.1 Customer Data & Segmentation** — Holding a single view of each customer and grouping customers by behaviour and need.
+- **13.2 Loyalty & Offers** — Running the loyalty scheme and offers that reward repeat custom.
+- **13.3 Marketing & Campaigns** — Planning and running marketing activity across channels.
+- **13.4 Payments & Fraud** — Accepting payments securely and detecting fraudulent transactions.
+- **13.5 Customer Service & Returns Support** — Answering customer questions and resolving problems with orders and returns.
 
 ### 1. Finance
 
@@ -3065,7 +3065,7 @@ Value streams:
 
 ### vs1. Plan to Shelf
 
-_No definition._
+Starts when a range is planned. Ends when stock is bought, priced and on the shelf.
 
 - **vs1.1 Plan Range** — _No definition._ — enabled by Range Planning, Demand Forecasting
 - **vs1.2 Buy & Price** — _No definition._ — enabled by Supplier & Buying Management, Pricing & Promotions
@@ -3073,22 +3073,22 @@ _No definition._
 
 ### vs2. Click to Door
 
-_No definition._
+Starts when a customer browses online. Ends when the order is bought and delivered.
 
 - **vs2.1 Browse** — _No definition._ — enabled by Website & App Experience, Search & Personalisation
 - **vs2.2 Buy** — _No definition._ — enabled by Online Basket & Checkout, Payments & Fraud
 - **vs2.3 Fulfil** — _No definition._ — enabled by Order Management, Transport & Delivery
 
-### vs3. Store Trading
+### vs3. Trade in Store
 
-_No definition._
+Starts when a customer enters a store. Ends when they are served and stock losses are prevented.
 
 - **vs3.1 Serve** — _No definition._ — enabled by Point of Sale, Store Labour Scheduling
 - **vs3.2 Protect** — _No definition._ — enabled by Store Stock & Availability, Loss Prevention
 
-### vs4. Know & Reward
+### vs4. Know & Reward Customers
 
-_No definition._
+Starts when customer data is captured. Ends when customers are rewarded and re-engaged.
 
 - **vs4.1 Understand** — _No definition._ — enabled by Customer Data & Segmentation
 - **vs4.2 Engage** — _No definition._ — enabled by Loyalty & Offers, Marketing & Campaigns
@@ -3107,75 +3107,75 @@ Sources:
 
 Winning customers through direct and comparison channels and designing the tariffs and propositions they buy.
 
-- **9.1 Price Comparison & Aggregator Channels** — _No definition._
-- **9.2 Direct Digital Sales** — _No definition._
-- **9.3 Tariff Design & Pricing** — _No definition._
-- **9.4 Product & Proposition Management** — _No definition._
+- **9.1 Price Comparison & Aggregator Channels** — Winning customers through price comparison sites and other third-party channels.
+- **9.2 Direct Digital Sales** — Selling to customers directly through the supplier's own website, app and phone.
+- **9.3 Tariff Design & Pricing** — Setting tariffs and prices that cover costs and comply with the price cap.
+- **9.4 Product & Proposition Management** — Designing and managing the products and offers customers can choose.
 
 ### 10. Customer Onboarding & Switching
 
 Taking a new customer through credit checks, registration, switching and the start of supply.
 
-- **10.1 Switching & Registration** — _No definition._
-- **10.2 Credit & Identity Checks** — _No definition._
-- **10.3 Welcome & Contract Management** — _No definition._
-- **10.4 Smart Meter Installation Booking** — _No definition._
+- **10.1 Switching & Registration** — Moving customers to the supplier and registering them with the industry.
+- **10.2 Credit & Identity Checks** — Checking new customers' credit and identity before supply begins.
+- **10.3 Welcome & Contract Management** — Welcoming customers, issuing their contract and managing it through its term.
+- **10.4 Smart Meter Installation Booking** — Arranging for smart meters to be installed at customers' premises.
 
 ### 11. Metering & Data
 
 Collecting, validating and managing meter data and the smart metering communications that deliver it.
 
-- **11.1 Meter Data Management** — _No definition._
-- **11.2 Smart Meter Communications (DCC)** — _No definition._
-- **11.3 Meter Reading & Estimation** — _No definition._
-- **11.4 Meter Asset Management** — _No definition._
-- **11.5 Half-Hourly Data Collection & Aggregation** — _No definition._
+- **11.1 Meter Data Management** — Collecting, validating and storing the meter readings used for billing and settlement.
+- **11.2 Smart Meter Communications (DCC)** — Using the national smart meter communications network to read and control meters.
+- **11.3 Meter Reading & Estimation** — Obtaining actual readings and estimating usage when none is available.
+- **11.4 Meter Asset Management** — Tracking the meters the supplier is responsible for and their installation and condition.
+- **11.5 Half-Hourly Data Collection & Aggregation** — Collecting half-hourly consumption data and combining it for settlement.
 
 ### 12. Billing & Revenue
 
 Calculating, issuing and collecting what customers owe for the energy they use.
 
-- **12.1 Bill Calculation & Production** — _No definition._
-- **12.2 Payments & Direct Debit** — _No definition._
-- **12.3 Billing Exceptions & Adjustments** — _No definition._
-- **12.4 Revenue Assurance** — _No definition._
+- **12.1 Bill Calculation & Production** — Working out what each customer owes and producing accurate bills.
+- **12.2 Payments & Direct Debit** — Taking payment by direct debit and other methods and recording what is received.
+- **12.3 Billing Exceptions & Adjustments** — Correcting billing errors and applying credits, refunds and adjustments.
+- **12.4 Revenue Assurance** — Checking that all energy supplied is correctly billed and paid for.
 
 ### 13. Customer Care & Debt
 
 Serving customers, protecting those in vulnerable circumstances and managing arrears fairly.
 
-- **13.1 Customer Service & Contact** — _No definition._
-- **13.2 Complaints & Ombudsman** — _No definition._
-- **13.3 Vulnerable Customer Support** — _No definition._
-- **13.4 Priority Services Register** — _No definition._
-- **13.5 Debt Management & Collections** — _No definition._
+- **13.1 Customer Service & Contact** — Answering customer questions and resolving problems through all contact channels.
+- **13.2 Complaints & Ombudsman** — Handling complaints, including those referred to the energy ombudsman.
+- **13.3 Vulnerable Customer Support** — Identifying customers in vulnerable circumstances and adjusting how they are treated and supported.
+- **13.4 Priority Services Register** — Keeping the register of customers who need extra help and acting on it.
+- **13.5 Debt Management & Collections** — Managing customers' arrears, agreeing repayment and recovering what is owed.
 
 ### 14. Energy Trading & Settlement
 
 Buying energy to meet demand and settling volumes and imbalance with the wholesale market.
 
-- **14.1 Energy Procurement & Hedging** — _No definition._
-- **14.2 Demand Forecasting** — _No definition._
-- **14.3 Wholesale Settlement (BSC)** — _No definition._
-- **14.4 Market-wide Half-Hourly Settlement (MHHS)** — _No definition._
-- **14.5 Imbalance & Position Management** — _No definition._
+- **14.1 Energy Procurement & Hedging** — Buying energy ahead of demand and hedging the supplier's exposure to price changes.
+- **14.2 Demand Forecasting** — Predicting how much energy customers will use to guide buying.
+- **14.3 Wholesale Settlement (BSC)** — Settling the energy used each day with industry under the balancing and settlement code.
+- **14.4 Market-wide Half-Hourly Settlement (MHHS)** — Settling energy using half-hourly data for every customer under the market-wide reform.
+- **14.5 Imbalance & Position Management** — Managing the gap between energy bought and energy used and the cost of correcting it.
 
 ### 15. Regulation & Industry Compliance
 
 Meeting supply licence conditions and industry code obligations and reporting to Ofgem.
 
-- **15.1 Ofgem Regulatory Reporting** — _No definition._
-- **15.2 Industry Codes Compliance** — _No definition._
-- **15.3 Environmental & Social Obligations** — _No definition._
-- **15.4 Price Cap Compliance** — _No definition._
+- **15.1 Ofgem Regulatory Reporting** — Reporting to the energy regulator as the supply licence requires.
+- **15.2 Industry Codes Compliance** — Meeting the obligations of the industry codes the supplier has signed up to.
+- **15.3 Environmental & Social Obligations** — Delivering government schemes for energy efficiency, carbon and social support.
+- **15.4 Price Cap Compliance** — Keeping customer prices within the cap set by the regulator.
 
 ### 16. Smart Energy & Net Zero
 
 Offering smart tariffs, EV and heat propositions and flexibility services that support net zero.
 
-- **16.1 Smart Tariffs & Home Energy Services** — _No definition._
-- **16.2 EV & Heat Pump Propositions** — _No definition._
-- **16.3 Flexibility & Demand-Side Response** — _No definition._
+- **16.1 Smart Tariffs & Home Energy Services** — Offering time-of-use tariffs and services that help customers understand and manage their energy.
+- **16.2 EV & Heat Pump Propositions** — Offering electric vehicle and heat pump tariffs, installation and services.
+- **16.3 Flexibility & Demand-Side Response** — Rewarding customers for shifting when they use energy and selling that flexibility.
 
 ### 1. Finance
 
@@ -3262,7 +3262,7 @@ Value streams:
 
 ### vs1. Acquire & Onboard
 
-_No definition._
+Starts when a prospect enquires or switches. Ends when they are registered, welcomed and have a smart meter booked.
 
 - **vs1.1 Attract & Quote** — _No definition._ — enabled by Direct Digital Sales, Price Comparison & Aggregator Channels, Tariff Design & Pricing
 - **vs1.2 Switch & Register** — _No definition._ — enabled by Switching & Registration, Credit & Identity Checks
@@ -3270,7 +3270,7 @@ _No definition._
 
 ### vs2. Meter to Cash
 
-_No definition._
+Starts when meter data is collected. Ends when the bill is issued and payment is collected.
 
 - **vs2.1 Collect Meter Data** — _No definition._ — enabled by Meter Data Management, Smart Meter Communications (DCC), Half-Hourly Data Collection & Aggregation
 - **vs2.2 Bill** — _No definition._ — enabled by Bill Calculation & Production, Billing Exceptions & Adjustments
@@ -3278,14 +3278,14 @@ _No definition._
 
 ### vs3. Care & Support
 
-_No definition._
+Starts when a customer contacts us. Ends when the issue is resolved and vulnerable customers are protected.
 
 - **vs3.1 Contact & Resolve** — _No definition._ — enabled by Customer Service & Contact, Complaints & Ombudsman
 - **vs3.2 Protect Vulnerable Customers** — _No definition._ — enabled by Vulnerable Customer Support, Priority Services Register
 
 ### vs4. Trade & Settle
 
-_No definition._
+Starts when demand is forecast. Ends when the energy is bought and settled with the industry.
 
 - **vs4.1 Forecast & Buy** — _No definition._ — enabled by Demand Forecasting, Energy Procurement & Hedging
 - **vs4.2 Settle** — _No definition._ — enabled by Wholesale Settlement (BSC), Market-wide Half-Hourly Settlement (MHHS), Imbalance & Position Management
@@ -3568,9 +3568,9 @@ Directing the organisation and assuring that it is well run, lawful and accounta
 
 ## Utility (Generic) — utility v3 (draft, 13 level-1, 80 items)
 
-Adds value streams — Connect & Serve, Operate & Maintain, and Assure & Report — grouping v2 capabilities by the outcome customers experience.
+Adds value streams — Connect & Serve, Operate & Maintain, and Prove Compliance — grouping v2 capabilities by the outcome customers experience.
 
-Starter capability map for a generic regulated utility, v3: adds value streams (ADR-023) — Connect & Serve, Operate & Maintain, Assure & Report — grouping v2 capabilities by the outcome customers experience. Capability items are unchanged from v2 (codes 1-13). Stream content was drafted this sprint (F6) for the reviewer; reviewed by Simon Parkinson, 2026-09-21.
+Starter capability map for a generic regulated utility, v3: adds value streams (ADR-023) — Connect & Serve, Operate & Maintain, Prove Compliance — grouping v2 capabilities by the outcome customers experience. Capability items are unchanged from v2 (codes 1-13). Stream content was drafted this sprint (F6) for the reviewer; reviewed by Simon Parkinson, 2026-09-21. Stream names and descriptions revised 2026-11-10 (Claude Code, for consistency across maps); pending re-review.
 
 Sources:
 
@@ -3714,7 +3714,7 @@ Value streams:
 
 ### vs1. Connect & Serve
 
-_No definition._
+Starts when a customer asks for a connection or service. Ends when they are connected, metered and billed.
 
 - **vs1.1 Connections** — _No definition._ — enabled by Connections
 - **vs1.2 Metering & Billing** — _No definition._ — enabled by Metering & Meter Data, Billing & Settlement
@@ -3722,15 +3722,15 @@ _No definition._
 
 ### vs2. Operate & Maintain
 
-_No definition._
+Starts when the network needs operating or an asset needs attention. Ends when the work is done and the asset is safe.
 
 - **vs2.1 Real-Time Operations** — _No definition._ — enabled by Control Room & Real-Time Operations
 - **vs2.2 Asset Health & Inspection** — _No definition._ — enabled by Asset Health & Condition Assessment, Inspection & Maintenance
 - **vs2.3 Field Delivery** — _No definition._ — enabled by Field Operations, Capital Projects & Construction
 
-### vs3. Assure & Report
+### vs3. Prove Compliance
 
-_No definition._
+Starts when a licence, price-control or safety duty falls due. Ends when it is met and reported.
 
 - **vs3.1 Licence & Permits** — _No definition._ — enabled by Licence Compliance, Environmental Permitting & Compliance
 - **vs3.2 Price-Control Reporting** — _No definition._ — enabled by Price-Control Submissions, Regulatory Performance Reporting
@@ -3750,51 +3750,51 @@ Sources:
 
 Securing raw water and treating it to drinking-water standards.
 
-- **9.1 Water Resource Planning** — _No definition._
-- **9.2 Abstraction & Reservoir Management** — _No definition._
-- **9.3 Water Treatment Operations** — _No definition._
-- **9.4 Water Quality Monitoring & Compliance** — _No definition._
-- **9.5 Drought & Demand Management** — _No definition._
+- **9.1 Water Resource Planning** — Planning how to secure enough raw water for the long term, accounting for growth and climate.
+- **9.2 Abstraction & Reservoir Management** — Managing the abstraction of water from rivers and boreholes and its storage in reservoirs.
+- **9.3 Water Treatment Operations** — Running treatment works that make raw water safe to drink.
+- **9.4 Water Quality Monitoring & Compliance** — Sampling and testing water and demonstrating it meets drinking water standards.
+- **9.5 Drought & Demand Management** — Managing supply during dry periods and encouraging customers to use less water.
 
 ### 10. Clean Water Network
 
 Moving treated water to customers through pipes, pumps and storage.
 
-- **10.1 Network Modelling & Hydraulics** — _No definition._
-- **10.2 Leakage Detection & Control** — _No definition._
-- **10.3 Pressure & Flow Management** — _No definition._
-- **10.4 Mains Repair & Renewal** — _No definition._
-- **10.5 Bursts & Supply Interruption Response** — _No definition._
+- **10.1 Network Modelling & Hydraulics** — Modelling how water flows through the network to plan operations and investment.
+- **10.2 Leakage Detection & Control** — Finding, locating and fixing leaks, and tracking how much water is lost.
+- **10.3 Pressure & Flow Management** — Controlling pressure and flow so supply is steady and damage to pipes is limited.
+- **10.4 Mains Repair & Renewal** — Repairing and replacing pipes, valves and other network assets.
+- **10.5 Bursts & Supply Interruption Response** — Responding to bursts and keeping customers supplied or restoring their supply.
 
 ### 11. Wastewater & Environment
 
 Collecting, treating and returning wastewater safely to the environment.
 
-- **11.1 Sewer Network Operations** — _No definition._
-- **11.2 Wastewater Treatment** — _No definition._
-- **11.3 Storm Overflow & Pollution Management** — _No definition._
-- **11.4 Sludge & Biosolids Management** — _No definition._
-- **11.5 Environmental Permitting & Monitoring** — _No definition._
+- **11.1 Sewer Network Operations** — Operating and maintaining the sewers that carry wastewater away.
+- **11.2 Wastewater Treatment** — Treating wastewater so it can be returned safely to the environment.
+- **11.3 Storm Overflow & Pollution Management** — Reducing storm overflow discharges and responding to pollution incidents.
+- **11.4 Sludge & Biosolids Management** — Treating and disposing of or reusing the sludge produced by wastewater treatment.
+- **11.5 Environmental Permitting & Monitoring** — Holding environmental permits and monitoring the effect of discharges.
 
 ### 12. Customers & Billing
 
 Serving household and business customers and billing for water and sewerage.
 
-- **12.1 Customer Contact & Self-Service** — _No definition._
-- **12.2 Metering & Meter Reading** — _No definition._
-- **12.3 Billing & Collections** — _No definition._
-- **12.4 Affordability & Priority Services** — _No definition._
-- **12.5 Retail Market (Business Customers)** — _No definition._
+- **12.1 Customer Contact & Self-Service** — Handling customer contact and enabling customers to manage their account online.
+- **12.2 Metering & Meter Reading** — Fitting, maintaining and reading customer meters.
+- **12.3 Billing & Collections** — Producing bills and collecting payment, including from customers in arrears.
+- **12.4 Affordability & Priority Services** — Helping customers who struggle to pay and supporting those who need extra care.
+- **12.5 Retail Market (Business Customers)** — Serving business customers who are able to choose their retailer.
 
 ### 13. Regulation & Performance
 
 Meeting licence duties and reporting performance to regulators.
 
-- **13.1 Ofwat Performance Reporting** — _No definition._
-- **13.2 Drinking Water Inspectorate Compliance** — _No definition._
-- **13.3 Price Review & Business Plan** — _No definition._
-- **13.4 Asset Management Plan & Investment** — _No definition._
-- **13.5 Dam & Reservoir Safety** — _No definition._
+- **13.1 Ofwat Performance Reporting** — Measuring and reporting performance against the regulator's commitments.
+- **13.2 Drinking Water Inspectorate Compliance** — Meeting the drinking water inspectorate's requirements and reporting on water quality.
+- **13.3 Price Review & Business Plan** — Preparing the business plan and evidence for each price review.
+- **13.4 Asset Management Plan & Investment** — Planning the investment needed to maintain and improve the assets over the long term.
+- **13.5 Dam & Reservoir Safety** — Meeting the safety duties that apply to dams and reservoirs.
 
 ### 1. Finance
 
@@ -3881,28 +3881,28 @@ Value streams:
 
 ### vs1. Source to Tap
 
-_No definition._
+Starts when raw water is sourced. Ends when treated water reaches customers' taps.
 
 - **vs1.1 Secure & Treat** — _No definition._ — enabled by Water Resource Planning, Water Treatment Operations, Water Quality Monitoring & Compliance
 - **vs1.2 Deliver** — _No definition._ — enabled by Network Modelling & Hydraulics, Pressure & Flow Management, Mains Repair & Renewal
 
 ### vs2. Find & Fix Leaks
 
-_No definition._
+Starts when a leak is suspected. Ends when it is found and fixed.
 
 - **vs2.1 Detect** — _No definition._ — enabled by Leakage Detection & Control
 - **vs2.2 Respond** — _No definition._ — enabled by Bursts & Supply Interruption Response, Mains Repair & Renewal
 
 ### vs3. Return to Environment
 
-_No definition._
+Starts when wastewater is collected. Ends when it is treated and returned to the environment.
 
 - **vs3.1 Collect** — _No definition._ — enabled by Sewer Network Operations
 - **vs3.2 Treat & Return** — _No definition._ — enabled by Wastewater Treatment, Storm Overflow & Pollution Management, Environmental Permitting & Monitoring
 
 ### vs4. Meter to Cash
 
-_No definition._
+Starts when water use is measured. Ends when the bill is issued and paid.
 
 - **vs4.1 Measure** — _No definition._ — enabled by Metering & Meter Reading
 - **vs4.2 Bill & Collect** — _No definition._ — enabled by Billing & Collections, Affordability & Priority Services
@@ -3983,7 +3983,7 @@ Rows are every distinct level-1 name across all maps; a ✓ means that map has a
 
 ## 3. Flagged items
 
-184 flag(s). A flag is a prompt to look, not a verdict: the name heuristics are word lists, and a definition-length flag is a count, not a judgement of the sentence.
+29 flag(s). A flag is a prompt to look, not a verdict: the name heuristics are word lists, and a definition-length flag is a count, not a judgement of the sentence.
 
 | Map | Code | Name | Reason |
 |---|---|---|---|
@@ -3993,182 +3993,27 @@ Rows are every distinct level-1 name across all maps; a ✓ means that map has a
 | electricity_network/4.json | 13 | Network Delivery & Maintenance | 7 level-2 entries, outside 3-6 |
 | financial_services/1.json | (map) | 13 level-1 capabilities | level-1 count outside 8-12 |
 | financial_services/1.json | 9 | Customer Onboarding & Identity | definition under 8 words (7) |
-| financial_services/1.json | 9.1 | Customer Acquisition | no definition |
-| financial_services/1.json | 9.2 | Know Your Customer & Identity Checks | no definition |
-| financial_services/1.json | 9.3 | Account & Policy Opening | no definition |
-| financial_services/1.json | 9.4 | Consent & Preferences | no definition |
-| financial_services/1.json | 9.5 | Customer Servicing & Contact | no definition |
-| financial_services/1.json | 10.1 | Product Design & Management | no definition |
-| financial_services/1.json | 10.2 | Pricing & Underwriting | no definition |
-| financial_services/1.json | 10.3 | Credit & Risk Decisioning | no definition |
-| financial_services/1.json | 10.4 | Distribution & Broker Channels | no definition |
-| financial_services/1.json | 10.5 | Fair Value & Product Governance | no definition |
 | financial_services/1.json | 11.1 | Payments Processing | process-shaped name (activity/lifecycle wording) |
-| financial_services/1.json | 11.1 | Payments Processing | no definition |
-| financial_services/1.json | 11.2 | Cards & Digital Wallets | no definition |
-| financial_services/1.json | 11.3 | Account & Ledger Management | no definition |
-| financial_services/1.json | 11.4 | Reconciliation & Settlement | no definition |
-| financial_services/1.json | 11.5 | Open Banking & APIs | no definition |
-| financial_services/1.json | 12.1 | Loan Origination & Servicing | no definition |
-| financial_services/1.json | 12.2 | Claims Intake & Assessment | no definition |
-| financial_services/1.json | 12.3 | Claims Settlement & Recovery | no definition |
-| financial_services/1.json | 12.4 | Arrears & Collections | no definition |
-| financial_services/1.json | 12.5 | Customer Vulnerability & Support | no definition |
-| financial_services/1.json | 13.1 | Anti-Money Laundering & Sanctions | no definition |
-| financial_services/1.json | 13.2 | Fraud Detection & Prevention | no definition |
-| financial_services/1.json | 13.3 | Regulatory Reporting | no definition |
-| financial_services/1.json | 13.4 | Capital & Liquidity Management | no definition |
-| financial_services/1.json | 13.5 | Complaints & Redress | no definition |
 | manufacturing/1.json | (map) | 13 level-1 capabilities | level-1 count outside 8-12 |
 | manufacturing/1.json | 9.1 | Product Lifecycle Management | process-shaped name (activity/lifecycle wording) |
-| manufacturing/1.json | 9.1 | Product Lifecycle Management | no definition |
-| manufacturing/1.json | 9.2 | Engineering Change Management | no definition |
-| manufacturing/1.json | 9.3 | Bill of Materials Management | no definition |
-| manufacturing/1.json | 9.4 | Simulation & Testing | no definition |
-| manufacturing/1.json | 9.5 | Regulatory & Standards Compliance | no definition |
-| manufacturing/1.json | 10.1 | Demand & Capacity Planning | no definition |
-| manufacturing/1.json | 10.2 | Production Scheduling | no definition |
-| manufacturing/1.json | 10.3 | Shop Floor Execution | no definition |
-| manufacturing/1.json | 10.4 | Traceability & Genealogy | no definition |
 | manufacturing/1.json | 10.5 | Process Control & Automation | process-shaped name (activity/lifecycle wording) |
-| manufacturing/1.json | 10.5 | Process Control & Automation | no definition |
 | manufacturing/1.json | 11 | Quality & Compliance | definition under 8 words (7) |
-| manufacturing/1.json | 11.1 | Quality Management | no definition |
-| manufacturing/1.json | 11.2 | Inspection & Non-Conformance | no definition |
-| manufacturing/1.json | 11.3 | Supplier Quality | no definition |
-| manufacturing/1.json | 11.4 | Calibration & Audit | no definition |
-| manufacturing/1.json | 11.5 | Product Recall Management | no definition |
 | manufacturing/1.json | 12 | Maintenance & Asset Performance | definition under 8 words (7) |
-| manufacturing/1.json | 12.1 | Preventive & Predictive Maintenance | no definition |
-| manufacturing/1.json | 12.2 | Spare Parts Management | no definition |
-| manufacturing/1.json | 12.3 | Equipment Performance Monitoring | no definition |
-| manufacturing/1.json | 12.4 | Energy & Utilities Management | no definition |
-| manufacturing/1.json | 12.5 | Health & Safety on the Line | no definition |
 | manufacturing/1.json | 13 | Supply Chain & Logistics | definition under 8 words (6) |
-| manufacturing/1.json | 13.1 | Supplier Management & Sourcing | no definition |
-| manufacturing/1.json | 13.2 | Materials Planning | no definition |
-| manufacturing/1.json | 13.3 | Warehousing & Inventory | no definition |
-| manufacturing/1.json | 13.4 | Outbound Logistics | no definition |
-| manufacturing/1.json | 13.5 | Order Management & Customer Delivery | no definition |
 | rail_transport/1.json | (map) | 13 level-1 capabilities | level-1 count outside 8-12 |
-| rail_transport/1.json | 9.1 | Timetable Planning | no definition |
-| rail_transport/1.json | 9.2 | Train Path & Capacity Allocation | no definition |
-| rail_transport/1.json | 9.3 | Rolling Stock Diagramming | no definition |
-| rail_transport/1.json | 9.4 | Crew Rostering | no definition |
-| rail_transport/1.json | 9.5 | Performance & Delay Attribution | no definition |
-| rail_transport/1.json | 10.1 | Real-Time Service Control | no definition |
-| rail_transport/1.json | 10.2 | Disruption & Contingency Management | no definition |
-| rail_transport/1.json | 10.3 | Station Operations | no definition |
-| rail_transport/1.json | 10.4 | Depot & Stabling Operations | no definition |
-| rail_transport/1.json | 10.5 | Network Rail Interface | no definition |
-| rail_transport/1.json | 11.1 | Fleet Maintenance Planning | no definition |
-| rail_transport/1.json | 11.2 | Condition Monitoring & Diagnostics | no definition |
-| rail_transport/1.json | 11.3 | Infrastructure Inspection & Renewal | no definition |
-| rail_transport/1.json | 11.4 | Spares & Depot Logistics | no definition |
-| rail_transport/1.json | 11.5 | Accessibility & Station Assets | no definition |
 | rail_transport/1.json | 12 | Passengers & Ticketing | definition under 8 words (7) |
-| rail_transport/1.json | 12.1 | Fares & Ticketing | no definition |
-| rail_transport/1.json | 12.2 | Journey Planning & Passenger Information | no definition |
-| rail_transport/1.json | 12.3 | Retail Channels & Smart Ticketing | no definition |
-| rail_transport/1.json | 12.4 | Delay Repay & Compensation | no definition |
-| rail_transport/1.json | 12.5 | Accessibility & Assisted Travel | no definition |
-| rail_transport/1.json | 13.1 | Safety Management System | no definition |
-| rail_transport/1.json | 13.2 | Incident Investigation | no definition |
-| rail_transport/1.json | 13.3 | Railway Group Standards Compliance | no definition |
-| rail_transport/1.json | 13.4 | Licence & Franchise Reporting | no definition |
-| rail_transport/1.json | 13.5 | Security & Emergency Planning | no definition |
 | retail_ecommerce/1.json | (map) | 13 level-1 capabilities | level-1 count outside 8-12 |
-| retail_ecommerce/1.json | 9.1 | Range Planning | no definition |
-| retail_ecommerce/1.json | 9.2 | Supplier & Buying Management | no definition |
-| retail_ecommerce/1.json | 9.3 | Pricing & Promotions | no definition |
-| retail_ecommerce/1.json | 9.4 | Demand Forecasting | no definition |
-| retail_ecommerce/1.json | 9.5 | Product Information Management | no definition |
 | retail_ecommerce/1.json | 10 | Supply Chain & Fulfilment | definition under 8 words (7) |
-| retail_ecommerce/1.json | 10.1 | Inventory & Replenishment | no definition |
-| retail_ecommerce/1.json | 10.2 | Warehouse Operations | no definition |
-| retail_ecommerce/1.json | 10.3 | Transport & Delivery | no definition |
-| retail_ecommerce/1.json | 10.4 | Click & Collect and Returns | no definition |
-| retail_ecommerce/1.json | 10.5 | Supplier Collaboration & Logistics | no definition |
-| retail_ecommerce/1.json | 11.1 | Store Labour Scheduling | no definition |
-| retail_ecommerce/1.json | 11.2 | Point of Sale | no definition |
-| retail_ecommerce/1.json | 11.3 | Store Stock & Availability | no definition |
-| retail_ecommerce/1.json | 11.4 | Loss Prevention | no definition |
-| retail_ecommerce/1.json | 11.5 | Store Estate & Format | no definition |
+| retail_ecommerce/1.json | 11.1 | Store Labour Scheduling | definition under 8 words (7) |
 | retail_ecommerce/1.json | 12 | Digital Commerce | definition under 8 words (6) |
-| retail_ecommerce/1.json | 12.1 | Website & App Experience | no definition |
-| retail_ecommerce/1.json | 12.2 | Online Basket & Checkout | no definition |
-| retail_ecommerce/1.json | 12.3 | Search & Personalisation | no definition |
-| retail_ecommerce/1.json | 12.4 | Marketplace Management | no definition |
-| retail_ecommerce/1.json | 12.5 | Order Management | no definition |
 | retail_ecommerce/1.json | 13 | Customer & Loyalty | definition under 8 words (7) |
-| retail_ecommerce/1.json | 13.1 | Customer Data & Segmentation | no definition |
-| retail_ecommerce/1.json | 13.2 | Loyalty & Offers | no definition |
-| retail_ecommerce/1.json | 13.3 | Marketing & Campaigns | no definition |
-| retail_ecommerce/1.json | 13.4 | Payments & Fraud | no definition |
-| retail_ecommerce/1.json | 13.5 | Customer Service & Returns Support | no definition |
+| retail_ecommerce/1.json | 13.3 | Marketing & Campaigns | definition under 8 words (7) |
+| retail_ecommerce/1.json | 13.4 | Payments & Fraud | definition under 8 words (7) |
 | retail_energy/1.json | (map) | 16 level-1 capabilities | level-1 count outside 8-12 |
-| retail_energy/1.json | 9.1 | Price Comparison & Aggregator Channels | no definition |
-| retail_energy/1.json | 9.2 | Direct Digital Sales | no definition |
-| retail_energy/1.json | 9.3 | Tariff Design & Pricing | no definition |
-| retail_energy/1.json | 9.4 | Product & Proposition Management | no definition |
-| retail_energy/1.json | 10.1 | Switching & Registration | no definition |
-| retail_energy/1.json | 10.2 | Credit & Identity Checks | no definition |
-| retail_energy/1.json | 10.3 | Welcome & Contract Management | no definition |
-| retail_energy/1.json | 10.4 | Smart Meter Installation Booking | no definition |
-| retail_energy/1.json | 11.1 | Meter Data Management | no definition |
-| retail_energy/1.json | 11.2 | Smart Meter Communications (DCC) | no definition |
-| retail_energy/1.json | 11.3 | Meter Reading & Estimation | no definition |
-| retail_energy/1.json | 11.4 | Meter Asset Management | no definition |
-| retail_energy/1.json | 11.5 | Half-Hourly Data Collection & Aggregation | no definition |
-| retail_energy/1.json | 12.1 | Bill Calculation & Production | no definition |
-| retail_energy/1.json | 12.2 | Payments & Direct Debit | no definition |
-| retail_energy/1.json | 12.3 | Billing Exceptions & Adjustments | no definition |
-| retail_energy/1.json | 12.4 | Revenue Assurance | no definition |
-| retail_energy/1.json | 13.1 | Customer Service & Contact | no definition |
-| retail_energy/1.json | 13.2 | Complaints & Ombudsman | no definition |
-| retail_energy/1.json | 13.3 | Vulnerable Customer Support | no definition |
-| retail_energy/1.json | 13.4 | Priority Services Register | no definition |
-| retail_energy/1.json | 13.5 | Debt Management & Collections | no definition |
-| retail_energy/1.json | 14.1 | Energy Procurement & Hedging | no definition |
-| retail_energy/1.json | 14.2 | Demand Forecasting | no definition |
-| retail_energy/1.json | 14.3 | Wholesale Settlement (BSC) | no definition |
-| retail_energy/1.json | 14.4 | Market-wide Half-Hourly Settlement (MHHS) | no definition |
-| retail_energy/1.json | 14.5 | Imbalance & Position Management | no definition |
-| retail_energy/1.json | 15.1 | Ofgem Regulatory Reporting | no definition |
-| retail_energy/1.json | 15.2 | Industry Codes Compliance | no definition |
-| retail_energy/1.json | 15.3 | Environmental & Social Obligations | no definition |
-| retail_energy/1.json | 15.4 | Price Cap Compliance | no definition |
-| retail_energy/1.json | 16.1 | Smart Tariffs & Home Energy Services | no definition |
-| retail_energy/1.json | 16.2 | EV & Heat Pump Propositions | no definition |
-| retail_energy/1.json | 16.3 | Flexibility & Demand-Side Response | no definition |
 | utility/2.json | (map) | 13 level-1 capabilities | level-1 count outside 8-12 |
 | utility/2.json | 13 | Network Delivery & Maintenance | 7 level-2 entries, outside 3-6 |
 | utility/3.json | (map) | 13 level-1 capabilities | level-1 count outside 8-12 |
 | utility/3.json | 13 | Network Delivery & Maintenance | 7 level-2 entries, outside 3-6 |
 | water_wastewater/1.json | (map) | 13 level-1 capabilities | level-1 count outside 8-12 |
-| water_wastewater/1.json | 9.1 | Water Resource Planning | no definition |
-| water_wastewater/1.json | 9.2 | Abstraction & Reservoir Management | no definition |
-| water_wastewater/1.json | 9.3 | Water Treatment Operations | no definition |
-| water_wastewater/1.json | 9.4 | Water Quality Monitoring & Compliance | no definition |
-| water_wastewater/1.json | 9.5 | Drought & Demand Management | no definition |
-| water_wastewater/1.json | 10.1 | Network Modelling & Hydraulics | no definition |
-| water_wastewater/1.json | 10.2 | Leakage Detection & Control | no definition |
-| water_wastewater/1.json | 10.3 | Pressure & Flow Management | no definition |
-| water_wastewater/1.json | 10.4 | Mains Repair & Renewal | no definition |
-| water_wastewater/1.json | 10.5 | Bursts & Supply Interruption Response | no definition |
-| water_wastewater/1.json | 11.1 | Sewer Network Operations | no definition |
-| water_wastewater/1.json | 11.2 | Wastewater Treatment | no definition |
-| water_wastewater/1.json | 11.3 | Storm Overflow & Pollution Management | no definition |
-| water_wastewater/1.json | 11.4 | Sludge & Biosolids Management | no definition |
-| water_wastewater/1.json | 11.5 | Environmental Permitting & Monitoring | no definition |
-| water_wastewater/1.json | 12.1 | Customer Contact & Self-Service | no definition |
-| water_wastewater/1.json | 12.2 | Metering & Meter Reading | no definition |
-| water_wastewater/1.json | 12.3 | Billing & Collections | no definition |
-| water_wastewater/1.json | 12.4 | Affordability & Priority Services | no definition |
-| water_wastewater/1.json | 12.5 | Retail Market (Business Customers) | no definition |
-| water_wastewater/1.json | 13.1 | Ofwat Performance Reporting | no definition |
-| water_wastewater/1.json | 13.2 | Drinking Water Inspectorate Compliance | no definition |
-| water_wastewater/1.json | 13.3 | Price Review & Business Plan | no definition |
-| water_wastewater/1.json | 13.4 | Asset Management Plan & Investment | no definition |
-| water_wastewater/1.json | 13.5 | Dam & Reservoir Safety | no definition |
+| water_wastewater/1.json | 12.2 | Metering & Meter Reading | definition under 8 words (6) |
 
