@@ -14,6 +14,7 @@ import { ChangesTouchingSection } from '../components/ChangesTouchingSection/Cha
 import { CollapsibleSection } from '../components/CollapsibleSection/CollapsibleSection';
 import { CommentsSection } from '../components/CommentsSection/CommentsSection';
 import { ConvertToModuleAction } from '../components/ConvertToModuleAction/ConvertToModuleAction';
+import { DocumentsSection } from '../components/DocumentsSection/DocumentsSection';
 import { ElementDecisionsSection } from '../components/ElementDecisionsSection/ElementDecisionsSection';
 import { ElementHeader } from '../components/ElementHeader/ElementHeader';
 import { ElementSearchAdd } from '../components/ElementSearchAdd/ElementSearchAdd';
@@ -47,7 +48,7 @@ import { parseMergePrefillFromSearchParams } from '../duplicates/mergePrefill';
 import { ProposeChangePicker } from '../home/ProposeChangePicker';
 import { useModels } from '../models/useModels';
 import { canCreateChangeBranch, canEditBranch, canEditValueStreamStructure, useMembership } from '../orgs/useMembership';
-import { canStartProject } from '../orgs/roleGates';
+import { canEditOnMain, canStartProject } from '../orgs/roleGates';
 import { canStartDecision } from '../orgs/useMembership';
 import { startDecisionFromElementHref } from '../decisions/decisionPrefill';
 import { startProjectFromElementHref } from '../projects/projectPrefill';
@@ -122,6 +123,7 @@ export function ElementPage() {
   const [justCreatedType] = useState<string | null>(() => (location.state as { justCreated?: string } | null)?.justCreated ?? null);
   const [toastDismissed, setToastDismissed] = useState(false);
   const [justAddedElementId, setJustAddedElementId] = useState<string | null>(null);
+  const [documentCount, setDocumentCount] = useState<number | null>(null);
   // Sprint 7i item 4: "Propose a change" — the contributor-at-main path
   // `ElementHeader.tsx`'s own former comment named as a real, named gap.
   const [proposingChange, setProposingChange] = useState(false);
@@ -589,6 +591,18 @@ export function ElementPage() {
                       onSaved={reloadAfterCommit}
                     />
                   )}
+                </CollapsibleSection>
+                {/* Documents (ADR-030): pointers to where documents live, on every element type. Owners and architects manage them directly; changes here are not in History. */}
+                <CollapsibleSection title="Documents" meta={documentCount === null ? undefined : `(${String(documentCount)})`}>
+                  <DocumentsSection
+                    key={state.data.element.element_id}
+                    modelId={model.id}
+                    orgId={organisation?.id ?? ''}
+                    elementId={state.data.element.element_id}
+                    userId={userId ?? null}
+                    canManage={canEditOnMain(role)}
+                    onCount={setDocumentCount}
+                  />
                 </CollapsibleSection>
                 {/* An integration platform's own interfaces and flows come first after its attributes — what it exposes, and what goes through it, is what the page is for (ADR-026). */}
                 {state.data.element.element_type === 'system' && isIntegrationPlatform(state.data.element) && (
