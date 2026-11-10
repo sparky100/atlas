@@ -1,5 +1,5 @@
 import { useId, useState } from 'react';
-import { useNavigate } from 'react-router';
+import { Link, useNavigate } from 'react-router';
 import type { UUID } from '../../contracts/delta';
 import { useAuth } from '../auth/useAuth';
 import { Button } from '../components/Button/Button';
@@ -8,7 +8,10 @@ import { Panel } from '../components/Panel/Panel';
 import { Text } from '../components/Text/Text';
 import { TypedNameConfirm } from '../components/TypedNameConfirm/TypedNameConfirm';
 import type { ModelRow, MemberRole } from '../../db/types';
-import { canArchiveModel, canDeleteModel, canRestoreModel } from '../orgs/roleGates';
+import { defaultCopyName, slugForCopy } from '../../db/copyModel';
+import { canArchiveModel, canCopyModel, canDeleteModel, canRestoreModel } from '../orgs/roleGates';
+import { useCopyModel } from './useCopyModel';
+import { useModels } from './useModels';
 import { useModelSettings } from './useModelSettings';
 import { useModelSharing } from './useModelSharing';
 import styles from './ModelSettingsView.module.css';
@@ -27,7 +30,7 @@ export interface ModelSettingsViewProps {
  * confirmation). Read-only when the model is archived, per the prompt's
  * own wording — only Restore and Delete remain live then.
  */
-export function ModelSettingsView({ model, role, orgSlug, onChanged }: ModelSettingsViewProps) {
+export function ModelSettingsView({ model, role, orgId, orgSlug, onChanged }: ModelSettingsViewProps) {
   const { userId } = useAuth();
   const { status, error, update, archive, restore, remove } = useModelSettings(model.id, onChanged);
   const canShare = canDeleteModel(role);
@@ -36,6 +39,11 @@ export function ModelSettingsView({ model, role, orgSlug, onChanged }: ModelSett
   const [slug, setSlug] = useState(model.slug);
   const [description, setDescription] = useState(model.description ?? '');
   const [deleteResult, setDeleteResult] = useState<'not_archived' | 'not_found' | null>(null);
+  const canCopy = canCopyModel(role);
+  const { models: orgModels } = useModels(canCopy ? orgId : null);
+  const copying = useCopyModel(model, userId);
+  const [copyName, setCopyName] = useState<string | null>(null);
+  const copyNameId = useId();
   const [targetOrgSlug, setTargetOrgSlug] = useState('');
   const [targetTagId, setTargetTagId] = useState('');
   const [shareResult, setShareResult] = useState<'org_not_found' | 'already_shared' | null>(null);
@@ -126,6 +134,50 @@ export function ModelSettingsView({ model, role, orgSlug, onChanged }: ModelSett
         </form>
         {error !== null && <Text as="p">{error}</Text>}
       </Panel>
+
+      {canCopy && (
+        <Panel>
+          <Text as="h2" size="lg">
+            Copy this model
+          </Text>
+          <Text as="p" tone="muted" size="sm">
+            Makes a new, separate model in this organisation from how this one stands today: every element and relationship, who said what and how sure they were, names and codes, and the organisation's shared reports and dashboards. It starts with a single "Copied from {model.name}" entry in History. Earlier history, open changes, decisions, projects, comments, private reports and shares are not copied. This model is not touched.
+          </Text>
+          <form
+            className={styles.form}
+            onSubmit={(e) => {
+              e.preventDefault();
+              const name = (copyName ?? defaultCopyName(model.name, orgModels.map((m) => m.name))).trim();
+              if (name.length === 0) return;
+              void copying.copy(name, slugForCopy(name, orgModels.map((m) => m.slug)));
+            }}
+          >
+            <label htmlFor={copyNameId}>
+              <Text as="span" size="sm">
+                Name of the copy
+              </Text>
+            </label>
+            <input
+              id={copyNameId}
+              className={styles.input}
+              type="text"
+              value={copyName ?? defaultCopyName(model.name, orgModels.map((m) => m.name))}
+              onChange={(e) => {
+                setCopyName(e.target.value);
+              }}
+            />
+            <Button variant="primary" type="submit" disabled={copying.status === 'copying'}>
+              {copying.status === 'copying' ? 'Copying…' : 'Copy model'}
+            </Button>
+          </form>
+          {copying.error !== null && <Text as="p">{copying.error}</Text>}
+          {copying.copied !== null && (
+            <Text as="p">
+              Copied {copying.copied.elements} elements and {copying.copied.relationships} relationships. <Link to={`/o/${orgSlug}/m/${copying.copied.model.slug}/start`}>Open {copying.copied.model.name}</Link>
+            </Text>
+          )}
+        </Panel>
+      )}
 
       {canArchiveModel(role) && (
         <Panel>

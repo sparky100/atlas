@@ -39,7 +39,7 @@ export interface CreateTagInput {
  * elements/relationships/facts unable to ever create a tag at all, for a
  * reason with no visible error pointing at it.
  */
-async function loadMaterialisedHead(supabase: Client, commitId: UUID) {
+export async function loadMaterialisedHead(supabase: Client, commitId: UUID) {
   const [elementsData, relationshipsData, factsData] = await Promise.all([
     selectAll<ElementsHeadRow>(supabase.from('elements_head').select('*', { count: 'exact' }).eq('commit_id', commitId).order('element_id')),
     selectAll<RelationshipsHeadRow>(supabase.from('relationships_head').select('*', { count: 'exact' }).eq('commit_id', commitId).order('relationship_id')),
