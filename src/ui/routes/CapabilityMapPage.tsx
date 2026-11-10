@@ -28,6 +28,7 @@ import { CapabilityMapImportPanel } from '../capabilityMap/CapabilityMapImportPa
 import { CapabilityMapInspectorContent } from '../capabilityMap/CapabilityMapInspectorContent';
 import { capabilityMapLevelOf } from '../capabilityMap/capabilityMapInspectorSelection';
 import { CapabilityMapView } from '../capabilityMap/CapabilityMapView';
+import { CapabilityWholeMapView } from '../capabilityMap/CapabilityWholeMapView';
 import { ExportCapabilityMapAction } from '../capabilityMap/ExportCapabilityMapAction';
 import { tileCapabilityIds } from '../capabilityMap/layout';
 import { useBackfillCapabilityOrder } from '../capabilityMap/useBackfillCapabilityOrder';
@@ -182,6 +183,19 @@ export function CapabilityMapPage() {
   // comment). An id that doesn't match any real domain is harmless: no
   // row ever matches it, so it just never renders expanded.
   const [expandedDomainId, setExpandedDomainId] = useState<UUID | null>(() => searchParams.get('domain'));
+  // "List" (domains that open one at a time) or "Whole map" (every area on one screen). Kept in the URL so a link opens the same layout.
+  const wholeMap = searchParams.get('layout') === 'whole';
+  const setLayout = (next: 'list' | 'whole'): void => {
+    setSearchParams(
+      (prev) => {
+        const updated = new URLSearchParams(prev);
+        if (next === 'whole') updated.set('layout', 'whole');
+        else updated.delete('layout');
+        return updated;
+      },
+      { replace: true },
+    );
+  };
   const toggleDomain = (id: UUID): void => {
     const next = expandedDomainId === id ? null : id;
     setExpandedDomainId(next);
@@ -354,6 +368,28 @@ export function CapabilityMapPage() {
           const reorderCapability = canEdit && mainBranch ? { modelId: model.id, orgId: organisation?.id ?? '', userId, branch: mainBranch, expectedHeadCommitId: state.data.commitId, onReordered: reloadAll } : undefined;
           return (
             <div className={hasContent ? styles.mapRow : undefined}>
+              <div className={styles.mapColumn}>
+              {hasContent && (
+                <div className={styles.layoutToggle} role="group" aria-label="Map layout">
+                  <Button variant={wholeMap ? 'ghost' : 'secondary'} aria-pressed={!wholeMap} onClick={() => { setLayout('list'); }}>
+                    List
+                  </Button>
+                  <Button variant={wholeMap ? 'secondary' : 'ghost'} aria-pressed={wholeMap} onClick={() => { setLayout('whole'); }}>
+                    Whole map
+                  </Button>
+                </div>
+              )}
+              {wholeMap && hasContent ? (
+                <CapabilityWholeMapView
+                  tree={state.data.tree}
+                  colourBy={colourBy}
+                  supportsEdges={state.data.supportsEdges}
+                  systemsById={state.data.systemsById}
+                  replacedIds={state.data.replacedIds}
+                  orgSlug={organisation?.slug ?? ''}
+                  modelSlug={model.slug}
+                />
+              ) : (
               <CapabilityMapView
                 tree={state.data.tree}
                 supportsEdges={state.data.supportsEdges}
@@ -376,6 +412,8 @@ export function CapabilityMapPage() {
                 onCommentMarkerClick={setCommentsPanelCapabilityId}
                 onInspectClick={setSelectedCapabilityId}
               />
+              )}
+              </div>
               {/* V2b: net-new on this view (no prior focus/filter panel to replace) — gated on `hasContent` the same way colour-by's own control used to be (`capability-map-actions.engine.spec.ts`'s own "no view content for it to control yet"), since an empty map has nothing to inspect or filter either. */}
               {hasContent && (
                 <Inspector
