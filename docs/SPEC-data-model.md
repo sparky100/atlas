@@ -1001,6 +1001,11 @@ The two-round-trip design's orphaned-commit tradeoff (a lost race leaving a perm
 
 ---
 
+
+### 5.6 Copying a model (ADR-030)
+
+`atlas.copy_model` is the one operation that writes a commit into a model on behalf of a *different* model's content: owner-only (`has_role(org, 'owner')`, checked in the function), same organisation, one ordinary `manual` commit titled "Copied from <name>" whose deltas carry each copied fact's original provenance against re-keyed `sources` rows. It refuses if the source's main head moved after the client read it. History, changes, decisions, comments, private reports and shares are not copied. See `docs/ADR-030-copy-model.md`.
+
 ## 6. Head rebuild and its proof
 
 ### 6.1 Definitions

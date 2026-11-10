@@ -92,6 +92,11 @@ export function canDeleteModel(role: MemberRole | null): boolean {
   return role === 'owner';
 }
 
+/** Mirrors `atlas.copy_model`'s own owner-only check — the database refuses anyone else; this only hides the affordance. */
+export function canCopyModel(role: MemberRole | null): boolean {
+  return role === 'owner';
+}
+
 /**
  * S1 item 4: mirrors `atlas.cancel_change`'s own check — "proposer or
  * owner/architect, Draft or Proposed." Unlike every other gate in this
