@@ -1,10 +1,25 @@
 # Atlas User Guide
 
-**Status:** reviewed against the app on 2026-10-17 (after F13 view exports and the project pack, cancelling and editing decisions, the Home split, capture review, and integration interfaces). Written for the in-app AI help chat to ground its answers in — if something here doesn't match what you see, the app is right and this guide needs correcting.
+**Status:** reviewed against the app on 2026-10-17, with the first-10-minutes section added 2026-11-10 (after F13 view exports and the project pack, cancelling and editing decisions, the Home split, capture review, and integration interfaces). Written for the in-app AI help chat to ground its answers in — if something here doesn't match what you see, the app is right and this guide needs correcting.
 
 This is the guide the in-app **Help** assistant reads to answer your questions. It isn't reference documentation for developers (that's `docs/ADR-000-foundations.md` and `docs/SPEC-data-model.md`); it's written for the people who use Atlas: architects who maintain the model, and the senior people who read it.
 
 ---
+
+## Your first 10 minutes
+
+**Where do I start?** It depends on your role.
+
+- **Viewer:** you land on the capability map. Click a capability to see the systems that support it, then open a system to see its details. Use the search box at the top to find anything by name.
+- **Contributor:** look around the capability map and landscape first. To change something, start a change from **Work → Changes**; it is reviewed before it reaches the live model.
+- **Architect:** open Home and read **Where to focus**. Each row is a problem and links straight to it, with **Start a decision** or **Start a project** on the same row.
+- **Owner:** as an architect, plus **Invite a colleague** in organisation settings.
+
+**A new, empty model.** Home shows a **Get started** checklist: import your capabilities, add a system, link it to the capability it supports, and (owners only) invite a colleague.
+
+**A model that already has data.** Home shows a **Welcome** card with a few places to start, worded for your role. **Dismiss** hides it in that browser.
+
+**Stuck?** Click the **Help** button at the top and ask. You can also choose a different start page for yourself.
 
 ## What Atlas is
 
@@ -92,7 +107,7 @@ Home has two views; switch with **Overview** / **My work** at the top. They do d
 
 **Your start page.** Opening a model from the model list takes you to your start page: the capability map for viewers and contributors, Home for owners and architects. Pick another (Home, Capability map or Landscape) under **Profile → Start page**, or press **Make this my start page** on any of those three pages. The choice follows you across organisations. On a phone, the **Search** button in the header searches elements, changes, decisions and projects from any page.
 
-**Get started.** A model with no capabilities, no systems or no system-to-capability links shows a **Get started** checklist on Home (for people who can add to the model). Each step ticks itself from the model's real contents and links to the screen that does it; **Dismiss** hides it in that browser.
+**Get started.** A model with no capabilities, no systems or no system-to-capability links shows a **Get started** checklist on Home (for people who can add to the model). Owners also get an **Invite a colleague** step, which ticks once an invite has been sent. A model that already has data shows a **Welcome** card instead. Each step ticks itself from the model's real contents and links to the screen that does it; **Dismiss** hides it in that browser.
 
 Health findings include: systems not linked to a capability, capabilities with no owner, stale values, critical systems with no business owner or nearing end of life, critical systems near the end of vendor support, relationships missing a verb or a data classification across the IT/OT or enterprise boundary, and systems planned to move or switch off that nothing is retiring.
 

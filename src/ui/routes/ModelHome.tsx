@@ -17,6 +17,7 @@ import { useSelectedRef } from '../branches/useSelectedRef';
 import { ArchitectHome } from '../home/ArchitectHome';
 import { DirectorHome } from '../home/DirectorHome';
 import { HomeModeSwitch } from '../home/HomeModeSwitch';
+import { FirstVisit } from '../home/FirstVisit';
 import { GetStarted } from '../home/GetStarted';
 import { HomeSearch } from '../home/HomeSearch';
 import { useArchitectHome } from '../home/useArchitectHome';
@@ -211,7 +212,8 @@ export function ModelHome() {
           )}
         </Panel>
 
-        {canShowSearch && <GetStarted modelId={model.id} commitId={searchCommitId} orgSlug={organisation?.slug ?? ''} modelSlug={model.slug} />}
+        {canShowSearch && <GetStarted modelId={model.id} commitId={searchCommitId} orgId={organisation?.id ?? ''} isOwner={role === 'owner'} orgSlug={organisation?.slug ?? ''} modelSlug={model.slug} />}
+        <FirstVisit modelId={model.id} commitId={searchCommitId} orgId={organisation?.id ?? ''} role={role} orgSlug={organisation?.slug ?? ''} modelSlug={model.slug} />
 
         <div className={styles.doorLinks}>
           <Link to={`/o/${organisation?.slug ?? ''}/m/${model.slug}/elements`}>
