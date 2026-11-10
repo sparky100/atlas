@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router';
 import type { UUID } from '../../contracts/delta';
+import { countInvites } from '../../db/invites';
 import { countGettingStarted } from '../../db/landscape';
 import { reportError } from '../errors/errorBannerStore';
 import { supabase } from '../supabaseClient';
@@ -19,20 +20,20 @@ function isDismissed(modelId: string): boolean {
 
 /**
  * "Get started" checklist for a model that is still being set up: import
- * capabilities, add a system, link it to a capability. Ticks come from real
+ * capabilities, add a system, link it to a capability, invite a colleague (owners only). Ticks come from real
  * counts on main's head; each step links into the existing screen that does
  * it. Dismissal is per browser (localStorage) — it is a nudge, not data.
  */
-export function GetStarted({ modelId, commitId, orgSlug, modelSlug }: { modelId: UUID; commitId: UUID | null; orgSlug: string; modelSlug: string }) {
+export function GetStarted({ modelId, commitId, orgId, isOwner, orgSlug, modelSlug }: { modelId: UUID; commitId: UUID | null; orgId: UUID; isOwner: boolean; orgSlug: string; modelSlug: string }) {
   const [steps, setSteps] = useState<GettingStartedStep[] | null>(null);
   const [dismissed, setDismissed] = useState(() => isDismissed(modelId));
 
   useEffect(() => {
     if (!commitId || dismissed) return undefined;
     let cancelled = false;
-    countGettingStarted(supabase, commitId)
-      .then((counts) => {
-        if (!cancelled) setSteps(gettingStartedSteps(counts));
+    Promise.all([countGettingStarted(supabase, commitId), isOwner && orgId ? countInvites(supabase, orgId) : Promise.resolve(null)])
+      .then(([counts, invites]) => {
+        if (!cancelled) setSteps(gettingStartedSteps(counts, invites));
       })
       .catch((e: unknown) => {
         reportError("Couldn't load the get-started checklist.", e);
@@ -40,7 +41,7 @@ export function GetStarted({ modelId, commitId, orgSlug, modelSlug }: { modelId:
     return () => {
       cancelled = true;
     };
-  }, [commitId, dismissed]);
+  }, [commitId, dismissed, isOwner, orgId]);
 
   if (dismissed || !steps || !showGettingStarted(steps)) return null;
 
@@ -49,11 +50,13 @@ export function GetStarted({ modelId, commitId, orgSlug, modelSlug }: { modelId:
     capabilities: { to: `${base}/capture`, text: 'Import' },
     system: { to: `${base}/elements`, text: 'See elements' },
     link: { to: `${base}/capability-map`, text: 'Open the capability map' },
+    invite: { to: `/o/${orgSlug}/settings`, text: 'Open organisation settings' },
   };
   const hints: Record<GettingStartedStep['id'], string> = {
     capabilities: 'Import a spreadsheet or document, or type a name in the search box above.',
     system: 'Type its name in the search box above and choose to create it.',
     link: 'Open a system and say which capability it supports.',
+    invite: 'Add their email and choose a role. They get an email with a link to join.',
   };
 
   return (

@@ -49,6 +49,13 @@ export async function listInvites(supabase: Client, orgId: UUID): Promise<Invite
   return (data as InviteRow[] | null) ?? [];
 }
 
+/** Owner only (`invites_select`'s RLS) — how many invites the org has ever created, pending or consumed; a head-only count for the Home "Get started" checklist. */
+export async function countInvites(supabase: Client, orgId: UUID): Promise<number> {
+  const { count, error } = await supabase.from('invites').select('id', { count: 'exact', head: true }).eq('org_id', orgId);
+  if (error) throw new Error(`countInvites: ${error.message}`);
+  return count ?? 0;
+}
+
 /**
  * Owner only (`invites_delete`'s RLS) — deletes the row outright, pending or already consumed; there's no soft-revoke state, same "delete means delete" the row itself already is (a consumed invite is history the `members` row it created now carries, not something this row alone needs to preserve).
  *
