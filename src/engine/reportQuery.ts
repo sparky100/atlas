@@ -200,6 +200,11 @@ function groupAndSplitRows(rows: readonly ReportRow[], field: string, splitField
 
 /** Runs a report. Never mutates `rows`. */
 export function runReport(rows: readonly ReportRow[], spec: ReportSpec, options: RunReportOptions = {}): ReportResult {
+  return runReportWithRows(rows, spec, options).result;
+}
+
+/** Live views can use the original rows in display order for navigation. Only the result is stored or exported. */
+export function runReportWithRows<Row extends ReportRow>(rows: readonly Row[], spec: ReportSpec, options: RunReportOptions = {}): { result: ReportResult; displayedRows: readonly Row[] } {
   const matched = rows.filter((row) => spec.filters.every((filter) => matches(row, filter)));
   const tiebreak = options.tiebreakField ?? 'id';
   const useTiebreak = matched.some((row) => row[tiebreak] !== undefined);
@@ -215,14 +220,14 @@ export function runReport(rows: readonly ReportRow[], spec: ReportSpec, options:
   const limit = presentation.kind === 'table' ? presentation.limit : undefined;
   const shown = presentation.kind === 'table' ? (limit === undefined ? ordered : ordered.slice(0, limit)) : [];
 
-  return {
+  return { displayedRows: shown, result: {
     columns: spec.columns,
     rows: shown.map((row) => spec.columns.map((column) => read(row, column))),
     rowCount: ordered.length,
     truncated: presentation.kind === 'table' && shown.length < ordered.length,
     groups: spec.groupBy === undefined ? [] : spec.splitBy === undefined ? groupRows(ordered, spec.groupBy) : groupAndSplitRows(ordered, spec.groupBy, spec.splitBy),
     unknownFields: unknownFieldsOf(spec, rows, options.knownFields),
-  };
+  } };
 }
 
 /**

@@ -34,6 +34,11 @@
   background: var(--bg-subtle);
 }
 
+.recordLink {
+  color: var(--accent);
+  text-decoration: underline;
+}
+
 /* A dashboard tile: smaller type, tighter rows; the first column (the name) never squeezes to one word per line. */
 .compact {
   font-size: var(--text-sm-size);

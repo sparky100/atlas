@@ -83,6 +83,11 @@ export async function listRelationshipsForElement(supabase: Client, commitId: UU
   return selectAll<RelationshipsHeadRow>(query);
 }
 
+export async function listAllRelationships(supabase: Client, commitId: UUID): Promise<RelationshipsHeadRow[]> {
+  const query = supabase.from('relationships_head').select(RELATIONSHIPS_HEAD_COLUMNS, { count: 'exact' }).eq('commit_id', commitId).order('relationship_id');
+  return selectAll<RelationshipsHeadRow>(query);
+}
+
 /**
  * Every `uses`/`flows_to` edge whose `via` names `platformElementId` —
  * Prompt 7k item 4's "Flows via this platform" element-page section.

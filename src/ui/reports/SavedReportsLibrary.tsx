@@ -37,6 +37,7 @@ import {
   type SavedReportSortKey,
 } from "./savedReportList";
 import { RowMenu } from "./RowMenu";
+import { NewModelReport } from "./NewModelReport";
 import styles from "./SavedReportsLibrary.module.css";
 
 export interface SavedReportsLibraryProps {
@@ -101,6 +102,7 @@ export function SavedReportsLibrary({
   }
 
   const canCreate = userId !== null && canCreateChangeBranch(role);
+  const newReport = canCreate ? <NewModelReport orgId={orgId} modelId={modelId} userId={userId} basePath={basePath} /> : null;
   const shown = sortSavedReports(reports, sortKey).flatMap((row) => {
     const parsed = parseReportSpec(row.spec);
     return matchesSearch(
@@ -116,6 +118,7 @@ export function SavedReportsLibrary({
         <Text as="h2" size="lg">
           Saved reports
         </Text>
+        {newReport}
         <Text as="p" tone="muted">
           Nothing saved yet. Filter the Elements or Portfolio page, then choose
           "Save as report…".
@@ -129,6 +132,7 @@ export function SavedReportsLibrary({
       <Text as="h2" size="lg">
         Saved reports
       </Text>
+      {newReport}
       {message !== null && (
         <Text as="p" size="sm">
           {message}

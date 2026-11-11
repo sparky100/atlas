@@ -22,6 +22,10 @@ const FIELD_LABELS: Readonly<Record<string, string>> = {
   fit: 'Fit',
   capabilities: 'Capabilities served',
   signals: 'Signals',
+  from: 'From',
+  to: 'To',
+  description: 'Description',
+  finding: 'Finding',
 };
 
 /** A column heading: a known field's label, else the field's own key (a custom attribute reads as its definition key). */

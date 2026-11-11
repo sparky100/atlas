@@ -6,6 +6,7 @@
  * stored rows.
  */
 import type { ReportSpec, ReportValue } from '../../contracts/reportSpec';
+import { Link } from 'react-router';
 import type { ReportResult } from '../../engine/reportQuery';
 import { BarChart } from '../charts/BarChart';
 import { BigNumber } from '../charts/BigNumber';
@@ -14,6 +15,7 @@ import { StackedBarChart } from '../charts/StackedBarChart';
 import { Text } from '../components/Text/Text';
 import type { ReportDrill } from './reportDrill';
 import { reportFieldLabel, reportValueLabel, reportValueScale } from './reportTable';
+import { reportCellHref, type LiveReportRow } from './reportRowLinks';
 import styles from './ReportResultView.module.css';
 
 /** Called when a chart mark is clicked, with the value(s) it stands for; the page narrows to those rows. */
@@ -48,7 +50,12 @@ export function ReportChart({ result, spec, onDrill }: { result: ReportResult; s
 }
 
 /** The rows of a result as a table, with the "attribute removed" and "showing N of M" notes. */
-export function ResultTable({ result, compact = false }: { result: ReportResult; compact?: boolean }) {
+interface LiveRows {
+  rows: readonly LiveReportRow[];
+  basePath: string;
+}
+
+export function ResultTable({ result, compact = false, live }: { result: ReportResult; compact?: boolean; live?: LiveRows | undefined }) {
   const removed = new Set(result.unknownFields);
   return (
     <div className={styles.scroll}>
@@ -65,12 +72,15 @@ export function ResultTable({ result, compact = false }: { result: ReportResult;
         </thead>
         <tbody>
           {result.rows.map((row, i) => (
-            <tr key={i}>
-              {row.map((cell, j) => (
-                <td key={j} title={compact ? reportValueLabel(result.columns[j] ?? '', cell) : undefined}>
-                  {reportValueLabel(result.columns[j] ?? '', cell)}
-                </td>
-              ))}
+            <tr key={String(live?.rows[i]?.id ?? i)}>
+              {row.map((cell, j) => {
+                const field = result.columns[j] ?? '';
+                const label = reportValueLabel(field, cell);
+                const href = live === undefined ? undefined : reportCellHref(live.rows[i], field, live.basePath);
+                return <td key={j} title={compact ? label : undefined}>
+                  {href === undefined || label === '' ? label : <Link className={styles.recordLink} to={href}>{label}</Link>}
+                </td>;
+              })}
             </tr>
           ))}
         </tbody>
@@ -89,7 +99,7 @@ export function ResultTable({ result, compact = false }: { result: ReportResult;
   );
 }
 
-export function ReportResultView({ result, spec, onDrill }: { result: ReportResult; spec: ReportSpec; onDrill?: OnDrill | undefined }) {
+export function ReportResultView({ result, spec, onDrill, live }: { result: ReportResult; spec: ReportSpec; onDrill?: OnDrill | undefined; live?: LiveRows | undefined }) {
   const kind = spec.presentation.kind;
   const summary = <BigNumber label={result.rowCount === 1 ? 'Row matches' : 'Rows match'} value={result.rowCount} />;
 
@@ -106,7 +116,7 @@ export function ReportResultView({ result, spec, onDrill }: { result: ReportResu
     <div className={styles.stack}>
       {summary}
       <ReportChart result={result} spec={spec} onDrill={onDrill} />
-      <ResultTable result={result} />
+      <ResultTable result={result} live={live} />
     </div>
   );
 }

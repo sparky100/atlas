@@ -1,5 +1,5 @@
-import { useId, useState } from 'react';
-import { Link } from 'react-router';
+import { useEffect, useId, useState } from 'react';
+import { Link, useLocation } from 'react-router';
 import type { ElementType, RelationshipType, UUID } from '../../../contracts/delta';
 import type { FactsRow, RelationshipsHeadRow, ElementsHeadRow } from '../../../contracts/rows';
 import { inboundRelationshipGroups, outboundRelationshipGroups, type RelationshipGroupSlot } from '../../../contracts/relationshipTypeRules';
@@ -159,6 +159,14 @@ export function RelationshipsSection({
   enablesRemoveRelationship,
   justAddedElementId = null,
 }: RelationshipsSectionProps) {
+  const { hash } = useLocation();
+  useEffect(() => {
+    if (!hash.startsWith('#relationship-')) return;
+    const target = document.getElementById(hash.slice(1));
+    if (!target) return;
+    target.scrollIntoView({ block: 'center' });
+    target.focus({ preventScroll: true });
+  }, [hash, relationships]);
   const outboundSlots = new Map(outboundRelationshipGroups(elementType).map((slot) => [slot.relationshipType, slot]));
   const inboundSlots = new Map(inboundRelationshipGroups(elementType).map((slot) => [slot.relationshipType, slot]));
 
@@ -342,7 +350,7 @@ function RelationshipDirectionGroup({
         const otherDisplayName = other ? endpointDisplayName(other, endpoints) : '';
 
         return (
-          <div key={rel.relationship_id} className={styles.rowGroup}>
+          <div key={rel.relationship_id} className={styles.rowGroup} id={direction === 'outbound' ? `relationship-${rel.relationship_id}` : undefined} tabIndex={direction === 'outbound' ? -1 : undefined}>
             <div className={styles.row}>
               <span className={styles.arrow} aria-hidden="true">
                 {direction === 'outbound' ? '→' : '←'}

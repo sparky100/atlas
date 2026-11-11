@@ -109,9 +109,11 @@ export function ReportSettings({ report, spec, knownFields, canShare, onSaved }:
       <Text as="h2" size="lg">
         Report settings
       </Text>
-      <Text as="p" size="sm" tone="muted">
-        To change which rows the report includes, open it from the {spec.source === 'portfolio' ? 'Portfolio' : 'Elements'} page, adjust the filters, and choose "Save changes". These settings are kept when you do.
-      </Text>
+      {(spec.source === 'elements' || spec.source === 'portfolio') && (
+        <Text as="p" size="sm" tone="muted">
+          To change which rows the report includes, open it from the {spec.source === 'portfolio' ? 'Portfolio' : 'Elements'} page, adjust the filters, and choose "Save changes".
+        </Text>
+      )}
       <div className={styles.row}>
         <label className={styles.field}>
           <span>Show as</span>

@@ -84,8 +84,8 @@ export function withoutShape(spec: ReportSpec): ReportSpec {
 const HELPER_FIELDS: Record<ReportSource, ReadonlySet<string>> = {
   elements: new Set<string>(ELEMENT_REPORT_HELPER_FIELDS),
   portfolio: new Set<string>(PORTFOLIO_REPORT_HELPER_FIELDS),
-  relationships: new Set<string>(),
-  findings: new Set<string>(),
+  relationships: new Set(['id', 'description']),
+  findings: new Set(['id', 'findingKey']),
 };
 
 /** Fields worth grouping by: the source's own fields minus internal helpers and the row's name (one group per row says nothing). Order kept. */
