@@ -1,19 +1,68 @@
-.wrapper {
-  position: relative;
+.trigger {
   display: inline-flex;
+  align-items: center;
+  min-block-size: var(--space-6);
   background: none;
   border: none;
+  border-radius: var(--radius-sm);
   padding: 0;
   margin: 0;
-  cursor: default;
+  cursor: pointer;
   font: inherit;
   text-align: left;
 }
 
+.trigger:focus-visible {
+  outline: var(--border-width-emphasis) solid var(--focus);
+  outline-offset: var(--border-width-emphasis);
+}
+
 .popover {
-  position: absolute;
-  z-index: 20;
-  top: 100%;
-  left: 0;
-  margin-top: var(--space-1);
+  display: none;
+  position: fixed;
+  inset: 0;
+  margin: auto;
+  box-sizing: border-box;
+  inline-size: min(var(--evidence-panel-width), calc(100vw - 2 * var(--space-4)));
+  max-block-size: calc(100dvh - 2 * var(--space-4));
+  block-size: fit-content;
+  overflow: auto;
+  overflow-wrap: anywhere;
+  padding: var(--space-3);
+  border: var(--border-width) solid var(--border);
+  border-radius: var(--radius-md);
+  box-shadow: var(--surface-raised-shadow);
+  background: var(--surface-raised);
+  color: var(--text);
+}
+
+.popover:popover-open {
+  display: block;
+}
+
+@media (min-width: 768px) {
+  @supports (position-area: block-end) and (position-try-fallbacks: flip-block) {
+    .popover {
+      inset: auto;
+      margin: var(--space-1) 0;
+      position-area: block-end span-inline-end;
+      justify-self: start;
+      position-try-fallbacks: flip-inline, flip-block, flip-inline flip-block, --center-evidence;
+    }
+
+    @position-try --center-evidence {
+      position-area: none;
+      inset: 0;
+      margin: auto;
+      justify-self: auto;
+    }
+  }
+}
+
+.header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+  margin-block-end: var(--space-2);
 }

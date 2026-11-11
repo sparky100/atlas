@@ -39,10 +39,10 @@ export function AttributeRow({ label, required, fact, source, field }: Attribute
         {label}
       </Text>
       {fact ? (
-        <span className={styles.value}>
+        <div className={styles.value}>
           <Text as="span">{displayValue(fact, field)}</Text>
-          <FactBadge fact={fact} source={source} />
-        </span>
+          <FactBadge label={label} fact={fact} source={source} />
+        </div>
       ) : required ? (
         <Text as="span" className={styles.missingRequired}>
           — required, not recorded

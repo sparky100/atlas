@@ -71,6 +71,7 @@
   --side-column-width: 300px;
   --blueprint-corner-size: 10px;
   --comments-panel-width: 372px;
+  --evidence-panel-width: 20rem;
   --avatar-size-sm: 24px;
   --avatar-size-md: 32px;
   /** Sprint U4-2a item 5: a canvas route's own full-viewport-height calc (`LandscapePage.module.css`) needs this exact value — named once here rather than repeating the literal `AppHeader.module.css`'s `.header` already used. */

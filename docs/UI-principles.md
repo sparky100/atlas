@@ -6,7 +6,7 @@
 
 Atlas has two audiences with opposite usage patterns: an architect who lives in it, and a service owner or director who opens it twice a quarter and must not need training. Every screen is judged against both. "Materially better than Sparx, Ardoq, LeanIX and Structurizr" is a testable claim, defined in §1; the rest of this document is how we meet it.
 
-The single idea underneath all of it: **the UI shows facts, and every fact shows why we believe it.** No screen presents a value without a route to its provenance in one hover; no diagram presents a shape that isn't a query result.
+The single idea underneath all of it: **the UI shows facts, and every fact shows why we believe it.** Every displayed value has a route to its provenance. Diagrams show query results.
 
 ---
 
@@ -224,6 +224,8 @@ Two columns on desktop (≥ 1024 px), stacked on narrower screens. Left column ~
 - `Rename` (capability only, Sprint U2 step 2; **amended, Sprint U4-1 D3**): a "Rename" item in the header's own overflow menu, same gate as `Edit` — not a standalone control sitting between `Edit` and Attributes (§4.3), which is what it used to be. Picking it replaces the static `h1` with an inline input, in place, with its own Save/Cancel — an independent action from the Attributes edit form, not merged into it. The old name is recorded as a `name`-type alias before the rename commits (`useElementRename.ts`'s own comment), so a later capture pass can still match on it.
 
 ### 4.3 Attributes with provenance badges
+
+**Interaction update.** Activate the badge with a click, tap, Enter or Space to open the evidence panel. Close it with Escape, the Close button or an outside click. Fetch history when the panel first opens. If history fails, keep the current evidence visible and offer a retry. The panel distinguishes a failed request from a successful check that finds no earlier evidence. This interaction supersedes the hover and focus trigger described below.
 
 A two-column key/value list, one row per attribute in `type_schemas` order, including empty required attributes (shown as `— required, not recorded` in the warning colour so gaps are visible, never hidden). **Amended (Sprint U4-1 D2), one named exception:** Capability's own `templateRef` (a `capability_map_items` id, meaningless as a value to a reader) is never a row here at all — `src/contracts/attributeSchema.ts`'s `hidden` flag, checked nowhere else. Its information isn't lost, just relocated: any fact seeded alongside it (`code`, `description`, …) carries the same `template`-kind source, so its own provenance card names the map it came from instead (below: "Seeded from …").
 

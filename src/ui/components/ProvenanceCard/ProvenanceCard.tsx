@@ -2,16 +2,18 @@ import type { DeltaRow, FactsRow } from '../../../contracts/rows';
 import type { CapabilityMapRow } from '../../../db/capabilityMapTemplates';
 import type { SourceRow } from '../../../db/types';
 import { formatRelativeTime } from '../../time';
+import { Button } from '../Button/Button';
 import { ConfidenceDots } from '../ConfidenceDots/ConfidenceDots';
 import { Text } from '../Text/Text';
 import styles from './ProvenanceCard.module.css';
 
+export type FactHistory = { status: 'loading' } | { status: 'error' } | { status: 'ready'; deltas: DeltaRow[]; sources: Map<string, SourceRow> };
+
 export interface ProvenanceCardProps {
   fact: FactsRow;
   source: SourceRow | undefined;
-  /** [currentFact's own delta, ...supersededDeltas], oldest last. `null` while still loading (fetched lazily on first hover/focus) — the top-level fields render immediately either way; only the "Previously" section waits. */
-  supersessionChain: DeltaRow[] | null;
-  supersessionSources: Map<string, SourceRow>;
+  history: FactHistory;
+  onRetryHistory: () => void;
   /**
    * Sprint U4-1 D2: "Show on the provenance card as 'Seeded from
    * electricity_network v1'". `null` either while `FactBadge`'s own lazy
@@ -27,9 +29,8 @@ export interface ProvenanceCardProps {
 /**
  * The answer to "why do we believe this" (UI-principles §4.3): source,
  * kind, `source_ref`, effective/recorded dates, confidence as a number,
- * and the supersession chain. One hover or focus away from every value on
- * every screen, per §4.3 — this component is the shared implementation;
- * canvas tooltips (step 4) reuse it too.
+ * and the supersession chain. The current evidence remains visible while
+ * the chain loads or if that request fails.
  *
  * Prompt 7h bug fix: "recorded/effective as precise relative time or
  * date" — the Effective/Recorded rows use `formatRelativeTime`
@@ -38,13 +39,12 @@ export interface ProvenanceCardProps {
  * stale-colour threshold; a card the viewer is already hovering to read
  * closely can afford (and asked for) the precise answer.
  */
-export function ProvenanceCard({ fact, source, supersessionChain, supersessionSources, seededFrom, now = new Date() }: ProvenanceCardProps) {
+export function ProvenanceCard({ fact, source, history, onRetryHistory, seededFrom, now = new Date() }: ProvenanceCardProps) {
   const effectiveDateStr = fact.effective_date ?? fact.asserted_at;
   const recordedDateStr = fact.asserted_at;
-  const superseded = supersessionChain?.filter((d) => d.id !== fact.delta_id) ?? null;
 
   return (
-    <div className={styles.card} role="tooltip">
+    <div className={styles.card}>
       <div className={styles.row}>
         <Text size="sm" tone="muted" as="span">
           Source
@@ -103,24 +103,27 @@ export function ProvenanceCard({ fact, source, supersessionChain, supersessionSo
           </Text>
         </span>
       </div>
-      {superseded === null ? (
-        <Text size="xs" tone="faint" as="p" className={styles.chainEntry}>
-          Loading history…
-        </Text>
-      ) : (
-        superseded.length > 0 && (
-          <div className={styles.chain}>
-            <Text size="xs" tone="muted" as="span">
-              Previously
-            </Text>
-            {superseded.map((delta) => (
-              <Text key={delta.id} size="xs" tone="muted" as="p" className={styles.chainEntry}>
-                {JSON.stringify(delta.value)} — {supersessionSources.get(delta.source_id)?.name ?? delta.source_id}
+      <div className={styles.chain}>
+        {history.status === 'loading' && <div role="status"><Text size="sm" tone="muted">Loading history…</Text></div>}
+        {history.status === 'error' && (
+          <>
+            <div role="alert"><Text size="sm">Couldn’t load earlier evidence.</Text></div>
+            <Button variant="secondary" onClick={onRetryHistory}>Retry history</Button>
+          </>
+        )}
+        {history.status === 'ready' && (history.deltas.length === 0 ? (
+          <Text size="sm" tone="muted">No earlier evidence.</Text>
+        ) : (
+          <>
+            <Text size="sm" tone="muted">Previously</Text>
+            {history.deltas.map((delta) => (
+              <Text key={delta.id} size="sm" tone="muted" as="p" className={styles.chainEntry}>
+                {JSON.stringify(delta.value)} — {history.sources.get(delta.source_id)?.name ?? 'Unknown source'}
               </Text>
             ))}
-          </div>
-        )
-      )}
+          </>
+        ))}
+      </div>
     </div>
   );
 }

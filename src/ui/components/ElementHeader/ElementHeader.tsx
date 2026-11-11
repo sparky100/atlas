@@ -290,7 +290,7 @@ export function ElementHeader({ element, existsFact, existsSource, onEdit, onCon
         {isExternal && <Chip tone="neutral">{externalOrganisation ? `external (${externalOrganisation})` : 'external'}</Chip>}
       </div>
       <div className={styles.metaRow}>
-        {existsFact && <FactBadge fact={existsFact} source={existsSource} />}
+        {existsFact && <FactBadge label={element.name} fact={existsFact} source={existsSource} />}
         {onEdit && (
           <Button variant="ghost" onClick={onEdit}>
             ✎ Edit

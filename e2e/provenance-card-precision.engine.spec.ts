@@ -81,15 +81,8 @@ test('provenance card: Effective/Recorded read a precise relative time, and the 
   await page.goto(`/o/${orgSlug}/m/${modelSlug}/e/${systemId}`);
   await expect(page.getByRole('heading', { name: systemName })).toBeVisible();
 
-  // ElementHeader.tsx's own existence-fact badge (`FactBadge`) — the only
-  // provenance badge on the page for a freshly seeded element with no
-  // attributes filled in yet. `ProvenanceBadge.tsx` sets a `title` of
-  // "<kind>, <age> old" on the compact badge itself; hovering it opens
-  // `FactBadge`'s popover (mouseenter), which is `ProvenanceCard`.
-  const badge = page.getByTitle(/old$/).first();
-  await badge.hover();
-
-  const card = page.getByRole('tooltip');
+  await page.getByRole('button', { name: `Evidence for ${systemName}` }).click();
+  const card = page.getByRole('dialog', { name: `Evidence for ${systemName}` });
   await expect(card).toBeVisible();
 
   // The bug itself: recorded moments ago used to read "< 1mo ago" (the
@@ -103,5 +96,5 @@ test('provenance card: Effective/Recorded read a precise relative time, and the 
 
   // The chain fetch (real Supabase) resolves quickly for a single-delta
   // element — "Loading history…" must not be the card's final state.
-  await expect(card.getByText('Loading history…')).toBeHidden({ timeout: 10_000 });
+  await expect(card.getByText('No earlier evidence.')).toBeVisible({ timeout: 10_000 });
 });
