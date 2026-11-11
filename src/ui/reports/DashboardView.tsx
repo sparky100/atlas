@@ -6,7 +6,7 @@
  * tiles. No coordinates are stored: order and a size from a fixed set only
  * (rule 3).
  */
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate } from 'react-router';
 import type { UUID } from '../../contracts/delta';
 import { parseReportSpec, type ReportSource } from '../../contracts/reportSpec';
@@ -14,6 +14,7 @@ import { addDashboardTile, deleteDashboard, listDashboardTiles, listSavedReports
 import type { DashboardRow, DashboardTileKind, DashboardTileRow, DashboardTileSize, MemberRole, SavedReportRow } from '../../db/types';
 import { Button } from '../components/Button/Button';
 import { ExportViewButtons } from '../components/ExportViewButtons/ExportViewButtons';
+import { Loading } from '../components/Loading/Loading';
 import { dashboardExportPlan, type ExportTileItem } from '../exports/dashboardExport';
 import { exportDate } from '../exports/viewExport';
 import { Text } from '../components/Text/Text';
@@ -22,6 +23,7 @@ import { supabase } from '../supabaseClient';
 import { DashboardTileCard } from './DashboardTileCard';
 import { canEditDashboard, DEFAULT_TABLE_TILE_ROWS, nextTilePosition, reportsOfferableTo, suggestedTileKind, swapTilePositions, tileColumnSpan, tileKindsFor, TILE_KIND_LABEL } from './dashboardTiles';
 import { ReportRunner } from './ReportRunner';
+import { ReportLoadError } from './ReportLoadError';
 import styles from './Dashboard.module.css';
 
 export interface DashboardViewProps {
@@ -39,11 +41,18 @@ export interface DashboardViewProps {
 const SIZE_LABEL: Record<DashboardTileSize, string> = { one: 'One column', two: 'Two columns', full: 'Full width' };
 /** ADR-027: a table tile shows 1 to 50 rows. */
 const TABLE_TILE_ROW_CHOICES = [3, 5, 10, 15, 25, 50] as const;
+const NO_TILES: DashboardTileRow[] = [];
+const NO_REPORTS: SavedReportRow[] = [];
+
+type DashboardLoad = { key: string; status: 'error' } | { key: string; status: 'ready'; tiles: DashboardTileRow[]; reports: SavedReportRow[] };
+interface TileExport {
+  scope: string;
+  item: ExportTileItem;
+}
 
 export function DashboardView({ dashboard, orgId, modelId, modelName, userId, role, main, basePath, onChanged }: DashboardViewProps) {
   const navigate = useNavigate();
-  const [tiles, setTiles] = useState<DashboardTileRow[]>([]);
-  const [reports, setReports] = useState<SavedReportRow[]>([]);
+  const [load, setLoad] = useState<DashboardLoad | null>(null);
   const [reload, setReload] = useState(0);
   const [editing, setEditing] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
@@ -51,29 +60,42 @@ export function DashboardView({ dashboard, orgId, modelId, modelName, userId, ro
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [add, setAdd] = useState<{ reportId: string; kind: DashboardTileKind | ''; size: DashboardTileSize }>({ reportId: '', kind: '', size: 'one' });
   const [presenting, setPresenting] = useState(false);
-  const results = useRef(new Map<string, ExportTileItem>());
+  const requestKey = `${dashboard.id}:${modelId}:${userId ?? ''}:${String(reload)}`;
+  const current = load?.key === requestKey ? load : null;
+  const ready = current?.status === 'ready';
+  const tiles = current?.status === 'ready' ? current.tiles : NO_TILES;
+  const reports = current?.status === 'ready' ? current.reports : NO_REPORTS;
+  const resultScope = `${requestKey}:${main.headCommitId}`;
+  const [results, setResults] = useState(new Map<string, TileExport>());
   const onResult = useCallback((tileId: string, item: ExportTileItem | null) => {
-    if (item === null) results.current.delete(tileId);
-    else results.current.set(tileId, item);
-  }, []);
-  const canEdit = canEditDashboard(dashboard, userId, role) && !presenting;
+    setResults((previous) => {
+      if (item === null && previous.get(tileId)?.scope !== resultScope) return previous;
+      const next = new Map(previous);
+      if (item === null) next.delete(tileId);
+      else next.set(tileId, { scope: resultScope, item });
+      return next;
+    });
+  }, [resultScope]);
+  const canEdit = ready && canEditDashboard(dashboard, userId, role) && !presenting;
   const canShare = role === 'owner' || role === 'architect';
+  const retry = () => { setReload((n) => n + 1); };
 
   useEffect(() => {
     let cancelled = false;
     Promise.all([listDashboardTiles(supabase, dashboard.id), listSavedReports(supabase, modelId)])
       .then(([t, r]) => {
         if (cancelled) return;
-        setTiles(t);
-        setReports(r);
+        setLoad({ key: requestKey, status: 'ready', tiles: t, reports: r });
       })
       .catch((e: unknown) => {
-        reportError("Couldn't load the dashboard.", e);
+        if (cancelled) return;
+        console.error("Couldn't load the dashboard tiles and reports.", e);
+        setLoad({ key: requestKey, status: 'error' });
       });
     return () => {
       cancelled = true;
     };
-  }, [dashboard.id, modelId, reload]);
+  }, [dashboard.id, modelId, requestKey]);
 
   async function attempt(action: () => Promise<void>, failure: string): Promise<void> {
     setMessage(null);
@@ -120,6 +142,12 @@ export function DashboardView({ dashboard, orgId, modelId, modelName, userId, ro
   const offerable = reportsOfferableTo(reports, dashboard.visibility);
   const addSpec = specs.get(add.reportId);
   const addKinds = addSpec?.ok ? tileKindsFor(addSpec.spec) : [];
+  const exportItems = shown.flatMap(({ tile }) => {
+    const entry = results.get(tile.id);
+    return entry?.scope === resultScope ? [entry.item] : [];
+  });
+  const canExport = ready && tiles.length > 0 && exportItems.length === tiles.length;
+  const unavailable = tiles.filter((tile) => !specs.get(tile.report_id)?.ok);
 
   return (
     <div className={presenting ? styles.present : styles.dashboard}>
@@ -155,14 +183,11 @@ export function DashboardView({ dashboard, orgId, modelId, modelName, userId, ro
           </Button>
           <ExportViewButtons
             what="dashboard"
+            disabled={!canExport}
             build={() => {
-              const items = shown.flatMap(({ tile }) => {
-                const item = results.current.get(tile.id);
-                return item ? [item] : [];
-              });
-              if (items.length === 0) return null;
+              if (!canExport) return null;
               const stamp = { modelName, viewLabel: dashboard.name, refLabel: 'Main', date: exportDate() };
-              return { plan: dashboardExportPlan(items, stamp), stamp };
+              return { plan: dashboardExportPlan(exportItems, stamp), stamp };
             }}
           />
         {canEdit && (
@@ -184,13 +209,26 @@ export function DashboardView({ dashboard, orgId, modelId, modelName, userId, ro
         </Text>
       )}
 
-      {shown.length === 0 && (
+      {current === null && <Loading />}
+      {current?.status === 'error' && <ReportLoadError message="Couldn't load the dashboard tiles and reports." retry={retry} />}
+      {ready && tiles.length === 0 && (
         <Text as="p" tone="muted">
           {canEdit ? 'No tiles yet. Choose "Edit dashboard" to add one from a saved report.' : 'This dashboard has no tiles yet.'}
         </Text>
       )}
+      {ready && tiles.length > 0 && !canExport && (
+        <Text as="p" size="sm" tone="muted">All tiles must be available before you can export this dashboard.</Text>
+      )}
 
       <div className={styles.grid}>
+        {unavailable.map((tile) => (
+          <section key={tile.id} className={styles.tile} style={{ '--span': tileColumnSpan(tile.size), order: tile.position } as React.CSSProperties}>
+            <Text as="p">{reportsById.get(tile.report_id)?.name ?? 'The report for this tile'} is unavailable.</Text>
+            {editing && canEdit && (
+              <Button variant="destructive" onClick={() => { void attempt(() => removeDashboardTile(supabase, tile.id), "Couldn't remove the tile."); }}>Remove</Button>
+            )}
+          </section>
+        ))}
         {sources.map((source) => (
           <div key={source} className={styles.contents}>
             <ReportRunner source={source} modelId={modelId} orgId={orgId} commitId={main.headCommitId}>

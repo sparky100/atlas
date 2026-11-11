@@ -18,6 +18,7 @@ import { canCreateChangeBranch } from '../orgs/roleGates';
 import { supabase } from '../supabaseClient';
 import { reportExportPlan } from '../exports/dashboardExport';
 import { ReportDownloadButtons } from './ReportDownloadButtons';
+import { ReportLoadError } from './ReportLoadError';
 import { ReportResultView } from './ReportResultView';
 import { ReportRunner } from './ReportRunner';
 import { ReportSettings } from './ReportSettings';
@@ -40,6 +41,8 @@ export interface SavedReportViewProps {
   /** Called with the report as stored after its settings are edited here. */
   onReportChanged?: ((report: SavedReportRow) => void) | undefined;
 }
+
+type Copies = { key: string; status: 'error' } | { key: string; status: 'ready'; rows: ReportSnapshotRow[] };
 
 export function SavedReportView({ report, modelName, orgId, modelId, userId, role, main, basePath, onReportChanged }: SavedReportViewProps) {
   const parsed = useMemo(() => parseReportSpec(report.spec), [report.spec]);
@@ -77,8 +80,10 @@ function Loaded({ report, spec: savedSpec, rows, knownFields, modelName, orgId, 
   const spec = useMemo(() => (drilled ? drilledSpec(savedSpec, drills) : savedSpec), [drilled, savedSpec, drills]);
   const result = useMemo(() => runReport(rows, spec, { knownFields }), [rows, spec, knownFields]);
   const table = useMemo(() => resultToTable(result, spec.groupBy === undefined ? undefined : { field: spec.groupBy }), [result, spec.groupBy]);
-  const [copies, setCopies] = useState<ReportSnapshotRow[]>([]);
+  const [copies, setCopies] = useState<Copies | null>(null);
   const [reload, setReload] = useState(0);
+  const copyKey = `${report.id}:${String(reload)}`;
+  const currentCopies = copies?.key === copyKey ? copies : null;
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const canCopy = userId !== null && canCreateChangeBranch(role);
@@ -88,15 +93,17 @@ function Loaded({ report, spec: savedSpec, rows, knownFields, modelName, orgId, 
     let cancelled = false;
     listSnapshotsForReport(supabase, report.id)
       .then((list) => {
-        if (!cancelled) setCopies(list);
+        if (!cancelled) setCopies({ key: copyKey, status: 'ready', rows: list });
       })
       .catch((e: unknown) => {
-        reportError("Couldn't load saved copies.", e);
+        if (cancelled) return;
+        console.error("Couldn't load saved copies.", e);
+        setCopies({ key: copyKey, status: 'error' });
       });
     return () => {
       cancelled = true;
     };
-  }, [report.id, reload]);
+  }, [report.id, copyKey]);
 
   async function saveCopy(): Promise<void> {
     if (userId === null) return;
@@ -183,13 +190,15 @@ function Loaded({ report, spec: savedSpec, rows, knownFields, modelName, orgId, 
       <Text as="h2" size="lg">
         Saved copies
       </Text>
-      {copies.length === 0 ? (
+      {currentCopies === null && <div role="status"><Text tone="muted">Loading saved copies…</Text></div>}
+      {currentCopies?.status === 'error' && <ReportLoadError message="Couldn't load saved copies." retry={() => { setReload((n) => n + 1); }} />}
+      {currentCopies?.status === 'ready' && (currentCopies.rows.length === 0 ? (
         <Text as="p" tone="muted">
           No copies yet. A copy keeps this result as it is today.
         </Text>
       ) : (
         <ul className={styles.copies}>
-          {copies.map((c) => (
+          {currentCopies.rows.map((c) => (
             <li key={c.id}>
               <Link to={`${basePath}/reports/copies/${c.id}`}>
                 As at {formatCopyDate(c.generated_at)} · {shortCommit(c.commit_id)}
@@ -200,7 +209,7 @@ function Loaded({ report, spec: savedSpec, rows, knownFields, modelName, orgId, 
             </li>
           ))}
         </ul>
-      )}
+      ))}
     </>
   );
 }

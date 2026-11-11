@@ -10,7 +10,6 @@ import type { UUID } from '../../contracts/delta';
 import type { ReportRow, ReportSource } from '../../contracts/reportSpec';
 import type { Ref } from '../../db/ref';
 import { Text } from '../components/Text/Text';
-import { reportError } from '../errors/errorBannerStore';
 import { useAuth } from '../auth/useAuth';
 import { useAttributeDefinitions } from '../orgs/useAttributeDefinitions';
 import { usePortfolio } from '../portfolio/usePortfolio';
@@ -18,6 +17,7 @@ import { supabase } from '../supabaseClient';
 import { ELEMENT_REPORT_FIELDS, ELEMENT_REPORT_HELPER_FIELDS } from './elementsReport';
 import { loadElementReportRows } from './loadElementReportRows';
 import { PORTFOLIO_REPORT_FIELDS, PORTFOLIO_REPORT_HELPER_FIELDS, portfolioReportRow } from './portfolioReport';
+import { ReportLoadError } from './ReportLoadError';
 
 const MAIN_REF: Ref = { kind: 'main' };
 
@@ -31,14 +31,19 @@ export interface ReportRunnerProps {
 }
 
 export function ReportRunner(props: ReportRunnerProps) {
-  if (props.source === 'elements') return <ElementsRunner {...props} />;
-  if (props.source === 'portfolio') return <PortfolioRunner {...props} />;
+  const [attempt, setAttempt] = useState(0);
+  const key = `${props.orgId}:${props.modelId}:${props.commitId}:${String(attempt)}`;
+  const retry = () => { setAttempt((n) => n + 1); };
+  if (props.source === 'elements') return <ElementsRunner key={key} {...props} retry={retry} />;
+  if (props.source === 'portfolio') return <PortfolioRunner key={key} {...props} retry={retry} />;
   return <Text as="p">Reports about {props.source} are not available yet.</Text>;
 }
 
-function ElementsRunner({ orgId, commitId, children }: ReportRunnerProps) {
+type RunnerProps = ReportRunnerProps & { retry: () => void };
+
+function ElementsRunner({ orgId, commitId, children, retry }: RunnerProps) {
   const { userId } = useAuth();
-  const { definitions } = useAttributeDefinitions(orgId, userId);
+  const { definitions, loading: definitionsLoading, error: definitionsError } = useAttributeDefinitions(orgId, userId);
   const [state, setState] = useState<{ status: 'loading' } | { status: 'error' } | { status: 'ready'; rows: ReportRow[] }>({ status: 'loading' });
   useEffect(() => {
     let cancelled = false;
@@ -47,24 +52,25 @@ function ElementsRunner({ orgId, commitId, children }: ReportRunnerProps) {
         if (!cancelled) setState({ status: 'ready', rows });
       })
       .catch((e: unknown) => {
-        reportError("Couldn't load the report's data.", e);
-        if (!cancelled) setState({ status: 'error' });
+        if (cancelled) return;
+        console.error("Couldn't load element report data.", e);
+        setState({ status: 'error' });
       });
     return () => {
       cancelled = true;
     };
   }, [commitId]);
   const known = useMemo(() => [...ELEMENT_REPORT_FIELDS, ...ELEMENT_REPORT_HELPER_FIELDS, ...definitions.filter((d) => d.deprecated_at === null).map((d) => d.key)], [definitions]);
-  if (state.status === 'loading') return <Text tone="muted">Running…</Text>;
-  if (state.status === 'error') return <Text as="p">Couldn't run this report.</Text>;
+  if (state.status === 'error' || definitionsError !== null) return <ReportLoadError message="Couldn't load element report data." retry={retry} />;
+  if (state.status === 'loading' || definitionsLoading) return <div role="status"><Text tone="muted">Loading element report data…</Text></div>;
   return <>{children(state.rows, known)}</>;
 }
 
-function PortfolioRunner({ modelId, commitId, children }: ReportRunnerProps) {
-  const { state } = usePortfolio(modelId, MAIN_REF, commitId);
+function PortfolioRunner({ modelId, commitId, children, retry }: RunnerProps) {
+  const { state } = usePortfolio(modelId, MAIN_REF, commitId, { inlineErrors: true });
   const rows = useMemo(() => (state.status === 'ready' ? state.data.rows.map(portfolioReportRow) : []), [state]);
   const known = useMemo(() => [...PORTFOLIO_REPORT_FIELDS, ...PORTFOLIO_REPORT_HELPER_FIELDS], []);
-  if (state.status === 'loading') return <Text tone="muted">Running…</Text>;
-  if (state.status !== 'ready') return <Text as="p">Couldn't run this report.</Text>;
+  if (state.status === 'loading') return <div role="status"><Text tone="muted">Loading portfolio report data…</Text></div>;
+  if (state.status !== 'ready') return <ReportLoadError message="Couldn't load portfolio report data." retry={retry} />;
   return <>{children(rows, known)}</>;
 }

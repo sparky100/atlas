@@ -37,7 +37,7 @@ export interface UsePortfolioResult {
   reload: () => void;
 }
 
-export function usePortfolio(modelId: UUID, ref: Ref, mainCommitIdHint: UUID | null = null): UsePortfolioResult {
+export function usePortfolio(modelId: UUID, ref: Ref, mainCommitIdHint: UUID | null = null, { inlineErrors = false }: { inlineErrors?: boolean } = {}): UsePortfolioResult {
   const [state, setState] = useState<PortfolioState>({ status: 'loading' });
   const [reloadToken, setReloadToken] = useState(0);
   const refParam = refParamOf(ref);
@@ -78,8 +78,10 @@ export function usePortfolio(modelId: UUID, ref: Ref, mainCommitIdHint: UUID | n
     }
 
     load().catch((e: unknown) => {
-      reportError("Couldn't load the portfolio.", e);
-      if (!cancelled) setState({ status: 'error', message: e instanceof Error ? e.message : 'Failed to load the portfolio.' });
+      if (cancelled) return;
+      if (inlineErrors) console.error("Couldn't load the portfolio.", e);
+      else reportError("Couldn't load the portfolio.", e);
+      setState({ status: 'error', message: e instanceof Error ? e.message : 'Failed to load the portfolio.' });
     });
 
     return () => {
@@ -87,7 +89,7 @@ export function usePortfolio(modelId: UUID, ref: Ref, mainCommitIdHint: UUID | n
     };
     // `refParam` (a stable string), not `ref` itself — same pitfall/fix as
     // useLandscape.ts/useCapabilityMap.ts/useRoadmap.ts.
-  }, [modelId, refParam, reloadToken, mainCommitIdHint]);
+  }, [modelId, refParam, reloadToken, mainCommitIdHint, inlineErrors]);
 
   return {
     state,
