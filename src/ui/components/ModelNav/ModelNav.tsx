@@ -13,6 +13,7 @@ import { useSelectedRef } from '../../branches/useSelectedRef';
 import { isViewingMode } from '../../branches/viewingMode';
 import { refLabelOf, refQueryParam } from '../../../db/ref';
 import { modelNavSectionFor, type ModelNavSection } from '../../nav/modelNavSection';
+import { prefetchModelPage } from '../../routes/modelPageLoaders';
 import { OPEN_SEARCH_EVENT } from '../../search/openSearchEvent';
 import styles from './ModelNav.module.css';
 
@@ -239,7 +240,14 @@ export function ModelNav({ orgSlug, modelSlug }: ModelNavProps) {
     const Icon = SECTION_ICONS[section];
     return (
       // `title` is the icon-only tier's own tooltip (UI-principles §2.0) — harmless left on at every width. The full label stays in the DOM at every width (`.linkLabel`'s own sr-only treatment between 769 and 1023px, module CSS) so the accessible name never depends on viewport; a short bar label, where there is one, is `aria-hidden` for the same reason.
-      <Link to={hrefFor(section)} className={[inSheet ? styles.sheetLink : styles.link, isActive ? styles.active : '', !inSheet && shortLabel ? styles.hasShortLabel : ''].filter(Boolean).join(' ')} aria-current={isActive ? 'page' : undefined} title={label}>
+      <Link
+        to={hrefFor(section)}
+        className={[inSheet ? styles.sheetLink : styles.link, isActive ? styles.active : '', !inSheet && shortLabel ? styles.hasShortLabel : ''].filter(Boolean).join(' ')}
+        aria-current={isActive ? 'page' : undefined}
+        title={label}
+        onPointerEnter={(event) => { if (!isActive && event.pointerType !== 'touch') prefetchModelPage(section); }}
+        onFocus={() => { if (!isActive) prefetchModelPage(section); }}
+      >
         <Icon size={18} className={styles.icon} aria-hidden="true" />
         <Text as="span" size="sm" className={inSheet ? undefined : styles.linkLabel}>
           {label}

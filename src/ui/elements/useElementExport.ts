@@ -6,7 +6,6 @@ import { reportError } from '../errors/errorBannerStore';
 import { supabase } from '../supabaseClient';
 import { elementBrowseRowsToCsv, sanitizeForFilename } from './elementExport';
 import { loadExportData, type LoadedExportData } from './loadExportData';
-import { browseRowsToXlsxBlob } from './elementExportXlsx';
 
 export type ElementExportStatus = 'idle' | 'working';
 
@@ -85,6 +84,7 @@ export function useElementExport({ modelId, commitId, definitions, rows, filenam
         setError('This model has no commits yet.');
         return;
       }
+      const { browseRowsToXlsxBlob } = await import('./elementExportXlsx');
       const blob = browseRowsToXlsxBlob(rows, definitions, data.provenanceById, data.relationships, data.nameById);
       downloadBlob(blob, `${sanitizeForFilename(filenameBase)}-export.xlsx`);
     } catch (e) {
