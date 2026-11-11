@@ -1,97 +1,107 @@
-import { useEffect, useState } from 'react';
-import type { DeltaRow, FactsRow } from '../../../contracts/rows';
+import { useEffect, useId, useRef, useState } from 'react';
+import type { FactsRow } from '../../../contracts/rows';
 import { getCapabilityMap, type CapabilityMapRow } from '../../../db/capabilityMapTemplates';
 import { getSourcesByIds, getSupersessionChain } from '../../../db/elements';
 import type { SourceRow } from '../../../db/types';
 import { supabase } from '../../supabaseClient';
+import { Button } from '../Button/Button';
 import { ProvenanceBadge } from '../ProvenanceBadge/ProvenanceBadge';
-import { ProvenanceCard } from '../ProvenanceCard/ProvenanceCard';
+import { ProvenanceCard, type FactHistory } from '../ProvenanceCard/ProvenanceCard';
+import { Text } from '../Text/Text';
 import styles from './FactBadge.module.css';
 
 export interface FactBadgeProps {
+  label: string;
   fact: FactsRow;
-  /** Looked up by the caller from a batch fetch (§4.9's paint budget) — never refetched per badge. */
+  /** Loaded by the caller in a batch with the other current sources. */
   source: SourceRow | undefined;
 }
 
-/**
- * The compact badge (§4.3) plus the full provenance card on hover or
- * focus (§4.3: "one hover away from every value"). The card's
- * supersession chain is fetched lazily, on first hover/focus, not
- * up front for every badge on the page — Sprint U4-1 D2's "seeded from"
- * lookup (`capability_maps`, keyed off `source.capability_map_id`) is
- * fetched the same lazy way, for the same reason: most badges on a page
- * never need it (`source.kind` is `template` only for a seeded fact), so
- * there's nothing to gain fetching it up front for every one of them.
- */
-export function FactBadge({ fact, source }: FactBadgeProps) {
-  const [open, setOpen] = useState(false);
-  const [chain, setChain] = useState<{ deltas: DeltaRow[]; sources: Map<string, SourceRow> } | null>(null);
-  const [seededFrom, setSeededFrom] = useState<CapabilityMapRow | null>(null);
+export function FactBadge(props: FactBadgeProps) {
+  // A replacement fact has a different chain, even in the same attribute row.
+  return <FactEvidence key={props.fact.delta_id} {...props} />;
+}
+
+function FactEvidence({ label, fact, source }: FactBadgeProps) {
+  const panelId = useId();
+  const headingId = useId();
+  const panelRef = useRef<HTMLDivElement>(null);
+  const [opened, setOpened] = useState(false);
+  const [requested, setRequested] = useState(false);
+  const [history, setHistory] = useState<FactHistory>({ status: 'loading' });
+  const [seededFrom, setSeededFrom] = useState<{ id: string; map: CapabilityMapRow } | null>(null);
+  const mapId = source?.capability_map_id;
 
   useEffect(() => {
-    if (!open || chain) return;
+    if (!requested || history.status !== 'loading') return;
     let cancelled = false;
-    getSupersessionChain(supabase, fact.delta_id)
-      .then(async (deltas) => {
-        const sourceIds = [...new Set(deltas.map((d) => d.source_id))];
-        const sources = await getSourcesByIds(supabase, sourceIds);
-        if (!cancelled) setChain({ deltas, sources });
-      })
-      .catch(() => {
-        // Prompt 7h bug fix: a card that fails to load its chain still
-        // shows the badge and the top-level fact fields — not worth
-        // surfacing as a page error — but `chain` must still leave `null`
-        // (ProvenanceCard's own "loading" state) or the card is stuck
-        // reading "Loading history…" forever instead of simply omitting
-        // the "Previously" section, its behaviour for a real empty chain.
-        if (!cancelled) setChain({ deltas: [], sources: new Map() });
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [open, chain, fact.delta_id]);
+    async function loadHistory() {
+      const chain = await getSupersessionChain(supabase, fact.delta_id);
+      const deltas = chain.filter((delta) => delta.id !== fact.delta_id);
+      const ids = [...new Set(deltas.map((delta) => delta.source_id))];
+      const sources = await getSourcesByIds(supabase, ids);
+      if (!cancelled) setHistory({ status: 'ready', deltas, sources });
+    }
+    void loadHistory().catch((error: unknown) => {
+      if (cancelled) return;
+      console.error('Could not load fact history.', error);
+      setHistory({ status: 'error' });
+    });
+    return () => { cancelled = true; };
+  }, [fact.delta_id, history.status, requested]);
 
   useEffect(() => {
-    const capabilityMapId = source?.capability_map_id;
-    if (!open || seededFrom || !capabilityMapId) return;
+    if (!requested || !mapId) return;
     let cancelled = false;
-    getCapabilityMap(supabase, capabilityMapId)
-      .then((map) => {
-        if (!cancelled && map) setSeededFrom(map);
-      })
-      .catch(() => {
-        // Same stance as the supersession chain above: this is additional
-        // context, not something worth surfacing a page error for.
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [open, seededFrom, source?.capability_map_id]);
+    void getCapabilityMap(supabase, mapId).then((map) => {
+      if (!cancelled && map) setSeededFrom({ id: mapId, map });
+    }).catch((error: unknown) => {
+      if (!cancelled) console.error('Could not load the source capability map.', error);
+    });
+    return () => { cancelled = true; };
+  }, [mapId, requested]);
 
+  const heading = `Evidence for ${label}`;
   return (
-    <button
-      type="button"
-      className={styles.wrapper}
-      onMouseEnter={() => {
-        setOpen(true);
-      }}
-      onMouseLeave={() => {
-        setOpen(false);
-      }}
-      onFocus={() => {
-        setOpen(true);
-      }}
-      onBlur={() => {
-        setOpen(false);
-      }}
-    >
-      <ProvenanceBadge sourceKind={source?.kind ?? 'manual'} date={fact.effective_date ? new Date(fact.effective_date) : new Date(fact.asserted_at)} confidence={fact.confidence} />
-      {open && (
-        <span className={styles.popover}>
-          <ProvenanceCard fact={fact} source={source} supersessionChain={chain?.deltas ?? null} supersessionSources={chain?.sources ?? new Map()} seededFrom={seededFrom} />
-        </span>
-      )}
-    </button>
+    <>
+      <button type="button" className={styles.trigger} popoverTarget={panelId} aria-label={heading} aria-haspopup="dialog">
+        <ProvenanceBadge sourceKind={source?.kind ?? 'manual'} date={new Date(fact.effective_date ?? fact.asserted_at)} confidence={fact.confidence} />
+      </button>
+      <div
+        ref={panelRef}
+        id={panelId}
+        popover="auto"
+        role="dialog"
+        aria-labelledby={headingId}
+        tabIndex={-1}
+        className={styles.popover}
+        onToggle={(event) => {
+          const panel = event.currentTarget;
+          const isOpen = panel.matches(':popover-open');
+          setOpened(isOpen);
+          if (isOpen) {
+            setRequested(true);
+            panel.focus({ preventScroll: true });
+          }
+        }}
+      >
+        <div className={styles.header}>
+          <Text id={headingId} size="md">{heading}</Text>
+          <Button variant="ghost" popoverTarget={panelId} popoverTargetAction="hide">Close</Button>
+        </div>
+        {opened && (
+          <ProvenanceCard
+            fact={fact}
+            source={source}
+            history={history}
+            seededFrom={seededFrom && seededFrom.id === mapId ? seededFrom.map : null}
+            onRetryHistory={() => {
+              panelRef.current?.focus({ preventScroll: true });
+              setHistory({ status: 'loading' });
+            }}
+          />
+        )}
+      </div>
+    </>
   );
 }
