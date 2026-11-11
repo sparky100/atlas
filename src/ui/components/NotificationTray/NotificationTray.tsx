@@ -55,7 +55,7 @@ export function NotificationTray() {
           </Text>
         )}
         {state.status === 'error' && <Text as="p">{state.message}</Text>}
-        {state.status === 'ready' && state.rows.length === 0 && <EmptyState>Only mentions and replies notify you here — no digests, no activity feed, and a merge never waits on this.</EmptyState>}
+        {state.status === 'ready' && state.rows.length === 0 && <EmptyState>No notifications yet. Mentions, replies, and review assignments appear here.</EmptyState>}
         {state.status === 'ready' && state.rows.length > 0 && (
           <ul className={styles.list}>
             {state.rows.map(({ notification, comment, authorProfile, subjectName, href }) => {

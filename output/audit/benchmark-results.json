@@ -1,0 +1,57 @@
+{
+  "node": "v22.12.0",
+  "platform": "win32",
+  "results": [
+    {
+      "kind": "history",
+      "commits": 500,
+      "ms": 12,
+      "ok": true
+    },
+    {
+      "kind": "history",
+      "commits": 2000,
+      "ms": 16.8,
+      "ok": true
+    },
+    {
+      "kind": "history",
+      "commits": 5000,
+      "ms": 7.6,
+      "error": "RangeError: Maximum call stack size exceeded"
+    },
+    {
+      "kind": "history",
+      "commits": 10000,
+      "ms": 6.2,
+      "error": "RangeError: Maximum call stack size exceeded"
+    },
+    {
+      "kind": "history",
+      "commits": 20000,
+      "ms": 6.1,
+      "error": "RangeError: Maximum call stack size exceeded"
+    },
+    {
+      "kind": "portfolio",
+      "systems": 200,
+      "capabilities": 20,
+      "supportEdges": 600,
+      "medianMs": 33.7
+    },
+    {
+      "kind": "portfolio",
+      "systems": 2000,
+      "capabilities": 200,
+      "supportEdges": 6000,
+      "medianMs": 1468.6
+    },
+    {
+      "kind": "portfolio",
+      "systems": 10000,
+      "capabilities": 1000,
+      "supportEdges": 30000,
+      "medianMs": 37900.4
+    }
+  ]
+}
