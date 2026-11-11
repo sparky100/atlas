@@ -8,6 +8,8 @@ export interface ExportViewButtonsProps {
   build: () => { plan: ExportPlan; stamp: ExportStamp } | null;
   /** What the buttons export, for their accessible names — e.g. "capability map". */
   what: string;
+  /** The view is waiting for the complete result needed for export. */
+  disabled?: boolean;
   /**
    * Which downloads to offer, in order. Defaults to PNG and PDF (the pictures the capability map and landscape are); a table-shaped view like the Portfolio asks for `['xlsx', 'pdf']` instead — a PNG of a table is worse than a spreadsheet.
    */
@@ -25,10 +27,11 @@ const FORMAT_LABEL: Record<ExportFormat, string> = { png: 'PNG', pdf: 'PDF', xls
  * what the view shows now (`src/ui/exports/viewExport.ts`). Shared by the
  * capability map, landscape and Portfolio so all three behave the same.
  */
-export function ExportViewButtons({ build, what, formats = ['png', 'pdf'], buildXlsx }: ExportViewButtonsProps) {
+export function ExportViewButtons({ build, what, disabled = false, formats = ['png', 'pdf'], buildXlsx }: ExportViewButtonsProps) {
   const [busy, setBusy] = useState<ExportFormat | null>(null);
 
   async function run(format: ExportFormat) {
+    if (disabled || busy !== null) return;
     const built = build();
     if (!built) return;
     setBusy(format);
@@ -52,7 +55,7 @@ export function ExportViewButtons({ build, what, formats = ['png', 'pdf'], build
         <Button
           key={format}
           variant="secondary"
-          disabled={busy !== null}
+          disabled={disabled || busy !== null}
           aria-label={`Export ${what} as ${FORMAT_LABEL[format]}`}
           onClick={() => {
             void run(format);

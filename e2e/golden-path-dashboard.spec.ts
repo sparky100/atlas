@@ -24,26 +24,70 @@ test('build a dashboard from a saved report, export it and present it', async ({
   await page.getByRole('button', { name: 'Save', exact: true }).click();
   await expect(page.getByText('Saved “Estate costs”.')).toBeVisible();
 
+  await goToModelHome(page);
+  await clickNavItem(page, 'Elements');
+  await page.getByRole('button', { name: 'Save as report…' }).click();
+  await page.getByLabel('Report name').fill('Model inventory');
+  await page.getByRole('button', { name: 'Save', exact: true }).click();
+  await expect(page.getByText('Saved “Model inventory”.')).toBeVisible();
+
   // A new dashboard from the Reports hub.
   await goToModelHome(page);
   await clickNavItem(page, 'Reports');
+  let finishLoadingTiles: () => void = () => undefined;
+  const waitForTiles = new Promise<void>((resolve) => { finishLoadingTiles = resolve; });
+  const tileRequests = '**/rest/v1/dashboard_tiles?*';
+  await page.route(tileRequests, async (route) => {
+    await waitForTiles;
+    await route.fulfill({ status: 400, json: { message: 'Temporary tile list failure' } });
+  });
   await page.getByRole('button', { name: 'New dashboard…' }).click();
   await page.getByLabel('Dashboard name').fill('Estate overview');
   await page.getByRole('button', { name: 'Create' }).click();
   await expect(page.getByRole('heading', { name: 'Estate overview' })).toBeVisible();
+  const exportPng = page.getByRole('button', { name: 'Export dashboard as PNG' });
+  try {
+    await expect(page.getByRole('status').filter({ hasText: 'Loading…' })).toBeVisible();
+    await expect(page.getByText('No tiles yet.', { exact: false })).toHaveCount(0);
+    await expect(exportPng).toBeDisabled();
+  } finally {
+    finishLoadingTiles();
+  }
+  await expect(page.getByRole('alert').getByText("Couldn't load the dashboard tiles and reports.")).toBeVisible();
+  await expect(page.getByText('No tiles yet.', { exact: false })).toHaveCount(0);
+  await page.unroute(tileRequests);
+  await page.getByRole('button', { name: 'Try again' }).click();
   await expect(page.getByText('No tiles yet.', { exact: false })).toBeVisible();
 
-  // Add the report as a tile.
+  // A portfolio fetch can fail while the element tile still loads.
   await page.getByRole('button', { name: 'Edit dashboard' }).click();
-  await page.getByLabel('Report', { exact: true }).selectOption({ label: 'Estate costs' });
+  await page.getByLabel('Report', { exact: true }).selectOption({ label: 'Model inventory' });
+  await page.locator('form').filter({ has: page.getByRole('button', { name: 'Add tile' }) }).getByLabel('Show as').selectOption('table');
   await page.getByRole('button', { name: 'Add tile' }).click();
-  await expect(page.getByText('No tiles yet.', { exact: false })).toHaveCount(0);
+  const inventory = page.getByRole('link', { name: 'Model inventory', exact: true });
+  await expect(inventory).toBeVisible();
+  await expect(exportPng).toBeEnabled();
+
+  let failPortfolio = true;
+  await page.route((url) => url.pathname.endsWith('/rest/v1/elements_head') && url.searchParams.get('element_type') === 'eq.system', async (route) => {
+    if (failPortfolio) await route.fulfill({ status: 400, json: { message: 'Temporary portfolio data failure' } });
+    else await route.continue();
+  });
+  await page.getByLabel('Report', { exact: true }).selectOption({ label: 'Estate costs' });
+  await page.locator('form').filter({ has: page.getByRole('button', { name: 'Add tile' }) }).getByLabel('Show as').selectOption('table');
+  await page.getByRole('button', { name: 'Add tile' }).click();
+  await expect(page.getByRole('alert').getByText("Couldn't load portfolio report data.")).toBeVisible();
+  await expect(inventory).toBeVisible();
+  await expect(exportPng).toBeDisabled();
+  failPortfolio = false;
+  await page.getByRole('button', { name: 'Try again' }).click();
+  await expect(page.getByRole('link', { name: 'Estate costs', exact: true })).toBeVisible();
+  await expect(exportPng).toBeEnabled();
   await page.getByRole('button', { name: 'Done editing' }).click();
-  await expect(page.getByRole('link', { name: /Estate costs|Open report/ }).first()).toBeVisible();
 
   // Download the dashboard as a stamped picture.
   const download = page.waitForEvent('download');
-  await page.getByRole('button', { name: 'Export dashboard as PNG' }).click();
+  await exportPng.click();
   const file = await download;
   expect(file.suggestedFilename()).toMatch(/-\d{4}-\d{2}-\d{2}\.png$/);
   expect((await readFile(await file.path())).subarray(0, 8).equals(PNG_SIGNATURE)).toBe(true);
@@ -57,4 +101,13 @@ test('build a dashboard from a saved report, export it and present it', async ({
 
   const hasHorizontalOverflow = await page.evaluate(() => document.documentElement.scrollWidth > document.documentElement.clientWidth + 1);
   expect(hasHorizontalOverflow).toBe(false);
+
+  failPortfolio = true;
+  await page.getByRole('link', { name: 'Estate costs', exact: true }).click();
+  await expect(page.getByRole('alert').getByText("Couldn't load portfolio report data.")).toBeVisible();
+  const downloadCsv = page.getByRole('button', { name: 'Download CSV' });
+  await expect(downloadCsv).toHaveCount(0);
+  failPortfolio = false;
+  await page.getByRole('button', { name: 'Try again' }).click();
+  await expect(downloadCsv).toBeEnabled();
 });

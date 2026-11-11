@@ -10,15 +10,15 @@ import navStyles from '../components/ModelNav/ModelNav.module.css';
 import { Text } from '../components/Text/Text';
 import { useAuth } from '../auth/useAuth';
 import { useMainBranch } from '../branches/useMainBranch';
-import { reportError } from '../errors/errorBannerStore';
 import { useModels } from '../models/useModels';
 import { useMembership } from '../orgs/useMembership';
 import { useOrganisationBySlug } from '../orgs/useOrganisationBySlug';
 import { DashboardView } from '../reports/DashboardView';
+import { ReportLoadError } from '../reports/ReportLoadError';
 import { supabase } from '../supabaseClient';
 import styles from './ViewPage.module.css';
 
-type Loaded = { status: 'loading' } | { status: 'missing' } | { status: 'ready'; dashboard: DashboardRow };
+type Loaded = { status: 'loading' } | { id: string; status: 'missing' } | { id: string; status: 'error' } | { id: string; status: 'ready'; dashboard: DashboardRow };
 
 /** ADR-027 (F14 step 6b): one dashboard (`/reports/dashboards/:id`), under the Reports hub. Same chrome as `SavedReportPage.tsx`. */
 export function DashboardPage() {
@@ -37,11 +37,12 @@ export function DashboardPage() {
     let cancelled = false;
     getDashboard(supabase, id)
       .then((d) => {
-        if (!cancelled) setState(d ? { status: 'ready', dashboard: d } : { status: 'missing' });
+        if (!cancelled) setState(d ? { id, status: 'ready', dashboard: d } : { id, status: 'missing' });
       })
       .catch((e: unknown) => {
-        reportError("Couldn't open the dashboard.", e);
-        if (!cancelled) setState({ status: 'missing' });
+        if (cancelled) return;
+        console.error("Couldn't open the dashboard.", e);
+        setState({ id, status: 'error' });
       });
     return () => {
       cancelled = true;
@@ -67,7 +68,11 @@ export function DashboardPage() {
   );
 
   if (orgLoading || modelsLoading || mainLoading || !model || !mainBranch || !organisation) return chrome('Dashboard', <Loading />);
-  if (state.status === 'loading') return chrome('Dashboard', <Loading />);
+  if (state.status === 'loading' || state.id !== id) return chrome('Dashboard', <Loading />);
+  if (state.status === 'error') return chrome('Dashboard', <ReportLoadError message="Couldn't open the dashboard." retry={() => {
+    setState({ status: 'loading' });
+    setReload((n) => n + 1);
+  }} />);
   if (state.status === 'missing') return chrome('Dashboard', <Text as="p">This dashboard doesn't exist, or you can't see it.</Text>);
   return chrome(
     state.dashboard.name,
