@@ -113,12 +113,14 @@ Health findings include: systems not linked to a capability, capabilities with n
 
 ## Element pages
 
-Open any element to see its **attributes**, **relationships**, **structure** (modules, or value-stream stages), the **changes touching it**, its **history**, its **decisions** and **comments**.
+Open any element to see its **attributes**, **relationships**, **structure** (modules, or value-stream stages), the **changes touching it**, its **documents**, its **history**, its **decisions** and **comments**.
 
 - Each value has a small **provenance badge**: where it came from, its confidence (dots) and its age — anything over 12 months old shows in the warning colour. Hover or tap for the full source.
 - **✎ Edit** changes its attributes; **+ Add …** under each relationship group adds a link.
 - **✓ Still accurate** confirms that everything on it is still right — see below.
 - To **rename** an element, click its name (a pencil appears beside it). The **⋯ menu** holds **Start a decision…** and **Start a project…**, then **Mark as retired…** (a planned end date, and optionally what replaces it — its capabilities move to the replacement), **Merge a duplicate into…** (when two elements are really the same thing; the old name stays findable by search), **Make this a module of…** (move a system inside a platform), and **Remove from model…** last.
+
+- **Documents** lists the documents behind an element — a design, a business case, a contract — as a name plus where it lives. Atlas never stores the document itself. Each entry is either a web link (Confluence, SharePoint and so on, which opens in a new tab) or a plain note of where to find it, such as "SharePoint › Business cases". Owners and architects use **+ Add a document**, **Edit** and **Remove**; everyone else can read them, and can leave a comment to ask for one to be added. Document changes save straight away and don't appear in History.
 
 What you can do depends on your role and on whether you're looking at main or a change (see below). On main, a contributor sees **Propose a change** instead of Edit.
 

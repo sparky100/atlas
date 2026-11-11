@@ -591,3 +591,18 @@ export function fromRefreshBranchResult(row: RefreshBranchResultRow): RefreshBra
   if (row.reason === undefined) throw new Error('fromRefreshBranchResult: status "invalid" with no reason');
   return { status: 'invalid', reason: row.reason };
 }
+
+/** The literal shape of a row in `element_links` (ADR-030): a labelled pointer to a document on an element. Workflow tier — never a delta. */
+export interface ElementLinkRow {
+  id: string;
+  org_id: string;
+  model_id: string;
+  element_id: string;
+  label: string;
+  pointer: string;
+  kind: 'link' | 'reference';
+  added_by: string;
+  added_at: string;
+  updated_by: string | null;
+  updated_at: string | null;
+}
