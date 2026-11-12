@@ -13,6 +13,8 @@ import { BigNumber } from '../charts/BigNumber';
 import { DonutChart } from '../charts/DonutChart';
 import { StackedBarChart } from '../charts/StackedBarChart';
 import { Text } from '../components/Text/Text';
+import { ResultPagination } from '../components/ResultPagination/ResultPagination';
+import { useResultPage } from '../components/ResultPagination/useResultPage';
 import type { ReportDrill } from './reportDrill';
 import { reportFieldLabel, reportValueLabel, reportValueScale } from './reportTable';
 import { reportCellHref, type LiveReportRow } from './reportRowLinks';
@@ -57,45 +59,50 @@ interface LiveRows {
 
 export function ResultTable({ result, compact = false, live }: { result: ReportResult; compact?: boolean; live?: LiveRows | undefined }) {
   const removed = new Set(result.unknownFields);
+  const page = useResultPage(result.rows, !compact);
+  const indexedRows = page.rows.map((row, index) => ({ row, i: page.start + index }));
   return (
-    <div className={styles.scroll}>
-      <table className={compact ? [styles.table, styles.compact].join(' ') : styles.table}>
-        <thead>
-          <tr>
-            {result.columns.map((c) => (
-              <th key={c} scope="col">
-                {reportFieldLabel(c)}
-                {removed.has(c) ? ' (attribute removed)' : ''}
-              </th>
-            ))}
-          </tr>
-        </thead>
-        <tbody>
-          {result.rows.map((row, i) => (
-            <tr key={String(live?.rows[i]?.id ?? i)}>
-              {row.map((cell, j) => {
-                const field = result.columns[j] ?? '';
-                const label = reportValueLabel(field, cell);
-                const href = live === undefined ? undefined : reportCellHref(live.rows[i], field, live.basePath);
-                return <td key={j} title={compact ? label : undefined}>
-                  {href === undefined || label === '' ? label : <Link className={styles.recordLink} to={href}>{label}</Link>}
-                </td>;
-              })}
+    <>
+      <ResultPagination label="Report pages" {...page} />
+      <div className={styles.scroll}>
+        <table className={compact ? [styles.table, styles.compact].join(' ') : styles.table}>
+          <thead>
+            <tr>
+              {result.columns.map((c) => (
+                <th key={c} scope="col">
+                  {reportFieldLabel(c)}
+                  {removed.has(c) ? ' (attribute removed)' : ''}
+                </th>
+              ))}
             </tr>
-          ))}
-        </tbody>
-      </table>
-      {result.rows.length === 0 && (
-        <Text as="p" tone="muted">
-          No rows match.
-        </Text>
-      )}
-      {result.truncated && (
-        <Text as="p" size="sm" tone="muted">
-          Showing {result.rows.length} of {result.rowCount} rows.
-        </Text>
-      )}
-    </div>
+          </thead>
+          <tbody>
+            {indexedRows.map(({ row, i }) => (
+              <tr key={String(live?.rows[i]?.id ?? i)}>
+                {row.map((cell, j) => {
+                  const field = result.columns[j] ?? '';
+                  const label = reportValueLabel(field, cell);
+                  const href = live === undefined ? undefined : reportCellHref(live.rows[i], field, live.basePath);
+                  return <td key={j} title={compact ? label : undefined}>
+                    {href === undefined || label === '' ? label : <Link className={styles.recordLink} to={href}>{label}</Link>}
+                  </td>;
+                })}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+        {result.rows.length === 0 && (
+          <Text as="p" tone="muted">
+            No rows match.
+          </Text>
+        )}
+        {result.truncated && (
+          <Text as="p" size="sm" tone="muted">
+            This report includes {result.rows.length} of {result.rowCount} matching rows.
+          </Text>
+        )}
+      </div>
+    </>
   );
 }
 
