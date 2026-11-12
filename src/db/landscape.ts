@@ -203,10 +203,12 @@ export interface GettingStartedCounts {
   capabilities: number;
   systems: number;
   supportsEdges: number;
+  /** Systems (applications) with a planned action recorded — the "Assess an application" step. */
+  assessedSystems: number;
 }
 
 /**
- * Three head-only counts at one commit — what the Home "Get started"
+ * Four head-only counts at one commit — what the Home "Get started"
  * checklist (`src/ui/home/GetStarted.tsx`) reads to tick its own steps.
  * Count queries only (`head: true`), so nothing grows with model size.
  */
@@ -217,7 +219,10 @@ export async function countGettingStarted(supabase: Client, commitId: UUID): Pro
     return count ?? 0;
   };
   const edges = supabase.from('relationships_head').select('relationship_id', { count: 'exact', head: true }).eq('commit_id', commitId).eq('relationship_type', 'supports');
-  const [capabilities, systems, edgeResult] = await Promise.all([elementCount('capability'), elementCount('system'), edges]);
+  // "Assessed" = a planned action (`attributes.disposition`) is recorded on a system — the same meaning the portfolio's "Not assessed" filter uses.
+  const assessed = supabase.from('elements_head').select('element_id', { count: 'exact', head: true }).eq('commit_id', commitId).eq('element_type', 'system').not('attributes->>disposition', 'is', null);
+  const [capabilities, systems, edgeResult, assessedResult] = await Promise.all([elementCount('capability'), elementCount('system'), edges, assessed]);
   if (edgeResult.error) throw new Error(edgeResult.error.message);
-  return { capabilities, systems, supportsEdges: edgeResult.count ?? 0 };
+  if (assessedResult.error) throw new Error(assessedResult.error.message);
+  return { capabilities, systems, supportsEdges: edgeResult.count ?? 0, assessedSystems: assessedResult.count ?? 0 };
 }

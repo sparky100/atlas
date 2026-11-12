@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { ElementsHeadRow } from '../../contracts/rows';
 import type { SearchPoolElement } from '../../db/elementSearch';
-import { HOME_SEARCH_CREATABLE_TYPES, HOME_SEARCH_TYPES, hasCreatableExactMatch } from './homeSearchTypes';
+import { HOME_SEARCH_CREATABLE_TYPES, HOME_SEARCH_TYPES, hasCreatableExactMatch, sameNameModules } from './homeSearchTypes';
 
 function el(overrides: Partial<ElementsHeadRow>): ElementsHeadRow {
   return { element_id: 'e1', element_type: 'system', name: 'System', parent_id: null, attributes: {}, exists_delta_id: 'd1', ...overrides };
@@ -50,5 +50,22 @@ describe('hasCreatableExactMatch', () => {
   it('is false for an empty query', () => {
     const p = pool([{ element: el({ name: 'Anything' }) }]);
     expect(hasCreatableExactMatch(p, '')).toBe(false);
+  });
+});
+
+describe('sameNameModules', () => {
+  const sap = el({ element_id: 'sap', element_type: 'system', name: 'SAP' });
+  it('finds a module by exact name or alias, with its platform', () => {
+    const fi = el({ element_id: 'fi', element_type: 'container', name: 'Finance', parent_id: 'sap' });
+    const p = pool([{ element: sap }, { element: fi, aliases: ['FI'] }]);
+    expect(sameNameModules(p, 'finance').map((m) => m.element.element_id)).toEqual(['fi']);
+    expect(sameNameModules(p, 'FI')[0]?.parent?.name).toBe('SAP');
+  });
+  it('ignores systems, near-matches and an empty query', () => {
+    const fi = el({ element_id: 'fi', element_type: 'container', name: 'Finance', parent_id: 'sap' });
+    const p = pool([{ element: sap }, { element: fi }]);
+    expect(sameNameModules(p, 'SAP')).toEqual([]);
+    expect(sameNameModules(p, 'Fin')).toEqual([]);
+    expect(sameNameModules(p, '  ')).toEqual([]);
   });
 });

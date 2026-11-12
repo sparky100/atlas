@@ -1,7 +1,7 @@
 import type { GettingStartedCounts } from '../../db/landscape';
 
 export interface GettingStartedStep {
-  id: 'capabilities' | 'system' | 'link' | 'invite';
+  id: 'capabilities' | 'system' | 'link' | 'assess' | 'invite';
   label: string;
   done: boolean;
 }
@@ -15,8 +15,9 @@ export interface GettingStartedStep {
 export function gettingStartedSteps(counts: GettingStartedCounts, invites: number | null = null): GettingStartedStep[] {
   return [
     { id: 'capabilities', label: 'Add your capabilities', done: counts.capabilities > 0 },
-    { id: 'system', label: 'Add a system', done: counts.systems > 0 },
-    { id: 'link', label: 'Link a system to the capability it supports', done: counts.supportsEdges > 0 },
+    { id: 'system', label: 'Add an application', done: counts.systems > 0 },
+    { id: 'link', label: 'Link an application to the capability it supports', done: counts.supportsEdges > 0 },
+    { id: 'assess', label: 'Assess an application', done: counts.assessedSystems > 0 },
     ...(invites === null ? [] : [{ id: 'invite' as const, label: 'Invite a colleague', done: invites > 0 }]),
   ];
 }

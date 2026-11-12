@@ -6,7 +6,7 @@ import { enrichElementMatches, type MatchEnrichment } from '../elements/enrichEl
 import { loadProjectionAtCommitCached } from '../query/cachedBranchProjection';
 import { reportError } from '../errors/errorBannerStore';
 import { supabase } from '../supabaseClient';
-import { HOME_SEARCH_TYPES, hasCreatableExactMatch } from './homeSearchTypes';
+import { HOME_SEARCH_TYPES, hasCreatableExactMatch, sameNameModules, type SameNameModule } from './homeSearchTypes';
 
 export type HomeSearchStatus = 'loading' | 'ready' | 'error';
 
@@ -34,6 +34,8 @@ export interface UseHomeSearchResult {
   showCreate: boolean;
   /** How many more real matches exist beyond `results` (`countMatches` minus what's shown) — `HomeSearch.tsx` renders this so a short/empty `results` list reads as "keep typing to narrow," not "safe to create" (a near-match past the display cap never suppresses `showCreate` on its own — only an exact match does). 0 when nothing was cut off. */
   moreCount: number;
+  /** Modules with exactly the typed name (or alias) — drawn from the whole pool, not the capped `results`, so one can never be missed. */
+  sameNameModules: SameNameModule[];
 }
 
 /**
@@ -126,5 +128,5 @@ export function useHomeSearch(commitId: UUID, modelId: UUID, branchCommitId: UUI
   const showCreate = status === 'ready' && query.trim().length > 0 && pool !== null && !hasCreatableExactMatch(pool, query);
   const totalMatches = pool ? countMatches(pool, query) : 0;
 
-  return { query, setQuery, status, error, results, showCreate, moreCount: Math.max(0, totalMatches - matches.length) };
+  return { query, setQuery, status, error, results, showCreate, moreCount: Math.max(0, totalMatches - matches.length), sameNameModules: pool ? sameNameModules(pool, query) : [] };
 }
