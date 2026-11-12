@@ -6,27 +6,23 @@
  * no `.in()` over a list that grows with the model.
  */
 import type { UUID } from '../contracts/delta';
-import type { RelationshipsHeadRow } from '../contracts/rows';
 import type { Client } from '../db/client';
 import { listAllElements } from '../db/elementBrowse';
 import { listFactsForCommit, loadElementsRetiredByOpenChanges } from '../db/healthFindings';
 import { loadChangeSummary } from '../db/changeSummary';
 import { listChangeBranches } from '../db/branches';
 import { listDecisionsForModel, listOpenDecisionElementLinksForModel } from '../db/decisions';
-import { listFactsForSubject } from '../db/elements';
+import { listAllRelationships, listFactsForSubject } from '../db/elements';
 import { listProjectsForModel } from '../db/projects';
 import { listSavedReports } from '../db/reports';
 import { selectAll } from '../db/selectAll';
 import type { ModelSnapshot, ToolContext, ToolStamp } from './types';
 
-const RELATIONSHIPS_HEAD_COLUMNS = 'relationship_id, relationship_type, from_element_id, to_element_id, attributes, exists_delta_id';
-
 async function loadSnapshot(supabase: Client, modelId: UUID, commitId: UUID): Promise<ModelSnapshot> {
-  const relationshipsQuery = supabase.from('relationships_head').select(RELATIONSHIPS_HEAD_COLUMNS, { count: 'exact' }).eq('commit_id', commitId).order('relationship_id');
   const aliasesQuery = supabase.from('aliases').select('element_id, alias_value', { count: 'exact' }).eq('model_id', modelId).neq('alias_type', 'merged_id').order('id');
   const [elements, relationships, aliasRows] = await Promise.all([
     listAllElements(supabase, commitId),
-    selectAll<RelationshipsHeadRow>(relationshipsQuery),
+    listAllRelationships(supabase, commitId),
     selectAll<{ element_id: UUID; alias_value: string }>(aliasesQuery),
   ]);
   const aliases = new Map<UUID, string[]>();

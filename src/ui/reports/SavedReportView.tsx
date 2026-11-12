@@ -8,7 +8,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { Link, useSearchParams } from 'react-router';
 import type { UUID } from '../../contracts/delta';
 import { parseReportSpec, type ReportRow, type ReportSpec } from '../../contracts/reportSpec';
-import { reportFitsSnapshot, runReport } from '../../engine/reportQuery';
+import { reportFitsSnapshot, runReportWithRows } from '../../engine/reportQuery';
 import { createReportSnapshot, listSnapshotsForReport } from '../../db/reports';
 import type { MemberRole, ReportSnapshotRow, SavedReportRow } from '../../db/types';
 import { Button } from '../components/Button/Button';
@@ -78,7 +78,7 @@ function Loaded({ report, spec: savedSpec, rows, knownFields, modelName, orgId, 
   const drills = useMemo(() => parseDrill(searchParams), [searchParams]);
   const drilled = drills.length > 0;
   const spec = useMemo(() => (drilled ? drilledSpec(savedSpec, drills) : savedSpec), [drilled, savedSpec, drills]);
-  const result = useMemo(() => runReport(rows, spec, { knownFields }), [rows, spec, knownFields]);
+  const { result, displayedRows } = useMemo(() => runReportWithRows(rows, spec, { knownFields }), [rows, spec, knownFields]);
   const table = useMemo(() => resultToTable(result, spec.groupBy === undefined ? undefined : { field: spec.groupBy }), [result, spec.groupBy]);
   const [copies, setCopies] = useState<Copies | null>(null);
   const [reload, setReload] = useState(0);
@@ -183,6 +183,7 @@ function Loaded({ report, spec: savedSpec, rows, knownFields, modelName, orgId, 
       <ReportResultView
         result={result}
         spec={spec}
+        live={{ rows: displayedRows, basePath }}
         onDrill={(next) => {
           setSearchParams(new URLSearchParams(drillSearch(next)));
         }}

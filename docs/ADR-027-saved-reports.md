@@ -103,7 +103,9 @@ Found in review: nothing let a user set `groupBy`, `splitBy`, a non-table presen
 
 **Standard dashboards** (Simon, 2026-11-07, chose 'Application portfolio overview' and 'Rationalisation (TIME)' from five proposed, delivered as a button that creates ordinary editable items rather than read-only built-ins). `src/ui/reports/standardDashboards.ts` holds their report definitions and tiles; "Add standard dashboards…" creates them for the model only when someone chooses to. They are questions, not facts, and nothing reads them in place of a query, so rule 7 (no seed data on a production path) is not engaged. Values in charts, tables and exports now show as words ("£50k–£250k", "Retiring") and scale fields (lifecycle, criticality, cost, fit) chart in their own order.
 
-Still not reachable, and said so in the app: reports over `relationships` and `findings` (no source adapter yet), and so the finding-count tile.
+The Reports hub can now create relationship and finding reports from starter definitions. Relationship reports read one row per live relationship at the selected main commit. Finding reports use the existing element health checks and list one row per check and affected element. The check for a missing retirement change depends on open changes, so it remains in the health workflow. Time-dependent findings use the evaluation date.
+
+Live tables link to the current model's elements, owners and relationship rows. Saved copies keep the result values and grouping from the time the copy was taken. Links are generated only for live rows.
 
 ## Still open
 

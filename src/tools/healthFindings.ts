@@ -7,68 +7,14 @@
  * the product's own definition, not a new one.
  */
 import { z } from 'zod';
-import type { ElementsHeadRow } from '../contracts/rows';
 import { FINDING_FILTER_OPTIONS } from '../db/elementBrowse';
-import {
-  computeStaleAttributesFinding,
-  findCapabilitiesWithNoSupporters,
-  findCapabilitiesWithoutOwner,
-  findCriticalExposedSystems,
-  findCriticalSystemsPastOrNearSupportEnd,
-  findCriticalSystemsWithoutBusinessOwner,
-  findOutgoingWithoutRetiringChange,
-  findPlatformSupportsThatShouldMoveToModule,
-  findSystemsSupportingEssentialFunctionWithoutTechnicalOwner,
-  findSystemsWithoutCapability,
-  findSystemsWithoutTechnicalOwner,
-  findUnusedIntegrationInterfaces,
-  findUnusedIntegrationPlatforms,
-} from '../db/healthFindings';
-import { computeCapabilityMapTree } from '../engine/elementRead/capabilityTree';
-import { replacedElementIds } from '../engine/elementRead/fitAndExposure';
+import { computeFindings } from '../db/modelFindings';
 import { DEFAULT_TOOL_ROWS, MAX_TOOL_ROWS } from './limits';
 import { defineTool, elementRef, indexSnapshot, okResult } from './toolKit';
-import type { ModelSnapshot } from './types';
+
 
 const FINDINGS = FINDING_FILTER_OPTIONS.filter((o) => o.value !== '');
 const KEYS = FINDINGS.map((o) => o.value) as [string, ...string[]];
-
-export interface FindingInputs {
-  snapshot: ModelSnapshot;
-  facts: Parameters<typeof computeStaleAttributesFinding>[0];
-  retiredByOpenChanges: ReadonlySet<string>;
-  now: Date;
-}
-
-/** Every finding's flagged elements, keyed as `FINDING_FILTER_OPTIONS` keys them. Pure. */
-export function computeFindings({ snapshot, facts, retiredByOpenChanges, now }: FindingInputs): Map<string, readonly ElementsHeadRow[]> {
-  const elements = snapshot.elements;
-  const systems = elements.filter((e) => e.element_type === 'system');
-  const containers = elements.filter((e) => e.element_type === 'container');
-  const capabilities = elements.filter((e) => e.element_type === 'capability');
-  const systemsAndModules = [...systems, ...containers];
-  const supports = snapshot.relationships.filter((r) => r.relationship_type === 'supports');
-  const owns = snapshot.relationships.filter((r) => r.relationship_type === 'owns');
-  const replaces = snapshot.relationships.filter((r) => r.relationship_type === 'replaces');
-  const usesAndFlows = snapshot.relationships.filter((r) => r.relationship_type === 'uses' || r.relationship_type === 'flows_to');
-  const byId = new Map(elements.map((e) => [e.element_id, e]));
-  const level1 = computeCapabilityMapTree(capabilities).l1.map((column) => column.capability);
-  const out = new Map<string, readonly ElementsHeadRow[]>();
-  out.set('unlinked-systems', findSystemsWithoutCapability(systems, supports, containers));
-  out.set('platform-supports-move-to-module', findPlatformSupportsThatShouldMoveToModule(systems, supports, containers));
-  out.set('unowned-capabilities', findCapabilitiesWithoutOwner(capabilities, supports, owns));
-  out.set('stale-attributes', computeStaleAttributesFinding(facts, systems, now).staleSystems);
-  out.set('no-technical-owner', findSystemsWithoutTechnicalOwner(systemsAndModules, owns));
-  out.set('critical-no-business-owner', findCriticalSystemsWithoutBusinessOwner(systemsAndModules, owns));
-  out.set('critical-exposed', findCriticalExposedSystems(systems, now, replacedElementIds(replaces)));
-  out.set('unused-integration-platform', findUnusedIntegrationPlatforms(systems, usesAndFlows, containers));
-  out.set('unused-integration-interface', findUnusedIntegrationInterfaces(systems, containers, usesAndFlows));
-  out.set('essential-no-technical-owner', findSystemsSupportingEssentialFunctionWithoutTechnicalOwner(systemsAndModules, capabilities, supports, owns));
-  out.set('critical-support-end', findCriticalSystemsPastOrNearSupportEnd(systems, now));
-  out.set('capability-no-supporters', findCapabilitiesWithNoSupporters(level1, capabilities, supports, owns));
-  out.set('outgoing-no-retiring-change', findOutgoingWithoutRetiringChange(systemsAndModules, retiredByOpenChanges, byId));
-  return out;
-}
 
 const schema = z.strictObject({
   finding: z.enum(KEYS).optional().describe('One finding key from the list this tool returns when called with no finding.'),

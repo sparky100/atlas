@@ -8,7 +8,7 @@
 import { useEffect, useMemo } from 'react';
 import { Link, useNavigate } from 'react-router';
 import { parseReportSpec, type ReportRow, type ReportValue } from '../../contracts/reportSpec';
-import { runReport } from '../../engine/reportQuery';
+import { runReportWithRows } from '../../engine/reportQuery';
 import type { DashboardTileRow, SavedReportRow } from '../../db/types';
 import { BarChart } from '../charts/BarChart';
 import { BigNumber } from '../charts/BigNumber';
@@ -37,7 +37,8 @@ export function DashboardTileCard({ tile, report, rows, knownFields, basePath, o
   const navigate = useNavigate();
   const parsed = useMemo(() => parseReportSpec(report.spec), [report.spec]);
   const reportHref = `${basePath}/reports/saved/${report.id}`;
-  const result = useMemo(() => (parsed.ok ? runReport(rows, specForTile(parsed.spec, tile.kind, tile.row_limit), { knownFields }) : null), [parsed, rows, knownFields, tile.kind, tile.row_limit]);
+  const evaluation = useMemo(() => (parsed.ok ? runReportWithRows(rows, specForTile(parsed.spec, tile.kind, tile.row_limit), { knownFields }) : null), [parsed, rows, knownFields, tile.kind, tile.row_limit]);
+  const result = evaluation?.result ?? null;
 
   useEffect(() => {
     if (!onResult) return undefined;
@@ -47,7 +48,7 @@ export function DashboardTileCard({ tile, report, rows, knownFields, basePath, o
     };
   }, [onResult, tile.id, tile.kind, tile.size, tile.row_limit, report.name, parsed, result]);
 
-  if (!parsed.ok || result === null) {
+  if (!parsed.ok || result === null || evaluation === null) {
     return <Text as="p">“{report.name}” can't be shown: {parsed.ok ? 'it could not be run' : parsed.error}</Text>;
   }
   const spec = parsed.spec;
@@ -92,7 +93,7 @@ export function DashboardTileCard({ tile, report, rows, knownFields, basePath, o
       body = <DonutChart groups={result.groups} title={`By ${by}`} unit={spec.source === 'portfolio' ? 'items' : 'rows'} onSelect={byGroup} scale={groupScale} />;
       break;
     case 'table':
-      body = <ResultTable result={result} compact />;
+      body = <ResultTable result={result} compact live={{ rows: evaluation.displayedRows, basePath }} />;
       break;
   }
 
