@@ -19,6 +19,7 @@ import { foldFromGenesis } from '../engine/head';
 import { compareBySiblingOrder } from '../ui/elements/siblingOrder';
 import { type AffectedValueStreamStage, valueStreamsReachedFrom } from '../ui/valueStreams/impactTraversal';
 import { moduleDisplayName } from '../ui/elements/moduleDisplayName';
+import { findImpactProblems, NO_IMPACT_PROBLEMS, type ImpactProblems } from '../engine/changeImpactProblems';
 import { buildCommitLoader } from './commitLoader';
 import type { Client } from './client';
 import { getSourcesByIds, listOpenChangesSharingElements } from './elements';
@@ -91,6 +92,8 @@ export interface ChangeSummary {
   affectedCapabilities: AffectedCapability[];
   /** F6 (ADR-023): every stage/stream an affected capability enables, plus (ADR-023's "Amended — change impact") any this change edits directly or reaches through its own `enables` edges. */
   affectedValueStreams: ChangeAffectedValueStream[];
+  /** Problems this change causes that the lists above don't show: capabilities left with no system, and provider-side dependencies that are ending or removed. Empty when there are none. */
+  impactProblems: ImpactProblems;
   /** Other open changes sharing an element with this one (ADR-024 §9), with the shared elements' display names ("Platform · Module" for a module). */
   otherOpenChanges: { branch: BranchRow; sharedElementNames: string[] }[];
   /** Unreviewed capture drafts (`kind: 'capture_draft'`) sharing an element with this change — kept apart from real changes (ADR-024 §9), one entry per source document however many times it was uploaded. */
@@ -368,12 +371,13 @@ export async function loadChangeSummary(supabase: Client, modelId: UUID, branch:
   const ownDeltas = listOwnDeltas(fork, loader);
 
   if (ownDeltas.length === 0) {
-    return { subjects: [], affectedCapabilities: [], affectedValueStreams: [], otherOpenChanges: [], captureDraftOverlaps: [], sourcesById: new Map(), projectScopeIds: null };
+    return { subjects: [], affectedCapabilities: [], affectedValueStreams: [], impactProblems: NO_IMPACT_PROBLEMS, otherOpenChanges: [], captureDraftOverlaps: [], sourcesById: new Map(), projectScopeIds: null };
   }
 
   const toBeHead = foldFromGenesis(branch.head_commit_id, loader);
   const asIsHead = foldFromGenesis(branch.base_commit_id, loader);
   const { subjects, affectedCapabilities, affectedValueStreams } = summarizeOwnDeltas(ownDeltas, asIsHead, toBeHead);
+  const impactProblems = findImpactProblems(ownDeltas, asIsHead, toBeHead, new Date());
 
   const element = (id: UUID) => toBeHead.elements.get(id) ?? asIsHead.elements.get(id);
   const parentOf = (id: UUID) => {
@@ -401,7 +405,7 @@ export async function loadChangeSummary(supabase: Client, modelId: UUID, branch:
   const drafts = named.filter((o) => o.branch.kind === 'capture_draft');
   const captureDraftOverlaps = drafts.length === 0 ? [] : groupCaptureDraftOverlaps(drafts, await loadCaptureJobsByBranch(supabase, modelId));
 
-  return { subjects, affectedCapabilities, affectedValueStreams, otherOpenChanges, captureDraftOverlaps, sourcesById, projectScopeIds };
+  return { subjects, affectedCapabilities, affectedValueStreams, impactProblems, otherOpenChanges, captureDraftOverlaps, sourcesById, projectScopeIds };
 }
 
 /**

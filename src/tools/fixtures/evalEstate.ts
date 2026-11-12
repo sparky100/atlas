@@ -72,6 +72,7 @@ const EVAL_IMPACT = {
   affectedCapabilities: [{ capability: ref(1, 'capability', 'Customer Onboarding'), viaSystems: [ref(12, 'system', 'Legacy Portal')], reasons: [{ kind: 'edited', systemName: 'Legacy Portal' }] }],
   affectedValueStreams: [],
   otherOpenChanges: [],
+  impactProblems: { capabilitiesLeftWithoutSystem: [], providerProblems: [] },
   captureDraftOverlaps: [],
   sourcesById: new Map(),
   projectScopeIds: null,

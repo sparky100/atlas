@@ -124,6 +124,15 @@ A capability is affected when its own record is edited, its own `supports` edge 
 
 **Deferred:** naming which capability an integration serves (a field on the `uses`/`flows_to` relationship), which would make a system supporting several capabilities reach exactly one. It is a data-model change (migration, contract, round-trip test) and waits for a need the scope focus doesn't meet.
 
+### 8a. Amended — problems a change causes (2026-11-12)
+
+Requested by the human (Simon) on 2026-11-12 after the project-and-change walkthrough found two gaps on the change page. A new panel, **"Problems this change causes"** (`findImpactProblems`, `src/engine/changeImpactProblems.ts`; `ImpactProblemsPanel`), sits above "Affected capabilities". It lists problems only and renders nothing when there are none; every element in a row is a link.
+
+- **No system:** a capability some system supported before the change and none supports after (the same read the future landscape uses, `capabilitiesLeftWithoutSystem`), with the systems that supported it.
+- **Provider side:** §8's rule stands — a provider is still never counted as *affecting* capabilities. The panel only reports a provider that is a problem: a system the change touches depends (`uses`/`flows_to`) on a provider whose `plannedEnd` is within `STALE_AFTER_MONTHS` with no `replaces` edge ("End of life"), or the change removes a provider that another system still depends on ("Removed").
+
+Nothing is stored; it is computed from the as-is and to-be heads like the rest of the summary. Who can see a change page is unchanged (the Viewer question is still open).
+
 ### 9. Amended — open changes touching the same elements (2026-10-07)
 
 Agreed with the human on 2026-10-07. The change page's "Other open changes touching the same elements" compared only the subjects a change edits — element ids, and for a relationship the relationship's own id. A change made of relationships therefore never matched anything: a relationship it adds exists on no other change.

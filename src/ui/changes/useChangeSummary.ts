@@ -1,3 +1,4 @@
+import { NO_IMPACT_PROBLEMS } from '../../engine/changeImpactProblems';
 import { useEffect, useState } from 'react';
 import type { UUID } from '../../contracts/delta';
 import { resolveChangeLineage, type ChangeLineage } from '../../db/branches';
@@ -27,7 +28,7 @@ export function useChangeSummary(modelId: UUID, branch: BranchRow | null): Chang
     Promise.all([loadChangeSummary(supabase, modelId, branch), resolveChangeLineage(supabase, branch)])
       .then(([summary, lineage]) => {
         if (cancelled) return;
-        setState({ status: 'ready', summary: summary ?? { subjects: [], affectedCapabilities: [], affectedValueStreams: [], otherOpenChanges: [], captureDraftOverlaps: [], sourcesById: new Map(), projectScopeIds: null }, lineage });
+        setState({ status: 'ready', summary: summary ?? { subjects: [], affectedCapabilities: [], affectedValueStreams: [], impactProblems: NO_IMPACT_PROBLEMS, otherOpenChanges: [], captureDraftOverlaps: [], sourcesById: new Map(), projectScopeIds: null }, lineage });
       })
       .catch((e: unknown) => {
         reportError("Couldn't load this change's summary.", e);

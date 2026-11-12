@@ -25,6 +25,7 @@ import { dateFieldLabelForIntent, intentReviewWeight, isDateRequiredForIntent } 
 import { branchStatusTone } from './branchStatus';
 import { deriveChangeStep } from './changeStepper';
 import { describeDelta } from './changeSummaryFormat';
+import { ImpactProblemsPanel } from './ImpactProblemsPanel';
 import { describeImpactReasons, describeValueStreamReasons, focusImpact } from './impactFocus';
 import { Stepper } from './Stepper/Stepper';
 import { useApproveAndMerge } from './useApproveAndMerge';
@@ -580,6 +581,8 @@ export function ChangeView({ orgId, modelId, branchId, orgSlug, modelSlug, role,
         </Text>
         <CommentsSection orgId={orgId} modelId={modelId} userId={userId} role={role} anchorType="change" anchorId={branchId} branchId={branchId} />
       </Panel>
+
+      {summaryState.status === 'ready' && <ImpactProblemsPanel problems={summaryState.summary.impactProblems} orgSlug={orgSlug} modelSlug={modelSlug} />}
 
       <Panel>
         <Text as="h2" size="lg">
