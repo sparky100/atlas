@@ -266,6 +266,20 @@
   display: none;
 }
 
+/* Desktop rail stays in view while the page scrolls; it scrolls on its own
+   if taller than the viewport. `.body`'s `align-items: flex-start` lets the
+   rail keep its own height, which sticky needs. Mobile's fixed bottom bar
+   is untouched. */
+@media (min-width: 769px) {
+  .nav {
+    position: sticky;
+    top: 0;
+    align-self: flex-start;
+    max-height: 100vh;
+    overflow-y: auto;
+  }
+}
+
 @media (max-width: 768px) {
   .nav {
     width: 100%;
