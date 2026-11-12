@@ -16,6 +16,8 @@ import { Button } from '../Button/Button';
 import { Chip } from '../Chip/Chip';
 import { EmptyState } from '../EmptyState/EmptyState';
 import { ElementTypeGlyph } from '../ElementTypeGlyph/ElementTypeGlyph';
+import { ResultPagination } from '../ResultPagination/ResultPagination';
+import { useResultPage } from '../ResultPagination/useResultPage';
 import { Text } from '../Text/Text';
 import { criticalityToneFor } from '../../elements/criticalityTone';
 import { dispositionLabel, dispositionTone } from '../../elements/disposition';
@@ -236,6 +238,7 @@ export function ElementBrowseTable({ state, orgSlug, modelSlug, modelId, filenam
   // once `state.status === 'ready'`, and the export loader refuses to run on
   // the null/empty fallbacks until then.
   const exportState = useElementExport({ modelId, commitId: state.status === 'ready' ? state.commitId : null, definitions: attributeDefinitions, rows: state.status === 'ready' ? state.rows : [], filenameBase });
+  const page = useResultPage(state.status === 'ready' ? state.rows : undefined);
 
   // Below the breakpoint, `ElementBrowseCards` replaces the two-table
   // sticky-header block entirely, rather than trying to make one render
@@ -321,12 +324,8 @@ export function ElementBrowseTable({ state, orgSlug, modelSlug, modelId, filenam
       // open-ended user text with wildly varying length row to row.
       // Sizing the Name column from whichever name happened to be first
       // left every longer name further down the table overflowing
-      // visually into the Type column next to it (no wrap, no clip —
-      // `white-space: nowrap` with nothing catching the overflow). No
-      // virtualization exists on this table (`state.rows.map(...)`
-      // already renders every row), so every row is already in the DOM
-      // being painted — reading their bounding rects here adds no new
-      // DOM-scale exposure, just cheap reads over what's already there.
+      // visually into the Type column next to it. Measure the current page
+      // so the work stays bounded when the model is large.
       //
       // `cell.scrollWidth`, not `getBoundingClientRect().width` — found
       // live: once `table-layout: fixed` is in effect (true from the very
@@ -356,7 +355,7 @@ export function ElementBrowseTable({ state, orgSlug, modelSlug, modelId, filenam
       observer.disconnect();
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps -- re-measures on anything that could change a rendered cell's natural width (including the header's own sort-arrow toggling); `tbodyRef.current`/`headerRowRef.current` themselves aren't valid deps.
-  }, [state.status === 'ready' ? state.rows : null, customAttr, linkSupportsInline, decisionRowAction, state.status === 'ready' ? state.sortKey : null, state.status === 'ready' ? state.sortDirection : null, bulkEdit?.editing]);
+  }, [page.rows, narrow, customAttr, linkSupportsInline, decisionRowAction, state.status === 'ready' ? state.sortKey : null, state.status === 'ready' ? state.sortDirection : null, bulkEdit?.editing]);
 
   function syncHeaderScroll() {
     if (headerClipRef.current && tableWrapRef.current) {
@@ -564,12 +563,13 @@ export function ElementBrowseTable({ state, orgSlug, modelSlug, modelId, filenam
         </div>
       )}
       {exportState.error !== null && <Text as="p">{exportState.error}</Text>}
+      <ResultPagination label="Elements pages" {...page} />
 
       {state.rows.length === 0 ? (
         <EmptyState>No elements match this filter.</EmptyState>
       ) : narrow ? (
         <ElementBrowseCards
-          rows={state.rows}
+          rows={page.rows}
           elementHref={elementHref}
           unresolvedCounts={unresolvedCounts}
           selectedCustomDefinition={selectedCustomDefinition}
@@ -628,7 +628,7 @@ export function ElementBrowseTable({ state, orgSlug, modelSlug, modelId, filenam
             <table className={styles.table}>
               {colgroupEl}
               <tbody ref={tbodyRef}>
-                {state.rows.map((row) => {
+                {page.rows.map((row) => {
                   const unresolvedCount = unresolvedCounts?.get(row.element.element_id)?.open ?? 0;
                   return (
                   <tr key={row.element.element_id}>
