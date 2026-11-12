@@ -39,6 +39,15 @@ test('export the capability map, Portfolio and landscape as stamped files', asyn
   await addSystemFromHome(page, { name: 'Ledger System', description: 'The financial ledger system.', capabilityName: 'Finance' });
 
   await goToModelHome(page);
+  await clickNavItem(page, 'Elements');
+  await expect(page.getByText('Ledger System').first()).toBeVisible();
+  const elementsDownload = page.waitForEvent('download');
+  await page.getByRole('button', { name: 'Export XLSX', exact: true }).click();
+  const spreadsheet = await elementsDownload;
+  expect(spreadsheet.suggestedFilename()).toMatch(/-export\.xlsx$/);
+  expect((await readFile(await spreadsheet.path())).subarray(0, 4).equals(XLSX_SIGNATURE)).toBe(true);
+
+  await goToModelHome(page);
   await clickNavItem(page, 'Capability map');
   await expect(page.getByText('Finance', { exact: true }).first()).toBeVisible();
   await exportAs(page, 'capability map', /-capability-map/);
