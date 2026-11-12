@@ -19,6 +19,8 @@ import { subjectAnchorType } from './elementBreadcrumb';
 import { mergeRequestStatusTone } from './mergeRequestStatus';
 import { SplitReviewPanel } from './SplitReviewPanel';
 import { useReviewRequest } from './useReviewRequest';
+import { OverdueReviewFlag } from './OverdueReviewFlag';
+import { useReviewPeriodDays } from './useReviewPeriodDays';
 import styles from './ReviewRequestView.module.css';
 
 const VERDICT_TONE: Record<ReviewVerdict, ChipTone> = { approve: 'ok', request_changes: 'danger', abstain: 'neutral', pending: 'neutral' };
@@ -58,6 +60,7 @@ export function ReviewRequestView({ modelId, mergeRequestId, orgId, orgSlug, mod
   const canReview = canReviewMergeRequest(role);
   const canApproveOrMerge = canApproveOrMergeRequest(role);
   const rr = useReviewRequest(modelId, mergeRequestId, userId);
+  const periodDays = useReviewPeriodDays(orgId);
 
   // Per-subject comment threads (Sprint M1b, `docs/HANDOFF-M1b-comments.md`'s
   // 6b: "each Field-conflict card, each Identity-warning card, and each row
@@ -124,6 +127,7 @@ export function ReviewRequestView({ modelId, mergeRequestId, orgId, orgSlug, mod
         <div className={styles.summary}>
           <Chip tone={mergeRequestStatusTone(request.status)}>{request.status.replace('_', ' ')}</Chip>
           <Chip tone={branchStatusTone(branch.status)}>{branch.status}</Chip>
+          <OverdueReviewFlag request={request} periodDays={periodDays} canRemind={role === 'owner' || role === 'architect' || request.requested_by === userId} />
           <Text as="span" tone="muted" size="sm">
             Requested by {profileLabel(requesterProfile)}
           </Text>

@@ -3,6 +3,8 @@ import type { UUID } from '../../contracts/delta';
 import { getMainBranch, listChangeBranches } from '../../db/branches';
 import { listDecisionsForModel } from '../../db/decisions';
 import { listOpenMergeRequestsForModel } from '../../db/mergeRequests';
+import { getReviewPeriodDays } from '../../db/organisations';
+import { isReviewOverdue } from '../../contracts/thresholds';
 import { listProjectsForModel } from '../../db/projects';
 import type { BranchRow, MergeRequestRow } from '../../db/types';
 import { reportError } from '../errors/errorBannerStore';
@@ -12,6 +14,10 @@ import { buildMyOwnedWork, type MyOwnedWork } from './whatWeAreDoing';
 export interface ArchitectHomeData {
   reviewQueueCount: number;
   oldestReviewItem: MergeRequestRow | null;
+  /** Open reviews still waiting on reviewers past the organisation's review period, oldest first. */
+  overdueReviews: MergeRequestRow[];
+  /** The review period used for `overdueReviews`, in days; `null` when the queue is empty (not read). */
+  reviewPeriodDays: number | null;
   myOpenBranches: BranchRow[];
   /** The open decisions and in-hand projects this user owns (UI-principles §3, 2026-10-04) — `buildMyOwnedWork`. */
   myOwnedWork: MyOwnedWork;
@@ -66,10 +72,15 @@ export function useArchitectHome(modelId: UUID, userId: UUID | null): ArchitectH
       const myOpenBranches = changeBranches.filter((b) => b.created_by === viewerId && MY_OPEN_STATUSES.includes(b.status));
       const myOwnedWork = buildMyOwnedWork(projects, decisions, changeBranches, viewerId, new Date().toISOString().slice(0, 10));
 
+      // Only read the period when something is waiting — an empty queue has nothing to be overdue.
+      const first = reviewQueue[0];
+      const reviewPeriodDays = first ? await getReviewPeriodDays(supabase, first.org_id) : null;
+      const overdueReviews = reviewPeriodDays === null ? [] : reviewQueue.filter((r) => isReviewOverdue(r, reviewPeriodDays));
+
       if (!cancelled) {
         setState({
           status: 'ready',
-          data: { reviewQueueCount: reviewQueue.length, oldestReviewItem: reviewQueue[0] ?? null, myOpenBranches, myOwnedWork },
+          data: { reviewQueueCount: reviewQueue.length, oldestReviewItem: reviewQueue[0] ?? null, overdueReviews, reviewPeriodDays, myOpenBranches, myOwnedWork },
         });
       }
     }

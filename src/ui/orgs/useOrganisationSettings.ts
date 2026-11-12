@@ -1,6 +1,6 @@
 import { useCallback, useState } from 'react';
 import type { UUID } from '../../contracts/delta';
-import { deleteOrganisation, updateOrganisation, type DeleteOrganisationResult, type UpdateOrganisationInput } from '../../db/organisations';
+import { deleteOrganisation, setReviewPeriod, updateOrganisation, type DeleteOrganisationResult, type UpdateOrganisationInput } from '../../db/organisations';
 import type { OrganisationRow } from '../../db/types';
 import { reportError } from '../errors/errorBannerStore';
 import { supabase } from '../supabaseClient';
@@ -13,6 +13,8 @@ export interface UseOrganisationSettingsResult {
   update: (input: UpdateOrganisationInput) => Promise<OrganisationRow | null>;
   /** `null` on a real failure (already reported); the result's own `status` distinguishes 'deleted' from the two refused outcomes ('has_models'/'not_found') a caller shows inline rather than as a global error — same convention as `useModelSettings.ts`'s own `remove`. */
   remove: () => Promise<DeleteOrganisationResult | null>;
+  /** Owner or architect: the organisation-wide review period in days. */
+  updateReviewPeriod: (days: number) => Promise<OrganisationRow | null>;
 }
 
 /**
@@ -61,5 +63,7 @@ export function useOrganisationSettings(orgId: UUID, onChanged: (org: Organisati
     [orgId, run],
   );
 
-  return { status, error, update, remove };
+  const updateReviewPeriod = useCallback((days: number) => run('change the review period', () => setReviewPeriod(supabase, orgId, days), onChanged), [orgId, onChanged, run]);
+
+  return { status, error, update, remove, updateReviewPeriod };
 }

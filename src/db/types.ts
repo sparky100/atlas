@@ -27,6 +27,8 @@ export interface OrganisationRow {
   review_min_required_architects: number;
   /** F15 (ADR-028 §7): an owner has allowed Ask Atlas to send model content to the AI provider. Off by default. */
   ai_assistant_enabled: boolean;
+  /** Calendar days a reviewer has to respond before a change review is flagged overdue (1–90, default 5). Set via `atlas.set_review_period` (owner/architect). */
+  review_period_days: number;
 }
 
 /** The literal shape of a row in `members`. */
@@ -173,6 +175,8 @@ export interface MergeRequestRow {
   /** SPEC §10.2 P-18: identity-warning pairs ("keep both") dismissed for this request — sorted "<idA> <idB>" pair keys, the same shape `useReviewRequest.ts` already derives. Survives `classification` being wholly recomputed on every refresh/resubmit (a separate column for exactly that reason — Sprint C2 step 7). */
   dismissed_identity_pairs: string[];
   created_at: string;
+  /** When the one overdue-review reminder email was sent; null = none sent. Written only by the send-review-email edge function. */
+  reminded_at: string | null;
 }
 
 /** The literal shape of a row in `review_verdicts` (F3a) — written only by `atlas.submit_merge_request`/`set_reviewers`/`set_review_verdict`, never a raw client insert/update. */

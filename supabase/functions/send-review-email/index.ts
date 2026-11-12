@@ -30,6 +30,8 @@ import { corsHeaders } from '../_shared/cors.ts';
 
 interface Body {
   mergeRequestId?: unknown;
+  /** true = send the one overdue reminder to reviewers who have not responded, instead of the assignment email. */
+  reminder?: unknown;
 }
 
 Deno.serve(async (req: Request) => {
@@ -75,6 +77,8 @@ Deno.serve(async (req: Request) => {
       const role = (member as { role: string } | null)?.role;
       if (role !== 'owner' && role !== 'architect') return json({ status: 'error', message: 'Only the requester or an owner/architect can send review emails.' }, 403);
     }
+
+    if (body.reminder === true) return await sendReminder(admin, request, mergeRequestId, { resendApiKey, resendFrom, appUrl });
 
     const { data: pending } = await admin.from('notifications').select('id, user_id').eq('merge_request_id', mergeRequestId).eq('kind', 'review_assigned').is('emailed_at', null);
     const notifications = (pending ?? []) as { id: string; user_id: string }[];
@@ -124,6 +128,77 @@ Deno.serve(async (req: Request) => {
     return json({ status: 'error', message: e instanceof Error ? e.message : 'Unknown error sending review emails.' }, 500);
   }
 });
+
+interface Mail {
+  resendApiKey: string;
+  resendFrom: string;
+  appUrl: string;
+}
+
+const DAY_MS = 86_400_000;
+
+/**
+ * The one reminder for an overdue review: emails every reviewer whose verdict
+ * is still `pending`, once. Overdue is re-checked here (the button is only a
+ * request): the review must still be `pending` and older than the
+ * organisation's `review_period_days`. `merge_requests.reminded_at` is
+ * claimed with a conditional update before any send, so two presses (or two
+ * callers) can never email twice; the claim is released if nothing went out.
+ * Reviewers who switched off `email_on_review_assigned` are skipped.
+ */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any -- Deno runtime, no shared type-checking with src/.
+async function sendReminder(admin: any, request: { org_id: string; model_id: string; branch_id: string }, mergeRequestId: string, mail: Mail): Promise<Response> {
+  const { data: org } = await admin.from('organisations').select('slug, review_period_days').eq('id', request.org_id).maybeSingle();
+  const { data: model } = await admin.from('models').select('slug').eq('id', request.model_id).maybeSingle();
+  const { data: mr } = await admin.from('merge_requests').select('status, created_at, reminded_at').eq('id', mergeRequestId).maybeSingle();
+  if (!org || !model || !mr) return json({ status: 'error', message: 'Could not resolve the review.' }, 500);
+  const state = mr as { status: string; created_at: string; reminded_at: string | null };
+  const periodDays = (org as { review_period_days: number }).review_period_days;
+  if (state.status !== 'pending') return json({ status: 'not_due', reason: 'not_waiting_for_reviewers', sent: 0 }, 200);
+  if (Date.now() < new Date(state.created_at).getTime() + periodDays * DAY_MS) return json({ status: 'not_due', reason: 'not_overdue', sent: 0 }, 200);
+  if (state.reminded_at !== null) return json({ status: 'not_due', reason: 'already_reminded', sent: 0 }, 200);
+
+  const { data: claimed } = await admin.from('merge_requests').update({ reminded_at: new Date().toISOString() }).eq('id', mergeRequestId).is('reminded_at', null).select('id');
+  if (((claimed ?? []) as unknown[]).length === 0) return json({ status: 'not_due', reason: 'already_reminded', sent: 0 }, 200);
+
+  const [{ data: branch }, { data: waiting }] = await Promise.all([
+    admin.from('branches').select('title, name').eq('id', request.branch_id).maybeSingle(),
+    admin.from('review_verdicts').select('user_id').eq('merge_request_id', mergeRequestId).eq('verdict', 'pending'),
+  ]);
+  const branchRow = branch as { title: string | null; name: string } | null;
+  const changeTitle = branchRow?.title ?? branchRow?.name ?? 'a change';
+  const link = `${mail.appUrl.replace(/\/+$/, '')}/o/${(org as { slug: string }).slug}/m/${(model as { slug: string }).slug}/review/${mergeRequestId}`;
+
+  let sent = 0;
+  let failed = 0;
+  for (const w of (waiting ?? []) as { user_id: string }[]) {
+    const { data: prefs } = await admin.from('user_preferences').select('email_on_review_assigned').eq('user_id', w.user_id).maybeSingle();
+    if (((prefs as { email_on_review_assigned: boolean } | null)?.email_on_review_assigned ?? true) === false) continue;
+    const { data: authUser } = await admin.auth.admin.getUserById(w.user_id);
+    const to = authUser.user?.email;
+    if (!to) continue;
+    const res = await fetch('https://api.resend.com/emails', {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${mail.resendApiKey}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        from: mail.resendFrom,
+        to,
+        subject: `Reminder: your review of "${changeTitle}" is overdue`,
+        html: `<p>Your review of <strong>${esc(changeTitle)}</strong> on Atlas was due ${String(periodDays)} days after it was submitted and is still waiting for you.</p><p><a href="${esc(link)}">Open the review</a></p><p>You can turn these emails off on your Profile page.</p>`,
+      }),
+    });
+    if (res.ok) sent += 1;
+    else failed += 1;
+  }
+
+  if (sent === 0) {
+    // Nothing went out: release the claim so a later press can try again.
+    await admin.from('merge_requests').update({ reminded_at: null }).eq('id', mergeRequestId);
+    if (failed > 0) return json({ status: 'error', message: 'Resend refused the reminder.', sent: 0 }, 502);
+    return json({ status: 'not_due', reason: 'nobody_to_email', sent: 0 }, 200);
+  }
+  return json({ status: 'sent', sent }, 200);
+}
 
 function json(body: unknown, status: number): Response {
   return new Response(JSON.stringify(body), { status, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });

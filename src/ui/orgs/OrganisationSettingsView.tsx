@@ -39,12 +39,14 @@ export interface OrganisationSettingsViewProps {
  */
 export function OrganisationSettingsView({ organisation, role, userId, onChanged }: OrganisationSettingsViewProps) {
   const canManage = canManageOrgSettings(role);
-  const { status, error, update, remove } = useOrganisationSettings(organisation.id, onChanged);
+  const { status, error, update, remove, updateReviewPeriod } = useOrganisationSettings(organisation.id, onChanged);
   const { members, loading: membersLoading, error: membersError, changeRole, remove: removeMemberRow } = useMembers(organisation.id);
   const { invites, loading: invitesLoading, error: invitesError, create: createInviteRow, revoke: revokeInviteRow, resend: resendInviteRow } = useInvites(organisation.id, userId);
   const { events: memberEvents, profilesById: memberEventProfiles, loading: memberEventsLoading, error: memberEventsError } = useMemberEvents(canManage ? organisation.id : null);
   const [name, setName] = useState(organisation.name);
   const [slug, setSlug] = useState(organisation.slug);
+  const [reviewDays, setReviewDays] = useState(organisation.review_period_days);
+  const canSetReviewPeriod = role === 'owner' || role === 'architect';
   const [minArchitects, setMinArchitects] = useState(organisation.review_min_required_architects);
   const [deleteResult, setDeleteResult] = useState<'has_models' | 'not_found' | null>(null);
   const [deleteModelCount, setDeleteModelCount] = useState(0);
@@ -67,6 +69,8 @@ export function OrganisationSettingsView({ organisation, role, userId, onChanged
   const inviteEmailId = useId();
   const inviteRoleId = useId();
   const askHeadingId = useId();
+  const reviewPeriodId = useId();
+  const reviewHeadingId = useId();
 
   return (
     <div>
@@ -138,6 +142,49 @@ export function OrganisationSettingsView({ organisation, role, userId, onChanged
             </Button>
           )}
         </form>
+        <section aria-labelledby={reviewHeadingId}>
+          <Text as="h3" size="md" id={reviewHeadingId}>
+            Review reminders
+          </Text>
+          <Text as="p" tone="muted" size="sm">
+            How long a reviewer has to respond once a change is submitted for review. After that the review is marked overdue, on the review itself and on Home, and the person who submitted it, an owner or an architect can send the reviewers one reminder email.
+          </Text>
+          <form
+            className={styles.form}
+            onSubmit={(e) => {
+              e.preventDefault();
+              void updateReviewPeriod(reviewDays);
+            }}
+          >
+            <label htmlFor={reviewPeriodId}>
+              <Text as="span" size="sm">
+                Days to review
+              </Text>
+            </label>
+            <input
+              id={reviewPeriodId}
+              className={styles.input}
+              type="number"
+              min={1}
+              max={90}
+              value={reviewDays}
+              disabled={!canSetReviewPeriod}
+              onChange={(e) => {
+                const parsed = Number.parseInt(e.target.value, 10);
+                setReviewDays(Number.isNaN(parsed) ? 1 : parsed);
+              }}
+            />
+            {canSetReviewPeriod ? (
+              <Button variant="primary" type="submit" disabled={status === 'saving' || reviewDays < 1 || reviewDays > 90}>
+                {status === 'saving' ? 'Saving…' : 'Save'}
+              </Button>
+            ) : (
+              <Text as="p" tone="muted" size="sm">
+                Only an owner or architect can change this.
+              </Text>
+            )}
+          </form>
+        </section>
         <section aria-labelledby={askHeadingId}>
           <Text as="h3" size="md" id={askHeadingId}>
             Ask Atlas

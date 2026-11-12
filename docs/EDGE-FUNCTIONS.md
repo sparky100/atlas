@@ -399,6 +399,17 @@ Recipients are never taken from the request: only people with an un-emailed
 `user_preferences.email_on_review_assigned` (Profile → Notifications).
 `notifications.emailed_at` prevents double sends.
 
+**Reminder mode.** The same function, called with `{ mergeRequestId, reminder: true }`
+(`sendReviewReminder` in `src/db/reviewEmail.ts`, from the "Remind reviewers"
+button on an overdue review), sends the one reminder for a review that is
+still `pending` past the organisation's `review_period_days`. Recipients are
+the reviewers whose verdict is still `pending` and who haven't switched off
+`email_on_review_assigned`. Same authorisation (requester or owner/architect).
+`merge_requests.reminded_at` is claimed with a conditional update before any
+send, so a review is reminded at most once; the claim is released if nothing
+went out. It is a button, not a schedule: nothing sends it automatically on
+the due date (that would need a scheduler holding the service key — not built).
+
 Secrets: `RESEND_API_KEY`, `RESEND_FROM_ADDRESS` (shared with
 `send-invite-email`) and **`ATLAS_APP_URL`** (new; the app's public base URL,
 no trailing slash, e.g. `https://atlas.simmodlr.app`). Deploy with

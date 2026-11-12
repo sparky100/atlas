@@ -291,6 +291,8 @@ When multi-branch composition is built, **conflict** is defined as one of three 
 
 The queue and change page show "n of m" approvals with each reviewer's verdict; comments never block a merge (ADR-010), and a verdict is a gate, not a comment.
 
+**Amendment (review reminders, `20261112020000_review_reminders.sql`): reviews have a timeline.** One organisation-wide period, `organisations.review_period_days` (default 5 calendar days, 1–90; set by an owner or architect through `atlas.set_review_period`, because `organisations_update` is owner-only). A review is *overdue* when it is still `pending` (waiting on reviewers — not `changes_requested`, which waits on its author, nor `approved`) and `created_at + period` has passed; the due date is derived (`src/contracts/thresholds.ts`'s `reviewDueDate`/`isReviewOverdue`), never stored, so changing the period re-dates every open review. Overdue reviews carry a "Overdue" chip on the review itself and its queue row, and Home's "Waiting for review" panel links straight to the oldest. The requester, an owner or an architect can send **one** reminder email to the reviewers who have not responded (`send-review-email` in reminder mode; `merge_requests.reminded_at` is claimed before sending so it can never go twice). There is no per-review due date and no automatic send on the due date — both deliberately left out until decided.
+
 ---
 
 ## ADR-007: Provenance is fact-level

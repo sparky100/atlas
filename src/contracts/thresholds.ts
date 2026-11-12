@@ -47,3 +47,18 @@ export function monthsUntil(date: Date, now: Date = new Date()): number {
   const months = (date.getFullYear() - now.getFullYear()) * 12 + (date.getMonth() - now.getMonth());
   return date.getDate() < now.getDate() ? months - 1 : months;
 }
+
+/** The organisation's review period before an owner or architect changes it (`organisations.review_period_days`' own column default). */
+export const DEFAULT_REVIEW_PERIOD_DAYS = 5;
+
+const DAY_MS = 86_400_000;
+
+/** When a review submitted at `createdAt` is due: `periodDays` calendar days later. Derived, never stored, so changing the org period re-dates every open review. */
+export function reviewDueDate(createdAt: string, periodDays: number): Date {
+  return new Date(new Date(createdAt).getTime() + periodDays * DAY_MS);
+}
+
+/** Overdue = still waiting on its reviewers (`pending`) and past its due date. A request waiting on its author (`changes_requested`) or ready to merge (`approved`) is not overdue — nobody owes a review. */
+export function isReviewOverdue(request: { status: string; created_at: string }, periodDays: number, now: Date = new Date()): boolean {
+  return request.status === 'pending' && now.getTime() > reviewDueDate(request.created_at, periodDays).getTime();
+}
