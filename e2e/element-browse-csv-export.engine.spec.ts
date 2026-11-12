@@ -81,7 +81,7 @@ test('Export CSV downloads all matching elements from the second page', async ({
         elementType: 'system' as const,
         name: `Test system ${String(index + 1).padStart(2, '0')}`,
         parentId: null,
-        attributes: {},
+        attributes: { lifecycleStatus: 'active' as const, isExternal: false },
         sourceId: seedSourceId,
         confidence: 1,
       })),
