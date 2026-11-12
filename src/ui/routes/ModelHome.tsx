@@ -115,6 +115,7 @@ export function ModelHome() {
   const { role } = useMembership(organisation?.id ?? null, userId);
   const { homeMode, setHomeMode } = useHomeMode(userId, canEditOnMain(role));
   const [settingsMenuOpen, setSettingsMenuOpen] = useState(false);
+  const [addApplicationRequest, setAddApplicationRequest] = useState(0);
   const settingsMenuId = useId();
 
   // Handoff — Flow: Add a system, decision 5: the search box's create
@@ -206,13 +207,14 @@ export function ModelHome() {
               // weakness grid) is what a director opens this page to see.
               // eslint-disable-next-line jsx-a11y/no-autofocus -- HomeSearch's own input carries the real disable comment; this is a plain boolean prop being forwarded to it, opt-in per door.
               autoFocus={homeMode === 'architect'}
+              addApplicationRequest={addApplicationRequest}
             />
           ) : (
             <EmptyState>Only an owner, architect, or contributor can add elements from here.</EmptyState>
           )}
         </Panel>
 
-        {canShowSearch && <GetStarted modelId={model.id} commitId={searchCommitId} orgId={organisation?.id ?? ''} isOwner={role === 'owner'} orgSlug={organisation?.slug ?? ''} modelSlug={model.slug} />}
+        {canShowSearch && <GetStarted modelId={model.id} commitId={searchCommitId} orgId={organisation?.id ?? ''} isOwner={role === 'owner'} orgSlug={organisation?.slug ?? ''} modelSlug={model.slug} onAddApplication={() => { setAddApplicationRequest((n) => n + 1); }} />}
         <FirstVisit modelId={model.id} commitId={searchCommitId} orgId={organisation?.id ?? ''} role={role} orgSlug={organisation?.slug ?? ''} modelSlug={model.slug} />
 
         <div className={styles.doorLinks}>

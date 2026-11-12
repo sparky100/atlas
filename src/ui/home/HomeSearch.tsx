@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Link, useNavigate } from 'react-router';
 import type { ElementType, UUID } from '../../contracts/delta';
 import type { Json } from '../../contracts/rows';
@@ -43,6 +43,8 @@ export interface HomeSearchProps {
   modelSlug: string;
   /** Handoff — Flow: Add a system, decision 2: on, only for the architect door — the caller decides, this control just obeys. */
   autoFocus?: boolean;
+  /** Bumped by the Get started checklist's "Add application" button: switch the create type to system, focus the box and say what to do. 0 = never asked. */
+  addApplicationRequest?: number;
 }
 
 /**
@@ -73,7 +75,7 @@ export interface HomeSearchProps {
  * contributor at main) applies to every type this control creates, not
  * system alone.
  */
-export function HomeSearch({ modelId, orgId, userId, role, searchCommitId, activeRef, editingBranch, orgSlug, modelSlug, autoFocus }: HomeSearchProps) {
+export function HomeSearch({ modelId, orgId, userId, role, searchCommitId, activeRef, editingBranch, orgSlug, modelSlug, autoFocus, addApplicationRequest = 0 }: HomeSearchProps) {
   const navigate = useNavigate();
   // Folds and overlays `editingBranch`'s own head onto the main-scoped pool
   // (`useHomeSearch`'s own `branchCommitId` doc comment) — an element added
@@ -82,6 +84,21 @@ export function HomeSearch({ modelId, orgId, userId, role, searchCommitId, activ
   const search = useHomeSearch(searchCommitId, modelId, editingBranch?.kind === 'change' ? editingBranch.head_commit_id : null);
   const [createType, setCreateType] = useState<ElementType>('system');
   const [sheetOpen, setSheetOpen] = useState(false);
+  const inputRef = useRef<HTMLInputElement>(null);
+  const [addingApplication, setAddingApplication] = useState(false);
+  const [seenRequest, setSeenRequest] = useState(addApplicationRequest);
+  // A new request from the checklist's button: adjust state during render (not in an effect), then move focus below.
+  if (seenRequest !== addApplicationRequest) {
+    setSeenRequest(addApplicationRequest);
+    setCreateType('system');
+    setAddingApplication(true);
+  }
+
+  useEffect(() => {
+    if (addApplicationRequest === 0) return;
+    inputRef.current?.scrollIntoView({ block: 'center' });
+    inputRef.current?.focus();
+  }, [addApplicationRequest]);
   const [description, setDescription] = useState('');
   const [capability, setCapability] = useState<{ id: UUID; name: string } | null>(null);
   const [platform, setPlatform] = useState<{ id: UUID; name: string } | null>(null);
@@ -152,6 +169,7 @@ export function HomeSearch({ modelId, orgId, userId, role, searchCommitId, activ
   return (
     <div className={styles.panel}>
       <input
+        ref={inputRef}
         // eslint-disable-next-line jsx-a11y/no-autofocus -- opt-in per caller (decision 2: architect door only); a home page that never wants it simply omits the prop.
         autoFocus={autoFocus}
         type="text"
@@ -162,6 +180,23 @@ export function HomeSearch({ modelId, orgId, userId, role, searchCommitId, activ
           search.setQuery(e.target.value);
         }}
       />
+
+      {addingApplication && search.query.trim() === '' && (
+        <Text as="p" tone="muted" size="sm">
+          Type the application&apos;s name. Atlas checks the applications and modules you already have before it lets you create a new one.
+        </Text>
+      )}
+
+      {search.sameNameModules.length > 0 && (
+        <div role="note" aria-label="Same-named modules">
+          {search.sameNameModules.map((m) => (
+            <Text as="p" size="sm" key={m.element.element_id}>
+              A module with this name already exists:{' '}
+              <Link to={elementHref(m.element.element_id)}>{moduleDisplayName(m.element, m.parent)}</Link>. Open it, or carry on to create a separate {createType} with the same name.
+            </Text>
+          ))}
+        </div>
+      )}
 
       {activeRef.kind === 'branch' && (
         <Text as="p" tone="faint" size="xs">

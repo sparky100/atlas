@@ -5,6 +5,7 @@ import { countInvites } from '../../db/invites';
 import { countGettingStarted } from '../../db/landscape';
 import { reportError } from '../errors/errorBannerStore';
 import { supabase } from '../supabaseClient';
+import { Button } from '../components/Button/Button';
 import { Panel } from '../components/Panel/Panel';
 import { Text } from '../components/Text/Text';
 import styles from './GetStarted.module.css';
@@ -20,11 +21,11 @@ function isDismissed(modelId: string): boolean {
 
 /**
  * "Get started" checklist for a model that is still being set up: import
- * capabilities, add a system, link it to a capability, invite a colleague (owners only). Ticks come from real
+ * capabilities, add an application, link it to a capability, assess it, invite a colleague (owners only). Ticks come from real
  * counts on main's head; each step links into the existing screen that does
  * it. Dismissal is per browser (localStorage) — it is a nudge, not data.
  */
-export function GetStarted({ modelId, commitId, orgId, isOwner, orgSlug, modelSlug }: { modelId: UUID; commitId: UUID | null; orgId: UUID; isOwner: boolean; orgSlug: string; modelSlug: string }) {
+export function GetStarted({ modelId, commitId, orgId, isOwner, orgSlug, modelSlug, onAddApplication }: { modelId: UUID; commitId: UUID | null; orgId: UUID; isOwner: boolean; orgSlug: string; modelSlug: string; onAddApplication: () => void }) {
   const [steps, setSteps] = useState<GettingStartedStep[] | null>(null);
   const [dismissed, setDismissed] = useState(() => isDismissed(modelId));
 
@@ -48,14 +49,16 @@ export function GetStarted({ modelId, commitId, orgId, isOwner, orgSlug, modelSl
   const base = `/o/${orgSlug}/m/${modelSlug}`;
   const links: Record<GettingStartedStep['id'], { to: string; text: string }> = {
     capabilities: { to: `${base}/capture`, text: 'Import' },
-    system: { to: `${base}/elements`, text: 'See elements' },
+    system: { to: `${base}/elements`, text: 'See what is already here' },
     link: { to: `${base}/capability-map`, text: 'Open the capability map' },
+    assess: { to: `${base}/portfolio`, text: 'See your applications' },
     invite: { to: `/o/${orgSlug}/settings`, text: 'Open organisation settings' },
   };
   const hints: Record<GettingStartedStep['id'], string> = {
     capabilities: 'Import a spreadsheet or document, or type a name in the search box above.',
-    system: 'Type its name in the search box above and choose to create it.',
-    link: 'Open a system and say which capability it supports.',
+    system: 'Use Add application below, or Import inventory if you already have a list.',
+    link: 'Open an application and say which capability it supports.',
+    assess: 'Open an application and choose its planned action: invest, tolerate, migrate or eliminate.',
     invite: 'Add their email and choose a role. They get an email with a link to join.',
   };
 
@@ -84,6 +87,14 @@ export function GetStarted({ modelId, commitId, orgId, isOwner, orgSlug, modelSl
           </li>
         ))}
       </ul>
+      <div className={styles.actions}>
+        <Button variant="primary" onClick={onAddApplication}>
+          Add application
+        </Button>
+        <Link to={`${base}/capture`} className={styles.actionLink}>
+          Import inventory
+        </Link>
+      </div>
       <button
         type="button"
         className={styles.dismiss}

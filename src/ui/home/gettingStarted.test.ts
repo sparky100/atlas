@@ -3,19 +3,27 @@ import { firstVisitContent, gettingStartedSteps, showGettingStarted } from './ge
 
 describe('gettingStartedSteps', () => {
   it('ticks each step from its own count', () => {
-    expect(gettingStartedSteps({ capabilities: 2, systems: 0, supportsEdges: 0 }).map((s) => s.done)).toEqual([true, false, false]);
-    expect(gettingStartedSteps({ capabilities: 2, systems: 1, supportsEdges: 1 }).map((s) => s.done)).toEqual([true, true, true]);
+    expect(gettingStartedSteps({ capabilities: 2, systems: 0, supportsEdges: 0, assessedSystems: 0 }).map((s) => s.done)).toEqual([true, false, false, false]);
+    expect(gettingStartedSteps({ capabilities: 2, systems: 1, supportsEdges: 1, assessedSystems: 1 }).map((s) => s.done)).toEqual([true, true, true, true]);
   });
   it('hides once every step is done', () => {
-    expect(showGettingStarted(gettingStartedSteps({ capabilities: 1, systems: 1, supportsEdges: 1 }))).toBe(false);
-    expect(showGettingStarted(gettingStartedSteps({ capabilities: 0, systems: 0, supportsEdges: 0 }))).toBe(true);
+    expect(showGettingStarted(gettingStartedSteps({ capabilities: 1, systems: 1, supportsEdges: 1, assessedSystems: 1 }))).toBe(false);
+    expect(showGettingStarted(gettingStartedSteps({ capabilities: 0, systems: 0, supportsEdges: 0, assessedSystems: 0 }))).toBe(true);
+  });
+});
+
+describe('assess step', () => {
+  it('stays open until an application has a planned action', () => {
+    const steps = gettingStartedSteps({ capabilities: 1, systems: 1, supportsEdges: 1, assessedSystems: 0 });
+    expect(steps.find((s) => s.id === 'assess')?.done).toBe(false);
+    expect(showGettingStarted(steps)).toBe(true);
   });
 });
 
 describe('invite step and first visit', () => {
-  const counts = { capabilities: 1, systems: 1, supportsEdges: 1 };
+  const counts = { capabilities: 1, systems: 1, supportsEdges: 1, assessedSystems: 1 };
   it('offers the invite step only when an invite count is given', () => {
-    expect(gettingStartedSteps(counts).map((s) => s.id)).toEqual(['capabilities', 'system', 'link']);
+    expect(gettingStartedSteps(counts).map((s) => s.id)).toEqual(['capabilities', 'system', 'link', 'assess']);
     const withInvite = gettingStartedSteps(counts, 0);
     expect(withInvite.map((s) => s.id)).toContain('invite');
     expect(showGettingStarted(withInvite)).toBe(true);

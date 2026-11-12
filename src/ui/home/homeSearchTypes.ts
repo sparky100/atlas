@@ -51,3 +51,25 @@ export function hasCreatableExactMatch(pool: readonly SearchPoolElement[], query
     query,
   );
 }
+
+export interface SameNameModule {
+  element: SearchPoolElement['element'];
+  /** The platform (system) this is a module of, when it is in the pool — for `moduleDisplayName`. */
+  parent: SearchPoolElement['element'] | null;
+}
+
+/**
+ * Modules (containers) whose name or alias equals `query`, case-insensitively.
+ * They never suppress "Create" (a short module name like "FI" is legitimately
+ * reused across platforms — see `hasCreatableExactMatch`), so Add application
+ * names them separately and links to each, so nobody creates an application
+ * that is really an existing module without having been told.
+ */
+export function sameNameModules(pool: readonly SearchPoolElement[], query: string): SameNameModule[] {
+  const q = query.trim().toLowerCase();
+  if (q === '') return [];
+  const byId = new Map(pool.map(({ element }) => [element.element_id, element]));
+  return pool
+    .filter(({ element, aliases }) => element.element_type === 'container' && (element.name.toLowerCase() === q || aliases.some((a) => a.toLowerCase() === q)))
+    .map(({ element }) => ({ element, parent: element.parent_id !== null ? (byId.get(element.parent_id) ?? null) : null }));
+}
