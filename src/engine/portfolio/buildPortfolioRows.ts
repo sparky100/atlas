@@ -16,7 +16,7 @@ import { dispositionOf } from '../elementRead/disposition';
 import { fitForPurposeOf, hasLifecycleExposureData, systemsExposedByLifecycle, worstFitForPurposeOfSupporter } from '../elementRead/fitAndExposure';
 import { moduleDisplayNameFromMap } from '../elementRead/moduleDisplayName';
 import { ownersByRole } from '../elementRead/ownersByRole';
-import { annualRunCostOf, highCostOverlapByCapability, overlapCapabilityIdsFor, topLevelSupporterBands, topLevelSystemIdOf } from './portfolioOverlap';
+import { annualRunCostOf, highCostOverlapsFromBands, topLevelSupporterBandsByCapability, topLevelSystemIdOf } from './portfolioOverlap';
 import { computePortfolioSignals, missingPortfolioInputs, type PortfolioSignal } from './portfolioSignals';
 
 /** One other top-level system supporting the same capability as this row — the row-expand's own "other supporters" list, named and with its own highest band into that capability (never this row's own top-level system). */
@@ -33,7 +33,8 @@ export interface PortfolioCapabilityLink {
   fit: FitForPurpose | null;
   /** F12 step 2: the `supports` edge itself — the gaps queue rates it in place. */
   relationship: RelationshipsHeadRow;
-  otherSupporters: PortfolioOtherSupporter[];
+  /** Resolved on first expansion of this link. */
+  readonly otherSupporters: PortfolioOtherSupporter[];
 }
 
 export interface PortfolioRow {
@@ -93,42 +94,79 @@ export interface PortfolioInputs {
   now: Date;
 }
 
+function edgesByEndpoint(edges: readonly RelationshipsHeadRow[], endpoint: 'from_element_id' | 'to_element_id'): Map<UUID, RelationshipsHeadRow[]> {
+  const byId = new Map<UUID, RelationshipsHeadRow[]>();
+  for (const edge of edges) {
+    const list = byId.get(edge[endpoint]);
+    if (list) list.push(edge);
+    else byId.set(edge[endpoint], [edge]);
+  }
+  return byId;
+}
+
 export function buildPortfolioRows({ systems, containers, capabilities, actors, supportsEdges, ownsEdges, now }: PortfolioInputs): { rows: PortfolioRow[]; capabilitiesById: Map<UUID, ElementsHeadRow> } {
   // Every system and module container together: a module can carry its own `supports`/`owns` edges independently of its platform.
   const allElements = [...systems, ...containers];
   const elementsById = new Map<UUID, ElementsHeadRow>(allElements.map((e) => [e.element_id, e]));
   const capabilitiesById = new Map<UUID, ElementsHeadRow>(capabilities.map((c) => [c.element_id, c]));
   const actorsById = new Map<UUID, ElementsHeadRow>(actors.map((a) => [a.element_id, a]));
-  const overlapsByCapability = highCostOverlapByCapability(supportsEdges, elementsById);
-  
-  function nameOfTopLevel(topLevelId: UUID): string {
-    const system = elementsById.get(topLevelId);
-    return system ? moduleDisplayNameFromMap(system, elementsById) : '(unknown system)';
+  const supportsBySource = edgesByEndpoint(supportsEdges, 'from_element_id');
+  const ownsByTarget = edgesByEndpoint(ownsEdges, 'to_element_id');
+  const bandsByCapability = topLevelSupporterBandsByCapability(supportsEdges, elementsById);
+  const overlapsBySystem = new Map<UUID, string[]>();
+  for (const [capabilityId, systemsWithOverlap] of highCostOverlapsFromBands(bandsByCapability)) {
+    const name = capabilitiesById.get(capabilityId)?.name ?? '(unknown capability)';
+    for (const id of systemsWithOverlap) {
+      const names = overlapsBySystem.get(id);
+      if (names) names.push(name);
+      else overlapsBySystem.set(id, [name]);
+    }
+  }
+
+  const supportersByCapability = new Map<UUID, PortfolioOtherSupporter[]>();
+  function supportersOf(capabilityId: UUID): PortfolioOtherSupporter[] {
+    const cached = supportersByCapability.get(capabilityId);
+    if (cached) return cached;
+    const supporters: PortfolioOtherSupporter[] = [];
+    for (const [id, cost] of bandsByCapability.get(capabilityId) ?? []) {
+      const system = elementsById.get(id);
+      supporters.push({ topLevelSystemId: id, name: system ? moduleDisplayNameFromMap(system, elementsById) : '(unknown system)', cost });
+    }
+    supportersByCapability.set(capabilityId, supporters);
+    return supporters;
   }
 
   const rows: PortfolioRow[] = allElements.map((element) => {
     const parent = element.parent_id !== null ? elementsById.get(element.parent_id) ?? null : null;
     const topLevelSystemId = topLevelSystemIdOf(element);
     const cost = annualRunCostOf(element);
-    const fit = worstFitForPurposeOfSupporter(element.element_id, supportsEdges);
+    const support = supportsBySource.get(element.element_id) ?? [];
+    const ownership = ownsByTarget.get(element.element_id) ?? [];
+    const fit = worstFitForPurposeOfSupporter(element.element_id, support);
     const criticality = criticalityOf(element, parent);
     const lifecycleStatus = lifecycleStatusOf(element, parent);
     const lifecycleExposed = hasLifecycleExposureData([element]) ? systemsExposedByLifecycle([element], now) : null;
 
-    const capabilityLinks: PortfolioCapabilityLink[] = supportsEdges
-      .filter((edge) => edge.relationship_type === 'supports' && edge.from_element_id === element.element_id)
+    const capabilityLinks: PortfolioCapabilityLink[] = support
+      .filter((edge) => edge.relationship_type === 'supports')
       .map((edge) => {
         const capability = capabilitiesById.get(edge.to_element_id);
-        const bands = topLevelSupporterBands(edge.to_element_id, supportsEdges, elementsById);
-        const otherSupporters: PortfolioOtherSupporter[] = [...bands]
-          .filter(([id]) => id !== topLevelSystemId)
-          .map(([id, band]) => ({ topLevelSystemId: id, name: nameOfTopLevel(id), cost: band }));
-        return { capabilityId: edge.to_element_id, capabilityName: capability?.name ?? '(unknown capability)', fit: fitForPurposeOf(edge), relationship: edge, otherSupporters };
+        let otherSupporters: PortfolioOtherSupporter[] | undefined;
+        return {
+          capabilityId: edge.to_element_id,
+          capabilityName: capability?.name ?? '(unknown capability)',
+          fit: fitForPurposeOf(edge),
+          relationship: edge,
+          get otherSupporters() {
+            otherSupporters ??= supportersOf(edge.to_element_id).filter((supporter) => supporter.topLevelSystemId !== topLevelSystemId);
+            return otherSupporters;
+          },
+        };
       });
 
-    const businessOwner = ownersByRole(element.element_id, ownsEdges, actorsById).get('business')?.[0] ?? null;
+    const businessOwner = ownersByRole(element.element_id, ownership, actorsById).get('business')?.[0] ?? null;
 
-    const overlapCapabilityNames = overlapCapabilityIdsFor(topLevelSystemId, overlapsByCapability).map((id) => capabilitiesById.get(id)?.name ?? '(unknown capability)');
+    const overlapCapabilityNames = overlapsBySystem.get(topLevelSystemId) ?? [];
     const disposition = dispositionOf(element);
     const signals = computePortfolioSignals({ cost, fit, criticality, lifecycleExposed, overlapCapabilityNames, disposition });
     const missingInputs = missingPortfolioInputs({ cost, fit, criticality, lifecycleExposed });
@@ -145,7 +183,7 @@ export function buildPortfolioRows({ systems, containers, capabilities, actors, 
       lifecycleExposed,
       capabilities: capabilityLinks,
       businessOwner,
-      ownsEdges: ownsEdges.filter((edge) => edge.to_element_id === element.element_id),
+      ownsEdges: ownership,
       signals,
       missingInputs,
     };

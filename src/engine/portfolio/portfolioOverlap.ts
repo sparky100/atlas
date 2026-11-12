@@ -49,7 +49,7 @@ export function topLevelSystemIdOf(element: ElementsHeadRow): UUID {
 }
 
 /**
- * Every top-level system id supporting `capabilityId` (directly or via one
+ * Every top-level system id supporting each capability (directly or via one
  * of its own modules), each with the highest `annualRunCost` band recorded
  * across that top-level system's own contributing edges into this
  * capability — `null` if none of them has one entered. Exported (not just
@@ -58,10 +58,15 @@ export function topLevelSystemIdOf(element: ElementsHeadRow): UUID {
  * per-capability roll-up for its own "other supporters" list — same
  * definition, not a second one computed from scratch in `usePortfolio.ts`.
  */
-export function topLevelSupporterBands(capabilityId: UUID, supportsEdges: readonly RelationshipsHeadRow[], elementsById: ReadonlyMap<UUID, ElementsHeadRow>): Map<UUID, AnnualRunCost | null> {
-  const bands = new Map<UUID, AnnualRunCost | null>();
+export function topLevelSupporterBandsByCapability(supportsEdges: readonly RelationshipsHeadRow[], elementsById: ReadonlyMap<UUID, ElementsHeadRow>): Map<UUID, Map<UUID, AnnualRunCost | null>> {
+  const byCapability = new Map<UUID, Map<UUID, AnnualRunCost | null>>();
   for (const edge of supportsEdges) {
-    if (edge.relationship_type !== 'supports' || edge.to_element_id !== capabilityId) continue;
+    if (edge.relationship_type !== 'supports') continue;
+    let bands = byCapability.get(edge.to_element_id);
+    if (!bands) {
+      bands = new Map();
+      byCapability.set(edge.to_element_id, bands);
+    }
     const supporter = elementsById.get(edge.from_element_id);
     if (!supporter) continue;
     const topLevelId = topLevelSystemIdOf(supporter);
@@ -73,7 +78,7 @@ export function topLevelSupporterBands(capabilityId: UUID, supportsEdges: readon
       bands.set(topLevelId, band);
     }
   }
-  return bands;
+  return byCapability;
 }
 
 /**
@@ -83,13 +88,12 @@ export function topLevelSupporterBands(capabilityId: UUID, supportsEdges: readon
  * high-cost supporter has no entry at all (no overlap to report).
  */
 export function highCostOverlapByCapability(supportsEdges: readonly RelationshipsHeadRow[], elementsById: ReadonlyMap<UUID, ElementsHeadRow>): Map<UUID, ReadonlySet<UUID>> {
-  const capabilityIds = new Set<UUID>();
-  for (const edge of supportsEdges) {
-    if (edge.relationship_type === 'supports') capabilityIds.add(edge.to_element_id);
-  }
+  return highCostOverlapsFromBands(topLevelSupporterBandsByCapability(supportsEdges, elementsById));
+}
+
+export function highCostOverlapsFromBands(bandsByCapability: ReadonlyMap<UUID, ReadonlyMap<UUID, AnnualRunCost | null>>): Map<UUID, ReadonlySet<UUID>> {
   const overlaps = new Map<UUID, ReadonlySet<UUID>>();
-  for (const capabilityId of capabilityIds) {
-    const bands = topLevelSupporterBands(capabilityId, supportsEdges, elementsById);
+  for (const [capabilityId, bands] of bandsByCapability) {
     const highCostSupporters = new Set<UUID>();
     for (const [topLevelId, band] of bands) {
       if (isHighCostBand(band)) highCostSupporters.add(topLevelId);

@@ -32,10 +32,9 @@ test('set run cost and fit, see the expected signal in Portfolio, sort, filter a
   await page.getByRole('button', { name: 'Save', exact: true }).click();
   await expect(page.getByText('Fit for purpose: poor', { exact: false })).toBeVisible();
 
-  // Cheap App: cheap, no capability — a plain, unremarkable row, cheaper
-  // than Ledger System and alphabetically first.
+  // Cheap App shares Finance and is cheaper than Ledger System.
   await goToModelHome(page);
-  await addSystemFromHome(page, { name: 'Cheap App', description: 'A small, inexpensive system.' });
+  await addSystemFromHome(page, { name: 'Cheap App', description: 'A small, inexpensive system.', capabilityName: 'Finance' });
   await setRunCost(page, 'under_50k');
 
   await goToModelHome(page);
@@ -69,6 +68,7 @@ test('set run cost and fit, see the expected signal in Portfolio, sort, filter a
   // card's own tap target share this accessible name.
   await page.getByRole('button', { name: 'Expand Ledger System' }).click();
   await expect(page.getByRole('link', { name: 'Finance', exact: true }).first()).toBeVisible();
+  await expect(page.getByText(/^Also supported by: Cheap App/)).toBeVisible();
   await expect(page.getByText(/^No business owner\.?$/).first()).toBeVisible();
 
   // No horizontal overflow (checked at both 1280 and 390 — meaningful at
