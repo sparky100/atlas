@@ -135,7 +135,7 @@ export const FINDING_FILTER_OPTIONS: readonly { value: string; label: string }[]
   { value: 'unlinked-systems', label: 'Systems not linked to a capability' },
   { value: 'platform-supports-move-to-module', label: 'Platform supports that could move to a module' },
   { value: 'unowned-capabilities', label: 'Capabilities with no owner' },
-  { value: 'stale-attributes', label: 'Systems with stale attributes' },
+  { value: 'stale-attributes', label: 'Items not checked recently' },
   { value: 'no-technical-owner', label: 'Systems with no technical owner' },
   { value: 'critical-no-business-owner', label: 'Critical systems with no business owner' },
   { value: 'critical-exposed', label: 'Critical systems exposed with no replacement' },
