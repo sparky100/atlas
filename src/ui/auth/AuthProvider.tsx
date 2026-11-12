@@ -1,6 +1,8 @@
 import { useQueryClient } from '@tanstack/react-query';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import type { ReactNode } from 'react';
+import type { EntraJoinResult } from '../../contracts/entraTenant';
+import { joinMyEntraOrg } from '../../db/entraTenants';
 import { consumeMyInvites } from '../../db/invites';
 import { queryKeys } from '../query/keys';
 import { supabase } from '../supabaseClient';
@@ -18,6 +20,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [userId, setUserId] = useState<string | null>(null);
   const [email, setEmail] = useState<string | null>(null);
   const [membershipsGeneration, setMembershipsGeneration] = useState(0);
+  const [microsoftJoin, setMicrosoftJoin] = useState<EntraJoinResult | null>(null);
   const queryClient = useQueryClient();
 
   useEffect(() => {
@@ -40,9 +43,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         // Once it settles, memberships may have changed: re-fetch the org
         // list and the profile (a first membership creates the profile row).
         const signedInUserId = session?.user.id ?? null;
+        // A Microsoft sign-in also joins the organisation that recorded the
+        // person's company (as a Viewer). Same fire-and-forget rule: never
+        // blocks sign-in; a failure leaves the person where they were.
         void consumeMyInvites(supabase)
           .catch(() => undefined)
-          .then(() => {
+          .then(() => joinMyEntraOrg(supabase).catch(() => 'not_microsoft' as const))
+          .then((joinResult) => {
+            setMicrosoftJoin(joinResult === 'not_microsoft' ? null : joinResult);
             setMembershipsGeneration((g) => g + 1);
             void queryClient.invalidateQueries({ queryKey: queryKeys.ownProfile(signedInUserId) });
           });
@@ -55,6 +63,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const signInWithPassword = useCallback(async (emailInput: string, password: string) => {
     const { error } = await supabase.auth.signInWithPassword({ email: emailInput, password });
+    return { error: error?.message ?? null };
+  }, []);
+
+  const signInWithMicrosoft = useCallback(async () => {
+    // `email` is not granted by default for work accounts; `openid profile email` is what Supabase's Azure provider needs.
+    const { error } = await supabase.auth.signInWithOAuth({ provider: 'azure', options: { scopes: 'email', redirectTo: window.location.origin } });
     return { error: error?.message ?? null };
   }, []);
 
@@ -83,8 +97,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const value = useMemo<AuthContextValue>(
-    () => ({ status, userId, email, membershipsGeneration, signInWithPassword, signUpWithPassword, signOut, sendMagicLink, sendPasswordResetEmail, updatePassword }),
-    [status, userId, email, membershipsGeneration, signInWithPassword, signUpWithPassword, signOut, sendMagicLink, sendPasswordResetEmail, updatePassword],
+    () => ({ status, userId, email, membershipsGeneration, microsoftJoin, signInWithMicrosoft, signInWithPassword, signUpWithPassword, signOut, sendMagicLink, sendPasswordResetEmail, updatePassword }),
+    [status, userId, email, membershipsGeneration, microsoftJoin, signInWithMicrosoft, signInWithPassword, signUpWithPassword, signOut, sendMagicLink, sendPasswordResetEmail, updatePassword],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

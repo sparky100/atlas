@@ -110,6 +110,20 @@ Who belongs to an organisation and with what role.
 Primary key `(org_id, user_id)`. Index on `(user_id)`.
 Trigger `atlas.on_organisation_created` inserts the creator as `owner`. `atlas.guard_last_owner`, an ordinary `before` row trigger — not a SQL `create constraint trigger` (Sprint H1 correction, docs/AUDIT-2026-09-U2.md §2.E.3 item 18: this deferrable-checking distinction isn't needed here — "no owners left" should reject the statement immediately, not at end of transaction) — stops an org losing its last `owner`.
 
+#### `org_entra_tenants` (Microsoft Entra sign-in, `20261113010000_entra_sign_in.sql`)
+The Microsoft tenant an organisation's people sign in from.
+
+| Column | Type | Constraints |
+|---|---|---|
+| `org_id` | uuid | pk, → `organisations(id)` on delete cascade |
+| `tenant_id` | uuid | not null, **unique across all organisations** |
+| `created_by` | uuid | not null, → `auth.users(id)` |
+| `created_at` | timestamptz | not null default now() |
+
+One tenant per organisation; a tenant belongs to at most one organisation, so a sign-in is never ambiguous and one organisation cannot claim another's company. Owner-only select; written only through `atlas.set_entra_tenant` / `atlas.clear_entra_tenant` (owner).
+
+**Join rule.** After a sign-in, the client calls `atlas.join_my_entra_org()`. It reads the caller's own Microsoft (`azure`) identity from `auth.identities` — never a client-supplied tenant — takes the tenant from the `tid` claim (or the issuer URL), and, if an organisation has recorded that tenant, inserts a `viewer` membership (`invited_by` null; the normal `members` triggers record the `joined` audit event). An existing member's role is never changed; an unknown tenant adds nobody. Nothing is removed automatically: a leaver's Microsoft account being disabled stops them signing in, and an owner removes the membership. Supabase links a Microsoft sign-in to an existing account with the same email, so the Atlas app registration should carry the `xms_edov` optional claim (see the Azure setup notes) so an unverified email is never trusted for linking.
+
 #### `atlas.profiles` (Sprint M1a, ADR-009 amendment)
 A user's public identity, decoupled from `auth.users.email`. Lives in the `atlas` schema, not `public` — infrastructure identity, not model content, same distinction that already separates every `atlas.*` RPC from the tables it writes; client reads/writes go through `.schema('atlas')`. No `org_id` (like `organisations`/`user_preferences`, this is not org-scoped — a person's profile follows them across every org they belong to).
 
