@@ -15,13 +15,11 @@
  * `.range()` on that same query object (postgrest-js's `.range()` just
  * overwrites the offset/limit query params and returns `this`, so re-`await`ing
  * the same builder after another `.range()` call issues a fresh request each
- * time — no need to rebuild the query per page) until a page comes back
- * shorter than `pageSize`, then cross-checks the total rows collected
- * against the exact count Postgres reported on the first page. A mismatch
- * throws rather than returning a partial result — rows shifting between
- * pages (no stable order on the query) or a concurrent write racing the
- * read are the two ways that can happen, and both deserve a loud failure,
- * not a silently short list.
+ * time — no need to rebuild the query per page). It stops once it reaches
+ * the first page's exact count or encounters a short page. It rejects an
+ * incomplete or oversized result and any changed count reported by a
+ * later page. These checks detect count mismatches across requests; offset
+ * pagination does not provide a single snapshot across concurrent writes.
  *
  * The query must also carry a deterministic order over a value that's
  * unique within its filtered scope (e.g. a primary-key column, or a
@@ -47,17 +45,19 @@ export async function selectAll<T>(query: SelectAllQuery<T>, pageSize = 1000): P
   for (let offset = 0; ; offset += pageSize) {
     const { data, error, count } = await query.range(offset, offset + pageSize - 1);
     if (error) throw new Error(`selectAll: ${error.message}`);
-    if (offset === 0) {
+    if (expectedCount === null) {
       if (count == null) {
         throw new Error(
           "selectAll: the query did not request an exact count — build it with .select(columns, { count: 'exact' }) so selectAll can detect silent truncation",
         );
       }
       expectedCount = count;
+    } else if (count !== null && count !== expectedCount) {
+      throw new Error(`selectAll: exact count changed from ${String(expectedCount)} to ${String(count)} during pagination`);
     }
     const rows = data ?? [];
     results.push(...rows);
-    if (rows.length < pageSize) break;
+    if (results.length >= expectedCount || rows.length < pageSize) break;
   }
 
   if (results.length !== expectedCount) {

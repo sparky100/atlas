@@ -2,16 +2,17 @@ import { describe, expect, it } from 'vitest';
 import { selectAll, type SelectAllResult } from './selectAll';
 
 /** A fake postgrest-style query: `.range()` is called repeatedly on the same object, each call returning the next page. */
-function fakeQuery<T>(allRows: T[], { count = allRows.length, errorOnPage }: { count?: number | null; errorOnPage?: number } = {}) {
-  let calls = 0;
+function fakeQuery<T>(allRows: T[], { count = allRows.length, laterCount = null, errorOnPage }: { count?: number | null; laterCount?: number | null; errorOnPage?: number } = {}) {
+  const ranges: [number, number][] = [];
   return {
+    ranges,
     range(from: number, to: number): Promise<SelectAllResult<T>> {
-      const page = calls;
-      calls += 1;
+      const page = ranges.length;
+      ranges.push([from, to]);
       if (errorOnPage !== undefined && page === errorOnPage) {
         return Promise.resolve({ data: null, error: { message: 'simulated failure' }, count: null });
       }
-      return Promise.resolve({ data: allRows.slice(from, to + 1), error: null, count: page === 0 ? count : null });
+      return Promise.resolve({ data: allRows.slice(from, to + 1), error: null, count: page === 0 ? count : laterCount });
     },
   };
 }
@@ -27,10 +28,16 @@ describe('selectAll', () => {
     await expect(selectAll(fakeQuery(rows), 1000)).resolves.toEqual(rows);
   });
 
-  it('fetches one extra empty page when the total is an exact multiple of pageSize', async () => {
+  it('stops after the last full page when the exact count is reached', async () => {
     const rows = Array.from({ length: 2000 }, (_, i) => ({ id: i }));
     const query = fakeQuery(rows);
     await expect(selectAll(query, 1000)).resolves.toEqual(rows);
+    expect(query.ranges).toEqual([[0, 999], [1000, 1999]]);
+  });
+
+  it('rejects a later count change even when the requested rows match the first count', async () => {
+    const rows = Array.from({ length: 2001 }, (_, id) => ({ id }));
+    await expect(selectAll(fakeQuery(rows, { count: 2000, laterCount: 2001 }))).rejects.toThrow(/exact count changed from 2000 to 2001/);
   });
 
   it('throws if the query did not request an exact count', async () => {
@@ -43,6 +50,7 @@ describe('selectAll', () => {
     // Reports a count of 5 but only 2 rows ever come back — simulates the
     // exact failure mode this helper exists to catch.
     await expect(selectAll(fakeQuery(rows, { count: 5 }), 1000)).rejects.toThrow(/expected 5 rows.*received 2/);
+    await expect(selectAll(fakeQuery(rows, { count: 1 }), 1000)).rejects.toThrow(/expected 1 rows.*received 2/);
   });
 
   it('surfaces a page-level query error rather than returning a partial result', async () => {
