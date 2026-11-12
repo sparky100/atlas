@@ -20,8 +20,9 @@ import { commitToBranch } from '../src/db/commits';
 import { createModel } from '../src/db/models';
 import { createOrganisation } from '../src/db/organisations';
 import { loadEnv } from '../src/db/env';
+import { clickNavItem } from './fixtures/goldenPath';
 
-test('Export CSV on the browse table downloads exactly the visible rows and columns', async ({ page }) => {
+test('Export CSV downloads all matching elements from the second page', async ({ page }) => {
   const env = loadEnv();
 
   const email = `browse-csv-${randomUUID()}@example.test`;
@@ -60,6 +61,7 @@ test('Export CSV on the browse table downloads exactly the visible rows and colu
 
   const capabilityId = randomUUID();
   const systemId = randomUUID();
+  const lastSystemId = randomUUID();
 
   const seedEnvelope: CommitEnvelope = {
     id: randomUUID(),
@@ -67,11 +69,22 @@ test('Export CSV on the browse table downloads exactly the visible rows and colu
     parentCommitId: genesisCommitId,
     mergedBranchHeadCommitId: null,
     kind: 'manual',
-    title: 'seed one capability and one system',
+    title: 'seed a capability and enough systems for two pages',
     body: null,
     deltas: [
       { kind: 'element.create', id: randomUUID(), elementId: capabilityId, elementType: 'capability', name: 'Asset Management', parentId: null, attributes: {}, sourceId: seedSourceId, confidence: 1 },
       { kind: 'element.create', id: randomUUID(), elementId: systemId, elementType: 'system', name: 'Field Sensor Gateway', parentId: null, attributes: { lifecycleStatus: 'active', isExternal: false }, sourceId: seedSourceId, confidence: 1 },
+      ...Array.from({ length: 50 }, (_, index) => ({
+        kind: 'element.create' as const,
+        id: randomUUID(),
+        elementId: index === 49 ? lastSystemId : randomUUID(),
+        elementType: 'system' as const,
+        name: `Test system ${String(index + 1).padStart(2, '0')}`,
+        parentId: null,
+        attributes: { lifecycleStatus: 'active' as const, isExternal: false },
+        sourceId: seedSourceId,
+        confidence: 1,
+      })),
     ],
   };
   const seedResult = await commitToBranch(signedIn, { modelId, branchId: main.id, expectedHeadCommitId: genesisCommitId, envelope: seedEnvelope });
@@ -87,6 +100,16 @@ test('Export CSV on the browse table downloads exactly the visible rows and colu
   // whole model.
   await page.getByLabel('Element type').selectOption('system');
   await expect(page.getByText('Asset Management', { exact: true })).toHaveCount(0);
+  const pages = page.getByRole('navigation', { name: 'Elements pages' });
+  await expect(pages.getByRole('status')).toHaveText('Showing 1–50 of 51');
+  await expect(page.getByRole('link', { name: 'Test system 50', exact: true })).toHaveCount(0);
+  await pages.getByRole('button', { name: 'Next page' }).click();
+  await expect(pages.getByRole('status')).toHaveText('Showing 51–51 of 51');
+  await expect(page.getByRole('link', { name: 'Test system 50', exact: true })).toBeVisible();
+  await expect(page.getByRole('link', { name: 'Field Sensor Gateway', exact: true })).toHaveCount(0);
+  await page.setViewportSize({ width: 390, height: 844 });
+  await expect(pages.getByRole('status')).toHaveText('Showing 51–51 of 51');
+  await expect(page.getByRole('link', { name: 'Test system 50', exact: true })).toBeVisible();
 
   const downloadPromise = page.waitForEvent('download');
   await page.getByRole('button', { name: 'Export CSV' }).click();
@@ -110,5 +133,23 @@ test('Export CSV on the browse table downloads exactly the visible rows and colu
   expect(dataRow).toContain(systemId);
   expect(dataRow).toContain('active');
   expect(dataRow).toContain('Seed');
+  expect(csv).toContain('Test system 50');
+  expect(csv.trimEnd().split('\r\n')).toHaveLength(52);
   expect(csv).not.toContain('Asset Management');
+
+  await page.getByPlaceholder('Search by name or owner…').fill('Field Sensor Gateway');
+  await expect(pages).toHaveCount(0);
+  await expect(page.getByRole('link', { name: 'Field Sensor Gateway', exact: true })).toBeVisible();
+
+  await page.getByPlaceholder('Search by name or owner…').clear();
+  await page.getByRole('button', { name: 'Save as report…' }).click();
+  await page.getByLabel('Report name').fill('All test systems');
+  await page.getByRole('button', { name: 'Save', exact: true }).click();
+  await expect(page.getByText('Saved “All test systems”.')).toBeVisible();
+  await clickNavItem(page, 'Reports');
+  await page.getByRole('link', { name: 'All test systems', exact: true }).click();
+  const reportPages = page.getByRole('navigation', { name: 'Report pages' });
+  await reportPages.getByRole('button', { name: 'Next page' }).click();
+  await expect(reportPages.getByRole('status')).toHaveText('Showing 51–51 of 51');
+  await expect(page.getByRole('link', { name: 'Test system 50', exact: true })).toHaveAttribute('href', `/o/${orgSlug}/m/${modelSlug}/e/${lastSystemId}?ref=main`);
 });
