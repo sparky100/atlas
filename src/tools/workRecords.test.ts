@@ -57,6 +57,7 @@ describe('change_impact', () => {
     ],
     affectedValueStreams: [],
     otherOpenChanges: [{ branch: branch(511, { status: 'proposed' }), sharedElementNames: ['CRM Platform'] }],
+    impactProblems: { capabilitiesLeftWithoutSystem: [], providerProblems: [] },
     captureDraftOverlaps: [],
     sourcesById: new Map(),
     projectScopeIds: null,
