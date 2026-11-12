@@ -37,6 +37,8 @@ export interface ToolContext {
   allFacts: () => Promise<readonly FactsRow[]>;
   /** Elements an open change is retiring (for the "marked Migrate or Eliminate, nothing retiring it" finding). */
   retiredByOpenChanges: () => Promise<ReadonlySet<UUID>>;
+  /** The organisation's stale threshold in months (for the stale-attributes finding). */
+  staleAfterMonths: () => Promise<number>;
   /** Open and finished changes of this model (never main or capture drafts). */
   changes: () => Promise<readonly BranchRow[]>;
   decisions: () => Promise<readonly DecisionRow[]>;

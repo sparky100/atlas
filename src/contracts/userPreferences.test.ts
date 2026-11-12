@@ -106,6 +106,18 @@ describe('notification preferences wire <-> row (Sprint F7 item 3)', () => {
   });
 });
 
+describe('emailOnStaleNudge wire <-> row', () => {
+  it('defaults to true and carries false through independently of the review email', () => {
+    expect(defaultUserPreferences('u1', true).emailOnStaleNudge).toBe(true);
+    const prefs = { ...defaultUserPreferences('u1', true), emailOnStaleNudge: false };
+    const row = toUserPreferencesRow(prefs);
+    expect(row.email_on_stale_nudge).toBe(false);
+    expect(row.email_on_review_assigned).toBe(true);
+    expect(fromUserPreferencesRow(row).emailOnStaleNudge).toBe(false);
+    expect(fromUserPreferencesRow(row).emailOnReviewAssigned).toBe(true);
+  });
+});
+
 describe('emailOnReviewAssigned wire <-> row', () => {
   it('defaults to true and carries false through independently of notifyOnReviewAssigned', () => {
     expect(defaultUserPreferences('u1', true).emailOnReviewAssigned).toBe(true);

@@ -70,6 +70,7 @@ export function estateContext(over: { snapshot?: ModelSnapshot; facts?: FactsRow
     factsFor: (elementId) => Promise.resolve((over.facts ?? []).filter((f) => f.subject_id === elementId)),
     savedReports: () => Promise.resolve(over.reports ?? []),
     allFacts: () => Promise.resolve(over.facts ?? []),
+    staleAfterMonths: () => Promise.resolve(12),
     retiredByOpenChanges: () => Promise.resolve(new Set(over.retired ?? [])),
     changes: () => Promise.resolve(over.changes ?? []),
     decisions: () => Promise.resolve(over.decisions ?? []),

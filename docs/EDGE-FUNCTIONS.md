@@ -410,6 +410,20 @@ send, so a review is reminded at most once; the claim is released if nothing
 went out. It is a button, not a schedule: nothing sends it automatically on
 the due date (that would need a scheduler holding the service key — not built).
 
+**Stale-data mode.** The same function, called with `{ staleNudge: true, modelId }`
+(`sendStaleNudges` in `src/db/staleNudge.ts`, from **Email owners a reminder**
+above the out-of-date list on the Elements page), emails each person the
+elements that have gone stale. The caller must be an owner or architect of the
+model's organisation (checked by hand before any service-role read). Who gets
+what comes from `atlas.stale_nudge_recipients` (service role only): the member
+behind a business or technical owner of the element, else the organisation's
+architects (owners if there is no architect). Skipped: anyone emailed for this
+model in the last 7 days, anyone with `email_on_stale_nudge` off, anyone with
+no email address. A `stale_nudges (model_id, user_id, sent_on)` row is inserted
+before each send (the unique key stops two simultaneous presses double-sending)
+and deleted again if the send fails. Opening an email link only opens the
+element page; nothing is marked accurate. Button-driven, not scheduled.
+
 Secrets: `RESEND_API_KEY`, `RESEND_FROM_ADDRESS` (shared with
 `send-invite-email`) and **`ATLAS_APP_URL`** (new; the app's public base URL,
 no trailing slash, e.g. `https://atlas.simmodlr.app`). Deploy with

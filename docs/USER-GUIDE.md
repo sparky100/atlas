@@ -253,7 +253,7 @@ Each system's **Planned action** can be **Keep as is**, **Invest**, **Move to an
 
 ## Still accurate
 
-Values age: anything not updated for 12 months shows its age in the warning colour, and Home counts stale values on systems. If you've checked an element and everything on it is still right, press **✓ Still accurate** beside **✎ Edit** on its page (or on its row in the Elements grid while editing). That records a confirmation — today's date, by you — for every value on it without changing any of them; its provenance shows ✓, and the original source stays in the element's history.
+Values age: anything not updated for 12 months (an owner or architect can change that in Organisation settings → Out-of-date information) shows its age in the warning colour, and My work lists the items not checked in that time, for every kind of element. On that list an owner or architect can press **Email owners a reminder**: each owner gets an email listing their items, each linking to the item, and anything with no owner on record goes to the architects. Nobody is emailed twice in a week, and you can switch these emails off on your Profile page. If you've checked an element and everything on it is still right, press **✓ Still accurate** beside **✎ Edit** on its page (or on its row in the Elements grid while editing). That records a confirmation — today's date, by you — for every value on it without changing any of them; its provenance shows ✓, and the original source stays in the element's history.
 
 ## Comments and notifications
 

@@ -1,5 +1,6 @@
 import type { SourceKind } from '../../../contracts/sources';
 import { isStale } from '../../../contracts/thresholds';
+import { useStaleAfterMonths } from '../../orgs/staleThresholdContext';
 import { formatAge } from '../../time';
 import { ConfidenceDots } from '../ConfidenceDots/ConfidenceDots';
 import styles from './ProvenanceBadge.module.css';
@@ -34,7 +35,8 @@ export interface ProvenanceBadgeProps {
  * element page (Sprint U1 step 3), not a design-tokens-step primitive.
  */
 export function ProvenanceBadge({ sourceKind, date, confidence, now = new Date() }: ProvenanceBadgeProps) {
-  const stale = isStale(date, now);
+  const staleAfterMonths = useStaleAfterMonths();
+  const stale = isStale(date, now, staleAfterMonths);
   const ageLabel = formatAge(date, now);
   return (
     <span className={styles.badge} title={`${sourceKind}, ${ageLabel} old`}>

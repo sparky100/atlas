@@ -141,6 +141,8 @@ export interface UserPreferences {
   notifyOnReviewAssigned: boolean;
   /** Whether being assigned as a reviewer also sends this user an email (the in-app notification is `notifyOnReviewAssigned`'s). */
   emailOnReviewAssigned: boolean;
+  /** Email me when things I own (or, as an architect, things nobody owns) have gone stale. */
+  emailOnStaleNudge: boolean;
   /**
    * V2b: the shared Inspector panel's (`src/ui/components/Inspector`)
    * resting collapse state — see the migration's own column comment
@@ -171,6 +173,7 @@ export interface UserPreferencesRow {
   notify_on_reply: boolean;
   notify_on_review_assigned: boolean;
   email_on_review_assigned: boolean;
+  email_on_stale_nudge: boolean;
   inspector_collapsed: boolean;
   updated_at: string;
 }
@@ -192,6 +195,7 @@ export function toUserPreferencesRow(prefs: UserPreferences): UserPreferencesRow
     notify_on_reply: prefs.notifyOnReply,
     notify_on_review_assigned: prefs.notifyOnReviewAssigned,
     email_on_review_assigned: prefs.emailOnReviewAssigned,
+    email_on_stale_nudge: prefs.emailOnStaleNudge,
     inspector_collapsed: prefs.inspectorCollapsed,
     updated_at: prefs.updatedAt,
   };
@@ -214,6 +218,7 @@ export function fromUserPreferencesRow(row: UserPreferencesRow): UserPreferences
     notifyOnReply: row.notify_on_reply,
     notifyOnReviewAssigned: row.notify_on_review_assigned,
     emailOnReviewAssigned: row.email_on_review_assigned,
+    emailOnStaleNudge: row.email_on_stale_nudge,
     inspectorCollapsed: row.inspector_collapsed,
     updatedAt: row.updated_at,
   };
@@ -246,6 +251,7 @@ export function defaultUserPreferences(userId: UUID, isOwnerOrArchitect: boolean
     notifyOnReply: true,
     notifyOnReviewAssigned: true,
     emailOnReviewAssigned: true,
+    emailOnStaleNudge: true,
     inspectorCollapsed: false,
     updatedAt: new Date(0).toISOString(),
   };

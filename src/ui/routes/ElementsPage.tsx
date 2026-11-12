@@ -11,6 +11,7 @@ import navStyles from '../components/ModelNav/ModelNav.module.css';
 import { Button } from '../components/Button/Button';
 import { Panel } from '../components/Panel/Panel';
 import { Text } from '../components/Text/Text';
+import { StaleReminderBar } from '../elements/StaleReminderBar';
 import { useAuth } from '../auth/useAuth';
 import { useThreadCounts } from '../comments/useThreadCounts';
 import { EditingBranchBanner } from '../branches/EditingBranchBanner/EditingBranchBanner';
@@ -349,6 +350,7 @@ export function ElementsPage() {
               }}
             />
           )}
+          {filter === 'stale-attributes' && (role === 'owner' || role === 'architect') && state.status === 'ready' && <StaleReminderBar modelId={model.id} count={state.rows.length} />}
           <ElementBrowseTable
             state={state}
             orgSlug={organisation?.slug ?? ''}

@@ -6,6 +6,7 @@ import { FINDING_FILTER_OPTIONS, listAllElements } from '../../db/elementBrowse'
 import { listAllRelationships } from '../../db/elements';
 import { listFactsForCommit } from '../../db/healthFindings';
 import { computeFindings } from '../../db/modelFindings';
+import { getStaleAfterMonthsForCommit } from '../../db/organisations';
 import { attributesRecord } from '../../engine/elementRead/attributesRecord';
 import { moduleDisplayName } from '../../engine/elementRead/moduleDisplayName';
 import { withReportLinks, type LiveReportRow } from './reportRowLinks';
@@ -62,10 +63,10 @@ export async function loadRelationshipReportRows(client: Client, commitId: UUID)
 
 export async function loadFindingReportRows(client: Client, commitId: UUID): Promise<LiveReportRow[]> {
   const now = new Date();
-  const [elements, relationships, facts] = await Promise.all([
-    listAllElements(client, commitId), listAllRelationships(client, commitId), listFactsForCommit(client, commitId),
+  const [elements, relationships, facts, staleAfterMonths] = await Promise.all([
+    listAllElements(client, commitId), listAllRelationships(client, commitId), listFactsForCommit(client, commitId), getStaleAfterMonthsForCommit(client, commitId),
   ]);
-  return findingReportRows(elements, computeFindings({ snapshot: { elements, relationships }, facts, now }));
+  return findingReportRows(elements, computeFindings({ snapshot: { elements, relationships }, facts, now, staleAfterMonths }));
 }
 
 interface StarterReport {

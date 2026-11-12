@@ -41,6 +41,8 @@ export interface UpsertUserPreferencesInput {
   notifyOnReviewAssigned?: UserPreferencesRow['notify_on_review_assigned'];
   /** Review-assigned email opt-out — same omitted-leaves-untouched convention. */
   emailOnReviewAssigned?: UserPreferencesRow['email_on_review_assigned'];
+  /** Stale-data nudge email opt-out — same omitted-leaves-untouched convention. */
+  emailOnStaleNudge?: UserPreferencesRow['email_on_stale_nudge'];
   /** V2b: the shared Inspector panel's own collapsed state — same omitted-leaves-untouched convention. */
   inspectorCollapsed?: UserPreferencesRow['inspector_collapsed'];
 }
@@ -67,6 +69,7 @@ export async function upsertUserPreferences(supabase: Client, input: UpsertUserP
   if (input.notifyOnReply !== undefined) patch.notify_on_reply = input.notifyOnReply;
   if (input.notifyOnReviewAssigned !== undefined) patch.notify_on_review_assigned = input.notifyOnReviewAssigned;
   if (input.emailOnReviewAssigned !== undefined) patch.email_on_review_assigned = input.emailOnReviewAssigned;
+  if (input.emailOnStaleNudge !== undefined) patch.email_on_stale_nudge = input.emailOnStaleNudge;
   if (input.inspectorCollapsed !== undefined) patch.inspector_collapsed = input.inspectorCollapsed;
 
   // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment -- untyped client; see module comment.

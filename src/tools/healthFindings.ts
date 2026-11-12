@@ -27,7 +27,7 @@ export const listHealthFindings = defineTool({
   schema,
   run: async (ctx, input) => {
     const snapshot = await ctx.snapshot();
-    const findings = computeFindings({ snapshot, facts: await ctx.allFacts(), retiredByOpenChanges: await ctx.retiredByOpenChanges(), now: ctx.now() });
+    const findings = computeFindings({ snapshot, facts: await ctx.allFacts(), retiredByOpenChanges: await ctx.retiredByOpenChanges(), now: ctx.now(), staleAfterMonths: await ctx.staleAfterMonths() });
     if (input.finding === undefined) {
       return okResult(ctx, { findings: FINDINGS.map((o) => ({ finding: o.value, label: o.label, count: findings.get(o.value)?.length ?? 0 })) });
     }

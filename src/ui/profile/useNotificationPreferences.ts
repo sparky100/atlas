@@ -11,6 +11,8 @@ export interface NotificationPreferences {
   notifyOnReviewAssigned: boolean;
   /** Also email me (with a link) when I'm assigned as a reviewer. */
   emailOnReviewAssigned: boolean;
+  /** Email me when things I own (or, as an architect, things nobody owns) need checking. */
+  emailOnStaleNudge: boolean;
 }
 
 export interface UseNotificationPreferencesResult {
@@ -20,9 +22,10 @@ export interface UseNotificationPreferencesResult {
   setNotifyOnReply: (value: boolean) => void;
   setNotifyOnReviewAssigned: (value: boolean) => void;
   setEmailOnReviewAssigned: (value: boolean) => void;
+  setEmailOnStaleNudge: (value: boolean) => void;
 }
 
-const DEFAULTS: NotificationPreferences = { notifyOnMention: true, notifyOnReply: true, notifyOnReviewAssigned: true, emailOnReviewAssigned: true };
+const DEFAULTS: NotificationPreferences = { notifyOnMention: true, notifyOnReply: true, notifyOnReviewAssigned: true, emailOnReviewAssigned: true, emailOnStaleNudge: true };
 
 /**
  * Sprint F7 item 3 — same load-then-write shape `useLandscapeColourByPreference.ts`
@@ -49,7 +52,7 @@ export function useNotificationPreferences(userId: UUID | null): UseNotification
     getUserPreferences(supabase, userId)
       .then((row) => {
         if (cancelled) return;
-        setSaved(row ? { notifyOnMention: row.notify_on_mention, notifyOnReply: row.notify_on_reply, notifyOnReviewAssigned: row.notify_on_review_assigned, emailOnReviewAssigned: row.email_on_review_assigned } : DEFAULTS);
+        setSaved(row ? { notifyOnMention: row.notify_on_mention, notifyOnReply: row.notify_on_reply, notifyOnReviewAssigned: row.notify_on_review_assigned, emailOnReviewAssigned: row.email_on_review_assigned, emailOnStaleNudge: row.email_on_stale_nudge } : DEFAULTS);
       })
       .catch((e: unknown) => {
         reportError("Couldn't load your notification preferences.", e);
@@ -111,5 +114,17 @@ export function useNotificationPreferences(userId: UUID | null): UseNotification
     [userId],
   );
 
-  return { preferences, loading, setNotifyOnMention, setNotifyOnReply, setNotifyOnReviewAssigned, setEmailOnReviewAssigned };
+  const setEmailOnStaleNudge = useCallback(
+    (value: boolean) => {
+      setSaved((prev) => ({ ...(prev ?? DEFAULTS), emailOnStaleNudge: value }));
+      if (userId) {
+        upsertUserPreferences(supabase, { userId, emailOnStaleNudge: value }).catch((e: unknown) => {
+          reportError("Couldn't save your notification preference.", e);
+        });
+      }
+    },
+    [userId],
+  );
+
+  return { preferences, loading, setNotifyOnMention, setNotifyOnReply, setNotifyOnReviewAssigned, setEmailOnReviewAssigned, setEmailOnStaleNudge };
 }

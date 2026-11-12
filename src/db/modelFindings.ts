@@ -23,10 +23,12 @@ export interface FindingInputs {
   facts: Parameters<typeof computeStaleAttributesFinding>[0];
   retiredByOpenChanges?: ReadonlySet<string>;
   now: Date;
+  /** The organisation's stale threshold (`organisations.stale_after_months`); omitted = the default. */
+  staleAfterMonths?: number;
 }
 
 /** Every finding's flagged elements, keyed as `FINDING_FILTER_OPTIONS` keys them. Pure. */
-export function computeFindings({ snapshot, facts, retiredByOpenChanges, now }: FindingInputs): Map<string, readonly ElementsHeadRow[]> {
+export function computeFindings({ snapshot, facts, retiredByOpenChanges, now, staleAfterMonths }: FindingInputs): Map<string, readonly ElementsHeadRow[]> {
   const elements = snapshot.elements;
   const systems = elements.filter((e) => e.element_type === 'system');
   const containers = elements.filter((e) => e.element_type === 'container');
@@ -41,7 +43,7 @@ export function computeFindings({ snapshot, facts, retiredByOpenChanges, now }: 
   out.set('unlinked-systems', findSystemsWithoutCapability(systems, supports, containers));
   out.set('platform-supports-move-to-module', findPlatformSupportsThatShouldMoveToModule(systems, supports, containers));
   out.set('unowned-capabilities', findCapabilitiesWithoutOwner(capabilities, supports, owns));
-  out.set('stale-attributes', computeStaleAttributesFinding(facts, systems, now).staleSystems);
+  out.set('stale-attributes', computeStaleAttributesFinding(facts, elements, now, staleAfterMonths).staleElements);
   out.set('no-technical-owner', findSystemsWithoutTechnicalOwner(systemsAndModules, owns));
   out.set('critical-no-business-owner', findCriticalSystemsWithoutBusinessOwner(systemsAndModules, owns));
   out.set('critical-exposed', findCriticalExposedSystems(systems, now, replacedElementIds(replaces)));

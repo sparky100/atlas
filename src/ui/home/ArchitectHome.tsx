@@ -262,14 +262,12 @@ export function ArchitectHome({ data, insights, role, orgSlug, modelSlug, onShow
     },
     {
       key: 'stale-attributes',
-      count: insightsData.staleAttributes.staleFactCount,
-      summary:
-        insightsData.staleAttributes.staleFactCount > 0
-          ? `${String(insightsData.staleAttributes.staleFactCount)} ${plural(insightsData.staleAttributes.staleFactCount, 'attribute', 'attributes')} stale over 12 months — across ${String(insightsData.staleAttributes.staleSystems.length)} ${plural(insightsData.staleAttributes.staleSystems.length, 'system', 'systems')} · oldest ${String(insightsData.staleAttributes.oldestAgeYears)}y`
-          : '0 attributes stale over 12 months',
-      items: elementItems(insightsData.staleAttributes.staleSystems),
+      count: insightsData.staleAttributes.staleElements.length,
+      summary: `${String(insightsData.staleAttributes.staleElements.length)} ${plural(insightsData.staleAttributes.staleElements.length, 'item', 'items')} not checked for over ${String(insightsData.staleAfterMonths)} months`,
+      items: elementItems(insightsData.staleAttributes.staleElements),
       severity: 'medium',
       browseHref: browseHref('stale-attributes'),
+      browseLabel: 'Check them →',
     },
     {
       key: 'unlabeled-relationships',

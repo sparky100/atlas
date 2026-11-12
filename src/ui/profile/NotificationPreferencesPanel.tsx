@@ -18,11 +18,12 @@ export interface NotificationPreferencesPanelProps {
  * does too) reviewer assignment.
  */
 export function NotificationPreferencesPanel({ userId }: NotificationPreferencesPanelProps) {
-  const { preferences, loading, setNotifyOnMention, setNotifyOnReply, setNotifyOnReviewAssigned, setEmailOnReviewAssigned } = useNotificationPreferences(userId);
+  const { preferences, loading, setNotifyOnMention, setNotifyOnReply, setNotifyOnReviewAssigned, setEmailOnReviewAssigned, setEmailOnStaleNudge } = useNotificationPreferences(userId);
   const mentionId = useId();
   const replyId = useId();
   const reviewAssignedId = useId();
   const reviewEmailId = useId();
+  const staleEmailId = useId();
 
   return (
     <Panel>
@@ -83,6 +84,19 @@ export function NotificationPreferencesPanel({ userId }: NotificationPreferences
             />{' '}
             <Text as="span" size="sm">
               Also email me, with a link, when I'm asked to review a change
+            </Text>
+          </label>
+          <label htmlFor={staleEmailId}>
+            <input
+              id={staleEmailId}
+              type="checkbox"
+              checked={preferences.emailOnStaleNudge}
+              onChange={(e) => {
+                setEmailOnStaleNudge(e.target.checked);
+              }}
+            />{' '}
+            <Text as="span" size="sm">
+              Email me when things I own haven't been checked for a while
             </Text>
           </label>
         </>

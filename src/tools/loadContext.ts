@@ -13,6 +13,7 @@ import { loadChangeSummary } from '../db/changeSummary';
 import { listChangeBranches } from '../db/branches';
 import { listDecisionsForModel, listOpenDecisionElementLinksForModel } from '../db/decisions';
 import { listAllRelationships, listFactsForSubject } from '../db/elements';
+import { getStaleAfterMonthsForModel } from '../db/organisations';
 import { listProjectsForModel } from '../db/projects';
 import { listSavedReports } from '../db/reports';
 import { selectAll } from '../db/selectAll';
@@ -39,6 +40,7 @@ export function createToolContext(supabase: Client, model: { id: UUID; name: str
   let reports: ReturnType<typeof listSavedReports> | null = null;
   let facts: ReturnType<typeof listFactsForCommit> | null = null;
   let retired: ReturnType<typeof loadElementsRetiredByOpenChanges> | null = null;
+  let staleMonths: Promise<number> | null = null;
   let changes: ReturnType<typeof listChangeBranches> | null = null;
   let decisions: ReturnType<typeof listDecisionsForModel> | null = null;
   let decisionLinks: ReturnType<typeof listOpenDecisionElementLinksForModel> | null = null;
@@ -50,6 +52,7 @@ export function createToolContext(supabase: Client, model: { id: UUID; name: str
     savedReports: () => (reports ??= listSavedReports(supabase, model.id)),
     allFacts: () => (facts ??= listFactsForCommit(supabase, commitId)),
     retiredByOpenChanges: () => (retired ??= loadElementsRetiredByOpenChanges(supabase, model.id)),
+    staleAfterMonths: () => (staleMonths ??= getStaleAfterMonthsForModel(supabase, model.id)),
     changes: () => (changes ??= listChangeBranches(supabase, model.id)),
     decisions: () => (decisions ??= listDecisionsForModel(supabase, model.id)),
     openDecisionLinks: () => (decisionLinks ??= listOpenDecisionElementLinksForModel(supabase, model.id)),

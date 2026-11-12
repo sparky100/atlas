@@ -3,6 +3,7 @@ import { AppHeader } from '../components/AppHeader/AppHeader';
 import { Loading } from '../components/Loading/Loading';
 import { Text } from '../components/Text/Text';
 import { useModels } from '../models/useModels';
+import { StaleAfterMonthsContext } from '../orgs/staleThresholdContext';
 import { useOrganisationBySlug } from '../orgs/useOrganisationBySlug';
 
 /**
@@ -29,7 +30,13 @@ export function ModelRouteGate() {
 
   const failed = orgError !== null || modelsError !== null;
   const missing = !organisation || !models.some((m) => m.slug === modelSlug);
-  if (!failed && !missing) return <Outlet />;
+  if (organisation && !failed && !missing) {
+    return (
+      <StaleAfterMonthsContext.Provider value={organisation.stale_after_months}>
+        <Outlet />
+      </StaleAfterMonthsContext.Provider>
+    );
+  }
 
   return (
     <div>

@@ -633,7 +633,7 @@ Three constants, global for v1, defined once in `src/contracts/thresholds.ts` an
 
 | Constant | Value | Used by |
 |---|---|---|
-| `STALE_AFTER_MONTHS` | 12 | badge age colour (§4.3), staleness health chip (§3.1), `--status-warn` |
+| `STALE_AFTER_MONTHS` | 12 (the default; each organisation sets its own, `organisations.stale_after_months`, 1–60, owner or architect) | badge age colour (§4.3), staleness health finding, `--status-warn` |
 | `CONFIDENCE_HIGH` | 0.9 | `●●●` band |
 | `CONFIDENCE_MEDIUM` | 0.7 | `●●○` band, confidence health chip |
 
