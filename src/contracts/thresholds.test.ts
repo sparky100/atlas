@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { CONFIDENCE_HIGH, CONFIDENCE_MEDIUM, confidenceBand, isStale, monthsSince, monthsUntil, STALE_AFTER_MONTHS } from './thresholds';
+import { CONFIDENCE_HIGH, CONFIDENCE_MEDIUM, confidenceBand, isReviewOverdue, isStale, monthsSince, monthsUntil, reviewDueDate, STALE_AFTER_MONTHS } from './thresholds';
 
 describe('confidenceBand', () => {
   it('bands exactly at the documented cutoffs (§8.9)', () => {
@@ -48,5 +48,26 @@ describe('isStale', () => {
     expect(monthsSince(justUnder, now)).toBeLessThan(STALE_AFTER_MONTHS);
     expect(isStale(justUnder, now)).toBe(false);
     expect(isStale(atThreshold, now)).toBe(true);
+  });
+});
+
+describe('review period', () => {
+  const created = '2026-11-01T09:00:00Z';
+  it('is due periodDays calendar days after submission', () => {
+    expect(reviewDueDate(created, 5).toISOString()).toBe('2026-11-06T09:00:00.000Z');
+  });
+  it('is overdue only once past the due date', () => {
+    expect(isReviewOverdue({ status: 'pending', created_at: created }, 5, new Date('2026-11-06T08:59:00Z'))).toBe(false);
+    expect(isReviewOverdue({ status: 'pending', created_at: created }, 5, new Date('2026-11-06T09:01:00Z'))).toBe(true);
+  });
+  it('changing the period re-dates an open review', () => {
+    const now = new Date('2026-11-09T00:00:00Z');
+    expect(isReviewOverdue({ status: 'pending', created_at: created }, 5, now)).toBe(true);
+    expect(isReviewOverdue({ status: 'pending', created_at: created }, 14, now)).toBe(false);
+  });
+  it('is never overdue unless waiting on reviewers', () => {
+    for (const status of ['changes_requested', 'approved', 'merged', 'rejected']) {
+      expect(isReviewOverdue({ status, created_at: created }, 1, new Date('2027-01-01T00:00:00Z'))).toBe(false);
+    }
   });
 });

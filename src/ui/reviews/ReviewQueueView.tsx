@@ -12,6 +12,8 @@ import { useCaptureJobs } from '../capture/useCaptureJob';
 import { canDiscardCaptureJob, useMembership } from '../orgs/useMembership';
 import { cachedClassification } from './cachedClassification';
 import { mergeRequestStatusTone } from './mergeRequestStatus';
+import { OverdueReviewFlag } from './OverdueReviewFlag';
+import { useReviewPeriodDays } from './useReviewPeriodDays';
 import { useReviewQueue, type ReviewQueueRow } from './useReviewQueue';
 import styles from './ReviewQueueView.module.css';
 
@@ -39,6 +41,7 @@ export interface ReviewQueueViewProps {
  */
 export function ReviewQueueView({ modelId, orgId, orgSlug, modelSlug }: ReviewQueueViewProps) {
   const state = useReviewQueue(modelId);
+  const periodDays = useReviewPeriodDays(orgId);
   const { userId } = useAuth();
   const { role } = useMembership(orgId, userId);
   const { jobs: captureJobs, discardJobs } = useCaptureJobs(modelId, orgId, userId);
@@ -60,7 +63,7 @@ export function ReviewQueueView({ modelId, orgId, orgSlug, modelSlug }: ReviewQu
       ) : (
         <ul className={styles.list}>
           {state.rows.map((row) => (
-            <QueueRow key={row.request.id} row={row} orgSlug={orgSlug} modelSlug={modelSlug} />
+            <QueueRow key={row.request.id} row={row} orgSlug={orgSlug} modelSlug={modelSlug} periodDays={periodDays} canRemind={role === 'owner' || role === 'architect' || row.request.requested_by === userId} />
           ))}
         </ul>
       )}
@@ -110,7 +113,7 @@ export function ReviewQueueView({ modelId, orgId, orgSlug, modelSlug }: ReviewQu
   );
 }
 
-function QueueRow({ row, orgSlug, modelSlug }: { row: ReviewQueueRow; orgSlug: string; modelSlug: string }) {
+function QueueRow({ row, orgSlug, modelSlug, periodDays, canRemind }: { row: ReviewQueueRow; orgSlug: string; modelSlug: string; periodDays: number | null; canRemind: boolean }) {
   const { request, branch } = row;
   const classification = cachedClassification(request);
   const blockingCount = classification?.findings.filter((f) => f.blocking).length ?? 0;
@@ -124,6 +127,7 @@ function QueueRow({ row, orgSlug, modelSlug }: { row: ReviewQueueRow; orgSlug: s
         </Text>
         <div className={styles.rowMeta}>
           <Chip tone={mergeRequestStatusTone(request.status)}>{request.status.replace('_', ' ')}</Chip>
+          <OverdueReviewFlag request={request} periodDays={periodDays} canRemind={canRemind} />
           {blockingCount > 0 && (
             <Text as="span" tone="muted" size="sm">
               {blockingCount} blocking conflict{blockingCount === 1 ? '' : 's'}

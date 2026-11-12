@@ -16,7 +16,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { archiveModel, createModel, deleteModel } from './models';
 import type { Client } from './client';
 import { createServiceRoleClient, createSupabaseClient } from './client';
-import { changeMemberRole, createOrganisation, deleteOrganisation, listMembers, removeMember, updateOrganisation } from './organisations';
+import { changeMemberRole, createOrganisation, deleteOrganisation, getReviewPeriodDays, listMembers, removeMember, setReviewPeriod, updateOrganisation } from './organisations';
 import { loadEnv } from './env';
 
 const env = loadEnv();
@@ -82,6 +82,31 @@ describe('organisation settings against a real local Supabase', () => {
 
     const off = await updateOrganisation(owner.client, orgId, { aiAssistantEnabled: false });
     expect(off.ai_assistant_enabled).toBe(false);
+  });
+
+  it('review period: defaults to 5 days; an owner or architect can set it (1-90); a contributor and a direct column update cannot', async () => {
+    expect(await getReviewPeriodDays(owner.client, orgId)).toBe(5);
+
+    const byOwner = await setReviewPeriod(owner.client, orgId, 10);
+    expect(byOwner.review_period_days).toBe(10);
+    const byArchitect = await setReviewPeriod(architect.client, orgId, 3);
+    expect(byArchitect.review_period_days).toBe(3);
+    expect(await getReviewPeriodDays(owner.client, orgId)).toBe(3);
+
+    await expect(setReviewPeriod(owner.client, orgId, 0)).rejects.toThrow(/between 1 and 90/);
+    await expect(setReviewPeriod(owner.client, orgId, 91)).rejects.toThrow(/between 1 and 90/);
+
+    const contributor = await createSignedInUser('orgsettings-contributor');
+    const { error: memberError } = await owner.client.from('members').insert({ org_id: orgId, user_id: contributor.id, role: 'contributor', invited_by: owner.id });
+    if (memberError) throw new Error(`add contributor: ${memberError.message}`);
+    await expect(setReviewPeriod(contributor.client, orgId, 20)).rejects.toThrow(/owner or architect/);
+    // Remove again so the member-count test below still sees two members.
+    await removeMember(owner.client, orgId, contributor.id);
+
+    // No column grant: even the owner cannot write the column directly, only through the function.
+    const direct = await owner.client.from('organisations').update({ review_period_days: 30 }).eq('id', orgId);
+    expect(direct.error).not.toBeNull();
+    expect(await getReviewPeriodDays(owner.client, orgId)).toBe(3);
   });
 
   it('listMembers returns every member with their profile, role and joined date', async () => {

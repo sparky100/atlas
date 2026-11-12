@@ -129,3 +129,18 @@ export async function removeMember(supabase: Client, orgId: UUID, userId: UUID):
   const { error } = await supabase.from('members').delete().eq('org_id', orgId).eq('user_id', userId);
   if (error) throw new Error(`removeMember: ${error.message}`);
 }
+
+/** Owner or architect (`atlas.set_review_period`'s own check; `organisations_update` itself is owner-only): the organisation-wide number of days a reviewer has before a review is flagged overdue (1–90). */
+export async function setReviewPeriod(supabase: Client, orgId: UUID, days: number): Promise<OrganisationRow> {
+  // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment -- untyped client; see module comment.
+  const { data, error } = await supabase.schema('atlas').rpc('set_review_period', { p_org_id: orgId, p_days: days });
+  if (error) throw new Error(`setReviewPeriod: ${error.message}`);
+  return data as OrganisationRow;
+}
+
+/** The organisation's review period in days — one small read for the pages that only need to know when a review is overdue. */
+export async function getReviewPeriodDays(supabase: Client, orgId: UUID): Promise<number> {
+  const { data, error } = await supabase.from('organisations').select('review_period_days').eq('id', orgId).single();
+  if (error) throw new Error(`getReviewPeriodDays: ${error.message}`);
+  return (data as { review_period_days: number }).review_period_days;
+}

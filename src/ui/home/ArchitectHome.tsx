@@ -619,6 +619,16 @@ export function ArchitectHome({ data, insights, role, orgSlug, modelSlug, onShow
             <Text as="h2" size="xl" className={styles.sectionTitle}>
               Waiting for review
             </Text>
+            {data.overdueReviews[0] && data.reviewPeriodDays !== null && (
+              <p>
+                <Chip tone="warn">Overdue</Chip>{' '}
+                <Link to={`/o/${orgSlug}/m/${modelSlug}/review/${data.overdueReviews[0].id}`}>
+                  <Text as="span" size="sm">
+                    {data.overdueReviews.length} {plural(data.overdueReviews.length, 'review', 'reviews')} waiting longer than {data.reviewPeriodDays} days — oldest first →
+                  </Text>
+                </Link>
+              </p>
+            )}
             {data.oldestReviewItem ? (
               <Link to={`/o/${orgSlug}/m/${modelSlug}/review/${data.oldestReviewItem.id}`}>
                 <Text as="span" size="sm">
