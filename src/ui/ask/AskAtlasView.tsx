@@ -36,7 +36,7 @@ export function AskAtlasView({ modelId, basePath, orgSlug, enabled, isOwner }: A
           Ask Atlas is off for this organisation
         </Text>
         <Text as="p">
-          When it is on, the questions members ask, and the names, descriptions, attributes and relationships of the elements needed to answer them, are sent to our AI provider to produce each answer. Nothing is sent while it is off.
+          When it is on, the questions members ask, and the names, descriptions, attributes and relationships of the elements needed to answer them, are sent to our AI provider to produce each answer. The same setting covers Draft with AI on the Changes page. Nothing is sent while it is off.
         </Text>
         {isOwner ? (
           <Text as="p">
