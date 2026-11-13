@@ -97,6 +97,11 @@ import styles from './ElementPage.module.css';
  * decision) and say so plainly rather than rendering SPEC's designed
  * empty-state copy for a feature that doesn't exist yet.
  */
+/** What a lower-right section shows while its data is still loading, or if loading it failed — never the empty value. */
+function SecondaryPlaceholder({ status }: { status: 'loading' | 'error' }) {
+  return status === 'error' ? <Text tone="muted">Couldn't load this section. Reload the page to try again.</Text> : <Loading />;
+}
+
 export function ElementPage() {
   const { orgSlug, modelSlug, elementId } = useParams<{ orgSlug: string; modelSlug: string; elementId: string }>();
   const [searchParams] = useSearchParams();
@@ -801,23 +806,32 @@ export function ElementPage() {
                 )}
               </div>
               <div className={styles.rightColumn}>
+                {/* These three load just after the rest of the page (`ElementPageData.secondary`): until then show "loading", never their empty value as if it were the answer. */}
                 <CollapsibleSection title="Changes touching this">
-                  <ChangesTouchingSection inFlightBranches={state.data.inFlightBranches} />
+                  {state.data.secondary === 'ready' ? <ChangesTouchingSection inFlightBranches={state.data.inFlightBranches} /> : <SecondaryPlaceholder status={state.data.secondary} />}
                 </CollapsibleSection>
                 <CollapsibleSection title="History">
-                  <HistoryTimeline
-                    key={state.data.element.element_id}
-                    history={state.data.history}
-                    elementId={state.data.element.element_id}
-                    relationshipEndpoints={state.data.relationshipEndpoints}
-                    retractedElementNames={state.data.retractedElementNames}
-                  />
+                  {state.data.secondary === 'ready' ? (
+                    <HistoryTimeline
+                      key={state.data.element.element_id}
+                      history={state.data.history}
+                      elementId={state.data.element.element_id}
+                      relationshipEndpoints={state.data.relationshipEndpoints}
+                      retractedElementNames={state.data.retractedElementNames}
+                    />
+                  ) : (
+                    <SecondaryPlaceholder status={state.data.secondary} />
+                  )}
                 </CollapsibleSection>
-                <CollapsibleSection title="Decisions" meta={`(${String(state.data.elementDecisions.length)})`}>
+                <CollapsibleSection title="Decisions" meta={state.data.secondary === 'ready' ? `(${String(state.data.elementDecisions.length)})` : undefined}>
                   {/* "Why is this here" (prompt pack F3 PR6) — replaces the
                       hardcoded EmptyState Prompt 7h bug B6 left here before
                       the decisions schema existed at all. */}
-                  <ElementDecisionsSection entries={state.data.elementDecisions} orgSlug={organisation?.slug ?? ''} modelSlug={model.slug} />
+                  {state.data.secondary === 'ready' ? (
+                    <ElementDecisionsSection entries={state.data.elementDecisions} orgSlug={organisation?.slug ?? ''} modelSlug={model.slug} />
+                  ) : (
+                    <SecondaryPlaceholder status={state.data.secondary} />
+                  )}
                 </CollapsibleSection>
                 <CollapsibleSection title="Comments">
                   <CommentsSection
