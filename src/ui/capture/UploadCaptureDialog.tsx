@@ -18,6 +18,7 @@ import { prepareMulesoftUpload } from '../../capture/adapters/mulesoftUpload';
 import { DEFAULT_IMPORT_SOURCE, IMPORT_SOURCE_GROUP_LABELS, IMPORT_SOURCES, importSourceById, type ImportSourceId } from '../../capture/importSources';
 import { listExternalRefMappings } from '../../db/aliases';
 import { computeInputSha256Hex, findReimportCandidate } from '../../db/captureJobs';
+import { findConnector, listConnectors, runConnector } from '../../db/connectors';
 import { Button } from '../components/Button/Button';
 import { Panel } from '../components/Panel/Panel';
 import { Text } from '../components/Text/Text';
@@ -75,6 +76,9 @@ export function UploadCaptureDialog({ open, onClose, modelId, createJob, status,
   const [source, setSource] = useState<ImportSourceId>(DEFAULT_IMPORT_SOURCE);
   const [mulesoftFile, setMulesoftFile] = useState<{ name: string; text: string } | null>(null);
   const [aliasText, setAliasText] = useState('');
+  // A saved MuleSoft connection (Organisation settings → Connections) lets this dialog fetch the export itself instead of taking a file. Only owners and architects can read connections, so for anyone else this stays null and the file path is all they see.
+  const [mulesoftConnection, setMulesoftConnection] = useState<{ orgId: UUID } | null>(null);
+  const [fetchState, setFetchState] = useState<{ status: 'idle' | 'fetching' } | { status: 'error'; message: string }>({ status: 'idle' });
   // The model's own saved hostnames (external references on element pages); a failed load just means only typed mappings apply.
   const [savedAliases, setSavedAliases] = useState<Record<string, string>>({});
   const [documentDate, setDocumentDate] = useState('');
@@ -111,6 +115,25 @@ export function UploadCaptureDialog({ open, onClose, modelId, createJob, status,
       });
     return () => {
       cancelled = true;
+    };
+  }, [open, source, modelId]);
+
+  useEffect(() => {
+    if (!open || source !== 'mulesoft') return;
+    const live = { cancelled: false };
+    void (async () => {
+      try {
+        const { data } = await supabase.from('models').select('org_id').eq('id', modelId).maybeSingle();
+        const orgId = (data as { org_id?: UUID } | null)?.org_id;
+        if (orgId === undefined) return;
+        const rows = await listConnectors(supabase, orgId);
+        if (!live.cancelled) setMulesoftConnection(findConnector(rows, 'mulesoft') !== null ? { orgId } : null);
+      } catch (e) {
+        console.error('could not check for a MuleSoft connection', e);
+      }
+    })();
+    return () => {
+      live.cancelled = true;
     };
   }, [open, source, modelId]);
 
@@ -222,6 +245,19 @@ export function UploadCaptureDialog({ open, onClose, modelId, createJob, status,
       setFileSelection({ inputKind: kind, inputName: file.name, bytes: new Uint8Array(buffer) });
       if (!documentDateTouched && file.lastModified) {
         setDocumentDate(new Date(file.lastModified).toISOString().slice(0, 10));
+      }
+    });
+  };
+
+  const fetchFromMulesoft = (orgId: UUID) => {
+    setFetchState({ status: 'fetching' });
+    void runConnector(supabase, orgId, 'mulesoft', 'fetch').then((result) => {
+      if (result.status === 'ok' && result.mode === 'fetch') {
+        setFetchState({ status: 'idle' });
+        setFileError(null);
+        setMulesoftFile({ name: result.fileName, text: result.text });
+      } else {
+        setFetchState({ status: 'error', message: result.status === 'error' ? result.message : 'Unexpected answer from the connection.' });
       }
     });
   };
@@ -346,6 +382,33 @@ export function UploadCaptureDialog({ open, onClose, modelId, createJob, status,
                       </li>
                     ))}
                   </ol>
+                  {mulesoftConnection !== null && (
+                    <div className={styles.formRow}>
+                      <Text as="p" size="sm">
+                        This organisation has a MuleSoft connection, so you can fetch the export directly instead of using the script and a file.
+                      </Text>
+                      <div className={styles.actions}>
+                        <Button variant="primary" disabled={fetchState.status === 'fetching' || isCreatingJob(status)} onClick={() => { fetchFromMulesoft(mulesoftConnection.orgId); }}>
+                          {fetchState.status === 'fetching' ? 'Fetching from MuleSoft…' : 'Fetch from MuleSoft'}
+                        </Button>
+                      </div>
+                      {fetchState.status === 'error' && (
+                        <div role="alert">
+                          <Text as="p" size="sm">
+                            Problem: {fetchState.message}
+                          </Text>
+                        </div>
+                      )}
+                      <Text as="p" size="sm" tone="muted">
+                        Or use a file, as below.
+                      </Text>
+                    </div>
+                  )}
+                  {mulesoftConnection === null && (
+                    <Text as="p" size="sm" tone="muted">
+                      An owner can connect MuleSoft in Organisation settings (Connections), so this step becomes one button.
+                    </Text>
+                  )}
                   <div className={styles.actions}>
                     <Button variant="secondary" onClick={downloadMulesoftExportScript}>
                       Download the export script

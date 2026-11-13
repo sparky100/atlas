@@ -10,6 +10,7 @@ import { TypedNameConfirm } from '../components/TypedNameConfirm/TypedNameConfir
 import type { MemberRole, OrganisationRow } from '../../db/types';
 import { formatDate, formatRelativeTime } from '../time';
 import { ApiKeysPanel } from './ApiKeysPanel';
+import { ConnectorsPanel } from './ConnectorsPanel';
 import { AttributeDefinitionsPanel } from './AttributeDefinitionsPanel';
 import { EntraSignInPanel } from './EntraSignInPanel';
 import { memberEventSentence } from './memberEventFormat';
@@ -260,6 +261,7 @@ export function OrganisationSettingsView({ organisation, role, userId, onChanged
           )}
         </section>
         <ApiKeysPanel orgId={organisation.id} isOwner={role === 'owner'} />
+        <ConnectorsPanel orgId={organisation.id} role={role} />
         {error !== null && <Text as="p">{error}</Text>}
       </Panel>
 

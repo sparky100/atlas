@@ -141,6 +141,8 @@ Rather than typing your landscape in by hand, you can feed Atlas source material
 
 Nothing reaches your model without this review, and it always lands in a change you then submit like any other.
 
+**Connecting a tool instead of uploading a file.** Owners can link Atlas to MuleSoft Anypoint once, in **Organisation settings → Connections** (the page explains each step, including what to create in Anypoint). After that, on **Import → MuleSoft Anypoint**, **Fetch from MuleSoft** replaces the export script and the upload. You still review everything before it changes your model, and the file route still works. The client secret is saved encrypted and never shown again; owners set the connection up and remove it, architects can test it. See `docs/import/mulesoft/connector.md`.
+
 ## Changes
 
 Editing directly on **main** is for architects and owners making small, uncontroversial edits. Everything else happens in a **change**: a named, isolated set of edits you can review before it reaches main.
