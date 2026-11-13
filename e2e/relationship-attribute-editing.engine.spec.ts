@@ -160,8 +160,8 @@ test('promoting a secondary supports edge demotes the current primary in the sam
   await expect(page.getByRole('heading', { name: systemName })).toBeVisible();
   const capOneRow = page.locator('div').filter({ has: page.getByRole('link', { name: /Capability One/ }) }).filter({ has: page.getByRole('button', { name: /(Show|Hide) attributes/ }) }).last();
   const capTwoRow = page.locator('div').filter({ has: page.getByRole('link', { name: /Capability Two/ }) }).filter({ has: page.getByRole('button', { name: /(Show|Hide) attributes/ }) }).last();
-  await expect(capOneRow.getByText('secondary', { exact: true })).toBeVisible();
-  await expect(capTwoRow.getByText('primary', { exact: true })).toBeVisible();
+  await expect(capOneRow.getByText('Also', { exact: true })).toBeVisible();
+  await expect(capTwoRow.getByText('Main', { exact: true })).toBeVisible();
 
   // The tile starts in Capability Two's lane (its primary) — the same
   // pure layout function the app itself calls, given the seeded edges.
@@ -209,8 +209,8 @@ test('promoting a secondary supports edge demotes the current primary in the sam
   // Same-commit auto-demote: Capability Two's own row chip flips to
   // secondary without a second edit (C17, useRelationshipEditor.ts's own
   // module comment).
-  await expect(page.locator('div').filter({ has: page.getByRole('link', { name: /Capability One/ }) }).filter({ has: page.getByRole('button', { name: /(Show|Hide) attributes/ }) }).last().getByText('primary', { exact: true }).first()).toBeVisible();
-  await expect(page.locator('div').filter({ has: page.getByRole('link', { name: /Capability Two/ }) }).filter({ has: page.getByRole('button', { name: /(Show|Hide) attributes/ }) }).last().getByText('secondary', { exact: true }).first()).toBeVisible();
+  await expect(page.locator('div').filter({ has: page.getByRole('link', { name: /Capability One/ }) }).filter({ has: page.getByRole('button', { name: /(Show|Hide) attributes/ }) }).last().getByText('Main', { exact: true }).first()).toBeVisible();
+  await expect(page.locator('div').filter({ has: page.getByRole('link', { name: /Capability Two/ }) }).filter({ has: page.getByRole('button', { name: /(Show|Hide) attributes/ }) }).last().getByText('Also', { exact: true }).first()).toBeVisible();
 
   // --- After: the tile has moved to Capability One's lane. ---
   const afterEdges = [

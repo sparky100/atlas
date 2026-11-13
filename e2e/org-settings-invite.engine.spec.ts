@@ -97,7 +97,7 @@ test('inviting an email that already has an account: consumed at their next sign
   // invite did).
   await inviteePage.getByLabel('Email').fill(email);
   await inviteePage.getByLabel('Password').fill(password);
-  await inviteePage.getByRole('button', { name: 'Sign in' }).click();
+  await inviteePage.getByRole('button', { name: 'Sign in', exact: true }).click();
 
   // 5. Their first-ever org membership is created right at this sign-in,
   // so the display-name gate fires the same as a fresh signup would.

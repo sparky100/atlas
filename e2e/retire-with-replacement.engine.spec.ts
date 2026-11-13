@@ -44,7 +44,7 @@ test('retiring a system with a replacement transfers its supports edges and clea
   await page.goto(`/o/${orgSlug}/m/${modelSlug}/e/${systemId}?ref=main`);
   await expect(page.getByRole('heading', { name: 'Legacy Billing System' })).toBeVisible();
   await page.getByRole('button', { name: '✎ Edit' }).click();
-  await page.getByLabel('Planned end').fill(nearPlannedEnd);
+  await page.getByLabel('Planned end', { exact: true }).fill(nearPlannedEnd);
   await page.getByRole('button', { name: 'Save' }).click();
   await expect(page.getByRole('button', { name: '✎ Edit' })).toBeVisible();
 
@@ -57,7 +57,7 @@ test('retiring a system with a replacement transfers its supports edges and clea
   await page.goto(`/o/${orgSlug}/m/${modelSlug}/e/${systemId}?ref=main`);
   await page.getByRole('button', { name: 'Element actions' }).click();
   await page.getByRole('button', { name: 'Mark as retired…' }).click();
-  await page.getByLabel('Planned end').fill(nearPlannedEnd);
+  await page.getByLabel('Planned end', { exact: true }).fill(nearPlannedEnd);
   await page.getByRole('button', { name: '+ Replaced by…' }).click();
   await page.getByPlaceholder('Search systems…').fill('New Billing Platform');
   await page.getByRole('button', { name: /New Billing Platform/ }).click();

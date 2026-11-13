@@ -37,5 +37,5 @@ test('profile: edit display name/handle/avatar from the account menu, then sign 
   await expect(page.getByText(/Email: .+@example\.test/)).toBeVisible();
 
   await page.getByRole('button', { name: 'Sign out everywhere' }).click();
-  await expect(page.getByRole('button', { name: 'Sign in' })).toBeVisible({ timeout: 15_000 });
+  await expect(page.getByRole('button', { name: 'Sign in', exact: true })).toBeVisible({ timeout: 15_000 });
 });

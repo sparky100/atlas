@@ -224,7 +224,7 @@ test('director door: weakness grid (warn/info/healthy/unrecorded), what we\'re d
 
   // A healthy capability is not listed here; the capability map shows all of them.
   await expect(page.getByRole('link', { name: /Waste Collection/ })).toHaveCount(0);
-  await expect(page.getByRole('link', { name: /Electoral Services/ })).toBeVisible();
+  await expect(page.getByRole('link', { name: /Electoral Services/ }).first()).toBeVisible();
 
   // What we're doing: the project (owner, target date, progress, its
   // overdue decision flagged in words), then the decision outside any
@@ -257,7 +257,8 @@ test('director door: weakness grid (warn/info/healthy/unrecorded), what we\'re d
 
   // No add/edit control anywhere on this door; its only create controls
   // start a project or a decision — never a change.
-  await expect(page.getByRole('button', { name: /^Add/ })).toHaveCount(0);
+  // The Get started checklist's own "Add application" button is onboarding, not an edit control for this door's data.
+  await expect(page.getByRole('button', { name: /^Add/ }).filter({ hasNotText: 'Add application' })).toHaveCount(0);
   await expect(page.getByRole('link', { name: 'Start a project', exact: true })).toBeVisible();
   await expect(page.getByRole('link', { name: 'Start a decision', exact: true })).toBeVisible();
   await expect(page.getByRole('button', { name: 'Propose a change' })).toHaveCount(0);
@@ -340,10 +341,11 @@ test('director door: a capability supported only by a container (a platform modu
   await page.getByRole('button', { name: 'Overview', exact: true }).click();
 
   await expect(page.getByRole('heading', { name: 'Where to focus' })).toBeVisible();
-  const tile = page.getByRole('link', { name: /Customer Contact/ });
-  await expect(tile).toBeVisible();
-  await expect(tile.getByText('1 system')).toBeVisible();
-  await expect(tile.getByText('no system supports this')).toHaveCount(0);
+  // Overview lists only problems, so a capability a module supports is not
+  // here at all: it isn't "nothing recorded".
+  await expect(page.getByText('No capability needs attention.')).toBeVisible();
+  await expect(page.getByRole('link', { name: /Customer Contact/ })).toHaveCount(0);
+  await expect(page.getByText('0 with no system recorded')).toBeVisible();
   await expect(page.getByText('1 with no system recorded')).toHaveCount(0);
 });
 

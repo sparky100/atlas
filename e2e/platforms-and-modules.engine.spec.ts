@@ -97,7 +97,7 @@ test('a platform\'s modules get their own capability-lane tiles, the platform la
   await expect(page.getByRole('heading', { name: 'PM' })).toBeVisible();
   await page.getByRole('button', { name: 'Element actions' }).click();
   await page.getByRole('button', { name: 'Mark as retired…' }).click();
-  await page.getByLabel('Planned end').fill(nearPlannedEnd);
+  await page.getByLabel('Planned end', { exact: true }).fill(nearPlannedEnd);
   await page.getByRole('button', { name: '+ Replaced by…' }).click();
   await page.getByPlaceholder('Search modules…').fill('PM Replacement');
   await page.getByRole('button', { name: /PM Replacement/ }).click();

@@ -96,15 +96,12 @@ test('capability rollup: the same "1 system, 1/7 supported" rollup appears on th
   const seedResult = await commitToBranch(signedIn, { modelId, branchId: main.id, expectedHeadCommitId: genesisCommitId, envelope });
   if (!seedResult.ok) throw new Error(`seeding capability-rollup fixture: ${seedResult.message}`);
 
-  // 1) Director door.
+  // 1) Home's Overview no longer shows a tile for a domain that has a
+  // system (it lists only problems), so the rollup is checked on the
+  // surfaces below, which do show every domain.
   await page.goto(`/o/${orgSlug}/m/${modelSlug}`);
-  // The org's creator is its owner, so the default door is architect —
-  // switch to director, same precedent as e2e/director-door.engine.spec.ts.
   await page.getByRole('button', { name: 'Overview', exact: true }).click();
-  const directorTile = page.getByRole('link', { name: /Digital Services/ });
-  await expect(directorTile).toBeVisible();
-  await expect(directorTile.getByText('1 system', { exact: false })).toBeVisible();
-  await expect(directorTile.getByText('1 of 7 capabilities have a system')).toBeVisible();
+  await expect(page.getByRole('link', { name: /Digital Services/ })).toHaveCount(0);
 
   // 2) Capability map (capability map density redesign: the domain row's
   // own coverage sentence and supporting-system count are both always

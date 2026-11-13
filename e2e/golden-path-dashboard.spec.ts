@@ -61,7 +61,7 @@ test('build a dashboard from a saved report, export it and present it', async ({
 
   // A portfolio fetch can fail while the element tile still loads.
   await page.getByRole('button', { name: 'Edit dashboard' }).click();
-  await page.getByLabel('Report', { exact: true }).selectOption({ label: 'Model inventory' });
+  await page.getByRole('combobox', { name: /^Report/ }).selectOption({ label: 'Model inventory' });
   await page.locator('form').filter({ has: page.getByRole('button', { name: 'Add tile' }) }).getByLabel('Show as').selectOption('table');
   await page.getByRole('button', { name: 'Add tile' }).click();
   const inventory = page.getByRole('link', { name: 'Model inventory', exact: true });
@@ -73,7 +73,7 @@ test('build a dashboard from a saved report, export it and present it', async ({
     if (failPortfolio) await route.fulfill({ status: 400, json: { message: 'Temporary portfolio data failure' } });
     else await route.continue();
   });
-  await page.getByLabel('Report', { exact: true }).selectOption({ label: 'Estate costs' });
+  await page.getByRole('combobox', { name: /^Report/ }).selectOption({ label: 'Estate costs' });
   await page.locator('form').filter({ has: page.getByRole('button', { name: 'Add tile' }) }).getByLabel('Show as').selectOption('table');
   await page.getByRole('button', { name: 'Add tile' }).click();
   await expect(page.getByRole('alert').getByText("Couldn't load portfolio report data.")).toBeVisible();

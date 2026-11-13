@@ -14,7 +14,13 @@ import { addContainerFromHome, addSystemFromHome, clickNavItem, goToModelHome, s
 async function openSearch(page: Page): Promise<void> {
   const nav = page.getByRole('navigation', { name: 'Model navigation' });
   if ((page.viewportSize()?.width ?? 1280) > 768) {
-    await page.keyboard.press('Control+K');
+    // The shortcut is ignored while the page is still settling after a navigation
+    // (the dialog closes when the route changes), so retry until it opens.
+    await expect(async () => {
+      await page.keyboard.press('Control+K');
+      await expect(page.getByRole('dialog', { name: 'Search' })).toBeVisible({ timeout: 1_500 });
+    }).toPass({ timeout: 10_000 });
+    return;
   } else {
     await nav.getByRole('button', { name: /^More/ }).click();
     await nav.getByRole('region', { name: 'More sections' }).getByRole('button', { name: 'Search' }).click();

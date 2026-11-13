@@ -84,7 +84,7 @@ test('review queue split: accept one of two independent systems, preview, split,
   await page.goto(`/o/${orgSlug}/m/${modelSlug}`);
   const searchBox = page.getByPlaceholder('Search or create a capability, system, or actor…');
   await searchBox.fill('Accepted System');
-  await expect(page.getByRole('link', { name: /Accepted System/ })).toBeVisible();
+  await expect(page.getByRole('link', { name: /Accepted System/ }).first()).toBeVisible();
   await searchBox.fill('Remainder System');
   await expect(page.getByRole('link', { name: /Remainder System/ })).toHaveCount(0);
 

@@ -68,6 +68,8 @@ test('landscape mobile list at 390px: groups render (actors first), expanding on
     { kind: 'relationship.create', id: randomUUID(), relationshipId: randomUUID(), relationshipType: 'supports', fromElementId: systemAId, toElementId: capabilityId, attributes: { role: 'primary' }, sourceId: seedSourceId, confidence: 1 },
     { kind: 'relationship.create', id: randomUUID(), relationshipId: randomUUID(), relationshipType: 'supports', fromElementId: systemBId, toElementId: capabilityId, attributes: { role: 'secondary' }, sourceId: seedSourceId, confidence: 1 },
     { kind: 'relationship.create', id: randomUUID(), relationshipId: randomUUID(), relationshipType: 'uses', fromElementId: systemAId, toElementId: systemBId, attributes: {}, sourceId: seedSourceId, confidence: 1 },
+    // An actor that only owns things is hidden behind "Show owners"; one that uses a system stays in the actor row.
+    { kind: 'relationship.create', id: randomUUID(), relationshipId: randomUUID(), relationshipType: 'uses', fromElementId: actorId, toElementId: systemAId, attributes: {}, sourceId: seedSourceId, confidence: 1 },
   ];
   const envelope: CommitEnvelope = { id: randomUUID(), branchId: main.id, parentCommitId: genesisCommitId, mergedBranchHeadCommitId: null, kind: 'manual', title: 'seed a capability with two systems, an actor, and a uses edge', body: null, deltas };
   const seedResult = await commitToBranch(signedIn, { modelId, branchId: main.id, expectedHeadCommitId: genesisCommitId, envelope });
@@ -96,7 +98,7 @@ test('landscape mobile list at 390px: groups render (actors first), expanding on
   await expect(capabilityGroup).toHaveAttribute('aria-expanded', 'true');
   const invoicingRow = page.getByRole('link', { name: 'Invoicing Service' });
   await expect(invoicingRow).toBeVisible();
-  await expect(page.getByText('uses 1 · used by 0')).toBeVisible();
+  await expect(page.getByText('uses 1 · used by 1')).toBeVisible();
   await expect(page.getByRole('link', { name: 'Context →' }).first()).toBeVisible();
 
   // Tapping the system row opens its element page.

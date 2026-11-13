@@ -37,7 +37,7 @@ test('define a select attribute, set it on a system, and filter the browse table
   // all three systems (including the long-named one, which never sorts
   // first alphabetically) are on screen together.
   await page.getByRole('link', { name: 'Browse all elements' }).click();
-  await expect(page.getByRole('link', { name: 'Integrated Regional Revenue and Benefits Collection Platform' })).toBeVisible();
+  await expect(page.getByRole('link', { name: 'Integrated Regional Revenue and Benefits Collection Platform' }).first()).toBeVisible();
   // Below the mobile breakpoint (`ElementBrowseTable.tsx`'s own
   // `MOBILE_BREAKPOINT_PX`), `ElementBrowseCards` renders instead of the
   // table — no fixed-width columns to overflow at all (the long name just
@@ -73,13 +73,13 @@ test('define a select attribute, set it on a system, and filter the browse table
   // Define the attribute — owner-only, under organisation settings
   // (same "Atlas" → org → "Org settings" click path
   // `inviteMemberFromHome` already exercises at both widths).
-  await page.getByRole('link', { name: 'Atlas' }).click();
+  await page.getByRole('link', { name: 'Atlas', exact: true }).click();
   await page.getByRole('link', { name: orgName }).click();
   await page.getByRole('link', { name: 'Org settings' }).click();
   await expect(page.getByRole('heading', { name: 'Organisation settings' })).toBeVisible();
   await expect(page.getByRole('heading', { name: 'Custom attributes' })).toBeVisible();
 
-  await page.getByLabel('Key').fill('region');
+  await page.getByLabel('Key', { exact: true }).fill('region');
   await page.getByLabel('Label').fill('Region');
   await page.getByLabel('Kind').selectOption('select');
   await page.getByLabel('Options (comma-separated)').fill('EMEA, AMER, APAC');
@@ -89,10 +89,10 @@ test('define a select attribute, set it on a system, and filter the browse table
   await expect(page.getByText('Region', { exact: true })).toBeVisible();
 
   // Back into the model, onto Northgate's own page, to set the value.
-  await page.getByRole('link', { name: 'Atlas' }).click();
+  await page.getByRole('link', { name: 'Atlas', exact: true }).click();
   await page.getByRole('link', { name: orgName }).click();
   await page.getByRole('link', { name: modelName }).click();
-  await page.getByRole('link', { name: 'Northgate', exact: true }).click();
+  await page.getByRole('link', { name: 'Northgate', exact: true }).first().click();
   await expect(page.getByRole('heading', { name: 'Northgate' })).toBeVisible();
 
   await page.getByRole('button', { name: /Edit/ }).click();

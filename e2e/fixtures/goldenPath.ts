@@ -98,7 +98,7 @@ export async function signUpCreateOrgAndModel(page: Page, prefix: string): Promi
  * that need to get back into the model navigate there themselves.
  */
 export async function inviteMemberFromHome(page: Page, orgName: string, memberEmail: string, role: 'owner' | 'architect' | 'contributor' | 'viewer' = 'contributor'): Promise<void> {
-  await page.getByRole('link', { name: 'Atlas' }).click();
+  await page.getByRole('link', { name: 'Atlas', exact: true }).click();
   await page.getByRole('link', { name: orgName }).click();
   await page.getByRole('link', { name: 'Org settings' }).click();
   await expect(page.getByRole('heading', { name: 'Organisation settings' })).toBeVisible();
@@ -138,7 +138,7 @@ export async function acceptInviteViaSignUp(page: Page, email: string, displayNa
  * electricity map".
  */
 export async function seedStarterCapabilityMap(page: Page, cardTitleMatch: string | RegExp): Promise<void> {
-  await page.getByRole('link', { name: 'Capability map' }).click();
+  await page.getByRole('link', { name: 'Capability map', exact: true }).click();
   await expect(page.getByRole('heading', { name: 'Start from a capability map' })).toBeVisible();
   // Match the card's own title, never a draft: other specs leave draft maps
   // in the shared catalogue whose version line can match too.
@@ -237,7 +237,8 @@ export async function addContainerFromHome(page: Page, name: string, platformNam
 export async function addUsesRelationship(page: Page, targetNameMatch: string, verbPhrase: string): Promise<void> {
   await page.getByRole('button', { name: '+ Add uses' }).click();
   await page.getByPlaceholder('Search…').fill(targetNameMatch);
-  await page.getByRole('button', { name: new RegExp(targetNameMatch) }).click();
+  // Not the "Evidence for relationship with …" button, which also contains the name.
+  await page.getByRole('button', { name: new RegExp(`^(?!Evidence).*${targetNameMatch}`) }).click();
   await expect(page.getByText('Verb phrase')).toBeVisible();
   await page.getByPlaceholder('e.g. reads customer records from').fill(verbPhrase);
   // `RelationshipAdd.tsx`'s own "Next" always leads to a "Does this go via
@@ -264,9 +265,9 @@ export async function addUsesRelationship(page: Page, targetNameMatch: string, v
 export async function addSupportsRelationship(page: Page, capabilityNameMatch: string, answerPrimary?: boolean): Promise<void> {
   await page.getByRole('button', { name: '+ Add supports' }).click();
   await page.getByPlaceholder('Search…').fill(capabilityNameMatch);
-  await page.getByRole('button', { name: new RegExp(capabilityNameMatch) }).click();
+  await page.getByRole('button', { name: new RegExp(`^(?!Evidence).*${capabilityNameMatch}`) }).click();
   if (answerPrimary !== undefined) {
-    await expect(page.getByText(`Make ${capabilityNameMatch} the primary capability for this system?`, { exact: false })).toBeVisible();
+    await expect(page.getByText(`Is ${capabilityNameMatch} the main capability for this system?`, { exact: false })).toBeVisible();
     await page.getByRole('button', { name: answerPrimary ? 'Yes, it is the main one' : 'No, it also supports it', exact: true }).click();
   }
 }
@@ -289,7 +290,7 @@ export async function renameElement(page: Page, newName: string): Promise<void> 
 export async function retireElement(page: Page, plannedEndIsoDate: string, replacementNameMatch?: string): Promise<void> {
   await page.getByRole('button', { name: 'Element actions' }).click();
   await page.getByRole('button', { name: 'Mark as retired…' }).click();
-  await page.getByLabel('Planned end').fill(plannedEndIsoDate);
+  await page.getByLabel('Planned end', { exact: true }).fill(plannedEndIsoDate);
   if (replacementNameMatch) {
     await page.getByRole('button', { name: '+ Replaced by…' }).click();
     await page.getByPlaceholder('Search systems…').fill(replacementNameMatch);
@@ -316,14 +317,15 @@ export async function mergeElementInto(page: Page, targetNameMatch: string, rati
   await page.getByRole('button', { name: 'Element actions' }).click();
   await page.getByRole('button', { name: 'Merge a duplicate into…' }).click();
   await page.getByPlaceholder('Search for the element to merge into…').fill(targetNameMatch);
-  await page.getByRole('button', { name: new RegExp(targetNameMatch) }).click();
+  // Not the "Evidence for relationship with …" button, which also contains the name.
+  await page.getByRole('button', { name: new RegExp(`^(?!Evidence).*${targetNameMatch}`) }).click();
   await page.getByLabel('Why are these the same real thing?').fill(rationale);
   await page.getByRole('button', { name: 'Merge', exact: true }).click();
 }
 
 /** From ModelHome (or anywhere `ModelNav` renders), click into the Capability map and add a capability by hand via the empty-state's own "+ Add capability" control. */
 export async function addCapability(page: Page, name: string): Promise<void> {
-  await page.getByRole('link', { name: 'Capability map' }).click();
+  await page.getByRole('link', { name: 'Capability map', exact: true }).click();
   await page.getByRole('button', { name: '+ Add capability' }).click();
   await page.getByPlaceholder('Capability name').fill(name);
   await page.getByRole('button', { name: 'Add', exact: true }).click();
@@ -353,6 +355,8 @@ export async function goToModelHome(page: Page): Promise<void> {
  */
 export async function clickNavItem(page: Page, name: string): Promise<void> {
   const nav = page.getByRole('navigation', { name: 'Model navigation' });
+  // The nav mounts a moment after a route change; checking before then would wrongly look for More.
+  await expect(nav).toBeVisible();
   const link = nav.getByRole('link', { name });
   if (!(await link.isVisible())) await nav.getByRole('button', { name: /^More/ }).click();
   await link.click();
@@ -366,6 +370,8 @@ export async function clickNavItem(page: Page, name: string): Promise<void> {
  */
 export async function expectNavCurrent(page: Page, name: string): Promise<void> {
   const nav = page.getByRole('navigation', { name: 'Model navigation' });
+  // On a phone the More sheet is still closing right after a tap; its links carry no aria-current.
+  await expect(nav.getByRole('region', { name: 'More sections' })).toHaveCount(0);
   const link = nav.getByRole('link', { name });
   if (await link.isVisible()) await expect(link).toHaveAttribute('aria-current', 'page');
   else await expect(nav.getByRole('button', { name: `More (current: ${name})` })).toBeVisible();

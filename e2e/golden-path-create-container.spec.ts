@@ -37,6 +37,8 @@ test('create a container as a module of an existing platform, from Home search a
   await goToModelHome(page);
   await page.getByRole('link', { name: 'Browse all elements →' }).click();
   await expect(page.getByRole('heading', { name: 'Elements' })).toBeVisible();
+  // The create control sits behind "+ Add element" on this page.
+  await page.getByRole('button', { name: '+ Add element' }).click();
   await addContainerFromHome(page, 'RE', 'SAP');
   await expect(page.getByRole('heading', { name: 'RE', exact: true })).toBeVisible();
   await expect(page.getByRole('link', { name: 'SAP', exact: true })).toBeVisible();

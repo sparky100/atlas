@@ -268,6 +268,8 @@ test('landscape actors and boundary: the internal actor renders above the top ba
       { kind: 'relationship.create', id: randomUUID(), relationshipId: randomUUID(), relationshipType: 'supports', fromElementId: systemId, toElementId: capabilityId, attributes: { role: 'primary' }, sourceId: seedSourceId, confidence: 1 },
       { kind: 'element.create', id: randomUUID(), elementId: internalActorId, elementType: 'actor', name: 'Housing Digital Team', parentId: null, attributes: { subtype: 'team', isExternal: false }, sourceId: seedSourceId, confidence: 1 },
       { kind: 'element.create', id: randomUUID(), elementId: externalActorId, elementType: 'actor', name: 'Vendor Contact', parentId: null, attributes: { subtype: 'person', isExternal: true }, sourceId: seedSourceId, confidence: 1 },
+      // A team that only owns things is hidden behind "Show owners"; one that uses a system stays on the landscape.
+      { kind: 'relationship.create', id: randomUUID(), relationshipId: randomUUID(), relationshipType: 'uses', fromElementId: internalActorId, toElementId: systemId, attributes: {}, sourceId: seedSourceId, confidence: 1 },
     ],
   };
   const seedResult = await commitToBranch(signedIn, { modelId, branchId: main.id, expectedHeadCommitId: genesisCommitId, envelope });

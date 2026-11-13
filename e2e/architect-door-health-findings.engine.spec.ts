@@ -255,8 +255,10 @@ test('architect-door layout prompt: a finding with more than three items collaps
   // convention front-doors-and-browse.engine.spec.ts's own row-link
   // assertions already use.
   await expect(page).toHaveURL(/\/elements\?filter=unlinked-systems/);
-  await expect(page.getByRole('link', { name: /System 01/ })).toBeVisible();
-  await expect(page.getByRole('link', { name: /System 22/ })).toBeVisible();
+  // Scoped to the table: the filtered browse page now also carries its own
+  // Health findings panel, which links the same systems.
+  await expect(page.getByRole('row').getByRole('link', { name: /System 01/ })).toBeVisible();
+  await expect(page.getByRole('row').getByRole('link', { name: /System 22/ })).toBeVisible();
 });
 
 test('Sprint U4-1 B3: capability ownership inherits from an owned ancestor; an unowned subtree lists only its highest unowned ancestor', async ({ page }) => {

@@ -115,7 +115,7 @@ test('model nav: five-item bottom bar with a More sheet; every model route withi
 
   // One tap reaches each bar section.
   await nav.getByRole('link', { name: 'Capability map' }).click();
-  await expect(page.getByRole('heading', { name: 'Capability map' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Capability map', exact: true })).toBeVisible();
   await expect(nav.getByRole('link', { name: 'Capability map' })).toHaveAttribute('aria-current', 'page');
 
   await nav.getByRole('link', { name: 'Landscape' }).click();
@@ -158,7 +158,8 @@ test('model nav: five-item bottom bar with a More sheet; every model route withi
   await expect(sheet).toHaveCount(0);
   await expect(more).toBeFocused();
   await more.click();
-  await page.getByRole('heading', { level: 1 }).first().click();
+  // The taller sheet can now sit over the page's heading, so tap the empty strip at the very top of the page instead.
+  await page.mouse.click(195, 4);
   await expect(sheet).toHaveCount(0);
 
   // F9 step 2: the review queue is the Changes page's second tab, not a
@@ -173,7 +174,7 @@ test('model nav: five-item bottom bar with a More sheet; every model route withi
   // just a "next/previous" strip: one tap reaches any section from any
   // other, not just the one it was reached from.
   await nav.getByRole('link', { name: 'Capability map' }).click();
-  await expect(page.getByRole('heading', { name: 'Capability map' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Capability map', exact: true })).toBeVisible();
 
   // Back to home, one more tap.
   await nav.getByRole('link', { name: 'Home' }).click();
@@ -196,7 +197,7 @@ test('model nav: five-item bottom bar with a More sheet; every model route withi
   await expect(page.getByRole('heading', { name: 'Payment Gateway' })).toBeVisible();
   await expect(page.getByRole('navigation', { name: 'Model navigation' })).toBeVisible();
   await page.getByRole('navigation', { name: 'Model navigation' }).getByRole('button', { name: /^More/ }).click();
-  await page.getByRole('navigation', { name: 'Model navigation' }).getByRole('region', { name: 'More sections' }).getByRole('link', { name: 'Versions' }).click();
+  await page.getByRole('navigation', { name: 'Model navigation' }).getByRole('region', { name: 'More sections' }).getByRole('link', { name: 'History' }).click();
   await expect(page.getByRole('heading', { name: 'History', level: 1 })).toBeVisible();
 });
 
@@ -275,5 +276,5 @@ test('model nav: icons and groups at desktop width, icon-only with tooltips belo
   // Clicking still works with no visible label — the icon (or its
   // stretched link area) is still the real click target.
   await capabilityMapLink.click();
-  await expect(page.getByRole('heading', { name: 'Capability map' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Capability map', exact: true })).toBeVisible();
 });

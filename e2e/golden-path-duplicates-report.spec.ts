@@ -51,7 +51,7 @@ test('flag two near-duplicate systems, check from the report, merge, find the ol
   await goToModelHome(page);
   const searchBox = page.getByPlaceholder('Search or create a capability, system, or actor…');
   await searchBox.fill('Power On');
-  await page.getByRole('link', { name: 'PowerON', exact: true }).click();
+  await page.getByRole('link', { name: 'PowerON', exact: true }).first().click();
   await expect(page.getByRole('heading', { name: 'PowerON' })).toBeVisible();
 
   // The merged-away pair no longer flags a stray candidate — the report's

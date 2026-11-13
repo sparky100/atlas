@@ -60,9 +60,12 @@ test('propose a change from an element page, leave and re-enter it, submit; revi
 
   // `inviteMemberFromHome` leaves `page` on Org settings, not OrgHome —
   // back into the model for the reviewer steps below.
-  await page.getByRole('link', { name: 'Atlas' }).click();
+  await page.getByRole('link', { name: 'Atlas', exact: true }).click();
   await page.getByRole('link', { name: orgName }).click();
   await page.getByRole('link', { name: /goldenpath5 Model/ }).click();
+
+  // A contributor starts on the capability map, not Home, so go to Home for the search box.
+  await goToModelHome(proposerPage);
 
   // 1. Proposer, at main: "Propose a change" instead of "✎ Edit".
   await proposerPage.getByPlaceholder('Search or create a capability, system, or actor…').fill('Ledger Service');
@@ -201,7 +204,7 @@ test('propose a change from an element page, leave and re-enter it, submit; revi
   // exactly those systems"). Finance now shows Ledger Service as its one
   // supporting system — that's the director-visible result.
   await page.getByRole('link', { name: 'Capability map', exact: true }).click();
-  await expect(page.getByRole('heading', { name: 'Capability map' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Capability map', exact: true })).toBeVisible();
   const financeItem = page.getByRole('listitem').filter({ hasText: 'Finance' });
   await expect(financeItem).toBeVisible();
   // Below 768px, L1 groups collapse into an accordion, one open at a time
