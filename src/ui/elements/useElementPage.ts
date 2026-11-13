@@ -67,6 +67,14 @@ export interface ElementPageData {
    */
   history: DeltaHistoryRow[];
   inFlightBranches: BranchRow[];
+  /**
+   * The page shows its element, facts, relationships, modules and flows as soon as those arrive; history, in-flight
+   * changes and decisions (the three lower-right sections, which nothing above depends on) load straight after and
+   * fill in `history`, `inFlightBranches`, `elementDecisions`, `retractedElementNames` and any history-only
+   * endpoints in `relationshipEndpoints`. Until `'ready'` those hold empty placeholders — a section must show
+   * "loading" (or the error), never render the empty value as if it were the answer.
+   */
+  secondary: 'loading' | 'ready' | 'error';
   /** Prompt 7k item 4's "Flows via this platform" — every `uses`/`flows_to` edge naming this element as `via`, only ever populated when `element` is a system with `kind: 'integration_platform'` (`isIntegrationPlatform`); `[]` for every other element, not `undefined`, so the section can render an honest empty state rather than needing a second "is this even a platform" check downstream. */
   flowsViaThisPlatform: RelationshipsHeadRow[];
   /** The endpoints (`from`/`to`) of every edge in `flowsViaThisPlatform` — never this element itself, which is only ever the `via`, not an endpoint, of these edges. */
@@ -246,19 +254,7 @@ export function useElementPage(
       // together with the element itself — the page used to wait for the
       // element row before asking for anything else, then for the parent
       // before the children, and so on, one round trip at a time.
-      // History and in-flight changes are each a chain of two or three
-      // requests, so they start now and are awaited only where needed —
-      // never ahead of the rest of the page.
-      // Merge, then re-sort — `listDeltaHistoryForSubject`'s own newest-first,
-      // `id`-tiebreak order (see that function's doc comment) applied across
-      // both sources together, not just within each.
-      const historyPromise = Promise.all([listDeltaHistoryForSubject(supabase, modelId, elementId), listRelationshipHistoryForElement(supabase, modelId, elementId)]).then(([ownHistory, relationshipHistory]) =>
-        [...ownHistory, ...relationshipHistory].sort((a, b) => (a.created_at === b.created_at ? a.id.localeCompare(b.id) : b.created_at.localeCompare(a.created_at))),
-      );
-      const inFlightPromise = listInFlightBranchesTouchingSubject(supabase, modelId, elementId);
-      // Rejections are surfaced by the awaits below; these stop them being reported as unhandled first.
-      historyPromise.catch(() => undefined);
-      inFlightPromise.catch(() => undefined);
+      // History and in-flight changes feed only the lower-right sections, so they start after the page body has been shown (see below), not alongside it.
       const [element, facts, relationships, aliases, children] = await Promise.all([source.element(elementId), source.facts(elementId), source.relationships(elementId), listAliasesForElement(supabase, modelId, elementId), source.children(elementId)]);
       if (!element) {
         if (!cancelled) setState({ status: 'notPresentAtRef', commitId, elementId });
@@ -318,25 +314,28 @@ export function useElementPage(
         return [rel.from_element_id === elementId ? rel.to_element_id : rel.from_element_id, ...viaId];
       });
 
-      const loadEndpoints = async (): Promise<{ relationshipEndpoints: Map<UUID, ElementsHeadRow>; retractedElementNames: Map<UUID, string> }> => {
-        // Live endpoints don't wait for history; history's own extra endpoints (relationships since retracted) follow once it arrives.
-        const [liveEndpoints, history] = await Promise.all([source.elementsByIds(liveEndpointIds), historyPromise]);
+      /** `endpoints` plus the parent platform of any module and parent stream of any stage in it (for "Platform · Module" / "Stream · Stage"). A parent is never itself an endpoint, so it is fetched alongside and folded into the same map. */
+      const withParents = async (endpoints: Map<UUID, ElementsHeadRow>): Promise<Map<UUID, ElementsHeadRow>> => {
+        const parentIds = [...new Set([...containerParentIds(endpoints.values()), ...valueStreamParentIds(endpoints.values())])].filter((id) => !endpoints.has(id));
+        if (parentIds.length === 0) return endpoints;
+        const parents = await source.elementsByIds(parentIds);
+        return new Map([...endpoints, ...parents]);
+      };
+
+      const loadLiveEndpoints = async (): Promise<Map<UUID, ElementsHeadRow>> => withParents(await source.elementsByIds(liveEndpointIds));
+
+      // Second stage, once history is in: history's own extra endpoints (relationships since retracted), and the
+      // names of any that have themselves been retracted outright (`getElementNamesByIds`, read from `deltas`).
+      const loadHistoryEndpoints = async (
+        liveEndpoints: Map<UUID, ElementsHeadRow>,
+        history: DeltaHistoryRow[],
+      ): Promise<{ relationshipEndpoints: Map<UUID, ElementsHeadRow>; retractedElementNames: Map<UUID, string> }> => {
         const historyEndpointIds = [...buildRelationshipParticipantsById(history).values()].flatMap((p) => [p.fromElementId, p.toElementId]);
         const extraHistoryIds = [...new Set(historyEndpointIds)].filter((id) => !liveEndpoints.has(id));
-        const relationshipEndpoints = new Map([...liveEndpoints, ...(extraHistoryIds.length > 0 ? await source.elementsByIds(extraHistoryIds) : [])]);
-        // History's own remaining gap: a history endpoint `source` has no
-        // current row for has itself since been retracted — `deltas` still
-        // has its name (`getElementNamesByIds`). A container endpoint's own
-        // parent platform (and a stage's own stream) is never itself an
-        // endpoint, so it's fetched alongside and folded into the same map
-        // for "Platform · Module" / "Stream · Stage".
+        const extras = extraHistoryIds.length > 0 ? await source.elementsByIds(extraHistoryIds) : new Map<UUID, ElementsHeadRow>();
+        const relationshipEndpoints = await withParents(new Map([...liveEndpoints, ...extras]));
         const missingHistoryElementIds = [...new Set(historyEndpointIds)].filter((id) => !relationshipEndpoints.has(id));
-        const relationshipEndpointParentIds = [...containerParentIds(relationshipEndpoints.values()), ...valueStreamParentIds(relationshipEndpoints.values())];
-        const [retractedElementNames, parents] = await Promise.all([
-          getElementNamesByIds(supabase, modelId, missingHistoryElementIds),
-          relationshipEndpointParentIds.length > 0 ? source.elementsByIds(relationshipEndpointParentIds) : Promise.resolve(new Map<UUID, ElementsHeadRow>()),
-        ]);
-        for (const [id, row] of parents) relationshipEndpoints.set(id, row);
+        const retractedElementNames = await getElementNamesByIds(supabase, modelId, missingHistoryElementIds);
         return { relationshipEndpoints, retractedElementNames };
       };
 
@@ -376,47 +375,60 @@ export function useElementPage(
         return { edges, capabilities };
       };
 
-      // Performance: these five are independent of each other, so they run together.
-      const [elementDecisions, { relationshipEndpoints, retractedElementNames }, { relationshipFacts, sources, aliasSources }, flowsVia, moduleSupports, history, inFlightBranches] = await Promise.all([
-        loadDecisions(),
-        loadEndpoints(),
+      // Performance: the page body needs only these four, and they are independent of each other, so they run together.
+      const [liveEndpoints, { relationshipFacts, sources, aliasSources }, flowsVia, moduleSupports] = await Promise.all([
+        loadLiveEndpoints(),
         loadFactsAndSources(),
         loadFlowsVia(),
         loadModuleSupports(),
-        historyPromise,
-        inFlightPromise,
       ]);
-      const flowsViaThisPlatform = flowsVia.flows;
-      const flowsViaThisPlatformEndpoints = flowsVia.endpoints;
-      const moduleSupportsEdges = moduleSupports.edges;
-      const moduleSupportsCapabilities = moduleSupports.capabilities;
+      if (cancelled) return;
 
-      if (!cancelled) {
-        setState({
-          status: 'ready',
-          data: {
-            commitId,
-            element,
-            facts,
-            parent,
-            capabilityLevel: elementCapabilityLevel,
-            children,
-            relationships,
-            relationshipEndpoints,
-            retractedElementNames,
-            relationshipFacts,
-            aliases,
-            aliasSources,
-            sources,
-            history,
-            inFlightBranches,
-            flowsViaThisPlatform,
-            flowsViaThisPlatformEndpoints,
-            moduleSupportsEdges,
-            moduleSupportsCapabilities,
-            elementDecisions,
-          },
-        });
+      // The lower-right sections load next, without holding the body back (see `ElementPageData.secondary`).
+      setState({
+        status: 'ready',
+        data: {
+          commitId,
+          element,
+          facts,
+          parent,
+          capabilityLevel: elementCapabilityLevel,
+          children,
+          relationships,
+          relationshipEndpoints: liveEndpoints,
+          retractedElementNames: new Map(),
+          relationshipFacts,
+          aliases,
+          aliasSources,
+          sources,
+          history: [],
+          inFlightBranches: [],
+          flowsViaThisPlatform: flowsVia.flows,
+          flowsViaThisPlatformEndpoints: flowsVia.endpoints,
+          moduleSupportsEdges: moduleSupports.edges,
+          moduleSupportsCapabilities: moduleSupports.capabilities,
+          elementDecisions: [],
+          secondary: 'loading',
+        },
+      });
+
+      const applySecondary = (patch: Partial<ElementPageData>) => {
+        if (cancelled) return;
+        setState((prev) => (prev.status === 'ready' && prev.data.commitId === commitId && prev.data.element.element_id === elementId ? { status: 'ready', data: { ...prev.data, ...patch } } : prev));
+      };
+      try {
+        // Merge, then re-sort — `listDeltaHistoryForSubject`'s own newest-first,
+        // `id`-tiebreak order (see that function's doc comment) applied across
+        // both sources together, not just within each.
+        const historyPromise = Promise.all([listDeltaHistoryForSubject(supabase, modelId, elementId), listRelationshipHistoryForElement(supabase, modelId, elementId)]).then(([ownHistory, relationshipHistory]) =>
+          [...ownHistory, ...relationshipHistory].sort((a, b) => (a.created_at === b.created_at ? a.id.localeCompare(b.id) : b.created_at.localeCompare(a.created_at))),
+        );
+        const [elementDecisions, history, inFlightBranches] = await Promise.all([loadDecisions(), historyPromise, listInFlightBranchesTouchingSubject(supabase, modelId, elementId)]);
+        const { relationshipEndpoints, retractedElementNames } = await loadHistoryEndpoints(liveEndpoints, history);
+        applySecondary({ elementDecisions, history, inFlightBranches, relationshipEndpoints, retractedElementNames, secondary: 'ready' });
+      } catch (e: unknown) {
+        reportError("Couldn't load this element's history, changes and decisions.", e);
+        applySecondary({ secondary: 'error' });
       }
     }
 
