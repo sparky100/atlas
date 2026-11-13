@@ -111,7 +111,7 @@ test('capability map: an ink marker for an open thread, a hollow marker for an a
   // `e.stopPropagation()` on the marker click is what keeps the two from
   // firing together).
   await inkMarker.click();
-  await expect(page).toHaveURL(/\/capability-map$/);
+  await expect(page).toHaveURL(/\/capability-map(\?domain=[\w-]+)?$/);
   const panel = page.getByRole('complementary', { name: 'Comments on Has An Open Thread' });
   await expect(panel).toBeVisible();
   await expect(panel.getByText(openThreadBody)).toBeVisible();

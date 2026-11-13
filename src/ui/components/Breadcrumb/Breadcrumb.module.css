@@ -29,6 +29,12 @@
     max-width: 100%;
   }
 
+  /* The line scrolls rather than squeezing: without this, flex shrinks the
+     later segments to zero width and they vanish instead of scrolling. */
+  .segment {
+    flex-shrink: 0;
+  }
+
   .breadcrumb a {
     max-width: 120px;
     overflow: hidden;

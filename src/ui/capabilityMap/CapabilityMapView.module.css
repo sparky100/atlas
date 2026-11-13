@@ -225,12 +225,14 @@
   justify-content: space-between;
   gap: var(--space-2);
   min-width: 0;
+  /* A long link beside the name (e.g. "no systems — add one →") wraps to a second line instead of squeezing the name to nothing. */
+  flex-wrap: wrap;
 }
 
 .cardLink {
   color: inherit;
   text-decoration: none;
-  min-width: 0;
+  min-width: 6em;
   flex: 1 1 auto;
 }
 
