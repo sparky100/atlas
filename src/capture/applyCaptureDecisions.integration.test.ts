@@ -11,11 +11,12 @@
  */
 import { randomUUID } from 'node:crypto';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { captureCandidateRowToWire, captureCandidateWireToRow, type CaptureCandidate, type CaptureCandidateRowShape } from '../contracts/capture';
+import { captureCandidateRowToWire, captureCandidateWireToRow, type CaptureCandidate, type CaptureCandidateRowShape, type CaptureInputKind } from '../contracts/capture';
 import { envelopeToDeltaRows } from '../contracts/rows';
 import type { UUID } from '../contracts/delta';
 import { createChangeBranch, getBranch, getMainBranch } from '../db/branches';
 import type { Client } from '../db/client';
+import { getCaptureJob } from '../db/captureJobs';
 import { createServiceRoleClient, createSupabaseClient } from '../db/client';
 import { buildCommitLoader } from '../db/commitLoader';
 import { loadEnv } from '../db/env';
@@ -148,13 +149,13 @@ describe('stage_capture_decisions / apply_capture_decisions against a real local
     return { draftBranchId: branchId };
   }
 
-  async function insertPendingJob(createdBy: TestUser): Promise<UUID> {
+  async function insertPendingJob(createdBy: TestUser, inputKind: CaptureInputKind = 'spreadsheet'): Promise<UUID> {
     const jobId = randomUUID();
     const { error } = await createdBy.client.from('capture_jobs').insert({
       id: jobId,
       org_id: orgId,
       model_id: modelId,
-      input_kind: 'spreadsheet',
+      input_kind: inputKind,
       input_name: 'Applications.xlsx',
       input_ref: `capture-inputs/${orgId}/${modelId}/${jobId}/Applications.xlsx`,
       input_sha256: '\\x' + '00'.repeat(32),
@@ -165,8 +166,9 @@ describe('stage_capture_decisions / apply_capture_decisions against a real local
     return jobId;
   }
 
-  it('RT: stage accepted, apply, and the promoted element/commit/job/branch all read back consistently', async () => {
-    const jobId = await insertPendingJob(contributor);
+  it.each(['spreadsheet', 'change_brief'] as const)('RT: %s review and promotion read back consistently', async (inputKind) => {
+    const jobId = await insertPendingJob(contributor, inputKind);
+    expect((await getCaptureJob(contributor.client, jobId))?.inputKind).toBe(inputKind);
     const { draftBranchId } = await writeDraftWithNewCandidate(jobId);
 
     const { data: draftCandidateRows, error: draftCandidateError } = await owner.client.from('capture_candidates').select('*').eq('job_id', jobId).order('seq');
@@ -208,7 +210,7 @@ describe('stage_capture_decisions / apply_capture_decisions against a real local
     const deltaRows = envelopeToDeltaRows({ id: commitId, branchId: targetBranchId, parentCommitId: targetHeadCommitId, mergedBranchHeadCommitId: null, kind: 'manual', title: 'x', body: null, deltas }, { orgId: '', modelId: '', createdBy: '' });
 
      
-    const { data, error: applyError } = await contributor.client.schema('atlas').rpc('apply_capture_decisions', {
+    const args = {
       p_job_id: jobId,
       p_target_branch_id: targetBranchId,
       p_commit_id: commitId,
@@ -219,7 +221,16 @@ describe('stage_capture_decisions / apply_capture_decisions against a real local
       p_candidate_outcomes: [{ candidate_id: candidates[0]?.id, promoted_subject_id: promotedSubjectIdBySeq.get(0) }],
       p_resolved_conflicts: resolvedConflicts.map((r) => ({ id: r.id, winning_delta_id: r.winningDeltaId, discarded_delta_id: r.discardedDeltaId, resolution_delta_id: null, rationale: r.rationale })),
       p_stats: { decided: { accepted: 1, rejected: 0, merged: 0, edited: 0, split: 0 } },
-    } satisfies Record<string, unknown>);
+    } satisfies Record<string, unknown>;
+    if (inputKind === 'change_brief') {
+      const rejected = await contributor.client.schema('atlas').rpc('apply_capture_decisions', args);
+      expect(rejected.error?.message).toContain('AI draft edits must be applied to a draft Propose change.');
+      expect((await getBranch(contributor.client, targetBranchId))?.head_commit_id).toBe(targetHeadCommitId);
+      expect((await getCaptureJob(contributor.client, jobId))?.status).toBe('parsed');
+      const changeIntent = await contributor.client.from('branches').update({ intent: 'propose' }).eq('id', targetBranchId);
+      expect(changeIntent.error).toBeNull();
+    }
+    const { data, error: applyError } = await contributor.client.schema('atlas').rpc('apply_capture_decisions', args);
     if (applyError) throw new Error(`apply_capture_decisions: ${applyError.message}`);
     expect((data as { id: UUID }).id).toBe(commitId);
 
@@ -235,6 +246,11 @@ describe('stage_capture_decisions / apply_capture_decisions against a real local
     const { data: job, error: jobError } = await owner.client.from('capture_jobs').select('*').eq('id', jobId).single();
     if (jobError) throw new Error(jobError.message);
     expect(job).toMatchObject({ target_branch_id: targetBranchId, status: 'reviewed' }); // the one candidate was the only one, now decided.
+    if (inputKind === 'change_brief') {
+      const changed = await contributor.client.from('branches').update({ intent: 'record' }).eq('id', targetBranchId);
+      expect(changed.error?.message).toContain('must keep its Propose intent');
+    }
+
 
     const draftBranchAfter = await getBranch(owner.client, draftBranchId);
     expect(draftBranchAfter?.status).toBe('archived');

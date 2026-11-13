@@ -65,7 +65,7 @@
  *   the same disclosed gap `parse/pdf.test.ts` already names.
  */
 import type { CandidateClass, CandidateProposal, CandidateReimportStatus, CaptureAliasType, CaptureJobStats, ElementProposal, EvidenceWarning, MatchOutcome, RelationshipProposal } from '../contracts/capture';
-import type { CandidateEvidence } from '../contracts/capture';
+import { MAX_CHANGE_BRIEF_CHARS, type CandidateEvidence } from '../contracts/capture';
 import type { ActorSubtype, ElementType, OwnsRole, RelationshipType, UUID } from '../contracts/delta';
 import type { SourceRef } from '../contracts/sourceRef';
 import { factMapKey, type Head } from '../engine/deltas';
@@ -75,6 +75,7 @@ import type { ColumnRoleAssignment } from './columnSynonyms';
 import { classifyAttribute, classifyElement, classifyRelationship, type AttributeComparisonInput, type AttributeOutcome } from './classify';
 import { DEFAULTED_ATTRIBUTE_CONFIDENCE, existenceConf, SHEET_CONFIDENCE_CAP } from './confidence';
 import { extractProseChunk } from './extractProse';
+import { buildChangeBriefContext } from './changeBriefContext';
 import type { ImportChangeRow } from './importChangeRow';
 import type { ImportRelationshipRow } from './importRelationshipRow';
 import type { ImportRow, OwnerReference } from './importRowSchema';
@@ -98,7 +99,7 @@ import { applyRequiredDefaults, rowsToCandidates, type CapabilityColumnRow, type
 
 export class RunCaptureError extends Error {}
 
-export type RunCaptureSource = { format: 'csv'; text: string } | { format: 'xlsx'; bytes: ArrayBuffer } | { format: 'pdf'; bytes: ArrayBuffer } | { format: 'text'; text: string } | { format: 'json'; text: string };
+export type RunCaptureSource = { format: 'csv'; text: string } | { format: 'xlsx'; bytes: ArrayBuffer } | { format: 'pdf'; bytes: ArrayBuffer } | { format: 'text'; text: string } | { format: 'change_brief'; text: string } | { format: 'json'; text: string };
 
 export interface RunCaptureInput {
   inputName: string;
@@ -427,6 +428,15 @@ function resolveElementType(match: MatchOutcome, proposalElementType: ElementTyp
   return matchIndex.elements.get(match.elementId)?.element_type ?? proposalElementType;
 }
 
+function matchChangeBriefSystem(name: string, index: MatchIndex): MatchOutcome {
+  const normalized = normaliseName(name);
+  const matches = (index.elementsByType.get('system') ?? []).filter((system) => normaliseName(system.name) === normalized);
+  const first = matches[0];
+  if (!first) return NO_MATCH_OUTCOME;
+  const similar = matches.slice(0, 5).map((system) => ({ elementId: system.element_id, name: system.name, score: 1 }));
+  return { level: 'name_context', elementId: first.element_id, score: 1, similar, warnings: [], ...(matches.length > 1 ? { ambiguous: similar } : {}) };
+}
+
 /** Resolves one element candidate's own `parent` ref (system/actor never have one — `context` is unconditionally top-level for them per `match.ts`'s own `contextMatches`) and matches/classifies it against main. */
 function resolveElementCandidate(candidate: RowCandidate, proposal: ElementProposal, runIndex: RunElementIndex, resolvedSubjectBySeq: ReadonlyMap<number, UUID | null>, matchIndex: MatchIndex, targetOnlyIndex: MatchIndex | null, mainHead: Head, sourceCapturedAt: string | null, mintId: () => UUID): ElementResolutionResult {
   if (candidate.ungrounded) {
@@ -468,16 +478,18 @@ function resolveElementCandidate(candidate: RowCandidate, proposal: ElementPropo
     resolvedParentElementId = resolvedParentId;
   }
 
-  const match = matchElement(
-    {
-      name: proposal.name,
-      elementType: proposal.elementType,
-      ...(candidate.matchHints?.atlasId !== undefined ? { atlasId: candidate.matchHints.atlasId } : {}),
-      ...(candidate.matchHints?.sourceKeys !== undefined ? { sourceKeys: candidate.matchHints.sourceKeys } : {}),
-      context: proposal.parent === null ? TOP_LEVEL_CONTEXT : contextElementId,
-    },
-    matchIndex,
-  );
+  const match = candidate.defaultedAttributes !== undefined
+    ? matchChangeBriefSystem(proposal.name, matchIndex)
+    : matchElement(
+        {
+          name: proposal.name,
+          elementType: proposal.elementType,
+          ...(candidate.matchHints?.atlasId !== undefined ? { atlasId: candidate.matchHints.atlasId } : {}),
+          ...(candidate.matchHints?.sourceKeys !== undefined ? { sourceKeys: candidate.matchHints.sourceKeys } : {}),
+          context: proposal.parent === null ? TOP_LEVEL_CONTEXT : contextElementId,
+        },
+        matchIndex,
+      );
 
   if (match.level === 'none') {
     const attributes = proposal.attributes as Record<string, unknown>;
@@ -512,10 +524,13 @@ function resolveElementCandidate(candidate: RowCandidate, proposal: ElementPropo
   const matchedElementId = match.elementId;
   if (matchedElementId === undefined) throw new RunCaptureError(`seq ${String(candidate.seq)}: internal — a match outcome above 'none' always carries an elementId.`);
 
-  const comparisons = attributeComparisons(proposal.attributes, candidate.evidence.attributeConfidence, matchedElementId, mainHead, sourceCapturedAt);
+  const proposedAttributes = candidate.defaultedAttributes
+    ? Object.fromEntries(Object.entries(proposal.attributes).filter(([key]) => !candidate.defaultedAttributes?.includes(key)))
+    : proposal.attributes;
+  const comparisons = attributeComparisons(proposedAttributes, candidate.evidence.attributeConfidence, matchedElementId, mainHead, sourceCapturedAt);
   const cls = classifyElement({ match, attributes: [...comparisons.values()] });
   const outcomes = new Map<string, AttributeOutcome>([...comparisons].map(([key, input]) => [key, classifyAttribute(input)]));
-  const attributes = filterAttributesForClass(proposal.attributes, cls, outcomes);
+  const attributes = filterAttributesForClass(proposedAttributes, cls, outcomes);
 
   // `match.ts`'s own `resolvePlatformPrefixed`: the document never named a
   // parent for this candidate at all (it wrote the platform name inline,
@@ -566,15 +581,35 @@ interface ResolvedEndpoint {
   warning?: EvidenceWarning;
 }
 
-function resolveEndpointRef(ref: RelationshipProposal['from'], relationshipType: RelationshipType, end: 'from' | 'to', runIndex: RunElementIndex, resolvedSubjectBySeq: ReadonlyMap<number, UUID | null>, matchIndex: MatchIndex): ResolvedEndpoint {
+function resolveEndpointRef(ref: RelationshipProposal['from'], relationshipType: RelationshipType, end: 'from' | 'to', runIndex: RunElementIndex, resolvedSubjectBySeq: ReadonlyMap<number, UUID | null>, matchIndex: MatchIndex, exact: boolean): ResolvedEndpoint {
   if (ref.kind === 'existing') return { elementId: ref.elementId };
   if (ref.kind === 'candidate') {
     const resolved = resolvedSubjectBySeq.get(ref.seq);
     if (resolved === undefined) throw new RunCaptureError(`internal — candidate seq ${String(ref.seq)} referenced before it was resolved.`);
     return resolved === null ? { elementId: null, warning: { code: 'ENDPOINT_UNRESOLVED', text: `(candidate seq ${String(ref.seq)})`, end } } : { elementId: resolved };
   }
-  const resolvedId = resolveTextRef(ref.text, ENDPOINT_TYPES_BY_RELATIONSHIP[relationshipType][end], runIndex, resolvedSubjectBySeq, matchIndex);
+  const types = ENDPOINT_TYPES_BY_RELATIONSHIP[relationshipType][end];
+  const resolvedId = exact
+    ? resolveChangeBriefEndpoint(ref.text, types, runIndex, resolvedSubjectBySeq, matchIndex)
+    : resolveTextRef(ref.text, types, runIndex, resolvedSubjectBySeq, matchIndex);
   return resolvedId === null ? { elementId: null, warning: { code: 'ENDPOINT_UNRESOLVED', text: ref.text, end } } : { elementId: resolvedId };
+}
+
+function resolveChangeBriefEndpoint(text: string, types: readonly ElementType[], runIndex: RunElementIndex, resolvedSubjectBySeq: ReadonlyMap<number, UUID | null>, matchIndex: MatchIndex): UUID | null {
+  const name = normaliseName(text);
+  const hits = new Set<UUID>();
+  for (const type of types) {
+    for (const element of matchIndex.elementsByType.get(type) ?? []) {
+      const parent = element.parent_id ? matchIndex.elements.get(element.parent_id) : undefined;
+      if (normaliseName(element.name) === name || (parent && normaliseName(`${parent.name} ${element.name}`) === name)) hits.add(element.element_id);
+    }
+    for (const candidate of runIndex.byType.get(type) ?? []) {
+      if (candidate.proposal.kind !== 'element' || normaliseName(candidate.proposal.name) !== name) continue;
+      const id = resolvedSubjectBySeq.get(candidate.seq);
+      if (id && (!matchIndex.elements.has(id) || hits.has(id))) hits.add(id);
+    }
+  }
+  return hits.size === 1 ? [...hits][0] ?? null : null;
 }
 
 interface RelationshipResolutionResult {
@@ -599,13 +634,14 @@ function resolveRelationshipCandidate(
   relationshipIndex: ReadonlyMap<string, UUID>,
   sourceCapturedAt: string | null,
   mintId: () => UUID,
+  isChangeBrief: boolean,
 ): RelationshipResolutionResult {
   if (candidate.ungrounded) {
     return { class: 'unsourced', match: NO_MATCH_OUTCOME, draftSubjectId: null, fromElementId: null, toElementId: null, attributes: proposal.attributes as Record<string, unknown>, extraWarnings: [] };
   }
 
-  const from = resolveEndpointRef(proposal.from, proposal.relationshipType, 'from', runIndex, resolvedSubjectBySeq, matchIndex);
-  const to = resolveEndpointRef(proposal.to, proposal.relationshipType, 'to', runIndex, resolvedSubjectBySeq, matchIndex);
+  const from = resolveEndpointRef(proposal.from, proposal.relationshipType, 'from', runIndex, resolvedSubjectBySeq, matchIndex, isChangeBrief);
+  const to = resolveEndpointRef(proposal.to, proposal.relationshipType, 'to', runIndex, resolvedSubjectBySeq, matchIndex, isChangeBrief);
   const extraWarnings: EvidenceWarning[] = [from.warning, to.warning].filter((w): w is EvidenceWarning => w !== undefined);
 
   if (from.elementId === null || to.elementId === null) {
@@ -631,6 +667,7 @@ function resolveRelationshipCandidate(
     attributes = { ...attributes, role: 'primary' };
   }
 
+  if (isChangeBrief && proposal.relationshipType === 'supports') delete attributes.role;
   const comparisons = attributeComparisons(attributes, candidate.evidence.attributeConfidence, existingRelationshipId, mainHead, sourceCapturedAt);
   const cls = classifyRelationship({ existingRelationship: { attributes: [...comparisons.values()] } });
   const outcomes = new Map<string, AttributeOutcome>([...comparisons].map(([key, input]) => [key, classifyAttribute(input)]));
@@ -695,12 +732,12 @@ interface RunSheetCaptureInput extends Omit<RunCaptureInput, 'source'> {
 }
 
 interface RunProseCaptureInput extends Omit<RunCaptureInput, 'source'> {
-  source: { format: 'pdf'; bytes: ArrayBuffer } | { format: 'text'; text: string };
+  source: { format: 'pdf'; bytes: ArrayBuffer } | { format: 'text'; text: string } | { format: 'change_brief'; text: string };
 }
 
 export async function runCapture(input: RunCaptureInput): Promise<RunCaptureResult> {
   const { source } = input;
-  if (source.format === 'pdf' || source.format === 'text') {
+  if (source.format === 'pdf' || source.format === 'text' || source.format === 'change_brief') {
     return runProseCapture({ ...input, source });
   }
   if (source.format === 'json') {
@@ -1044,6 +1081,26 @@ async function runProseCapture(input: RunProseCaptureInput): Promise<RunCaptureR
   const { inputName, source, llmClient, matchIndex, mainHead, targetHead, documentDate, reimportPrevious, mintId } = input;
   const stats: Record<string, number> = {};
 
+  if (source.format === 'change_brief') {
+    if (source.text.length > MAX_CHANGE_BRIEF_CHARS) {
+      return { status: 'failed', errorCode: 'INPUT_TOO_LARGE', message: `A change brief can contain at most ${String(MAX_CHANGE_BRIEF_CHARS)} characters.` };
+    }
+    if (source.text.trim() === '') {
+      return { status: 'failed', errorCode: 'INPUT_UNREADABLE', message: 'Enter a brief describing the proposed change.' };
+    }
+    const { candidates } = await extractProseChunk({
+      llmClient,
+      inputName,
+      location: { kind: 'pastedText', start: 0, end: source.text.length, total: source.text.length },
+      chunkText: source.text,
+      priorElementNames: [],
+      sourceRefForOffset: (start, end) => ({ kind: 'text', start, end }),
+      changeBriefContext: buildChangeBriefContext(source.text, mainHead),
+    });
+    const { candidates: deduped } = dedupeIntraDocumentCandidates(candidates, true);
+    return classifyAndResolve(deduped, matchIndex, targetHead, mainHead, null, undefined, mintId, { chunks: 1 }, true);
+  }
+
   let chunkEntries: ProseChunkEntry[];
 
   if (source.format === 'pdf') {
@@ -1148,7 +1205,7 @@ export function orderByParentDependency<T extends RowCandidate & { proposal: Ele
   return candidates.map((candidate, index) => ({ candidate, index, depth: depthOf(candidate, new Set()) })).sort((a, b) => a.depth - b.depth || a.index - b.index).map((entry) => entry.candidate);
 }
 
-function classifyAndResolve(combined: readonly RowCandidate[], matchIndex: MatchIndex, targetHead: Head | undefined, mainHead: Head, documentDate: string | null, reimportPrevious: readonly PreviousCandidateForDiff[] | undefined, mintId: () => UUID, stats: Record<string, number>): RunCaptureResult {
+function classifyAndResolve(combined: readonly RowCandidate[], matchIndex: MatchIndex, targetHead: Head | undefined, mainHead: Head, documentDate: string | null, reimportPrevious: readonly PreviousCandidateForDiff[] | undefined, mintId: () => UUID, stats: Record<string, number>, isChangeBrief = false): RunCaptureResult {
   const runIndex = buildRunElementIndex(combined);
   const relationshipIndex = buildRelationshipIndex(mainHead);
   const targetOnlyIndex = targetHead ? buildTargetOnlyMatchIndex(targetHead, mainHead) : null;
@@ -1219,7 +1276,7 @@ function classifyAndResolve(combined: readonly RowCandidate[], matchIndex: Match
   };
 
   for (const candidate of relationships) {
-    const result = resolveRelationshipCandidate(candidate, candidate.proposal, runIndex, resolvedSubjectBySeq, matchIndex, mainHead, relationshipIndex, documentDate, mintId);
+    const result = resolveRelationshipCandidate(candidate, candidate.proposal, runIndex, resolvedSubjectBySeq, matchIndex, mainHead, relationshipIndex, documentDate, mintId, isChangeBrief);
     const fromKey = result.fromElementId !== null ? rowKeyForElementId(result.fromElementId) : (candidate.proposal.from.kind === 'unresolved' ? `unresolved:${candidate.proposal.from.text}` : 'unresolved:?');
     const toKey = result.toElementId !== null ? rowKeyForElementId(result.toElementId) : (candidate.proposal.to.kind === 'unresolved' ? `unresolved:${candidate.proposal.to.text}` : 'unresolved:?');
     const rowKey = relationshipRowKey(candidate.proposal.relationshipType, fromKey, toKey);
@@ -1278,7 +1335,9 @@ function classifyAndResolve(combined: readonly RowCandidate[], matchIndex: Match
   }
 
   const ordered = [...combined.map((c) => built.get(c.seq)).filter((c): c is ResolvedCandidate => c !== undefined), ...goneResolved];
-  const candidates = ordered.map((c, index) => ({ ...c, seq: index }));
+  const changes = isChangeBrief ? ordered.filter((c) => c.class !== 'confirm') : ordered;
+  if (isChangeBrief) delete stats['class.confirm'];
+  const candidates = changes.map((c, index) => ({ ...c, seq: index, ...(isChangeBrief ? { aliasProposals: [] } : {}) }));
   bump(stats, 'candidates', candidates.length);
 
   return { status: 'parsed', candidates, stats };

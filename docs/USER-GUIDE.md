@@ -156,6 +156,8 @@ Every change says **why** it exists:
 
 **Working in a change.** Create one from **Changes** (or **Propose a change** on an element page), then use **Edit in this change** in the banner at the top of the page: every edit you make while it shows **Editing in this change** goes into the change, not main. The change page shows what it touches.
 
+**Draft with AI.** If Ask Atlas is enabled for your organisation, open Changes or a system on main and choose **Draft with AI**. Enter a title and describe the future change. Review the suggested system and relationship edits, check their source passages, then select **Apply to draft Change**. Open the draft to review its impact, add a target date and submit it for review. For a phased move, record any removals or retirement separately in the draft once you know their scope.
+
 **Getting it merged.**
 
 - **Record** and **Correct** changes need one architect or owner: **Approve & merge** on the change page.

@@ -153,7 +153,7 @@ export interface DedupeIntraDocumentCandidatesResult {
  * original `seq` — final, contiguous re-numbering across every sheet is
  * `runCapture.ts`'s own last step, not this pass's job.
  */
-export function dedupeIntraDocumentCandidates(candidates: readonly RowCandidate[]): DedupeIntraDocumentCandidatesResult {
+export function dedupeIntraDocumentCandidates(candidates: readonly RowCandidate[], exactNames = false): DedupeIntraDocumentCandidatesResult {
   const result: RowCandidate[] = [];
   const seqRemap = new Map<number, number>();
   const survivorIndicesByBucket = new Map<string, number[]>();
@@ -179,7 +179,8 @@ export function dedupeIntraDocumentCandidates(candidates: readonly RowCandidate[
       const existingAtlasId = existing.matchHints?.atlasId;
       const ownAtlasId = candidate.matchHints?.atlasId;
       if (existingAtlasId !== undefined && ownAtlasId !== undefined && existingAtlasId !== ownAtlasId) continue;
-      if (trigramSimilarity(normalisedName, normaliseName(existing.proposal.name)) >= IDENTITY_TRIGRAM_THRESHOLD) {
+      const existingName = normaliseName(existing.proposal.name);
+      if (exactNames ? normalisedName === existingName : trigramSimilarity(normalisedName, existingName) >= IDENTITY_TRIGRAM_THRESHOLD) {
         mergeIntoIndex = index;
         break;
       }

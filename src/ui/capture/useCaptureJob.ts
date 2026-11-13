@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import type { UUID } from '../../contracts/delta';
-import type { CaptureInputKind, CaptureJob } from '../../contracts/capture';
+import { CHANGE_BRIEF_FILENAME, type CaptureInputKind, type CaptureJob } from '../../contracts/capture';
 import { computeInputSha256Hex, captureInputObjectPath, discardCaptureJob, insertCaptureJob, invokeCaptureRun, listCaptureJobs, uploadCaptureInput } from '../../db/captureJobs';
 import { reportError } from '../errors/errorBannerStore';
 import { queryKeys } from '../query/keys';
@@ -64,7 +64,7 @@ const POLL_INTERVAL_MS = 2500;
  * yet). `jobsRef` lets that check always read the latest list without the
  * interval itself being torn down and rebuilt on every reload.
  */
-export function useCaptureJobs(modelId: UUID, orgId: UUID, userId: UUID | null): UseCaptureJobsResult {
+export function useCaptureJobs(modelId: UUID, orgId: UUID, userId: UUID | null, trackJobs = true): UseCaptureJobsResult {
   const queryClient = useQueryClient();
   const [status, setStatus] = useState<CaptureJobsStatus>('loading');
   const [jobs, setJobs] = useState<CaptureJob[]>([]);
@@ -76,6 +76,7 @@ export function useCaptureJobs(modelId: UUID, orgId: UUID, userId: UUID | null):
   }, [jobs]);
 
   useEffect(() => {
+    if (!trackJobs) return;
     let cancelled = false;
     // `reload()` is only ever called once `status` is already back to
     // `'idle'` (`createJob` below sets it before its own first `reload()`),
@@ -98,20 +99,21 @@ export function useCaptureJobs(modelId: UUID, orgId: UUID, userId: UUID | null):
     return () => {
       cancelled = true;
     };
-  }, [modelId, reloadToken]);
+  }, [modelId, reloadToken, trackJobs]);
 
   const reload = useCallback(() => {
     setReloadToken((t) => t + 1);
   }, []);
 
   useEffect(() => {
+    if (!trackJobs) return;
     const interval = setInterval(() => {
       if (jobsRef.current.some((j) => j.status === 'pending' && j.error === null)) reload();
     }, POLL_INTERVAL_MS);
     return () => {
       clearInterval(interval);
     };
-  }, [reload]);
+  }, [reload, trackJobs]);
 
   const createJob = useCallback(
     async (input: CreateCaptureJobInput): Promise<CaptureJob | null> => {
@@ -124,7 +126,8 @@ export function useCaptureJobs(modelId: UUID, orgId: UUID, userId: UUID | null):
       const jobId: UUID = crypto.randomUUID();
       try {
         const inputSha256Hex = input.inputSha256Hex ?? (await computeInputSha256Hex(input.bytes));
-        await uploadCaptureInput(supabase, { orgId, modelId, jobId, filename: input.inputName, bytes: input.bytes });
+        const filename = input.inputKind === 'change_brief' ? CHANGE_BRIEF_FILENAME : input.inputName;
+        await uploadCaptureInput(supabase, { orgId, modelId, jobId, filename, bytes: input.bytes });
         setStatus('saving');
         const job = await insertCaptureJob(supabase, {
           id: jobId,
@@ -132,7 +135,7 @@ export function useCaptureJobs(modelId: UUID, orgId: UUID, userId: UUID | null):
           modelId,
           inputKind: input.inputKind,
           inputName: input.inputName,
-          inputRef: `capture-inputs/${captureInputObjectPath(orgId, modelId, jobId, input.inputName)}`,
+          inputRef: `capture-inputs/${captureInputObjectPath(orgId, modelId, jobId, filename)}`,
           inputSha256Hex,
           documentDate: input.documentDate,
           reimportOfJobId: input.reimportOfJobId,

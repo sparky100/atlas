@@ -111,7 +111,7 @@ const captureJobArb: fc.Arbitrary<CaptureJob> = fc.record(
     id: uuid,
     orgId: uuid,
     modelId: uuid,
-    inputKind: fc.constantFrom('spreadsheet' as const, 'pdf' as const, 'text' as const),
+    inputKind: fc.constantFrom('spreadsheet' as const, 'pdf' as const, 'text' as const, 'change_brief' as const),
     inputName: fc.string({ minLength: 1, maxLength: 60 }),
     inputRef: fc.string({ minLength: 1, maxLength: 80 }),
     inputSha256: fc.array(fc.constantFrom('0', '1', '2', '3', '4', '5', '6', '7', '8', '9', 'a', 'b', 'c', 'd', 'e', 'f'), { minLength: 64, maxLength: 64 }).map((chars) => chars.join('')),

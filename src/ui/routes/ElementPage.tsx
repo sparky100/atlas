@@ -45,6 +45,7 @@ import { hintedModelId, useMainBranch } from '../branches/useMainBranch';
 import { useSelectedRef } from '../branches/useSelectedRef';
 import { isViewingMode } from '../branches/viewingMode';
 import { parseMergePrefillFromSearchParams } from '../duplicates/mergePrefill';
+import { DraftWithAi } from '../changes/DraftWithAi';
 import { ProposeChangePicker } from '../home/ProposeChangePicker';
 import { useModels } from '../models/useModels';
 import { canCreateChangeBranch, canEditBranch, canEditValueStreamStructure, useMembership } from '../orgs/useMembership';
@@ -509,6 +510,9 @@ export function ElementPage() {
                 }}
                 onCancel={() => { setDeactivatePanel(null); }}
               />
+            )}
+            {ref.kind === 'main' && state.data.element.element_type === 'system' && canCreateChangeBranch(role) && userId && organisation?.ai_assistant_enabled && (
+              <DraftWithAi key={state.data.element.element_id} modelId={model.id} orgId={organisation.id} userId={userId} basePath={`/o/${orgSlug ?? ''}/m/${model.slug}`} elementName={state.data.element.name} />
             )}
             {proposingChange && (
               <Panel>

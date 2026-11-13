@@ -1070,3 +1070,7 @@ The first six rows below were true when this section was written (mid-build, aga
 | Capability *creation* from capture (a document that names a capability the map lacks) | prompt C is closed-vocabulary by design; a missing capability is a tailoring decision on the capability map, not an extraction | never automatic; a reviewer adds it on the map and re-runs |
 | `uses`/`flows_to` required `label` (Decisions from use) | the contract has `description?` only today; when `label` lands, prompt B's relationship schema gains it and the row-to-candidate code copies the verb phrase | with that contract change |
 | Per-model thresholds | global constants (UI §10 decision 2); a settings row + lookup if ever wanted | unscheduled |
+
+### AI change briefs
+
+A `change_brief` is proposed future work. It uses the same private storage, candidate evidence and review flow as pasted text. The worker requires the organisation AI setting and checks the job’s model and storage path before reading data. The provider receives up to 4,000 characters of brief plus bounded model context. A brief cannot be a re-import. Promotion targets a draft Propose branch and skips Capture’s immediate Record/Correct merge action.

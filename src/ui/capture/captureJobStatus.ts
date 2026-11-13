@@ -41,13 +41,14 @@ export function captureJobStatusLabel(job: JobStatusFields): string {
 
 /**
  * The format a capture run's input actually is, for the list's tag. The stored
- * `inputKind` only has three buckets — CSV, Excel and JSON files all share
+ * CSV, Excel and JSON files all share
  * `'spreadsheet'` (they go through one parser family) — so showing it raw
  * called a JSON file a spreadsheet. The file name's extension says which.
  */
 export function captureInputFormatLabel(job: Pick<CaptureJob, 'inputKind' | 'inputName'>): string {
   if (job.inputKind === 'pdf') return 'PDF';
   if (job.inputKind === 'text') return 'Text';
+  if (job.inputKind === 'change_brief') return 'AI change brief';
   const name = job.inputName.toLowerCase();
   if (name.endsWith('.json')) return 'JSON';
   if (name.endsWith('.csv')) return 'CSV';

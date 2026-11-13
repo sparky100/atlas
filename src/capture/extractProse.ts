@@ -51,6 +51,8 @@ import type { LlmClient } from './llm/client';
 import { normaliseName } from './normalise';
 import { parseBool, parseDate, parseEmail, parseName } from './normaliseValue';
 import { buildPromptBUserMessage, PROMPT_B_ELEMENT_TYPES, PROMPT_B_RELATIONSHIP_TYPES, PROMPT_B_SCHEMA, PROMPT_B_SYSTEM, type PromptBChunkLocation } from './prompts/b';
+import type { buildChangeBriefContext } from './changeBriefContext';
+import { CHANGE_BRIEF_SYSTEM } from './prompts/changeBrief';
 import { applyRequiredDefaults, type RowCandidate } from './rowsToCandidates';
 
 export class ExtractProseError extends Error {}
@@ -235,7 +237,7 @@ interface BuiltCandidate {
   offset: number;
 }
 
-function buildElementCandidate(raw: PromptBRawElement, chunkText: string, sourceRefForOffset: (start: number, end: number) => SourceRef): BuiltCandidate {
+function buildElementCandidate(raw: PromptBRawElement, chunkText: string, sourceRefForOffset: (start: number, end: number) => SourceRef, isChangeBrief: boolean): BuiltCandidate {
   const warnings: EvidenceWarning[] = [];
   const nameGround = groundPassage(chunkText, raw.namePassage);
   const ungrounded = !nameGround.found;
@@ -252,6 +254,8 @@ function buildElementCandidate(raw: PromptBRawElement, chunkText: string, source
   const attributeConfidence: Record<string, number> = { ...grounded.confidence, name: nameConfidence };
   const attributeRefs: Record<string, SourceRef> = { ...grounded.refs, name: topSourceRef };
   applyRequiredDefaults(raw.elementType, attributes, attributeConfidence, attributeRefs, topSourceRef);
+  if (isChangeBrief && grounded.values.lifecycleStatus === undefined) attributes.lifecycleStatus = 'planned';
+  const defaultedAttributes = isChangeBrief ? Object.keys(attributes).filter((key) => !(key in grounded.values)) : [];
 
   const proposal: ElementProposal = {
     kind: 'element',
@@ -268,7 +272,8 @@ function buildElementCandidate(raw: PromptBRawElement, chunkText: string, source
     proposal,
     evidence: { sourceRef: topSourceRef, passage: topPassageText, extractor: 'prose-llm', attributeRefs, attributeConfidence, warnings },
     matchHints: {},
-    aliasProposals,
+    aliasProposals: isChangeBrief ? [] : aliasProposals,
+    ...(isChangeBrief ? { defaultedAttributes } : {}),
     ...(ungrounded ? { ungrounded: true } : {}),
   };
   return { candidate, offset: nameGround.found ? nameGround.start : Number.POSITIVE_INFINITY };
@@ -313,6 +318,7 @@ export interface ExtractProseChunkInput {
   inputName: string;
   location: PromptBChunkLocation;
   chunkText: string;
+  changeBriefContext?: ReturnType<typeof buildChangeBriefContext>;
   /** §6.2: "names only... you may refer to them, do not re-emit them" — every prior chunk's own grounded element names, in this document. Empty on a document's first chunk. */
   priorElementNames: readonly string[];
   /** Translates an offset pair within `chunkText` into a real `SourceRef` — `pdf:p{page}!{start}-{end}` (page-local) or `text:{start}-{end}` (whole-document) depending on the chunk's own kind. Supplied by `runCapture.ts`, which alone knows which (`chunk.ts`'s own module comment). */
@@ -327,16 +333,21 @@ export interface ExtractProseChunkResult {
 
 /** One prompt-B call for one chunk: extract, validate, ground every fact, assemble `RowCandidate[]` in §4.5's own (page, passage start offset) order. */
 export async function extractProseChunk(input: ExtractProseChunkInput): Promise<ExtractProseChunkResult> {
-  const userMessage = buildPromptBUserMessage({
+  const isChangeBrief = input.changeBriefContext !== undefined;
+  const documentMessage = buildPromptBUserMessage({
     inputName: input.inputName,
     location: input.location,
     ...(input.priorElementNames.length > 0 ? { priorElementNames: input.priorElementNames } : {}),
     chunkText: input.chunkText,
   });
 
+  const userMessage = isChangeBrief
+    ? JSON.stringify({ brief: input.chunkText, model: input.changeBriefContext })
+    : documentMessage;
   const response = await input.llmClient.complete({
-    effort: PROMPT_B_EFFORT,
-    system: PROMPT_B_SYSTEM,
+    effort: isChangeBrief ? 'low' : PROMPT_B_EFFORT,
+    ...(isChangeBrief ? { maxTokens: 4000 } : {}),
+    system: isChangeBrief ? CHANGE_BRIEF_SYSTEM : PROMPT_B_SYSTEM,
     format: { type: 'json_schema', schema: PROMPT_B_SCHEMA },
     stream: true,
     messages: [{ role: 'user', content: userMessage }],
@@ -353,9 +364,20 @@ export async function extractProseChunk(input: ExtractProseChunkInput): Promise<
     throw new ExtractProseError(`Prompt B response failed schema validation: ${result.error.message}`);
   }
 
+  const brief = isChangeBrief ? ` ${normaliseName(input.chunkText)} ` : '';
+  const mentions = (name: string) => {
+    const normalised = normaliseName(name);
+    return normalised !== '' && brief.includes(` ${normalised} `);
+  };
+  const elements = isChangeBrief
+    ? result.data.elements.filter((element) => element.elementType === 'system' && element.parentName === null && mentions(element.name))
+    : result.data.elements;
+  const relationships = isChangeBrief
+    ? result.data.relationships.filter((relationship) => relationship.relationshipType !== 'owns' && mentions(relationship.fromName) && mentions(relationship.toName))
+    : result.data.relationships;
   const built: BuiltCandidate[] = [
-    ...result.data.elements.map((raw) => buildElementCandidate(raw, input.chunkText, input.sourceRefForOffset)),
-    ...result.data.relationships.map((raw) => buildRelationshipCandidate(raw, input.chunkText, input.sourceRefForOffset)),
+    ...elements.map((raw) => buildElementCandidate(raw, input.chunkText, input.sourceRefForOffset, isChangeBrief)),
+    ...relationships.map((raw) => buildRelationshipCandidate(isChangeBrief ? { ...raw, attributes: raw.attributes.filter((attribute) => attribute.key === 'description') } : raw, input.chunkText, input.sourceRefForOffset)),
   ];
   built.sort((a, b) => a.offset - b.offset);
 

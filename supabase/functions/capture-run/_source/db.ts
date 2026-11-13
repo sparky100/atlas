@@ -81,7 +81,7 @@ interface CaptureJobRow {
   id: UUID;
   org_id: UUID;
   model_id: UUID;
-  input_kind: 'spreadsheet' | 'pdf' | 'text';
+  input_kind: CaptureRunJob['inputKind'];
   input_name: string;
   input_ref: string;
   document_date: string | null;
@@ -250,7 +250,7 @@ export async function getOrCreateJobSource(service: SupabaseClient, job: Capture
     model_id: job.modelId,
     kind: 'capture_job' as const,
     name: sourceNameFor(job, source),
-    uri: `capture-inputs/${job.orgId}/${job.modelId}/${job.id}/${job.inputName}`,
+    uri: job.inputRef,
     captured_at: job.documentDate,
     capture_job_id: job.id,
     created_by: job.createdBy,
@@ -282,6 +282,7 @@ export async function downloadInput(service: SupabaseClient, job: CaptureRunJob)
   if (error) throw new Error(`downloadInput: ${error.message}`);
   const blob = data as Blob;
 
+  if (job.inputKind === 'change_brief') return { format: 'change_brief', text: await blob.text() };
   if (job.inputKind === 'text') return { format: 'text', text: await blob.text() };
   if (job.inputKind === 'pdf') return { format: 'pdf', bytes: await blob.arrayBuffer() };
   // 'spreadsheet'.

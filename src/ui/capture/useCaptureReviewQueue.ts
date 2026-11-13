@@ -10,7 +10,7 @@ import { loadTargetBranchHead, type LoadedTargetBranch } from '../../capture/loa
 import { computeNotInFile, type NotInFileElement } from '../../capture/notInFile';
 import { createChangeBranch, getMainBranch, listChangeBranches } from '../../db/branches';
 import { applyCaptureDecisions, listCaptureCandidates, stageCaptureDecisions, type CaptureDecisionInput } from '../../db/captureCandidates';
-import { discardCaptureJob, finishCaptureReview, getCaptureJob } from '../../db/captureJobs';
+import { discardCaptureJob, finishCaptureReview, getCaptureJob, invokeCaptureRun } from '../../db/captureJobs';
 import { getOrCreateManualSource } from '../../db/sources';
 import { envelopeToDeltaRows, type ElementsHeadRow, type RelationshipsHeadRow } from '../../contracts/rows';
 import { selectAll } from '../../db/selectAll';
@@ -48,8 +48,9 @@ export interface UseCaptureReviewQueueResult {
   draftElementById: Map<UUID, string>;
   targetBranchId: UUID | null;
   setTargetBranchId: (id: UUID | null) => void;
-  /** Creates a fresh draft change branch to promote into, for a reviewer with no existing one yet — mirrors `useChanges.ts`'s own `createChange`, narrowed to what this page needs (a name; intent fixed at `'record'`, matching a capture promotion's own nature). */
+  /** Creates a draft target with the intent appropriate to the capture input. */
   createTargetBranch: (name: string) => Promise<UUID | null>;
+  retry: () => Promise<void>;
   /** One `stage_capture_decisions` call per action (SPEC §8.2), never batched behind a flush button — optimistic local update first, reverted via `reload()` if the call fails. */
   decide: (candidateId: UUID, decision: CandidateDecision | null, decisionDetail?: CandidateDecisionDetail | null) => void;
   /** The `confirm` class's own `x` multi-select + `r` exclude (SPEC §10) — one staging call for the whole batch. */
@@ -65,7 +66,7 @@ export interface UseCaptureReviewQueueResult {
    * wasn't attempted or didn't succeed; the promotion itself is never
    * affected either way.
    */
-  apply: () => Promise<{ appliedCount: number; merged: boolean; mergeSkippedReason?: string } | null>;
+  apply: () => Promise<{ appliedCount: number; merged: boolean; mergeSkippedReason?: string; targetBranchId: UUID } | null>;
   /**
    * SPEC-capture.md §8.2 (amended): closes the review as `reviewed` via
    * `atlas.finish_capture_review` — no target change, no commit — when
@@ -129,6 +130,8 @@ export function useCaptureReviewQueue(modelId: UUID, orgId: UUID, jobId: UUID, u
   const [targetBranchId, setTargetBranchId] = useState<UUID | null>(null);
   const [reloadToken, setReloadToken] = useState(0);
   const targetSeededRef = useRef(false);
+  const applyingBrief = useRef(false);
+  const briefDecisionWrites = useRef<Promise<boolean>>(Promise.resolve(true));
   const targetHeadCacheRef = useRef<{ branchId: UUID; promise: Promise<LoadedTargetBranch> } | null>(null);
 
   const draftElementById = useMemo(() => {
@@ -154,9 +157,11 @@ export function useCaptureReviewQueue(modelId: UUID, orgId: UUID, jobId: UUID, u
       )
       .then(({ jobRow, candidateRows, branches, mainNow, mainHeadCommitId: loadedMainHeadCommitId }) => {
         if (cancelled) return;
-        setJob(jobRow);
-        setCandidates(candidateRows);
-        setChangeBranches(branches.filter((b) => b.status === 'draft'));
+        const scopedJob = jobRow?.modelId === modelId && jobRow.orgId === orgId ? jobRow : null;
+        if (scopedJob?.inputKind === 'change_brief') briefDecisionWrites.current = Promise.resolve(true);
+        setJob(scopedJob);
+        setCandidates(scopedJob ? candidateRows : []);
+        setChangeBranches(branches.filter((b) => b.status === 'draft' && (scopedJob?.inputKind !== 'change_brief' || b.intent === 'propose')));
         setMainHeadCommitId(loadedMainHeadCommitId);
         setMainElementById(mainNow.elements);
         setMainRelationshipById(mainNow.relationships);
@@ -166,7 +171,7 @@ export function useCaptureReviewQueue(modelId: UUID, orgId: UUID, jobId: UUID, u
         // never silently reset back to the job's stale default.
         if (!targetSeededRef.current) {
           targetSeededRef.current = true;
-          setTargetBranchId(jobRow?.targetBranchId ?? null);
+          setTargetBranchId(scopedJob?.targetBranchId ?? null);
         }
         setStatus('idle');
       })
@@ -180,14 +185,43 @@ export function useCaptureReviewQueue(modelId: UUID, orgId: UUID, jobId: UUID, u
     return () => {
       cancelled = true;
     };
-  }, [modelId, jobId, reloadToken]);
+  }, [modelId, orgId, jobId, reloadToken]);
 
   const reload = useCallback(() => {
     setReloadToken((t) => t + 1);
   }, []);
 
+  useEffect(() => {
+    if (job?.inputKind !== 'change_brief' || job.status !== 'pending' || job.error !== null) return;
+    let cancelled = false;
+    const interval = setInterval(() => {
+      void getCaptureJob(supabase, job.id).then((next) => {
+        if (cancelled || !next) return;
+        if (next.status !== 'pending' || next.error !== null) reload();
+        else if (Date.now() - Date.parse(next.progress?.updatedAt ?? next.createdAt) > 180_000) {
+          setError('The draft is taking longer than expected. You can retry this run.');
+        }
+      }).catch((e: unknown) => {
+        if (!cancelled) setError(e instanceof Error ? e.message : 'Could not check the draft status.');
+      });
+    }, 2500);
+    return () => { cancelled = true; clearInterval(interval); };
+  }, [job, reload]);
+
+  const retry = useCallback(async () => {
+    if (job?.inputKind !== 'change_brief' || job.status !== 'pending') return;
+    setError(null);
+    try {
+      const result = await invokeCaptureRun(supabase, job.id);
+      if (result.status === 'error') setError(result.message);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Could not retry the draft.');
+    }
+    reload();
+  }, [job, reload]);
+
   const stageMany = useCallback((entries: readonly CaptureDecisionInput[]) => {
-    if (entries.length === 0) return;
+    if (entries.length === 0 || applyingBrief.current) return;
     const byId = new Map(entries.map((e) => [e.candidateId, e]));
     setCandidates((prev) =>
       prev.map((c) => {
@@ -195,12 +229,24 @@ export function useCaptureReviewQueue(modelId: UUID, orgId: UUID, jobId: UUID, u
         return entry ? { ...c, decision: entry.decision, decisionDetail: entry.decisionDetail } : c;
       }),
     );
-    void stageCaptureDecisions(supabase, jobId, entries).catch((e: unknown) => {
+    const save = () => stageCaptureDecisions(supabase, jobId, entries).then(() => true).catch((e: unknown) => {
       setError(e instanceof Error ? e.message : 'Could not save that decision.');
       reportError("Couldn't save a review decision.", e);
-      reload();
+      return false;
     });
-  }, [jobId, reload]);
+    if (job?.inputKind === 'change_brief') {
+      const pending = briefDecisionWrites.current.then(async (previousSaved) => {
+        const saved = await save();
+        return previousSaved && saved;
+      });
+      briefDecisionWrites.current = pending;
+      void pending.then((saved) => {
+        if (!saved && briefDecisionWrites.current === pending) reload();
+      });
+    } else {
+      void save().then((saved) => { if (!saved) reload(); });
+    }
+  }, [job?.inputKind, jobId, reload]);
 
   const decide = useCallback(
     (candidateId: UUID, decision: CandidateDecision | null, decisionDetail: CandidateDecisionDetail | null = null) => {
@@ -228,7 +274,12 @@ export function useCaptureReviewQueue(modelId: UUID, orgId: UUID, jobId: UUID, u
         return null;
       }
       try {
-        const branch = await createChangeBranch(supabase, { id: crypto.randomUUID(), orgId, modelId, name: trimmed, createdBy: userId, mainHeadCommitId, intent: 'record' });
+        const isChangeBrief = job?.inputKind === 'change_brief';
+        const branch = await createChangeBranch(supabase, {
+          id: crypto.randomUUID(), orgId, modelId, name: isChangeBrief ? `ai-draft-${job.id}` : trimmed,
+          ...(isChangeBrief ? { title: trimmed } : {}),
+          createdBy: userId, mainHeadCommitId, intent: isChangeBrief ? 'propose' : 'record',
+        });
         setChangeBranches((prev) => [branch, ...prev]);
         setTargetBranchId(branch.id);
         return branch.id;
@@ -238,10 +289,10 @@ export function useCaptureReviewQueue(modelId: UUID, orgId: UUID, jobId: UUID, u
         return null;
       }
     },
-    [modelId, orgId, userId, mainHeadCommitId],
+    [modelId, orgId, userId, mainHeadCommitId, job],
   );
 
-  const apply = useCallback(async (): Promise<{ appliedCount: number; merged: boolean; mergeSkippedReason?: string } | null> => {
+  const apply = useCallback(async (): Promise<{ appliedCount: number; merged: boolean; mergeSkippedReason?: string; targetBranchId: UUID } | null> => {
     if (!job?.resultingBranchId) {
       setError('This job has no draft to promote from.');
       return null;
@@ -251,8 +302,29 @@ export function useCaptureReviewQueue(modelId: UUID, orgId: UUID, jobId: UUID, u
       return null;
     }
     // No change picked: the review needs somewhere to land, so make one named after the file rather than making the reviewer stop and create it first. Picking an existing change in the selector is still available.
-    const target = targetBranchId ?? (await createTargetBranch(`Import: ${job.inputName}`));
-    if (!target) return null;
+    const isChangeBrief = job.inputKind === 'change_brief';
+    if (isChangeBrief && !candidates.some((c) => c.decision !== null && c.decision !== 'rejected' && c.promotedSubjectId === null)) {
+      setError('Accept or edit at least one proposed change before applying.');
+      return null;
+    }
+    if (isChangeBrief && applyingBrief.current) return null;
+    if (isChangeBrief) {
+      applyingBrief.current = true;
+      setStatus('applying');
+      if (!(await briefDecisionWrites.current)) {
+        applyingBrief.current = false;
+        setStatus('idle');
+        return null;
+      }
+    }
+    const existingDraft = isChangeBrief ? changeBranches.find((branch) => branch.name === `ai-draft-${job.id}`) : undefined;
+    const selectedTarget = isChangeBrief && !changeBranches.some((branch) => branch.id === targetBranchId) ? null : targetBranchId;
+    const target = (isChangeBrief ? job.targetBranchId : null) ?? selectedTarget ?? existingDraft?.id ?? (await createTargetBranch(isChangeBrief ? job.inputName : `Import: ${job.inputName}`));
+    if (!target) {
+      applyingBrief.current = false;
+      setStatus('idle');
+      return null;
+    }
     setStatus('applying');
     setError(null);
     try {
@@ -297,10 +369,11 @@ export function useCaptureReviewQueue(modelId: UUID, orgId: UUID, jobId: UUID, u
       // real, separate reviewer set regardless of who's applying.
       // Best-effort: the promotion commit above has already landed
       // either way, so a failure here never undoes it.
-      const mergeResult = await autoMergeCaptureChange(supabase, modelId, role, target);
+      const mergeResult = isChangeBrief ? { merged: false as const, reason: 'not_eligible_intent' } : await autoMergeCaptureChange(supabase, modelId, role, target);
       setStatus('idle');
+      if (isChangeBrief) void queryClient.invalidateQueries({ queryKey: queryKeys.reviewQueueCount(modelId) });
       reload();
-      return { appliedCount: toPromote.length, merged: mergeResult.merged, ...(mergeResult.merged ? {} : { mergeSkippedReason: mergeResult.reason }) };
+      return { appliedCount: isChangeBrief ? candidateOutcomes.length : toPromote.length, targetBranchId: target, merged: mergeResult.merged, ...(mergeResult.merged ? {} : { mergeSkippedReason: mergeResult.reason }) };
     } catch (e) {
       setStatus('idle');
       // `explainPromotionError.ts`'s own doc comment: a bare `e.message` here
@@ -311,8 +384,10 @@ export function useCaptureReviewQueue(modelId: UUID, orgId: UUID, jobId: UUID, u
       setError(message);
       reportError("Couldn't apply capture review decisions.", e);
       return null;
+    } finally {
+      applyingBrief.current = false;
     }
-  }, [job, targetBranchId, createTargetBranch, userId, candidates, modelId, orgId, role, reload, mainElementById, draftElementById]);
+  }, [job, targetBranchId, createTargetBranch, userId, candidates, modelId, orgId, role, reload, mainElementById, draftElementById, changeBranches, queryClient]);
 
   const closeWith = useCallback(
     async (close: () => Promise<void>, failure: string): Promise<boolean> => {
@@ -335,7 +410,10 @@ export function useCaptureReviewQueue(modelId: UUID, orgId: UUID, jobId: UUID, u
     [reload, queryClient, modelId],
   );
 
-  const finish = useCallback(() => closeWith(() => finishCaptureReview(supabase, jobId), "Couldn't finish this capture review."), [closeWith, jobId]);
+  const finish = useCallback(async () => {
+    if (job?.inputKind === 'change_brief' && !(await briefDecisionWrites.current)) return false;
+    return closeWith(() => finishCaptureReview(supabase, jobId), "Couldn't finish this capture review.");
+  }, [closeWith, job?.inputKind, jobId]);
   const discard = useCallback(() => closeWith(() => discardCaptureJob(supabase, jobId), "Couldn't discard this import draft."), [closeWith, jobId]);
 
   const searchTargetElements = useCallback(
@@ -373,5 +451,5 @@ export function useCaptureReviewQueue(modelId: UUID, orgId: UUID, jobId: UUID, u
     return computeNotInFile(systems, containers, touchedElementIds);
   }, [candidates, mainElementById]);
 
-  return { status, error, job, candidates, changeBranches, mainElementById, mainRelationshipById, draftElementById, targetBranchId, setTargetBranchId, createTargetBranch, decide, decideMany, apply, finish, discard, searchTargetElements, reload, notInFile };
+  return { status, error, job, candidates, changeBranches, mainElementById, mainRelationshipById, draftElementById, targetBranchId, setTargetBranchId, createTargetBranch, retry, decide, decideMany, apply, finish, discard, searchTargetElements, reload, notInFile };
 }

@@ -36,7 +36,7 @@
  * that's already `parsed`/`reviewed`/`discarded` is a safe no-op — it never
  * re-runs the pipeline or double-writes a draft.
  */
-import type { CaptureCandidate, CaptureJobError, CaptureJobProgress, CaptureStatus } from '../contracts/capture';
+import type { CaptureCandidate, CaptureInputKind, CaptureJobError, CaptureJobProgress, CaptureStatus } from '../contracts/capture';
 import { captureCandidateWireToRow, type CaptureCandidateRowShape } from '../contracts/capture';
 import { envelopeToDeltaRows, type DeltaRow } from '../contracts/rows';
 import type { UUID } from '../contracts/delta';
@@ -51,7 +51,7 @@ export interface CaptureRunJob {
   id: UUID;
   orgId: UUID;
   modelId: UUID;
-  inputKind: 'spreadsheet' | 'pdf' | 'text';
+  inputKind: CaptureInputKind;
   inputName: string;
   /** §3.4: the `capture-inputs` Storage object this job's own input was uploaded/pasted to — `deps.downloadInput` is the only dep that reads it. */
   inputRef: string;
