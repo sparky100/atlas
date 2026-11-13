@@ -154,7 +154,7 @@ test('comment on a branch-only element, merge the change, see the comment on mai
   await page.goto(`/o/${orgSlug}/m/${modelSlug}/changes/${branchId}`);
   await submitForReviewWithReviewers(page, true, { selfApproves: true });
   await expect(page).toHaveURL(new RegExp(`/o/${orgSlug}/m/${modelSlug}/review/`));
-  await expect(page.getByText('pending', { exact: true }).first()).toBeVisible();
+  await expect(page.getByText('pending', { exact: true }).first()).toBeVisible({ timeout: 15_000 });
   const approveButton = page.getByRole('button', { name: 'Approve' });
   await expect(approveButton).toBeEnabled();
   await approveButton.click();

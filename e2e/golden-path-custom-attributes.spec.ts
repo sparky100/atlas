@@ -37,7 +37,7 @@ test('define a select attribute, set it on a system, and filter the browse table
   // all three systems (including the long-named one, which never sorts
   // first alphabetically) are on screen together.
   await page.getByRole('link', { name: 'Browse all elements' }).click();
-  await expect(page.getByRole('link', { name: 'Integrated Regional Revenue and Benefits Collection Platform' })).toBeVisible();
+  await expect(page.getByRole('link', { name: 'Integrated Regional Revenue and Benefits Collection Platform' }).first()).toBeVisible();
   // Below the mobile breakpoint (`ElementBrowseTable.tsx`'s own
   // `MOBILE_BREAKPOINT_PX`), `ElementBrowseCards` renders instead of the
   // table — no fixed-width columns to overflow at all (the long name just

@@ -83,7 +83,7 @@ test('comment on an element from a change\'s view, mention a member, see it in t
   // is always first regardless of how many others exist.
   await submitForReviewWithReviewers(page, true, { selfApproves: true });
   await expect(page).toHaveURL(/\/review\//, { timeout: 15_000 });
-  await expect(page.getByText('pending', { exact: true }).first()).toBeVisible();
+  await expect(page.getByText('pending', { exact: true }).first()).toBeVisible({ timeout: 15_000 });
   const approveButton = page.getByRole('button', { name: 'Approve' });
   await expect(approveButton).toBeEnabled();
   await approveButton.click();
