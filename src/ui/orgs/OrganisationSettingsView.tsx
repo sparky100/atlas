@@ -11,6 +11,7 @@ import type { MemberRole, OrganisationRow } from '../../db/types';
 import { formatDate, formatRelativeTime } from '../time';
 import { ApiKeysPanel } from './ApiKeysPanel';
 import { AttributeDefinitionsPanel } from './AttributeDefinitionsPanel';
+import { EntraSignInPanel } from './EntraSignInPanel';
 import { memberEventSentence } from './memberEventFormat';
 import { canManageOrgSettings } from './roleGates';
 import { useInvites } from './useInvites';
@@ -398,6 +399,12 @@ export function OrganisationSettingsView({ organisation, role, userId, onChanged
               })}
             </ul>
           )}
+        </Panel>
+      )}
+
+      {canManage && (
+        <Panel>
+          <EntraSignInPanel orgId={organisation.id} />
         </Panel>
       )}
 

@@ -1,4 +1,5 @@
 import { createContext } from 'react';
+import type { EntraJoinResult } from '../../contracts/entraTenant';
 
 export type AuthStatus = 'loading' | 'signedOut' | 'signedIn';
 
@@ -13,6 +14,10 @@ export interface AuthContextValue {
    * account sees "not a member of any organisation" until a reload.
    */
   membershipsGeneration: number;
+  /** Result of the join that runs after a sign-in with a Microsoft account (`unknown_tenant` = no organisation has recorded that company yet). `null` before it has run or for a non-Microsoft sign-in. */
+  microsoftJoin: EntraJoinResult | null;
+  /** Starts the Microsoft sign-in redirect (Supabase's Azure provider). */
+  signInWithMicrosoft: () => Promise<{ error: string | null }>;
   signInWithPassword: (email: string, password: string) => Promise<{ error: string | null }>;
   signUpWithPassword: (email: string, password: string) => Promise<{ error: string | null }>;
   /** Sprint F7 item 3: `supabase.auth.signInWithOtp` — emails a one-click sign-in link, no password involved. */

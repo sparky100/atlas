@@ -705,3 +705,5 @@ export interface DashboardTileRow {
   size: DashboardTileSize;
   row_limit: number | null;
 }
+
+export type { OrgEntraTenantRow } from '../contracts/entraTenant';
