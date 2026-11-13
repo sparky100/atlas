@@ -433,3 +433,7 @@ verified in the build sandbox (no Resend key): confirm once for real.
 ## `api`
 
 The read-only API (ADR-031, `docs/API.md`). Holds the service-role key (provided automatically) and scopes every read to the calling API key's organisation in code. Deploy with `pnpm functions:deploy:api`; it must be deployed with `--no-verify-jwt` (already in the script, and `[functions.api]` in `supabase/config.toml` for local runs), since callers send an API key rather than a Supabase JWT. Live behaviour (a real key against the deployed function) is not verifiable in the sandbox this was built in: after deploying, create a key in Organisation settings and `curl` `/v1/models` once.
+
+## `connector-fetch`
+
+Live connectors (ADR-032, `docs/import/mulesoft/connector.md`). Called with the signed-in user's own session (JWT verified by the platform): the connector row is read as that user, so owner/architect row-level security is the permission check, then the service role reads the one secret from Supabase Vault. Deploy with `pnpm functions:deploy:connector-fetch`, after the migration `20261113060000_org_connectors.sql` (which enables the Vault extension). Outbound HTTPS to `anypoint.mulesoft.com` (or the `eu1`/`gov` host) must be allowed. Live behaviour against a real Anypoint organisation has not been verified: after deploying, an owner sets up a connection in Organisation settings and presses **Test connection**.

@@ -10,7 +10,7 @@ import { signUpCreateOrgAndModel } from './fixtures/goldenPath';
 
 test('API access: an owner creates a key, sees it once, then revokes it', async ({ page }) => {
   const { orgName } = await signUpCreateOrgAndModel(page, 'goldenpath-apikeys');
-  await page.getByRole('link', { name: 'Atlas' }).click();
+  await page.getByRole('link', { name: 'Atlas', exact: true }).click();
   await page.getByRole('link', { name: orgName }).click();
   await page.getByRole('link', { name: 'Org settings' }).click();
   await expect(page.getByRole('heading', { name: 'API access' })).toBeVisible();

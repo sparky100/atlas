@@ -1,5 +1,7 @@
 # Importing from MuleSoft Anypoint
 
+> An owner can also **connect Atlas to Anypoint once**, so importing is one button instead of a script and a file: see [connector.md](connector.md). The file route below keeps working.
+
 Atlas imports an Anypoint export as a **file**, not a live connection. You run a small script on your own machine, upload the file it writes, and review the result like any other capture run — nothing changes until you accept and apply it.
 
 ## Steps

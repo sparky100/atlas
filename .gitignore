@@ -21,6 +21,7 @@ supabase/.branches/
 supabase/functions/capture-run/index.ts
 supabase/functions/ask-model/index.ts
 supabase/functions/api/index.ts
+supabase/functions/connector-fetch/index.ts
 
 # scoreCapture.ts --live's own raw cassette scratch output (SPEC-capture.md
 # §12.6) — reviewed by hand, then promoted into a fixture's own committed

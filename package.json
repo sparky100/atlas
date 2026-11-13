@@ -47,7 +47,9 @@
     "functions:bundle:ask-model": "tsx scripts/bundleAskModelFunction.ts",
     "functions:deploy:ask-model": "pnpm functions:bundle:ask-model && supabase functions deploy ask-model",
     "functions:bundle:api": "tsx scripts/bundleApiFunction.ts",
-    "functions:deploy:api": "pnpm functions:bundle:api && supabase functions deploy api --no-verify-jwt"
+    "functions:deploy:api": "pnpm functions:bundle:api && supabase functions deploy api --no-verify-jwt",
+    "functions:bundle:connector-fetch": "tsx scripts/bundleConnectorFetchFunction.ts",
+    "functions:deploy:connector-fetch": "pnpm functions:bundle:connector-fetch && supabase functions deploy connector-fetch"
   },
   "pnpm": {
     "onlyBuiltDependencies": [
