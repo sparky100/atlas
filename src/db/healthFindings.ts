@@ -362,6 +362,23 @@ export async function listFactsForCommit(supabase: Client, commitId: string): Pr
   return selectAll<FactsRow>(query);
 }
 
+/** The only fact columns the stale-attributes finding reads. */
+export type FactStalenessRow = Pick<FactsRow, 'subject_id' | 'attribute' | 'effective_date' | 'asserted_at'>;
+
+/**
+ * Just what `computeStaleAttributesFinding` needs — `subject_id`, `attribute` (to skip `$exists`) and the two dates — for element facts only. Same facts, a fraction of the payload `listFactsForCommit` (`select *`, values and provenance included) sends; Home's findings used to download all of it to read three columns. Routed through `selectAll` (SPEC §6.7).
+ */
+export async function listFactStalenessForCommit(supabase: Client, commitId: string): Promise<FactStalenessRow[]> {
+  const query = supabase
+    .from('facts')
+    .select('subject_id,attribute,effective_date,asserted_at', { count: 'exact' })
+    .eq('commit_id', commitId)
+    .eq('subject_type', 'element')
+    .order('subject_id')
+    .order('attribute');
+  return selectAll<FactStalenessRow>(query);
+}
+
 /** Every `container` in `containers`, grouped by its own `parent_id` — a platform's modules, keyed by the platform's own element id. Shared by `findSystemsWithoutCapability` and `findPlatformSupportsThatShouldMoveToModule` below so the two findings never define "this platform's modules" two different ways. */
 function groupModulesByPlatformId(containers: readonly ElementsHeadRow[]): Map<UUID, ElementsHeadRow[]> {
   const result = new Map<UUID, ElementsHeadRow[]>();
@@ -581,10 +598,10 @@ export interface StaleAttributesFinding {
  * "Still accurate" never re-asserts it, so counting it would keep every old
  * element on the list after its owner had confirmed it.
  *
- * SQL twin: `atlas.stale_elements` (20261113010000_stale_threshold_and_nudges.sql),
+ * SQL twin: `atlas.stale_elements` (20261113040000_stale_threshold_and_nudges.sql),
  * which decides who gets the reminder email — keep the two rules identical.
  */
-export function computeStaleAttributesFinding(facts: readonly FactsRow[], elements: readonly ElementsHeadRow[], now: Date = new Date(), staleAfterMonths: number = STALE_AFTER_MONTHS): StaleAttributesFinding {
+export function computeStaleAttributesFinding(facts: readonly FactStalenessRow[], elements: readonly ElementsHeadRow[], now: Date = new Date(), staleAfterMonths: number = STALE_AFTER_MONTHS): StaleAttributesFinding {
   const systemsById = new Map(elements.map((s) => [s.element_id, s]));
   let staleFactCount = 0;
   let oldestMonths = 0;

@@ -35,7 +35,7 @@ All the deltas share one fresh `sources` row of kind **`attestation`**, named "C
 
 **Where:** a **✓ Still accurate** button beside **✎ Edit** on the element page, and per row in the Elements grid while it is in edit mode.
 
-## Amendment (2026-11-13, `20261113010000_stale_threshold_and_nudges.sql`): the threshold is per organisation, staleness covers every element, owners are nudged
+## Amendment (2026-11-13, `20261113040000_stale_threshold_and_nudges.sql`): the threshold is per organisation, staleness covers every element, owners are nudged
 
 - **Threshold.** `STALE_AFTER_MONTHS` (12) is now only the default. `organisations.stale_after_months` (1–60) holds each organisation's own, set by an owner or architect through `atlas.set_stale_threshold` (Organisation settings → Out-of-date information). Every staleness check takes it: the provenance badge (via `StaleAfterMonthsContext`, provided once by `ModelRouteGate`), the My work finding, the Elements list, the finding reports and the Ask Atlas tools.
 - **Every element type.** The finding used to look at systems only. It now covers every element, because "Still accurate" is offered on every element. Relationships stay out until they can be confirmed (see Scope below): a flag nobody can clear is not a finding.

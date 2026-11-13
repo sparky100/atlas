@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import type { Criticality, ElementType, UUID } from '../../contracts/delta';
-import type { ElementsHeadRow, FactsRow, Json, RelationshipsHeadRow } from '../../contracts/rows';
+import type { ElementsHeadRow, Json, RelationshipsHeadRow } from '../../contracts/rows';
 import { CRITICALITY_ORDER } from './criticalityTone';
 import { DISPOSITION_ORDER } from './disposition';
 import type { Disposition } from '../../contracts/delta';
@@ -28,7 +28,8 @@ import {
   listAllOwnsEdges,
   listAllReplacesEdges,
   listAllUsesAndFlowsToEdges,
-  listFactsForCommit,
+  listFactStalenessForCommit,
+  type FactStalenessRow,
 } from '../../db/healthFindings';
 import { replacedElementIds } from '../../engine/elementRead/fitAndExposure';
 import { listAllSupportsEdges } from '../../db/modelHome';
@@ -38,6 +39,31 @@ import type { ViewMode } from '../../db/viewMode';
 import { resolveBranchModeProjectionCached } from '../query/cachedBranchProjection';
 import { reportError } from '../errors/errorBannerStore';
 import { supabase } from '../supabaseClient';
+
+/** Everything one model load produced — filters read this, never the network again (see the first effect in `useElementBrowse`). */
+interface BrowseBase {
+  elements: ElementsHeadRow[];
+  supportsEdges: RelationshipsHeadRow[];
+  ownsEdges: RelationshipsHeadRow[];
+  rows: BrowseRow[];
+  commitId: UUID;
+  getFacts: () => Promise<FactStalenessRow[]>;
+  getUsesAndFlowsToEdges: () => Promise<RelationshipsHeadRow[]>;
+  getReplacesEdges: () => Promise<RelationshipsHeadRow[]>;
+  getRetiredByOpenChanges: () => Promise<Set<UUID>>;
+}
+
+/** Runs `fn` on first call and hands every later caller the same promise; a failure is forgotten so a retry can run again. */
+function once<T>(fn: () => Promise<T>): () => Promise<T> {
+  let cached: Promise<T> | null = null;
+  return () => {
+    cached ??= fn().catch((e: unknown) => {
+      cached = null;
+      throw e;
+    });
+    return cached;
+  };
+}
 
 export type ElementBrowseStatus = 'loading' | 'error' | 'refNotFound' | 'ready';
 // `ElementBrowseSortKey`/`sortKeyEquals`/`compareCustomAttributeValues` now
@@ -204,7 +230,11 @@ export function useElementBrowse(
   // exactly the "is commitId really set by the time status is 'ready'"
   // question a reviewer would have to trust a comment for instead of the
   // type system.
-  const [loaded, setLoaded] = useState<{ allRows: BrowseRow[]; commitId: UUID; filteredIds: ReadonlySet<UUID> | null } | null>(null);
+  const [base, setBase] = useState<BrowseBase | null>(null);
+  const [filtered, setFiltered] = useState<{ base: BrowseBase; filterKey: string; ids: ReadonlySet<UUID> | null } | null>(null);
+  const filterKey = filter !== null && typeof filter === 'object' ? JSON.stringify(filter) : (filter ?? '');
+  // Only a result computed for this exact model load *and* this exact filter counts as loaded.
+  const loaded = filtered?.base === base && filtered.filterKey === filterKey ? { allRows: filtered.base.rows, commitId: filtered.base.commitId, filteredIds: filtered.ids } : null;
   const [reloadToken, setReloadToken] = useState(0);
   const [typeFilter, setTypeFilter] = useState<ElementType | 'all'>('all');
   const [dispositionFilter, setDispositionFilter] = useState<DispositionFilter>('all');
@@ -213,10 +243,16 @@ export function useElementBrowse(
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc');
   const refParam = refParamOf(ref);
 
+  // Effect 1 — the model itself, loaded once per model/ref/mode/reload. Changing only `filter`
+  // never re-runs this (it used to refetch every element and edge on each filter change); the
+  // extra reads a filter may need (facts, uses/flows_to, replaces, open-change retirements) are
+  // memoised on `base`, so each runs at most once however many filters the user switches through.
   useEffect(() => {
     if (!modelId) return undefined;
     let cancelled = false;
     setStatus('loading');
+    setBase(null);
+    setFiltered(null);
 
     async function load(): Promise<void> {
       let resolvedCommitId: UUID;
@@ -225,7 +261,7 @@ export function useElementBrowse(
       let ownsEdges: RelationshipsHeadRow[];
       let ownersByElementId: Map<UUID, ElementsHeadRow>;
       /** Deferred so the common filter logic below can `await` it only for the two filters that actually need it — a real query for main/tag, an already-in-memory filter for a branch ref (see this hook's own module comment). */
-      let getFacts: () => Promise<FactsRow[]>;
+      let getFacts: () => Promise<FactStalenessRow[]>;
       let getUsesAndFlowsToEdges: () => Promise<RelationshipsHeadRow[]>;
       let getReplacesEdges: () => Promise<RelationshipsHeadRow[]>;
 
@@ -271,77 +307,24 @@ export function useElementBrowse(
         const elementsByIdForOwners = new Map<UUID, ElementsHeadRow>(elements.map((e) => [e.element_id, e]));
         // Reuses the `owns` edges fetched above (the same query `loadOwnersByElementId` would run again, one round trip later).
         ownersByElementId = ownersByElementIdFromOwnsEdges(ownsEdges, elementsByIdForOwners);
-        getFacts = () => listFactsForCommit(supabase, commitId);
+        getFacts = () => listFactStalenessForCommit(supabase, commitId);
         getUsesAndFlowsToEdges = () => listAllUsesAndFlowsToEdges(supabase, commitId);
         getReplacesEdges = () => listAllReplacesEdges(supabase, commitId);
       }
-      const elementsById = new Map<UUID, ElementsHeadRow>(elements.map((e) => [e.element_id, e]));
-
-      let ids: Set<UUID> | null = null;
-      if (filter === 'unlinked-systems') {
-        const systems = elements.filter((e) => e.element_type === 'system');
-        const containers = elements.filter((e) => e.element_type === 'container');
-        ids = new Set(findSystemsWithoutCapability(systems, supportsEdges, containers).map((e) => e.element_id));
-      } else if (filter === 'platform-supports-move-to-module') {
-        const systems = elements.filter((e) => e.element_type === 'system');
-        const containers = elements.filter((e) => e.element_type === 'container');
-        ids = new Set(findPlatformSupportsThatShouldMoveToModule(systems, supportsEdges, containers).map((e) => e.element_id));
-      } else if (filter === 'unowned-capabilities') {
-        const capabilities = elements.filter((e) => e.element_type === 'capability');
-        ids = new Set(findCapabilitiesWithoutOwner(capabilities, supportsEdges, ownsEdges).map((e) => e.element_id));
-      } else if (filter === 'stale-attributes') {
-        const facts = await getFacts();
-        ids = new Set(computeStaleAttributesFinding(facts, elements, new Date(), staleAfterMonths).staleElements.map((e) => e.element_id));
-      } else if (filter === 'no-technical-owner') {
-        const systems = elements.filter((e) => e.element_type === 'system');
-        const containers = elements.filter((e) => e.element_type === 'container');
-        ids = new Set(findSystemsWithoutTechnicalOwner([...systems, ...containers], ownsEdges).map((e) => e.element_id));
-      } else if (filter === 'critical-no-business-owner') {
-        const systems = elements.filter((e) => e.element_type === 'system');
-        const containers = elements.filter((e) => e.element_type === 'container');
-        ids = new Set(findCriticalSystemsWithoutBusinessOwner([...systems, ...containers], ownsEdges).map((e) => e.element_id));
-      } else if (filter === 'critical-exposed') {
-        const systems = elements.filter((e) => e.element_type === 'system');
-        const replacesEdges = await getReplacesEdges();
-        ids = new Set(findCriticalExposedSystems(systems, new Date(), replacedElementIds(replacesEdges)).map((e) => e.element_id));
-      } else if (filter === 'unused-integration-platform') {
-        const systems = elements.filter((e) => e.element_type === 'system');
-        const usesAndFlowsToEdges = await getUsesAndFlowsToEdges();
-        const containers = elements.filter((e) => e.element_type === 'container');
-        ids = new Set(findUnusedIntegrationPlatforms(systems, usesAndFlowsToEdges, containers).map((e) => e.element_id));
-      } else if (filter === 'unused-integration-interface') {
-        const systems = elements.filter((e) => e.element_type === 'system');
-        const containers = elements.filter((e) => e.element_type === 'container');
-        const usesAndFlowsToEdges = await getUsesAndFlowsToEdges();
-        ids = new Set(findUnusedIntegrationInterfaces(systems, containers, usesAndFlowsToEdges).map((e) => e.element_id));
-      } else if (filter === 'essential-no-technical-owner') {
-        const systems = elements.filter((e) => e.element_type === 'system');
-        const containers = elements.filter((e) => e.element_type === 'container');
-        const capabilities = elements.filter((e) => e.element_type === 'capability');
-        ids = new Set(findSystemsSupportingEssentialFunctionWithoutTechnicalOwner([...systems, ...containers], capabilities, supportsEdges, ownsEdges).map((e) => e.element_id));
-      } else if (filter === 'critical-support-end') {
-        const systems = elements.filter((e) => e.element_type === 'system');
-        ids = new Set(findCriticalSystemsPastOrNearSupportEnd(systems).map((e) => e.element_id));
-      } else if (filter === 'capability-no-supporters') {
-        const capabilities = elements.filter((e) => e.element_type === 'capability');
-        const level1Capabilities = computeCapabilityMapTree(capabilities).l1.map((column) => column.capability);
-        ids = new Set(findCapabilitiesWithNoSupporters(level1Capabilities, capabilities, supportsEdges, ownsEdges).map((e) => e.element_id));
-      } else if (filter === 'outgoing-no-retiring-change') {
-        const retiring = await loadElementsRetiredByOpenChanges(supabase, modelId);
-        const candidates = elements.filter((e) => e.element_type === 'system' || e.element_type === 'container');
-        ids = new Set(findOutgoingWithoutRetiringChange(candidates, retiring, elementsById).map((e) => e.element_id));
-      } else if (filter !== null && typeof filter === 'object') {
-        // F1 PR4: an org-defined attribute's own equality filter — `value`
-        // arrives already parsed to the definition's `kind` by the caller,
-        // so this is a plain `===`, never a second parse here.
-        ids = new Set(elements.filter((e) => attributesRecord(e.attributes)[filter.custom] === filter.value).map((e) => e.element_id));
-      }
-
       const rows = buildBrowseRows(elements, ownersByElementId);
 
       if (!cancelled) {
-        setLoaded({ allRows: rows, commitId: resolvedCommitId, filteredIds: ids });
-        setStatus('ready');
+        setBase({
+          elements,
+          supportsEdges,
+          ownsEdges,
+          rows,
+          commitId: resolvedCommitId,
+          getFacts: once(getFacts),
+          getUsesAndFlowsToEdges: once(getUsesAndFlowsToEdges),
+          getReplacesEdges: once(getReplacesEdges),
+          getRetiredByOpenChanges: once(() => loadElementsRetiredByOpenChanges(supabase, modelId)),
+        });
       }
     }
 
@@ -359,7 +342,97 @@ export function useElementBrowse(
     // `ref`'s string form (`refParam`, computed above) is the real
     // dependency, not `ref` itself — same pitfall/fix as
     // useCapabilityLandscape.ts/useLandscape.ts.
-  }, [modelId, refParam, mode, filter, reloadToken, mainCommitIdHint, staleAfterMonths]);
+  }, [modelId, refParam, mode, reloadToken, mainCommitIdHint]);
+
+  // Effect 2 — which rows the current `filter` keeps, over the already-loaded `base`.
+  useEffect(() => {
+    if (!base) return undefined;
+    const b: BrowseBase = base;
+    let cancelled = false;
+    const { elements, supportsEdges, ownsEdges } = b;
+    const elementsById = new Map<UUID, ElementsHeadRow>(elements.map((e) => [e.element_id, e]));
+
+    async function compute(): Promise<void> {
+      let ids: Set<UUID> | null = null;
+      if (filter === 'unlinked-systems') {
+        const systems = elements.filter((e) => e.element_type === 'system');
+        const containers = elements.filter((e) => e.element_type === 'container');
+        ids = new Set(findSystemsWithoutCapability(systems, supportsEdges, containers).map((e) => e.element_id));
+      } else if (filter === 'platform-supports-move-to-module') {
+        const systems = elements.filter((e) => e.element_type === 'system');
+        const containers = elements.filter((e) => e.element_type === 'container');
+        ids = new Set(findPlatformSupportsThatShouldMoveToModule(systems, supportsEdges, containers).map((e) => e.element_id));
+      } else if (filter === 'unowned-capabilities') {
+        const capabilities = elements.filter((e) => e.element_type === 'capability');
+        ids = new Set(findCapabilitiesWithoutOwner(capabilities, supportsEdges, ownsEdges).map((e) => e.element_id));
+      } else if (filter === 'stale-attributes') {
+        const facts = await b.getFacts();
+        ids = new Set(computeStaleAttributesFinding(facts, elements, new Date(), staleAfterMonths).staleElements.map((e) => e.element_id));
+      } else if (filter === 'no-technical-owner') {
+        const systems = elements.filter((e) => e.element_type === 'system');
+        const containers = elements.filter((e) => e.element_type === 'container');
+        ids = new Set(findSystemsWithoutTechnicalOwner([...systems, ...containers], ownsEdges).map((e) => e.element_id));
+      } else if (filter === 'critical-no-business-owner') {
+        const systems = elements.filter((e) => e.element_type === 'system');
+        const containers = elements.filter((e) => e.element_type === 'container');
+        ids = new Set(findCriticalSystemsWithoutBusinessOwner([...systems, ...containers], ownsEdges).map((e) => e.element_id));
+      } else if (filter === 'critical-exposed') {
+        const systems = elements.filter((e) => e.element_type === 'system');
+        const replacesEdges = await b.getReplacesEdges();
+        ids = new Set(findCriticalExposedSystems(systems, new Date(), replacedElementIds(replacesEdges)).map((e) => e.element_id));
+      } else if (filter === 'unused-integration-platform') {
+        const systems = elements.filter((e) => e.element_type === 'system');
+        const usesAndFlowsToEdges = await b.getUsesAndFlowsToEdges();
+        const containers = elements.filter((e) => e.element_type === 'container');
+        ids = new Set(findUnusedIntegrationPlatforms(systems, usesAndFlowsToEdges, containers).map((e) => e.element_id));
+      } else if (filter === 'unused-integration-interface') {
+        const systems = elements.filter((e) => e.element_type === 'system');
+        const containers = elements.filter((e) => e.element_type === 'container');
+        const usesAndFlowsToEdges = await b.getUsesAndFlowsToEdges();
+        ids = new Set(findUnusedIntegrationInterfaces(systems, containers, usesAndFlowsToEdges).map((e) => e.element_id));
+      } else if (filter === 'essential-no-technical-owner') {
+        const systems = elements.filter((e) => e.element_type === 'system');
+        const containers = elements.filter((e) => e.element_type === 'container');
+        const capabilities = elements.filter((e) => e.element_type === 'capability');
+        ids = new Set(findSystemsSupportingEssentialFunctionWithoutTechnicalOwner([...systems, ...containers], capabilities, supportsEdges, ownsEdges).map((e) => e.element_id));
+      } else if (filter === 'critical-support-end') {
+        const systems = elements.filter((e) => e.element_type === 'system');
+        ids = new Set(findCriticalSystemsPastOrNearSupportEnd(systems).map((e) => e.element_id));
+      } else if (filter === 'capability-no-supporters') {
+        const capabilities = elements.filter((e) => e.element_type === 'capability');
+        const level1Capabilities = computeCapabilityMapTree(capabilities).l1.map((column) => column.capability);
+        ids = new Set(findCapabilitiesWithNoSupporters(level1Capabilities, capabilities, supportsEdges, ownsEdges).map((e) => e.element_id));
+      } else if (filter === 'outgoing-no-retiring-change') {
+        const retiring = await b.getRetiredByOpenChanges();
+        const candidates = elements.filter((e) => e.element_type === 'system' || e.element_type === 'container');
+        ids = new Set(findOutgoingWithoutRetiringChange(candidates, retiring, elementsById).map((e) => e.element_id));
+      } else if (filter !== null && typeof filter === 'object') {
+        // F1 PR4: an org-defined attribute's own equality filter — `value`
+        // arrives already parsed to the definition's `kind` by the caller,
+        // so this is a plain `===`, never a second parse here.
+        ids = new Set(elements.filter((e) => attributesRecord(e.attributes)[filter.custom] === filter.value).map((e) => e.element_id));
+      }
+
+      if (!cancelled) {
+        setFiltered({ base: b, filterKey, ids });
+        setStatus('ready');
+      }
+    }
+
+    compute().catch((e: unknown) => {
+      reportError("Couldn't load elements.", e);
+      if (!cancelled) {
+        setError(e instanceof Error ? e.message : 'Failed to load elements.');
+        setStatus('error');
+      }
+    });
+
+    return () => {
+      cancelled = true;
+    };
+    // `filterKey` stands in for `filter` (an object for a custom-attribute filter) so a caller
+    // passing a fresh-but-equal object never re-runs this.
+  }, [base, filterKey, staleAfterMonths]);
 
   const setSort = (key: ElementBrowseSortKey) => {
     if (sortKeyEquals(key, sortKey)) {

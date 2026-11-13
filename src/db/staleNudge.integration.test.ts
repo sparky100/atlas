@@ -1,5 +1,5 @@
 /**
- * Stale-data threshold and owner nudges (20261113010000_stale_threshold_and_nudges.sql)
+ * Stale-data threshold and owner nudges (20261113040000_stale_threshold_and_nudges.sql)
  * against a real local Supabase with real RLS:
  *
  * - the organisation's threshold defaults to 12 months, an owner or architect

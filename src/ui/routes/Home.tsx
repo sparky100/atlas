@@ -37,7 +37,7 @@ function slugify(name: string): string {
  * has a profile with a name, so gating there too would be redundant.
  */
 export function Home() {
-  const { userId } = useAuth();
+  const { userId, microsoftJoin } = useAuth();
   const { profile, loading: profileLoading, refresh: refreshProfile } = useOwnProfile(userId);
   const { organisations, loading, error, createOrganisation } = useOrganisations();
   const [creating, setCreating] = useState(false);
@@ -117,6 +117,11 @@ export function Home() {
             <Text as="p" tone="muted">
               You're not a member of any organisation yet. How do you want to start?
             </Text>
+            {microsoftJoin === 'unknown_tenant' && (
+              <Text as="p">
+                Your company hasn't set up Atlas yet. Ask your Atlas owner to add your Microsoft tenant ID in Organisation settings, then sign in again. Or start your own below.
+              </Text>
+            )}
             <div className={styles.createSection}>
               <Button variant="primary" disabled={submitting} onClick={() => void handleJustMe()}>
                 {submitting ? 'Creating…' : 'Just me'}

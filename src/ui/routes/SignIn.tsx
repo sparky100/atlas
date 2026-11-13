@@ -36,7 +36,7 @@ const HEADINGS: Record<Mode, string> = {
  * message (that function's own module comment has the full reasoning).
  */
 export function SignIn() {
-  const { status, signInWithPassword, signUpWithPassword, sendMagicLink, sendPasswordResetEmail } = useAuth();
+  const { status, signInWithMicrosoft, signInWithPassword, signUpWithPassword, sendMagicLink, sendPasswordResetEmail } = useAuth();
   const location = useLocation();
   const [mode, setMode] = useState<Mode>('signIn');
   const [email, setEmail] = useState('');
@@ -134,6 +134,20 @@ export function SignIn() {
               {submitting ? 'Please wait…' : mode === 'signIn' ? 'Sign in' : mode === 'signUp' ? 'Create account' : mode === 'magicLink' ? 'Send link' : 'Send reset link'}
             </Button>
           </form>
+        )}
+        {mode === 'signIn' && (
+          <Button
+            variant="secondary"
+            disabled={submitting}
+            onClick={() => {
+              setError(null);
+              void signInWithMicrosoft().then((result) => {
+                if (result.error) setError(authErrorMessage(result.error));
+              });
+            }}
+          >
+            Sign in with Microsoft
+          </Button>
         )}
         <div className={styles.modeSwitch}>
           {mode === 'signIn' && (

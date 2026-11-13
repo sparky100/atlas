@@ -429,3 +429,7 @@ Secrets: `RESEND_API_KEY`, `RESEND_FROM_ADDRESS` (shared with
 no trailing slash, e.g. `https://atlas.simmodlr.app`). Deploy with
 `supabase functions deploy send-review-email`. Live delivery was not
 verified in the build sandbox (no Resend key): confirm once for real.
+
+## `api`
+
+The read-only API (ADR-031, `docs/API.md`). Holds the service-role key (provided automatically) and scopes every read to the calling API key's organisation in code. Deploy with `pnpm functions:deploy:api`; it must be deployed with `--no-verify-jwt` (already in the script, and `[functions.api]` in `supabase/config.toml` for local runs), since callers send an API key rather than a Supabase JWT. Live behaviour (a real key against the deployed function) is not verifiable in the sandbox this was built in: after deploying, create a key in Organisation settings and `curl` `/v1/models` once.

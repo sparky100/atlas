@@ -9,7 +9,9 @@ import { Text } from '../components/Text/Text';
 import { TypedNameConfirm } from '../components/TypedNameConfirm/TypedNameConfirm';
 import type { MemberRole, OrganisationRow } from '../../db/types';
 import { formatDate, formatRelativeTime } from '../time';
+import { ApiKeysPanel } from './ApiKeysPanel';
 import { AttributeDefinitionsPanel } from './AttributeDefinitionsPanel';
+import { EntraSignInPanel } from './EntraSignInPanel';
 import { memberEventSentence } from './memberEventFormat';
 import { canManageOrgSettings } from './roleGates';
 import { useInvites } from './useInvites';
@@ -257,6 +259,7 @@ export function OrganisationSettingsView({ organisation, role, userId, onChanged
             </Text>
           )}
         </section>
+        <ApiKeysPanel orgId={organisation.id} isOwner={role === 'owner'} />
         {error !== null && <Text as="p">{error}</Text>}
       </Panel>
 
@@ -442,6 +445,12 @@ export function OrganisationSettingsView({ organisation, role, userId, onChanged
               })}
             </ul>
           )}
+        </Panel>
+      )}
+
+      {canManage && (
+        <Panel>
+          <EntraSignInPanel orgId={organisation.id} />
         </Panel>
       )}
 

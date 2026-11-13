@@ -45,7 +45,9 @@
     "functions:bundle:capture-run": "tsx scripts/bundleCaptureRunFunction.ts",
     "functions:deploy:capture-run": "pnpm functions:bundle:capture-run && supabase functions deploy capture-run",
     "functions:bundle:ask-model": "tsx scripts/bundleAskModelFunction.ts",
-    "functions:deploy:ask-model": "pnpm functions:bundle:ask-model && supabase functions deploy ask-model"
+    "functions:deploy:ask-model": "pnpm functions:bundle:ask-model && supabase functions deploy ask-model",
+    "functions:bundle:api": "tsx scripts/bundleApiFunction.ts",
+    "functions:deploy:api": "pnpm functions:bundle:api && supabase functions deploy api --no-verify-jwt"
   },
   "pnpm": {
     "onlyBuiltDependencies": [
