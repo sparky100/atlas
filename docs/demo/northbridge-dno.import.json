@@ -85,6 +85,7 @@
     },
     {
       "name": "Salesforce",
+      "description": "CRM, case management and field-force platform used by customer service, connections and field teams.",
       "kind": "platform",
       "vendor": "Salesforce",
       "lifecycle": "active",
@@ -95,7 +96,6 @@
       "hosting_model": "saas",
       "business_owner": "Customer Operations Director",
       "technical_owner": "Customer Platforms Team",
-      "description": "CRM, workflow and field-force platform.",
       "quote": "Northbridge Power Distribution demo architecture (fictional organisation, illustrative)",
       "confidence": 0.9,
       "introduced": "2009-11-01"
@@ -268,9 +268,9 @@
     },
     {
       "name": "Navisworks",
+      "description": "Combines design models from different teams to find clashes before construction starts.",
       "platform": "Autodesk Construction Cloud",
       "capability": "Capital Projects & Construction",
-      "description": "Model coordination and clash detection.",
       "lifecycle": "active",
       "criticality": "medium",
       "disposition": "tolerate",
@@ -426,6 +426,7 @@
     },
     {
       "name": "Interruptions Reporting Tool",
+      "description": "Calculates customer interruption (CI) and minutes lost (CML) figures and produces the regulatory interruptions report.",
       "capability": "Interruptions Incentive Reporting",
       "kind": "application",
       "lifecycle": "active",
@@ -436,7 +437,6 @@
       "hosting_model": "saas",
       "business_owner": "Head of Regulation",
       "technical_owner": "Network Operations IT",
-      "description": "CI/CML calculation and reporting.",
       "quote": "Northbridge Power Distribution demo architecture (fictional organisation, illustrative)",
       "confidence": 0.9,
       "introduced": "2020-04-01"
@@ -619,6 +619,7 @@
     },
     {
       "name": "Streetworks Permit Tracker",
+      "description": "Tracks street works permits and notices, with start and end dates and permit conditions for each excavation.",
       "capability": "Streetworks & Permits",
       "kind": "application",
       "lifecycle": "active",
@@ -651,6 +652,7 @@
     },
     {
       "name": "Vegetation Management Tool",
+      "description": "Plans and records tree cutting and vegetation clearance around overhead lines and assigns the work to contractors.",
       "capability": "Vegetation Management",
       "kind": "application",
       "lifecycle": "active",
@@ -667,6 +669,7 @@
     },
     {
       "name": "Complaints Access Database",
+      "description": "Old desktop database where customer complaints are logged and tracked, with no workflow or reporting.",
       "capability": "Complaints & Feedback",
       "kind": "application",
       "lifecycle": "retired",
@@ -684,6 +687,7 @@
     },
     {
       "name": "Microsoft 365",
+      "description": "Email, calendar, document sharing and Teams meetings for all staff.",
       "capability": "Contact Channels",
       "kind": "platform",
       "vendor": "Microsoft",
@@ -701,6 +705,7 @@
     },
     {
       "name": "ServiceNow",
+      "description": "IT service desk: incidents, requests, changes and the record of IT assets.",
       "capability": "Technology Service Management",
       "kind": "application",
       "vendor": "ServiceNow",
@@ -718,6 +723,7 @@
     },
     {
       "name": "Azure Data Platform",
+      "description": "Cloud data store and processing service holding network, customer and asset data for analytics.",
       "capability": "Analytics & Business Intelligence",
       "kind": "data_platform",
       "vendor": "Microsoft",
@@ -735,6 +741,7 @@
     },
     {
       "name": "Power BI",
+      "description": "Dashboards and reports for management, built on data from the data platform.",
       "capability": "Analytics & Business Intelligence",
       "kind": "application",
       "vendor": "Microsoft",
@@ -752,6 +759,7 @@
     },
     {
       "name": "Enterprise Risk Register",
+      "description": "Holds the organisation's risks, their owners, ratings and the actions to reduce them.",
       "capability": "Risk Management",
       "kind": "application",
       "lifecycle": "active",
@@ -768,6 +776,7 @@
     },
     {
       "name": "Safety Management System",
+      "description": "Records safety incidents, near misses, inspections and corrective actions for field and office staff.",
       "capability": "Health, Safety & Environment",
       "kind": "application",
       "lifecycle": "active",
@@ -802,6 +811,7 @@
     },
     {
       "name": "Document Management",
+      "description": "Stores controlled documents such as policies, procedures, drawings and contracts, with version history.",
       "capability": "Records Management",
       "kind": "application",
       "vendor": "OpenText",
@@ -861,6 +871,7 @@
     },
     {
       "name": "ECOES",
+      "description": "Industry registration look-up service for finding the supplier and meter details for a supply point.",
       "kind": "application",
       "is_external": true,
       "external_organisation": "Electricity Central Online Enquiry Service",
@@ -868,7 +879,6 @@
       "criticality": "high",
       "domain": "it",
       "hosting_model": "saas",
-      "description": "Industry registration look-up service.",
       "quote": "Northbridge Power Distribution demo architecture (fictional organisation, illustrative)",
       "confidence": 0.9,
       "introduced": "2011-05-01"
@@ -952,9 +962,9 @@
     },
     {
       "name": "Outage Events",
+      "description": "Live outage and fault events sent from the network control system to other systems.",
       "platform": "MuleSoft Anypoint",
       "interface_type": "event",
-      "description": "Live outage and fault events from ADMS.",
       "lifecycle": "active",
       "criticality": "high",
       "transformation": "Enriches events with affected customers from the PSR.",
@@ -974,9 +984,9 @@
     },
     {
       "name": "Billing Postings",
+      "description": "Network charge billing postings sent to the finance ledger.",
       "platform": "MuleSoft Anypoint",
       "interface_type": "batch",
-      "description": "DUoS billing postings to the ledger.",
       "lifecycle": "active",
       "criticality": "high",
       "quote": "Northbridge Power Distribution demo architecture (fictional organisation, illustrative)",
@@ -984,9 +994,9 @@
     },
     {
       "name": "Industry D-flow Gateway",
+      "description": "Exchanges industry data files with the central data transfer network.",
       "platform": "MuleSoft Anypoint",
       "interface_type": "file",
-      "description": "D-flow files to and from the DTN.",
       "lifecycle": "active",
       "criticality": "high",
       "transformation": "Converts D-flow fixed-width files to API messages.",
@@ -1194,11 +1204,11 @@
   ],
   "relationships": [
     {
-      "from": "Salesforce \u00b7 Field Service",
+      "from": "Salesforce · Field Service",
       "type": "flows_to",
-      "to": "SAP S/4HANA Utilities \u00b7 Plant Maintenance (PM)",
+      "to": "SAP S/4HANA Utilities · Plant Maintenance (PM)",
       "description": "sends completed work orders to",
-      "via": "MuleSoft Anypoint \u00b7 Work Order API",
+      "via": "MuleSoft Anypoint · Work Order API",
       "data_classification": "official",
       "protocol_in": "rest_api",
       "protocol_out": "rest_api",
@@ -1206,11 +1216,11 @@
       "confidence": 0.85
     },
     {
-      "from": "SAP S/4HANA Utilities \u00b7 Plant Maintenance (PM)",
+      "from": "SAP S/4HANA Utilities · Plant Maintenance (PM)",
       "type": "flows_to",
-      "to": "Salesforce \u00b7 Field Service",
+      "to": "Salesforce · Field Service",
       "description": "sends planned work orders to",
-      "via": "MuleSoft Anypoint \u00b7 Work Order API",
+      "via": "MuleSoft Anypoint · Work Order API",
       "data_classification": "official",
       "protocol_in": "rest_api",
       "protocol_out": "rest_api",
@@ -1218,11 +1228,11 @@
       "confidence": 0.85
     },
     {
-      "from": "Esri ArcGIS \u00b7 Utility Network",
+      "from": "Esri ArcGIS · Utility Network",
       "type": "flows_to",
       "to": "ADMS",
       "description": "publishes network model to",
-      "via": "MuleSoft Anypoint \u00b7 Network Model Sync",
+      "via": "MuleSoft Anypoint · Network Model Sync",
       "data_classification": "official",
       "protocol_in": "database",
       "protocol_out": "file_share",
@@ -1230,11 +1240,11 @@
       "confidence": 0.85
     },
     {
-      "from": "Esri ArcGIS \u00b7 Utility Network",
+      "from": "Esri ArcGIS · Utility Network",
       "type": "flows_to",
-      "to": "SAP S/4HANA Utilities \u00b7 Plant Maintenance (PM)",
+      "to": "SAP S/4HANA Utilities · Plant Maintenance (PM)",
       "description": "synchronises assets to",
-      "via": "MuleSoft Anypoint \u00b7 Network Model Sync",
+      "via": "MuleSoft Anypoint · Network Model Sync",
       "data_classification": "official",
       "protocol_in": "database",
       "protocol_out": "rest_api",
@@ -1244,9 +1254,9 @@
     {
       "from": "ADMS",
       "type": "flows_to",
-      "to": "Salesforce \u00b7 Service Cloud",
+      "to": "Salesforce · Service Cloud",
       "description": "sends outage events to",
-      "via": "MuleSoft Anypoint \u00b7 Outage Events",
+      "via": "MuleSoft Anypoint · Outage Events",
       "data_classification": "official",
       "protocol_in": "event_queue",
       "protocol_out": "rest_api",
@@ -1258,7 +1268,7 @@
       "type": "flows_to",
       "to": "ADMS",
       "description": "sends telemetry to",
-      "via": "MuleSoft Anypoint \u00b7 SCADA Gateway",
+      "via": "MuleSoft Anypoint · SCADA Gateway",
       "data_classification": "official",
       "protocol_in": "iccp",
       "protocol_out": "rest_api",
@@ -1266,11 +1276,11 @@
       "confidence": 0.85
     },
     {
-      "from": "Salesforce \u00b7 Priority Services Manager",
+      "from": "Salesforce · Priority Services Manager",
       "type": "flows_to",
       "to": "ADMS",
       "description": "provides PSR customers to",
-      "via": "MuleSoft Anypoint \u00b7 Outage Events",
+      "via": "MuleSoft Anypoint · Outage Events",
       "data_classification": "special_category",
       "protocol_in": "rest_api",
       "protocol_out": "event_queue",
@@ -1282,7 +1292,7 @@
       "type": "flows_to",
       "to": "Azure Data Platform",
       "description": "sends half-hourly data to",
-      "via": "MuleSoft Anypoint \u00b7 Smart Meter Data Feed",
+      "via": "MuleSoft Anypoint · Smart Meter Data Feed",
       "data_classification": "official_sensitive",
       "protocol_in": "file_sftp",
       "protocol_out": "file_sftp",
@@ -1316,9 +1326,9 @@
       "confidence": 0.85
     },
     {
-      "from": "SAP S/4HANA Utilities \u00b7 Utilities Billing (IS-U)",
+      "from": "SAP S/4HANA Utilities · Utilities Billing (IS-U)",
       "type": "flows_to",
-      "to": "SAP S/4HANA Utilities \u00b7 Finance (FI/CO)",
+      "to": "SAP S/4HANA Utilities · Finance (FI/CO)",
       "description": "posts DUoS revenue to",
       "data_classification": "official",
       "quote": "Northbridge Power Distribution demo architecture (fictional organisation, illustrative)",
@@ -1327,9 +1337,9 @@
     {
       "from": "DUoS Billing Engine",
       "type": "flows_to",
-      "to": "SAP S/4HANA Utilities \u00b7 Finance (FI/CO)",
+      "to": "SAP S/4HANA Utilities · Finance (FI/CO)",
       "description": "posts DUoS revenue to",
-      "via": "MuleSoft Anypoint \u00b7 Billing Postings",
+      "via": "MuleSoft Anypoint · Billing Postings",
       "data_classification": "official",
       "protocol_in": "database",
       "protocol_out": "rest_api",
@@ -1348,7 +1358,7 @@
     {
       "from": "MPRS Registration System",
       "type": "flows_to",
-      "to": "SAP S/4HANA Utilities \u00b7 Utilities Billing (IS-U)",
+      "to": "SAP S/4HANA Utilities · Utilities Billing (IS-U)",
       "description": "sends registered metering points to",
       "data_classification": "official",
       "quote": "Northbridge Power Distribution demo architecture (fictional organisation, illustrative)",
@@ -1366,7 +1376,7 @@
     {
       "from": "UoS Charging Statement Manager",
       "type": "flows_to",
-      "to": "SAP S/4HANA Utilities \u00b7 Utilities Billing (IS-U)",
+      "to": "SAP S/4HANA Utilities · Utilities Billing (IS-U)",
       "description": "provides charge rates to",
       "data_classification": "official",
       "quote": "Northbridge Power Distribution demo architecture (fictional organisation, illustrative)",
@@ -1377,7 +1387,7 @@
       "type": "flows_to",
       "to": "Data Transfer Network",
       "description": "exchanges registration D-flows with",
-      "via": "MuleSoft Anypoint \u00b7 Industry D-flow Gateway",
+      "via": "MuleSoft Anypoint · Industry D-flow Gateway",
       "data_classification": "official",
       "protocol_in": "database",
       "protocol_out": "file_sftp",
@@ -1389,7 +1399,7 @@
       "type": "flows_to",
       "to": "Data Transfer Network",
       "description": "sends and receives D-flows with",
-      "via": "MuleSoft Anypoint \u00b7 Industry D-flow Gateway",
+      "via": "MuleSoft Anypoint · Industry D-flow Gateway",
       "data_classification": "official",
       "protocol_in": "file_sftp",
       "protocol_out": "file_sftp",
@@ -1503,7 +1513,7 @@
       "confidence": 0.85
     },
     {
-      "from": "SAP S/4HANA Utilities \u00b7 Project System (PS)",
+      "from": "SAP S/4HANA Utilities · Project System (PS)",
       "type": "flows_to",
       "to": "Regulatory Reporting Pack",
       "description": "provides investment costs to",
@@ -1512,25 +1522,25 @@
       "confidence": 0.85
     },
     {
-      "from": "Autodesk Construction Cloud \u00b7 Revit",
+      "from": "Autodesk Construction Cloud · Revit",
       "type": "flows_to",
-      "to": "SAP S/4HANA Utilities \u00b7 Project System (PS)",
+      "to": "SAP S/4HANA Utilities · Project System (PS)",
       "description": "provides bills of quantities to",
       "data_classification": "official",
       "quote": "Northbridge Power Distribution demo architecture (fictional organisation, illustrative)",
       "confidence": 0.85
     },
     {
-      "from": "Autodesk Construction Cloud \u00b7 Civil 3D",
+      "from": "Autodesk Construction Cloud · Civil 3D",
       "type": "flows_to",
-      "to": "Esri ArcGIS \u00b7 Utility Network",
+      "to": "Esri ArcGIS · Utility Network",
       "description": "provides as-built designs to",
       "data_classification": "official",
       "quote": "Northbridge Power Distribution demo architecture (fictional organisation, illustrative)",
       "confidence": 0.85
     },
     {
-      "from": "Autodesk Construction Cloud \u00b7 Vault",
+      "from": "Autodesk Construction Cloud · Vault",
       "type": "uses",
       "to": "Document Management",
       "description": "archives drawings in",
@@ -1538,18 +1548,18 @@
       "confidence": 0.85
     },
     {
-      "from": "Salesforce \u00b7 Flow Orchestration",
+      "from": "Salesforce · Flow Orchestration",
       "type": "flows_to",
-      "to": "SAP S/4HANA Utilities \u00b7 Project System (PS)",
+      "to": "SAP S/4HANA Utilities · Project System (PS)",
       "description": "hands accepted quotes to",
       "data_classification": "official",
       "quote": "Northbridge Power Distribution demo architecture (fictional organisation, illustrative)",
       "confidence": 0.85
     },
     {
-      "from": "Salesforce \u00b7 Experience Cloud",
+      "from": "Salesforce · Experience Cloud",
       "type": "uses",
-      "to": "Salesforce \u00b7 Flow Orchestration",
+      "to": "Salesforce · Flow Orchestration",
       "description": "submits applications through",
       "quote": "Northbridge Power Distribution demo architecture (fictional organisation, illustrative)",
       "confidence": 0.85
@@ -1574,7 +1584,7 @@
     {
       "from": "Wayleave Register",
       "type": "flows_to",
-      "to": "Esri ArcGIS \u00b7 ArcGIS Enterprise Portal",
+      "to": "Esri ArcGIS · ArcGIS Enterprise Portal",
       "description": "publishes land rights to",
       "data_classification": "official",
       "quote": "Northbridge Power Distribution demo architecture (fictional organisation, illustrative)",
@@ -1589,7 +1599,7 @@
       "confidence": 0.85
     },
     {
-      "from": "Esri ArcGIS \u00b7 Utility Network",
+      "from": "Esri ArcGIS · Utility Network",
       "type": "flows_to",
       "to": "DIgSILENT PowerFactory",
       "description": "provides network model to",
@@ -1609,7 +1619,7 @@
       "confidence": 0.85
     },
     {
-      "from": "Salesforce \u00b7 Flow Orchestration",
+      "from": "Salesforce · Flow Orchestration",
       "type": "flows_to",
       "to": "Connection Quotation Engine",
       "description": "requests costed quotes from",
@@ -1620,7 +1630,7 @@
       "confidence": 0.85
     },
     {
-      "from": "Salesforce \u00b7 Experience Cloud",
+      "from": "Salesforce · Experience Cloud",
       "type": "uses",
       "to": "Network Capacity Map",
       "description": "links applicants to",
@@ -1628,7 +1638,7 @@
       "confidence": 0.85
     },
     {
-      "from": "Esri ArcGIS \u00b7 Utility Network",
+      "from": "Esri ArcGIS · Utility Network",
       "type": "flows_to",
       "to": "Network Capacity Map",
       "description": "provides substation capacity data to",
@@ -1648,7 +1658,7 @@
       "confidence": 0.85
     },
     {
-      "from": "Salesforce \u00b7 Flow Orchestration",
+      "from": "Salesforce · Flow Orchestration",
       "type": "flows_to",
       "to": "Generation Connections Register",
       "description": "registers generation applications in",
@@ -1789,7 +1799,7 @@
     {
       "name": "Complaints Access Database",
       "action": "retire",
-      "replaced_by": "Salesforce \u00b7 Service Cloud",
+      "replaced_by": "Salesforce · Service Cloud",
       "reason": "Complaints moved to Salesforce Service Cloud.",
       "quote": "Northbridge Power Distribution demo architecture (fictional organisation, illustrative)",
       "confidence": 0.9
