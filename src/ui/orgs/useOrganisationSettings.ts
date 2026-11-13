@@ -1,6 +1,6 @@
 import { useCallback, useState } from 'react';
 import type { UUID } from '../../contracts/delta';
-import { deleteOrganisation, setReviewPeriod, updateOrganisation, type DeleteOrganisationResult, type UpdateOrganisationInput } from '../../db/organisations';
+import { deleteOrganisation, setReviewPeriod, setStaleThreshold, updateOrganisation, type DeleteOrganisationResult, type UpdateOrganisationInput } from '../../db/organisations';
 import type { OrganisationRow } from '../../db/types';
 import { reportError } from '../errors/errorBannerStore';
 import { supabase } from '../supabaseClient';
@@ -15,6 +15,8 @@ export interface UseOrganisationSettingsResult {
   remove: () => Promise<DeleteOrganisationResult | null>;
   /** Owner or architect: the organisation-wide review period in days. */
   updateReviewPeriod: (days: number) => Promise<OrganisationRow | null>;
+  /** Owner or architect: the organisation-wide number of months before a value counts as out of date. */
+  updateStaleThreshold: (months: number) => Promise<OrganisationRow | null>;
 }
 
 /**
@@ -65,5 +67,7 @@ export function useOrganisationSettings(orgId: UUID, onChanged: (org: Organisati
 
   const updateReviewPeriod = useCallback((days: number) => run('change the review period', () => setReviewPeriod(supabase, orgId, days), onChanged), [orgId, onChanged, run]);
 
-  return { status, error, update, remove, updateReviewPeriod };
+  const updateStaleThreshold = useCallback((months: number) => run('change when information counts as out of date', () => setStaleThreshold(supabase, orgId, months), onChanged), [orgId, onChanged, run]);
+
+  return { status, error, update, remove, updateReviewPeriod, updateStaleThreshold };
 }

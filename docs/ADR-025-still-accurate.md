@@ -35,6 +35,13 @@ All the deltas share one fresh `sources` row of kind **`attestation`**, named "C
 
 **Where:** a **✓ Still accurate** button beside **✎ Edit** on the element page, and per row in the Elements grid while it is in edit mode.
 
+## Amendment (2026-11-13, `20261113040000_stale_threshold_and_nudges.sql`): the threshold is per organisation, staleness covers every element, owners are nudged
+
+- **Threshold.** `STALE_AFTER_MONTHS` (12) is now only the default. `organisations.stale_after_months` (1–60) holds each organisation's own, set by an owner or architect through `atlas.set_stale_threshold` (Organisation settings → Out-of-date information). Every staleness check takes it: the provenance badge (via `StaleAfterMonthsContext`, provided once by `ModelRouteGate`), the My work finding, the Elements list, the finding reports and the Ask Atlas tools.
+- **Every element type.** The finding used to look at systems only. It now covers every element, because "Still accurate" is offered on every element. Relationships stay out until they can be confirmed (see Scope below): a flag nobody can clear is not a finding.
+- **`$exists` is ignored.** The finding used to count the `$exists` fact, which "Still accurate" never re-asserts (decision above), so a confirmed element stayed on the list for ever. Both the TypeScript rule (`computeStaleAttributesFinding`) and its SQL twin (`atlas.stale_elements`) skip it.
+- **Nudging owners.** On the stale list an owner or architect can press **Email owners a reminder**. The `send-review-email` edge function (`staleNudge` mode) emails each person the elements they own that are stale, each linking to that element; opening a link changes nothing, only the person's own **Still accurate** does. An owner is the member behind an actor with a business or technical `owns` edge to the element (the actor's `memberId`). **Fallback:** an element with no owner who is a current member goes to the organisation's architects (or its owners when it has no architect), so an unowned stale element is never silently dropped. Nobody is emailed twice in a week or twice in a day; `stale_nudges` is the claim, and `user_preferences.email_on_stale_nudge` is each person's opt-out (Profile). It is a button, not a schedule: nothing sends it automatically.
+
 ## Consequences
 
 - **What the provenance badge shows.** It shows the confirmation — ✓, today, confidence 1 — rather than the original source. The original source (a spreadsheet, an interview) is still in the fact's history, one delta back, never edited or deleted. This is a deliberate trade: the badge answers "how current is this?", and history answers "where did it first come from?".

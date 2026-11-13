@@ -40,6 +40,15 @@ describe('monthsUntil', () => {
   });
 });
 
+describe('isStale with an organisation threshold', () => {
+  it('flags at the given number of months instead of the default', () => {
+    const now = new Date('2026-09-08T00:00:00.000Z');
+    expect(isStale(new Date('2026-03-08T00:00:00.000Z'), now, 6)).toBe(true);
+    expect(isStale(new Date('2026-03-09T00:00:00.000Z'), now, 6)).toBe(false);
+    expect(isStale(new Date('2026-03-08T00:00:00.000Z'), now)).toBe(false);
+  });
+});
+
 describe('isStale', () => {
   it('is false just under the threshold and true at it', () => {
     const now = new Date('2026-01-01');

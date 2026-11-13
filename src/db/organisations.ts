@@ -144,3 +144,31 @@ export async function getReviewPeriodDays(supabase: Client, orgId: UUID): Promis
   if (error) throw new Error(`getReviewPeriodDays: ${error.message}`);
   return (data as { review_period_days: number }).review_period_days;
 }
+
+/** Owner or architect (`atlas.set_stale_threshold`'s own check): the organisation-wide number of months a value can go unchecked before it is flagged stale (1–60). */
+export async function setStaleThreshold(supabase: Client, orgId: UUID, months: number): Promise<OrganisationRow> {
+  // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment -- untyped client; see module comment.
+  const { data, error } = await supabase.schema('atlas').rpc('set_stale_threshold', { p_org_id: orgId, p_months: months });
+  if (error) throw new Error(`setStaleThreshold: ${error.message}`);
+  return data as OrganisationRow;
+}
+
+async function staleMonthsOfOrganisation(supabase: Client, orgId: UUID, caller: string): Promise<number> {
+  const { data, error } = await supabase.from('organisations').select('stale_after_months').eq('id', orgId).single();
+  if (error) throw new Error(`${caller}: ${error.message}`);
+  return Number(data.stale_after_months);
+}
+
+/** The stale threshold of the organisation a model belongs to — for readers that have a model id but not the organisation row (the AI tools' context). */
+export async function getStaleAfterMonthsForModel(supabase: Client, modelId: UUID): Promise<number> {
+  const { data, error } = await supabase.from('models').select('org_id').eq('id', modelId).single();
+  if (error) throw new Error(`getStaleAfterMonthsForModel: ${error.message}`);
+  return staleMonthsOfOrganisation(supabase, String(data.org_id), 'getStaleAfterMonthsForModel');
+}
+
+/** The same, for a commit — the finding reports are given a commit, not a model. */
+export async function getStaleAfterMonthsForCommit(supabase: Client, commitId: UUID): Promise<number> {
+  const { data, error } = await supabase.from('commits').select('org_id').eq('id', commitId).single();
+  if (error) throw new Error(`getStaleAfterMonthsForCommit: ${error.message}`);
+  return staleMonthsOfOrganisation(supabase, String(data.org_id), 'getStaleAfterMonthsForCommit');
+}

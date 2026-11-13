@@ -25,6 +25,7 @@
  * unowned subtree, since fixing that one fixes everything under it.
  */
 import { isStale, monthsSince, monthsUntil, STALE_AFTER_MONTHS } from '../contracts/thresholds';
+import { EXISTS_ATTRIBUTE } from '../contracts/delta';
 import type { ElementsHeadRow, FactsRow, RelationshipsHeadRow } from '../contracts/rows';
 import type { SystemDomain, UUID } from '../contracts/delta';
 import { computeCapabilityRollup } from '../ui/capabilityMap/capabilityRollup';
@@ -362,15 +363,15 @@ export async function listFactsForCommit(supabase: Client, commitId: string): Pr
 }
 
 /** The only fact columns the stale-attributes finding reads. */
-export type FactStalenessRow = Pick<FactsRow, 'subject_id' | 'effective_date' | 'asserted_at'>;
+export type FactStalenessRow = Pick<FactsRow, 'subject_id' | 'attribute' | 'effective_date' | 'asserted_at'>;
 
 /**
- * Just what `computeStaleAttributesFinding` needs — `subject_id` and the two dates — for element facts only (the finding scopes to systems, which are elements). Same facts, a fraction of the payload `listFactsForCommit` (`select *`, values and provenance included) sends; Home's findings used to download all of it to read three columns. Routed through `selectAll` (SPEC §6.7).
+ * Just what `computeStaleAttributesFinding` needs — `subject_id`, `attribute` (to skip `$exists`) and the two dates — for element facts only. Same facts, a fraction of the payload `listFactsForCommit` (`select *`, values and provenance included) sends; Home's findings used to download all of it to read three columns. Routed through `selectAll` (SPEC §6.7).
  */
 export async function listFactStalenessForCommit(supabase: Client, commitId: string): Promise<FactStalenessRow[]> {
   const query = supabase
     .from('facts')
-    .select('subject_id,effective_date,asserted_at', { count: 'exact' })
+    .select('subject_id,attribute,effective_date,asserted_at', { count: 'exact' })
     .eq('commit_id', commitId)
     .eq('subject_type', 'element')
     .order('subject_id')
@@ -578,38 +579,51 @@ export function findCapabilitiesWithoutOwner(
 }
 
 export interface StaleAttributesFinding {
-  /** Distinct (system, attribute) facts older than `STALE_AFTER_MONTHS`. */
+  /** Distinct (element, attribute) facts older than the organisation's stale threshold. */
   staleFactCount: number;
-  /** Distinct systems with at least one stale fact, sorted by name — Sprint U4-1 B3's collapsed-row/expand list (`element_id` order breaks ties, same stable-order convention `src/db/landscape.ts` uses throughout). */
-  staleSystems: ElementsHeadRow[];
+  /** Distinct elements with at least one stale fact, sorted by name — Sprint U4-1 B3's collapsed-row/expand list (`element_id` order breaks ties, same stable-order convention `src/db/landscape.ts` uses throughout). */
+  staleElements: ElementsHeadRow[];
   /** The single oldest stale fact's age in whole years — `null` when there are no stale facts. */
   oldestAgeYears: number | null;
 }
 
-/** Handoff 7d's "N attributes stale over 12 months — across M systems · oldest Ky" finding, scoped to `systems`' own facts (not every subject in the model — capabilities/actors/relationships aren't this finding's concern). */
-export function computeStaleAttributesFinding(facts: readonly FactStalenessRow[], systems: readonly ElementsHeadRow[], now: Date = new Date()): StaleAttributesFinding {
-  const systemsById = new Map(systems.map((s) => [s.element_id, s]));
+/**
+ * Which elements have a value that has not been updated or confirmed for
+ * `staleAfterMonths` (the organisation's `stale_after_months`), scoped to the `elements`
+ * passed in — every element type, not only systems. Relationships are left
+ * out: "Still accurate" (ADR-025) cannot confirm them yet, so flagging one
+ * would be a finding nobody can clear.
+ *
+ * The `$exists` fact is skipped. It records that the element was created and
+ * "Still accurate" never re-asserts it, so counting it would keep every old
+ * element on the list after its owner had confirmed it.
+ *
+ * SQL twin: `atlas.stale_elements` (20261113040000_stale_threshold_and_nudges.sql),
+ * which decides who gets the reminder email — keep the two rules identical.
+ */
+export function computeStaleAttributesFinding(facts: readonly FactStalenessRow[], elements: readonly ElementsHeadRow[], now: Date = new Date(), staleAfterMonths: number = STALE_AFTER_MONTHS): StaleAttributesFinding {
+  const systemsById = new Map(elements.map((s) => [s.element_id, s]));
   let staleFactCount = 0;
   let oldestMonths = 0;
   const staleSystemIds = new Set<UUID>();
 
   for (const fact of facts) {
-    if (!systemsById.has(fact.subject_id)) continue;
+    if (fact.attribute === EXISTS_ATTRIBUTE || !systemsById.has(fact.subject_id)) continue;
     const dateStr = fact.effective_date ?? fact.asserted_at;
     const date = new Date(dateStr);
-    if (!isStale(date, now)) continue;
+    if (!isStale(date, now, staleAfterMonths)) continue;
     staleFactCount += 1;
     staleSystemIds.add(fact.subject_id);
     const months = monthsSince(date, now);
     if (months > oldestMonths) oldestMonths = months;
   }
 
-  const staleSystems = [...staleSystemIds]
+  const staleElements = [...staleSystemIds]
     .map((id) => systemsById.get(id))
     .filter((s): s is ElementsHeadRow => s !== undefined)
     .sort((a, b) => a.name.localeCompare(b.name) || a.element_id.localeCompare(b.element_id));
 
-  return { staleFactCount, staleSystems, oldestAgeYears: staleFactCount > 0 ? Math.floor(oldestMonths / 12) : null };
+  return { staleFactCount, staleElements, oldestAgeYears: staleFactCount > 0 ? Math.floor(oldestMonths / 12) : null };
 }
 
 /**

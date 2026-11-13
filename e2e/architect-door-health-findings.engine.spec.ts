@@ -112,7 +112,7 @@ test('architect door: health findings name systems with no capability, capabilit
 
   await page.goto(`/o/${orgSlug}/m/${modelSlug}`);
   // The org's creator is its owner, so the default door is already architect.
-  await expect(page.getByRole('heading', { name: 'Health findings' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Health findings', exact: true })).toBeVisible();
   // Scoped to the Health findings panel itself for every "must not appear"
   // check below — Recent activity (elsewhere on this door) links every
   // element the seeding commit touched, regardless of finding status, so a
@@ -142,8 +142,9 @@ test('architect door: health findings name systems with no capability, capabilit
   // The owned capability must not appear in the no-owner finding.
   await expect(healthFindingsPanel.getByText('Owned Capability', { exact: true })).toHaveCount(0);
 
-  await expect(healthFindingsPanel.getByText('1 attribute stale over 12 months')).toBeVisible();
-  await expect(healthFindingsPanel.getByText(/across 1 system · oldest \dy/)).toBeVisible();
+  await expect(healthFindingsPanel.getByText('1 item not checked for over 12 months')).toBeVisible();
+  // The one item is named, and the card links to the list where each can be checked.
+  await expect(healthFindingsPanel.getByRole('link', { name: /Check them/ })).toBeVisible();
 
   // Sprint U4-1 B5's finding: exactly the one unlabeled edge, named by its
   // endpoints — the labeled one must not appear here.

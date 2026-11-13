@@ -519,6 +519,15 @@ describe('repository layer against a real local Supabase', () => {
       expect((await getUserPreferences(alice.client, alice.id))?.email_on_review_assigned).toBe(false);
     });
 
+    it('email_on_stale_nudge defaults to true and round-trips false without touching the review email', async () => {
+      const created = await upsertUserPreferences(alice.client, { userId: alice.id, theme: 'dark' });
+      expect(created.email_on_stale_nudge).toBe(true);
+      const off = await upsertUserPreferences(alice.client, { userId: alice.id, emailOnStaleNudge: false });
+      expect(off.email_on_stale_nudge).toBe(false);
+      expect(off.email_on_review_assigned).toBe(created.email_on_review_assigned);
+      expect((await getUserPreferences(alice.client, alice.id))?.email_on_stale_nudge).toBe(false);
+    });
+
     it("bob cannot read alice's preferences, and cannot write a row under her id (RLS is user-scoped, not org-scoped)", async () => {
       expect(await getUserPreferences(bob.client, alice.id)).toBeNull();
       await expect(upsertUserPreferences(bob.client, { userId: alice.id, theme: 'light' })).rejects.toThrow();

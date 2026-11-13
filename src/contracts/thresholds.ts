@@ -7,7 +7,7 @@
  * site that currently imports them directly.
  */
 
-/** A fact older than this (months, by `effective_date` or the delta's commit time) is shown in the warning colour. Used by provenance badge age (§4.3) and the director door's staleness health chip (§3.1). */
+/** The default for how old a fact (by `effective_date` or the delta's commit time) can be before it is shown in the warning colour — `organisations.stale_after_months`' own column default. Each organisation sets its own (owner/architect); every staleness check takes that number, falling back to this one. Used by provenance badge age (§4.3) and the staleness health finding. */
 export const STALE_AFTER_MONTHS = 12;
 
 /** Confidence at or above this renders the full `●●●` band. */
@@ -31,8 +31,9 @@ export function monthsSince(date: Date, now: Date = new Date()): number {
   return now.getDate() < date.getDate() ? months - 1 : months;
 }
 
-export function isStale(date: Date, now: Date = new Date()): boolean {
-  return monthsSince(date, now) >= STALE_AFTER_MONTHS;
+/** `months` is the organisation's own `stale_after_months`; the default is the column's own default. */
+export function isStale(date: Date, now: Date = new Date(), months: number = STALE_AFTER_MONTHS): boolean {
+  return monthsSince(date, now) >= months;
 }
 
 /**

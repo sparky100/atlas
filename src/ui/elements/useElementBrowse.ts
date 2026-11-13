@@ -5,6 +5,7 @@ import { CRITICALITY_ORDER } from './criticalityTone';
 import { DISPOSITION_ORDER } from './disposition';
 import type { Disposition } from '../../contracts/delta';
 import { listAllElements, ownersByElementIdFromOwnsEdges, type BrowseRow } from '../../db/elementBrowse';
+import { useStaleAfterMonths } from '../orgs/staleThresholdContext';
 import { attributesRecord } from './attributesRecord';
 import { buildBrowseRows } from './buildBrowseRows';
 import { compareCustomAttributeValues, sortKeyEquals, type ElementBrowseSortKey } from './elementBrowseSort';
@@ -220,6 +221,7 @@ export function useElementBrowse(
   /** S1 item 15 (A2 remainder): the caller's own already-resolved main head commit id — same race-tolerant dedup shape `useDirectorHome.ts`'s own parameter comment explains, for the main/tag arm below. */
   mainCommitIdHint: UUID | null = null,
 ): ElementBrowseState {
+  const staleAfterMonths = useStaleAfterMonths();
   const [status, setStatus] = useState<ElementBrowseStatus>('loading');
   const [error, setError] = useState<string | null>(null);
   // One object, not three separate `useState`s: `commitId` and
@@ -364,9 +366,8 @@ export function useElementBrowse(
         const capabilities = elements.filter((e) => e.element_type === 'capability');
         ids = new Set(findCapabilitiesWithoutOwner(capabilities, supportsEdges, ownsEdges).map((e) => e.element_id));
       } else if (filter === 'stale-attributes') {
-        const systems = elements.filter((e) => e.element_type === 'system');
         const facts = await b.getFacts();
-        ids = new Set(computeStaleAttributesFinding(facts, systems).staleSystems.map((e) => e.element_id));
+        ids = new Set(computeStaleAttributesFinding(facts, elements, new Date(), staleAfterMonths).staleElements.map((e) => e.element_id));
       } else if (filter === 'no-technical-owner') {
         const systems = elements.filter((e) => e.element_type === 'system');
         const containers = elements.filter((e) => e.element_type === 'container');
@@ -431,7 +432,7 @@ export function useElementBrowse(
     };
     // `filterKey` stands in for `filter` (an object for a custom-attribute filter) so a caller
     // passing a fresh-but-equal object never re-runs this.
-  }, [base, filterKey]);
+  }, [base, filterKey, staleAfterMonths]);
 
   const setSort = (key: ElementBrowseSortKey) => {
     if (sortKeyEquals(key, sortKey)) {

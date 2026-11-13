@@ -414,28 +414,46 @@ describe('computeStaleAttributesFinding', () => {
 
   it('is all zero/empty/null when nothing is stale', () => {
     const facts = [fact('sys-1', 'vendor', '2026-08-01')];
-    expect(computeStaleAttributesFinding(facts, [system('sys-1')], now)).toEqual({ staleFactCount: 0, staleSystems: [], oldestAgeYears: null });
+    expect(computeStaleAttributesFinding(facts, [system('sys-1')], now)).toEqual({ staleFactCount: 0, staleElements: [], oldestAgeYears: null });
   });
 
   it('counts a fact older than STALE_AFTER_MONTHS as stale', () => {
     const facts = [fact('sys-1', 'vendor', '2024-01-01')];
     const result = computeStaleAttributesFinding(facts, [system('sys-1')], now);
     expect(result.staleFactCount).toBe(1);
-    expect(result.staleSystems).toEqual([system('sys-1')]);
+    expect(result.staleElements).toEqual([system('sys-1')]);
     expect(result.oldestAgeYears).toBe(2);
   });
 
   it('ignores facts on subjects outside the given systems (e.g. a capability, not a system)', () => {
     const facts = [fact('cap-1', 'description', '2020-01-01')];
-    expect(computeStaleAttributesFinding(facts, [system('sys-1')], now)).toEqual({ staleFactCount: 0, staleSystems: [], oldestAgeYears: null });
+    expect(computeStaleAttributesFinding(facts, [system('sys-1')], now)).toEqual({ staleFactCount: 0, staleElements: [], oldestAgeYears: null });
   });
 
   it('counts each stale (system, attribute) fact separately but lists each system once, sorted by name', () => {
     const facts = [fact('sys-1', 'vendor', '2024-01-01'), fact('sys-1', 'description', '2024-06-01'), fact('sys-2', 'vendor', '2023-01-01')];
     const result = computeStaleAttributesFinding(facts, [system('sys-2'), system('sys-1')], now);
     expect(result.staleFactCount).toBe(3);
-    expect(result.staleSystems).toEqual([system('sys-1'), system('sys-2')]);
+    expect(result.staleElements).toEqual([system('sys-1'), system('sys-2')]);
     expect(result.oldestAgeYears).toBe(3);
+  });
+
+  it('ignores the $exists fact, so confirming an element clears it', () => {
+    const facts = [fact('sys-1', '$exists', '2020-01-01'), fact('sys-1', 'vendor', '2026-08-01')];
+    expect(computeStaleAttributesFinding(facts, [system('sys-1')], now)).toEqual({ staleFactCount: 0, staleElements: [], oldestAgeYears: null });
+  });
+
+  it("uses the organisation's own threshold", () => {
+    const facts = [fact('sys-1', 'vendor', '2026-01-01')];
+    expect(computeStaleAttributesFinding(facts, [system('sys-1')], now).staleFactCount).toBe(0);
+    expect(computeStaleAttributesFinding(facts, [system('sys-1')], now, 6).staleFactCount).toBe(1);
+  });
+
+  it('covers every element type, not only systems', () => {
+    const facts = [fact('cap-1', 'description', '2020-01-01'), fact('act-1', 'description', '2020-01-01')];
+    const result = computeStaleAttributesFinding(facts, [capability('cap-1', null), actor('act-1', {})], now);
+    expect(result.staleFactCount).toBe(2);
+    expect(result.staleElements.map((e) => e.element_id)).toEqual(['act-1', 'cap-1']);
   });
 
   it('falls back to asserted_at when effective_date is null', () => {

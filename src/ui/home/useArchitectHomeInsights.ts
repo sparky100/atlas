@@ -40,6 +40,7 @@ import {
   type StaleAttributesFinding,
   type UnlabeledVerbRelationship,
 } from '../../db/healthFindings';
+import { listAllElements } from '../../db/elementBrowse';
 import { listActorsForLandscape, listSystemsForLandscape } from '../../db/landscape';
 import { listAllSupportsEdges, listDeltasForCommits, listRecentCommits } from '../../db/modelHome';
 import { listProfilesByIds } from '../../db/profiles';
@@ -47,6 +48,7 @@ import { replacedElementIds } from '../../engine/elementRead/fitAndExposure';
 import type { ProfileRow } from '../../db/types';
 import { envelopeSubjects } from '../../engine/describeEnvelope';
 import { reportError } from '../errors/errorBannerStore';
+import { useStaleAfterMonths } from '../orgs/staleThresholdContext';
 import { useAfterFirstPaint } from '../perf/useAfterFirstPaint';
 import { supabase } from '../supabaseClient';
 
@@ -73,6 +75,8 @@ export interface ArchitectHomeInsightsData {
   flowsToPlatformInsteadOfModule: PlatformFlowEndpoint[];
   capabilitiesWithoutOwner: ElementsHeadRow[];
   staleAttributes: StaleAttributesFinding;
+  /** The organisation's stale threshold the finding above was computed with — the Home row words itself with it. */
+  staleAfterMonths: number;
   /** Sprint U4-1 B5's fifth finding: `uses`/`flows_to` relationships with no verb-phrase label. */
   unlabeledVerbRelationships: UnlabeledVerbRelationship[];
   /** Prompt 7k item 2's role-aware finding: systems with no `owns` edge carrying `role: 'technical'`. */
@@ -120,6 +124,7 @@ export type ArchitectHomeInsightsState = { status: 'loading' } | { status: 'erro
  * parallel with the critical one.
  */
 export function useArchitectHomeInsights(modelId: UUID, userId: UUID | null): ArchitectHomeInsightsState {
+  const staleAfterMonths = useStaleAfterMonths();
   const [state, setState] = useState<ArchitectHomeInsightsState>({ status: 'loading' });
   const afterFirstPaint = useAfterFirstPaint();
 
@@ -134,7 +139,7 @@ export function useArchitectHomeInsights(modelId: UUID, userId: UUID | null): Ar
         return;
       }
 
-      const [commits, capabilities, systems, supportsEdges, ownsEdges, replacesEdges, facts, usesAndFlowsToEdges, usesAndFlowsToEndpoints, actors, duplicateCandidates, retiringElementIds, projectScope] = await Promise.all([
+      const [commits, capabilities, systems, allElements, supportsEdges, ownsEdges, replacesEdges, facts, usesAndFlowsToEdges, usesAndFlowsToEndpoints, actors, duplicateCandidates, retiringElementIds, projectScope] = await Promise.all([
         // S1 item 6: "recent activity" now groups consecutive same-subject
         // commits into one line and prefers others' activity when trimming
         // to five displayed items (groupRecentActivity.ts) — both can
@@ -144,6 +149,7 @@ export function useArchitectHomeInsights(modelId: UUID, userId: UUID | null): Ar
         listRecentCommits(supabase, main.id, 30),
         listCapabilitiesForMap(supabase, main.head_commit_id),
         listSystemsForLandscape(supabase, main.head_commit_id),
+        listAllElements(supabase, main.head_commit_id),
         listAllSupportsEdges(supabase, main.head_commit_id),
         listAllOwnsEdges(supabase, main.head_commit_id),
         listAllReplacesEdges(supabase, main.head_commit_id),
@@ -220,7 +226,8 @@ export function useArchitectHomeInsights(modelId: UUID, userId: UUID | null): Ar
             platformSupportsThatShouldMoveToModule: findPlatformSupportsThatShouldMoveToModule(systems, supportsEdges, containers),
             flowsToPlatformInsteadOfModule: findFlowsToPlatformInsteadOfModule(usesAndFlowsToEdges, usesAndFlowsToEndpointsById),
             capabilitiesWithoutOwner: findCapabilitiesWithoutOwner(capabilities, supportsEdges, ownsEdges),
-            staleAttributes: computeStaleAttributesFinding(facts, systems),
+            staleAttributes: computeStaleAttributesFinding(facts, allElements, new Date(), staleAfterMonths),
+            staleAfterMonths,
             unlabeledVerbRelationships: findUnlabeledVerbRelationships(usesAndFlowsToEdges, usesAndFlowsToEndpointsById),
             // Owner-related findings check systems and their own modules
             // together (`findSystemsWithoutTechnicalOwner`'s own doc
@@ -253,7 +260,7 @@ export function useArchitectHomeInsights(modelId: UUID, userId: UUID | null): Ar
     return () => {
       cancelled = true;
     };
-  }, [modelId, userId, afterFirstPaint]);
+  }, [modelId, userId, afterFirstPaint, staleAfterMonths]);
 
   return state;
 }
