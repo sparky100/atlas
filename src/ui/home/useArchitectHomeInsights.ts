@@ -31,7 +31,7 @@ import {
   listAllOwnsEdges,
   listAllReplacesEdges,
   listAllUsesAndFlowsToEdges,
-  listFactsForCommit,
+  listFactStalenessForCommit,
   listUsesAndFlowsToEndpointElements,
   type BoundaryCrossing,
   type ExternalInterfaceCrossing,
@@ -147,7 +147,7 @@ export function useArchitectHomeInsights(modelId: UUID, userId: UUID | null): Ar
         listAllSupportsEdges(supabase, main.head_commit_id),
         listAllOwnsEdges(supabase, main.head_commit_id),
         listAllReplacesEdges(supabase, main.head_commit_id),
-        listFactsForCommit(supabase, main.head_commit_id),
+        listFactStalenessForCommit(supabase, main.head_commit_id),
         listAllUsesAndFlowsToEdges(supabase, main.head_commit_id),
         listUsesAndFlowsToEndpointElements(supabase, main.head_commit_id),
         // S1 item 11a: an actor can now be a `uses` edge's own endpoint too

@@ -361,6 +361,23 @@ export async function listFactsForCommit(supabase: Client, commitId: string): Pr
   return selectAll<FactsRow>(query);
 }
 
+/** The only fact columns the stale-attributes finding reads. */
+export type FactStalenessRow = Pick<FactsRow, 'subject_id' | 'effective_date' | 'asserted_at'>;
+
+/**
+ * Just what `computeStaleAttributesFinding` needs — `subject_id` and the two dates — for element facts only (the finding scopes to systems, which are elements). Same facts, a fraction of the payload `listFactsForCommit` (`select *`, values and provenance included) sends; Home's findings used to download all of it to read three columns. Routed through `selectAll` (SPEC §6.7).
+ */
+export async function listFactStalenessForCommit(supabase: Client, commitId: string): Promise<FactStalenessRow[]> {
+  const query = supabase
+    .from('facts')
+    .select('subject_id,effective_date,asserted_at', { count: 'exact' })
+    .eq('commit_id', commitId)
+    .eq('subject_type', 'element')
+    .order('subject_id')
+    .order('attribute');
+  return selectAll<FactStalenessRow>(query);
+}
+
 /** Every `container` in `containers`, grouped by its own `parent_id` — a platform's modules, keyed by the platform's own element id. Shared by `findSystemsWithoutCapability` and `findPlatformSupportsThatShouldMoveToModule` below so the two findings never define "this platform's modules" two different ways. */
 function groupModulesByPlatformId(containers: readonly ElementsHeadRow[]): Map<UUID, ElementsHeadRow[]> {
   const result = new Map<UUID, ElementsHeadRow[]>();
@@ -570,7 +587,7 @@ export interface StaleAttributesFinding {
 }
 
 /** Handoff 7d's "N attributes stale over 12 months — across M systems · oldest Ky" finding, scoped to `systems`' own facts (not every subject in the model — capabilities/actors/relationships aren't this finding's concern). */
-export function computeStaleAttributesFinding(facts: readonly FactsRow[], systems: readonly ElementsHeadRow[], now: Date = new Date()): StaleAttributesFinding {
+export function computeStaleAttributesFinding(facts: readonly FactStalenessRow[], systems: readonly ElementsHeadRow[], now: Date = new Date()): StaleAttributesFinding {
   const systemsById = new Map(systems.map((s) => [s.element_id, s]));
   let staleFactCount = 0;
   let oldestMonths = 0;
