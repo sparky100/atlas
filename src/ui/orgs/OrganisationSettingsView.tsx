@@ -239,7 +239,7 @@ export function OrganisationSettingsView({ organisation, role, userId, onChanged
             Ask Atlas
           </Text>
           <Text as="p" tone="muted" size="sm">
-            When Ask Atlas is on, the questions members ask, and the names, descriptions, attributes and relationships of the elements needed to answer them, are sent to our AI provider to produce each answer. Comments and unreviewed imports are not sent. It also covers AI apps that members connect to Atlas on their own computer (such as Claude Desktop): while it is off, those apps get no model content. Nothing is sent while it is off.
+            When Ask Atlas is on, the questions members ask, and the names, descriptions, attributes and relationships of the elements needed to answer them, are sent to our AI provider to produce each answer. It also covers Draft with AI on the Changes page: the brief you write and the names, descriptions, attributes and relationships of the model's current elements are sent to our AI provider to suggest edits. Comments and unreviewed imports are not sent. It also covers AI apps that members connect to Atlas on their own computer (such as Claude Desktop): while it is off, those apps get no model content. Nothing is sent while it is off.
           </Text>
           <label className={styles.checkRow}>
             <input
