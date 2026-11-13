@@ -1,5 +1,5 @@
 /**
- * Microsoft Entra sign-in (`org_entra_tenants`, migration 20261113010000).
+ * Microsoft Entra sign-in (`org_entra_tenants`, migration 20261113030000).
  * An organisation records its company's Microsoft tenant ID once; anyone who
  * signs in from that tenant joins as a Viewer.
  *

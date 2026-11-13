@@ -110,7 +110,7 @@ Who belongs to an organisation and with what role.
 Primary key `(org_id, user_id)`. Index on `(user_id)`.
 Trigger `atlas.on_organisation_created` inserts the creator as `owner`. `atlas.guard_last_owner`, an ordinary `before` row trigger — not a SQL `create constraint trigger` (Sprint H1 correction, docs/AUDIT-2026-09-U2.md §2.E.3 item 18: this deferrable-checking distinction isn't needed here — "no owners left" should reject the statement immediately, not at end of transaction) — stops an org losing its last `owner`.
 
-#### `org_entra_tenants` (Microsoft Entra sign-in, `20261113010000_entra_sign_in.sql`)
+#### `org_entra_tenants` (Microsoft Entra sign-in, `20261113030000_entra_sign_in.sql`)
 The Microsoft tenant an organisation's people sign in from.
 
 | Column | Type | Constraints |
