@@ -19,9 +19,9 @@
     },
     {
       "name": "Sales Cloud",
+      "description": "Tracks leads, quotes and the pipeline for business customer sales.",
       "platform": "Salesforce",
       "capability": "Direct Digital Sales",
-      "description": "Leads, quotes and SME sales pipeline.",
       "lifecycle": "active",
       "criticality": "high",
       "disposition": "invest",
@@ -154,6 +154,7 @@
     },
     {
       "name": "Legacy Prepayment Billing",
+      "description": "Old billing system for prepayment customers, kept only until the last accounts and history are moved off.",
       "capability": "Bill Calculation & Production",
       "kind": "application",
       "lifecycle": "retired",
@@ -240,6 +241,7 @@
     },
     {
       "name": "Smart Install Scheduler",
+      "description": "Books smart meter installation visits and sends appointment reminders to customers.",
       "capability": "Smart Meter Installation Booking",
       "kind": "application",
       "lifecycle": "active",
@@ -294,6 +296,7 @@
     },
     {
       "name": "Demand Forecasting Engine",
+      "description": "Forecasts customer energy demand by half hour to support buying and balancing.",
       "capability": "Demand Forecasting",
       "kind": "application",
       "lifecycle": "active",
@@ -345,6 +348,7 @@
     },
     {
       "name": "Position & Imbalance Monitor",
+      "description": "Shows the company's energy position against forecast demand and the cost of any imbalance.",
       "capability": "Imbalance & Position Management",
       "kind": "application",
       "lifecycle": "active",
@@ -378,6 +382,7 @@
     },
     {
       "name": "Tariff Pricing Engine",
+      "description": "Calculates tariff prices from wholesale costs, network charges and policy costs.",
       "capability": "Tariff Design & Pricing",
       "kind": "application",
       "lifecycle": "active",
@@ -394,6 +399,7 @@
     },
     {
       "name": "Proposition Catalogue",
+      "description": "Master list of products and propositions, with their rules and launch status.",
       "capability": "Product & Proposition Management",
       "kind": "application",
       "lifecycle": "active",
@@ -410,6 +416,7 @@
     },
     {
       "name": "Smart Tariff Platform",
+      "description": "Runs smart tariffs that change price by time of day and sends customers their usage insights.",
       "capability": "Smart Tariffs & Home Energy Services",
       "kind": "application",
       "lifecycle": "planned",
@@ -426,6 +433,7 @@
     },
     {
       "name": "EV Proposition Portal",
+      "description": "Customer website for electric vehicle and heat pump tariffs and offers.",
       "capability": "EV & Heat Pump Propositions",
       "kind": "application",
       "lifecycle": "active",
@@ -442,6 +450,7 @@
     },
     {
       "name": "Flexibility Orchestrator",
+      "description": "Coordinates customer devices and aggregators to shift demand when asked.",
       "capability": "Flexibility & Demand-Side Response",
       "kind": "application",
       "lifecycle": "planned",
@@ -458,6 +467,7 @@
     },
     {
       "name": "Identity & Credit Service",
+      "description": "Checks a new customer's identity and credit before an account is opened.",
       "capability": "Credit & Identity Checks",
       "kind": "application",
       "lifecycle": "active",
@@ -492,6 +502,7 @@
     },
     {
       "name": "Aggregator Feed Manager",
+      "description": "Sends tariff prices to price comparison sites and receives the resulting sales.",
       "capability": "Price Comparison & Aggregator Channels",
       "kind": "application",
       "lifecycle": "active",
@@ -508,6 +519,7 @@
     },
     {
       "name": "Contact Centre Telephony",
+      "description": "Phone system that routes customer calls and records call volumes and waiting times.",
       "capability": "Customer Service & Contact",
       "kind": "application",
       "lifecycle": "active",
@@ -525,6 +537,7 @@
     },
     {
       "name": "Regulatory Reporting Hub",
+      "description": "Collects data and produces the regular reports required by the regulator.",
       "capability": "Ofgem Regulatory Reporting",
       "kind": "application",
       "lifecycle": "active",
@@ -557,6 +570,7 @@
     },
     {
       "name": "Social Obligations Tracker",
+      "description": "Tracks delivery of the company's environmental and social scheme obligations.",
       "capability": "Environmental & Social Obligations",
       "kind": "application",
       "lifecycle": "active",
@@ -573,6 +587,7 @@
     },
     {
       "name": "Industry Codes Compliance Register",
+      "description": "Lists the industry code obligations, who owns each and the evidence of compliance.",
       "capability": "Industry Codes Compliance",
       "kind": "application",
       "lifecycle": "active",
@@ -589,6 +604,7 @@
     },
     {
       "name": "SAP S/4HANA Finance",
+      "description": "Core finance platform for ledger, payables, receivables and financial reporting.",
       "capability": "Financial Accounting & Reporting",
       "kind": "platform",
       "lifecycle": "active",
@@ -606,6 +622,7 @@
     },
     {
       "name": "Treasury Management System",
+      "description": "Manages cash positions, bank balances, payments and funding.",
       "capability": "Treasury & Cash Management",
       "kind": "application",
       "lifecycle": "active",
@@ -623,6 +640,7 @@
     },
     {
       "name": "Workday",
+      "description": "Human resources and payroll system for staff records, pay and pensions.",
       "capability": "Pay, Reward & Pensions",
       "kind": "application",
       "lifecycle": "active",
@@ -640,6 +658,7 @@
     },
     {
       "name": "Snowflake Data Platform",
+      "description": "Cloud data store for billing, customer and energy data used for analysis and reports.",
       "capability": "Analytics & Business Intelligence",
       "kind": "data_platform",
       "lifecycle": "active",
@@ -657,6 +676,7 @@
     },
     {
       "name": "Power BI",
+      "description": "Dashboards and reports for management, built on data from the data platform.",
       "capability": "Analytics & Business Intelligence",
       "kind": "application",
       "lifecycle": "active",
@@ -674,6 +694,7 @@
     },
     {
       "name": "ServiceNow",
+      "description": "IT service desk: incidents, requests, changes and the record of IT assets.",
       "capability": "Technology Service Management",
       "kind": "application",
       "lifecycle": "active",
@@ -691,6 +712,7 @@
     },
     {
       "name": "Privacy Management Tool",
+      "description": "Records personal data processing, handles access requests and tracks privacy assessments.",
       "capability": "Data Protection & Privacy",
       "kind": "application",
       "lifecycle": "active",
@@ -708,6 +730,7 @@
     },
     {
       "name": "Enterprise Risk Register",
+      "description": "Holds the organisation's risks, their owners, ratings and the actions to reduce them.",
       "capability": "Risk Management",
       "kind": "application",
       "lifecycle": "active",
@@ -766,6 +789,7 @@
     },
     {
       "name": "ECOES",
+      "description": "Industry registration look-up service for finding the supplier and meter details for a supply point.",
       "kind": "application",
       "is_external": true,
       "external_organisation": "Gemserv",
@@ -773,7 +797,6 @@
       "criticality": "high",
       "domain": "it",
       "hosting_model": "saas",
-      "description": "Industry registration look-up service.",
       "quote": "Meridian Energy Supply demo architecture (fictional organisation, illustrative)",
       "confidence": 0.9,
       "introduced": "2011-05-01"
@@ -908,9 +931,9 @@
     },
     {
       "name": "Industry D-flow Gateway",
+      "description": "Exchanges industry data files with the central data transfer network.",
       "platform": "MuleSoft Anypoint",
       "interface_type": "file",
-      "description": "D-flow files to and from the DTN.",
       "lifecycle": "active",
       "criticality": "high",
       "transformation": "Converts D-flow fixed-width files to API messages.",
@@ -929,9 +952,9 @@
     },
     {
       "name": "Ledger Postings",
+      "description": "Billing postings sent to the general ledger.",
       "platform": "MuleSoft Anypoint",
       "interface_type": "batch",
-      "description": "Billing postings to the general ledger.",
       "lifecycle": "active",
       "criticality": "high",
       "quote": "Meridian Energy Supply demo architecture (fictional organisation, illustrative)",
@@ -952,9 +975,9 @@
     {
       "from": "Meridian Web & App",
       "type": "flows_to",
-      "to": "Kraken Billing \u00b7 Account & Contract Management",
+      "to": "Kraken Billing · Account & Contract Management",
       "description": "sends customer account changes to",
-      "via": "MuleSoft Anypoint \u00b7 Customer Account API",
+      "via": "MuleSoft Anypoint · Customer Account API",
       "data_classification": "official_sensitive",
       "protocol_in": "rest_api",
       "protocol_out": "rest_api",
@@ -962,11 +985,11 @@
       "confidence": 0.85
     },
     {
-      "from": "Salesforce \u00b7 Service Cloud",
+      "from": "Salesforce · Service Cloud",
       "type": "flows_to",
-      "to": "Kraken Billing \u00b7 Account & Contract Management",
+      "to": "Kraken Billing · Account & Contract Management",
       "description": "reads customer accounts from",
-      "via": "MuleSoft Anypoint \u00b7 Customer Account API",
+      "via": "MuleSoft Anypoint · Customer Account API",
       "data_classification": "official_sensitive",
       "protocol_in": "rest_api",
       "protocol_out": "rest_api",
@@ -974,11 +997,11 @@
       "confidence": 0.85
     },
     {
-      "from": "Salesforce \u00b7 Vulnerability Register",
+      "from": "Salesforce · Vulnerability Register",
       "type": "flows_to",
-      "to": "Kraken Billing \u00b7 Debt & Collections",
+      "to": "Kraken Billing · Debt & Collections",
       "description": "shares vulnerability flags with",
-      "via": "MuleSoft Anypoint \u00b7 Customer Account API",
+      "via": "MuleSoft Anypoint · Customer Account API",
       "data_classification": "special_category",
       "protocol_in": "rest_api",
       "protocol_out": "rest_api",
@@ -988,9 +1011,9 @@
     {
       "from": "Itron Meter Data Management",
       "type": "flows_to",
-      "to": "Kraken Billing \u00b7 Bill Engine",
+      "to": "Kraken Billing · Bill Engine",
       "description": "sends validated reads to",
-      "via": "MuleSoft Anypoint \u00b7 Meter Reads Feed",
+      "via": "MuleSoft Anypoint · Meter Reads Feed",
       "data_classification": "official_sensitive",
       "protocol_in": "file_sftp",
       "protocol_out": "rest_api",
@@ -1002,7 +1025,7 @@
       "type": "flows_to",
       "to": "Junifer Billing",
       "description": "sends validated reads to",
-      "via": "MuleSoft Anypoint \u00b7 Meter Reads Feed",
+      "via": "MuleSoft Anypoint · Meter Reads Feed",
       "data_classification": "official_sensitive",
       "protocol_in": "file_sftp",
       "protocol_out": "file_sftp",
@@ -1014,7 +1037,7 @@
       "type": "flows_to",
       "to": "Itron Meter Data Management",
       "description": "sends smart reads and alerts to",
-      "via": "MuleSoft Anypoint \u00b7 Smart Read Events",
+      "via": "MuleSoft Anypoint · Smart Read Events",
       "data_classification": "official_sensitive",
       "protocol_in": "soap",
       "protocol_out": "event_queue",
@@ -1050,9 +1073,9 @@
     {
       "from": "Switching Gateway",
       "type": "flows_to",
-      "to": "Kraken Billing \u00b7 Account & Contract Management",
+      "to": "Kraken Billing · Account & Contract Management",
       "description": "sends registration outcomes to",
-      "via": "MuleSoft Anypoint \u00b7 Switching Events",
+      "via": "MuleSoft Anypoint · Switching Events",
       "data_classification": "official_sensitive",
       "protocol_in": "event_queue",
       "protocol_out": "rest_api",
@@ -1064,7 +1087,7 @@
       "type": "flows_to",
       "to": "Data Transfer Network",
       "description": "exchanges registration D-flows with",
-      "via": "MuleSoft Anypoint \u00b7 Industry D-flow Gateway",
+      "via": "MuleSoft Anypoint · Industry D-flow Gateway",
       "data_classification": "official",
       "protocol_in": "file_sftp",
       "protocol_out": "file_sftp",
@@ -1116,7 +1139,7 @@
     {
       "from": "Tariff Pricing Engine",
       "type": "flows_to",
-      "to": "Kraken Billing \u00b7 Account & Contract Management",
+      "to": "Kraken Billing · Account & Contract Management",
       "description": "provides tariff rates to",
       "data_classification": "official",
       "quote": "Meridian Energy Supply demo architecture (fictional organisation, illustrative)",
@@ -1125,7 +1148,7 @@
     {
       "from": "Price Comparison Websites",
       "type": "flows_to",
-      "to": "Salesforce \u00b7 Sales Cloud",
+      "to": "Salesforce · Sales Cloud",
       "description": "sends sales leads to",
       "data_classification": "official_sensitive",
       "quote": "Meridian Energy Supply demo architecture (fictional organisation, illustrative)",
@@ -1149,11 +1172,11 @@
       "confidence": 0.85
     },
     {
-      "from": "Kraken Billing \u00b7 Bill Engine",
+      "from": "Kraken Billing · Bill Engine",
       "type": "flows_to",
       "to": "SAP S/4HANA Finance",
       "description": "posts revenue to",
-      "via": "MuleSoft Anypoint \u00b7 Ledger Postings",
+      "via": "MuleSoft Anypoint · Ledger Postings",
       "data_classification": "official",
       "protocol_in": "rest_api",
       "protocol_out": "rest_api",
@@ -1165,7 +1188,7 @@
       "type": "flows_to",
       "to": "SAP S/4HANA Finance",
       "description": "posts revenue to",
-      "via": "MuleSoft Anypoint \u00b7 Ledger Postings",
+      "via": "MuleSoft Anypoint · Ledger Postings",
       "data_classification": "official",
       "protocol_in": "file_sftp",
       "protocol_out": "file_sftp",
@@ -1173,9 +1196,9 @@
       "confidence": 0.85
     },
     {
-      "from": "Kraken Billing \u00b7 Payments & Direct Debit",
+      "from": "Kraken Billing · Payments & Direct Debit",
       "type": "flows_to",
-      "to": "Kraken Billing \u00b7 Debt & Collections",
+      "to": "Kraken Billing · Debt & Collections",
       "description": "sends payment outcomes to",
       "data_classification": "official_sensitive",
       "quote": "Meridian Energy Supply demo architecture (fictional organisation, illustrative)",
@@ -1195,7 +1218,7 @@
       "type": "flows_to",
       "to": "Settlement Engine",
       "description": "sends aggregated volumes to",
-      "via": "MuleSoft Anypoint \u00b7 Settlement Data Feed",
+      "via": "MuleSoft Anypoint · Settlement Data Feed",
       "data_classification": "official",
       "protocol_in": "file_sftp",
       "protocol_out": "file_sftp",
@@ -1252,7 +1275,7 @@
       "type": "flows_to",
       "to": "MHHS Reconciliation Hub",
       "description": "provides half-hourly data to",
-      "via": "MuleSoft Anypoint \u00b7 Settlement Data Feed",
+      "via": "MuleSoft Anypoint · Settlement Data Feed",
       "data_classification": "official_sensitive",
       "protocol_in": "file_sftp",
       "protocol_out": "rest_api",
@@ -1287,7 +1310,7 @@
       "confidence": 0.85
     },
     {
-      "from": "Kraken Billing \u00b7 Bill Engine",
+      "from": "Kraken Billing · Bill Engine",
       "type": "flows_to",
       "to": "Snowflake Data Platform",
       "description": "sends billing data to",
@@ -1305,7 +1328,7 @@
       "confidence": 0.85
     },
     {
-      "from": "Salesforce \u00b7 Service Cloud",
+      "from": "Salesforce · Service Cloud",
       "type": "flows_to",
       "to": "Snowflake Data Platform",
       "description": "sends case data to",
@@ -1334,7 +1357,7 @@
     {
       "from": "Contact Centre Telephony",
       "type": "uses",
-      "to": "Salesforce \u00b7 Service Cloud",
+      "to": "Salesforce · Service Cloud",
       "description": "logs calls in",
       "quote": "Meridian Energy Supply demo architecture (fictional organisation, illustrative)",
       "confidence": 0.85
@@ -1393,7 +1416,7 @@
     {
       "name": "Legacy Prepayment Billing",
       "action": "retire",
-      "replaced_by": "Kraken Billing \u00b7 Bill Engine",
+      "replaced_by": "Kraken Billing · Bill Engine",
       "reason": "Prepayment customers migrated to Kraken in 2025.",
       "quote": "Meridian Energy Supply demo architecture (fictional organisation, illustrative)",
       "confidence": 0.9

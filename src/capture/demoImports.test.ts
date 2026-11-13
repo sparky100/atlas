@@ -19,7 +19,7 @@ const DEMOS = [
   { file: 'docs/demo/meridian-retail.import.json', map: 'content/capability-maps/retail_energy/1.json' },
 ] as const;
 
-interface RawSystem { name: string; platform?: string; capability?: string; quote?: string; confidence?: number }
+interface RawSystem { name: string; description?: string; platform?: string; capability?: string; quote?: string; confidence?: number }
 interface RawEntry { name?: string; from?: string; to?: string; via?: string; platform?: string; capability?: string; replaced_by?: string; quote?: string; confidence?: number }
 interface RawImport { systems: RawSystem[]; relationships: RawEntry[]; changes: RawEntry[] }
 
@@ -54,6 +54,10 @@ describe.each(DEMOS)('demo import $file', ({ file, map }) => {
       ...raw.changes.flatMap((c) => [c.name, c.replaced_by].filter((x): x is string => !!x && !resolves(x))),
     ];
     expect(bad).toEqual([]);
+  });
+
+  it('gives every system a description of at least a short sentence', () => {
+    expect(raw.systems.filter((s) => (s.description ?? '').trim().length < 40).map((s) => s.name)).toEqual([]);
   });
 
   it('has no two systems (or modules of one platform) so similarly named that the importer treats them as one', () => {
