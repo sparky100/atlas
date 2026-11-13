@@ -150,6 +150,7 @@ export async function findReimportCandidate(supabase: Client, modelId: UUID, inp
     .select('*')
     .eq('model_id', modelId)
     .eq('input_name', inputName)
+    .neq('input_kind', 'change_brief')
     .in('status', ['parsed', 'reviewed'])
     .order('created_at', { ascending: false })
     .limit(1)

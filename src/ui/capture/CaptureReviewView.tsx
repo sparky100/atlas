@@ -85,8 +85,12 @@ export function CaptureReviewView({ modelId, orgId, jobId, reviewQueueHref }: Ca
   const { role } = useMembership(orgId, userId);
   const canReview = canRunCapture(role);
   const queue = useCaptureReviewQueue(modelId, orgId, jobId, userId, role);
-  const { status, error, job, candidates, changeBranches, mainElementById, mainRelationshipById, draftElementById, targetBranchId, setTargetBranchId, decide, decideMany, apply, finish, discard, searchTargetElements, notInFile } = queue;
+  const { status, error, job, candidates, changeBranches, mainElementById, mainRelationshipById, draftElementById, targetBranchId, setTargetBranchId, retry, decide, decideMany, apply, finish, discard, searchTargetElements, notInFile } = queue;
 
+  const busy = status === 'applying' || status === 'closing';
+  const isChangeBrief = job?.inputKind === 'change_brief';
+  const [retrying, setRetrying] = useState(false);
+  const [appliedBranchId, setAppliedBranchId] = useState<UUID | null>(null);
   const [selectedId, setSelectedId] = useState<UUID | null>(null);
   const [openPanel, setOpenPanel] = useState<{ candidateId: UUID; type: 'edit' | 'split' | 'merge' } | null>(null);
   const [multiSelected, setMultiSelected] = useState<Set<UUID>>(new Set());
@@ -140,20 +144,28 @@ export function CaptureReviewView({ modelId, orgId, jobId, reviewQueueHref }: Ca
   const runFinish = useCallback(() => {
     void finish().then((done) => {
       if (!done) return;
-      reportToast('Import review finished — nothing was applied.');
+      reportToast(isChangeBrief ? 'Draft review finished — nothing was applied.' : 'Import review finished — nothing was applied.');
       void navigate(reviewQueueHref);
     });
-  }, [finish, navigate, reviewQueueHref]);
+  }, [finish, isChangeBrief, navigate, reviewQueueHref]);
 
   const runDiscard = useCallback(
     () =>
       discard().then((done) => {
         if (!done) return;
-        reportToast('Import draft discarded.');
+        reportToast(isChangeBrief ? 'AI draft discarded.' : 'Import draft discarded.');
         void navigate(reviewQueueHref);
       }),
-    [discard, navigate, reviewQueueHref],
+    [discard, isChangeBrief, navigate, reviewQueueHref],
   );
+
+  const runApply = useCallback(() => {
+    void apply().then((result) => {
+      if (!result) return;
+      setApplyMessage(applyResultMessage(result));
+      if (isChangeBrief) setAppliedBranchId(result.targetBranchId);
+    });
+  }, [apply, isChangeBrief]);
 
   const bulkDecide = useCallback(
     (decision: 'accepted' | 'rejected') => {
@@ -171,7 +183,7 @@ export function CaptureReviewView({ modelId, orgId, jobId, reviewQueueHref }: Ca
   );
 
   useEffect(() => {
-    if (!canReview) return;
+    if (!canReview || busy) return;
     const onKeyDown = (e: KeyboardEvent) => {
       if (isTypingTarget(e.target)) return;
       if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') {
@@ -180,9 +192,7 @@ export function CaptureReviewView({ modelId, orgId, jobId, reviewQueueHref }: Ca
           runFinish();
           return;
         }
-        void apply().then((result) => {
-          if (result) setApplyMessage(applyResultMessage(result));
-        });
+        runApply();
         return;
       }
       if (e.key === 'j' || e.key === 'k') {
@@ -270,7 +280,7 @@ export function CaptureReviewView({ modelId, orgId, jobId, reviewQueueHref }: Ca
     return () => {
       document.removeEventListener('keydown', onKeyDown);
     };
-  }, [canReview, selectedCandidate, effectiveSelectedId, flat, multiSelected, pendingAmbiguousTargets, targetBranchId, bulkDecide, setDecisionFor, apply, finishable, runFinish]);
+  }, [canReview, busy, selectedCandidate, effectiveSelectedId, flat, multiSelected, pendingAmbiguousTargets, targetBranchId, bulkDecide, setDecisionFor, runApply, finishable, runFinish]);
 
   const toggleSelectAll = useCallback((items: readonly CaptureCandidate[]) => {
     setMultiSelected((prev) => {
@@ -296,13 +306,32 @@ export function CaptureReviewView({ modelId, orgId, jobId, reviewQueueHref }: Ca
   if (status === 'loading') return <Loading />;
   if (status === 'error' || !job) return <Text as="p">{error ?? "Couldn't load this import review."}</Text>;
 
+  const changeHref = (branchId: UUID) => `${reviewQueueHref.replace(/\/review$/, '')}/changes/${branchId}`;
+  if (isChangeBrief && job.status === 'pending') {
+    const failure = error ?? job.error?.message;
+    return (
+      <Panel>
+        <Text as="h2" size="lg">{job.inputName}</Text>
+        {failure ? <p role="alert">{failure}</p> : <p role="status">Generating proposed edits…</p>}
+        {(failure !== undefined || retrying) && (
+          <Button disabled={retrying} onClick={() => {
+            setRetrying(true);
+            void retry().finally(() => { setRetrying(false); });
+          }}>{retrying ? 'Retrying…' : 'Retry'}</Button>
+        )}
+        <LinkButton to={reviewQueueHref} variant="secondary">Back to review queue</LinkButton>
+      </Panel>
+    );
+  }
+
   // A reviewed or discarded job is closed: its decisions are history, not a queue to act on.
   if (job.status !== 'parsed') {
     return (
       <Panel>
         <Text as="p">
-          This capture review is closed ({captureJobStatusLabel(job).toLowerCase()}).
+          {isChangeBrief && job.targetBranchId ? (applyMessage ?? 'Selected edits were applied to a draft Change.') : `This capture review is closed (${captureJobStatusLabel(job).toLowerCase()}).`}
         </Text>
+        {isChangeBrief && job.targetBranchId && <LinkButton to={changeHref(job.targetBranchId)} variant="primary">Open draft Change</LinkButton>}
         <LinkButton to={reviewQueueHref} variant="secondary">
           Back to review queue
         </LinkButton>
@@ -310,7 +339,6 @@ export function CaptureReviewView({ modelId, orgId, jobId, reviewQueueHref }: Ca
     );
   }
 
-  const busy = status === 'applying' || status === 'closing';
   const applyDisabledReason = finishable ? (busy ? 'Working…' : null) : busy ? 'Applying…' : null;
   const canDiscard = canDiscardCaptureJob(role, job, userId);
 
@@ -320,7 +348,7 @@ export function CaptureReviewView({ modelId, orgId, jobId, reviewQueueHref }: Ca
         <Panel>
           <div className={styles.headerRow}>
             <Text as="p" size="sm" tone="muted">
-              {candidates.length} items · {decidedCount} decided
+              {isChangeBrief && `${job.inputName} · `}{candidates.length} items · {decidedCount} decided
             </Text>
           </div>
           <div className={styles.filterRow} role="group" aria-label="Filter by review status">
@@ -345,11 +373,12 @@ export function CaptureReviewView({ modelId, orgId, jobId, reviewQueueHref }: Ca
               id="capture-review-target-branch"
               className={styles.select}
               value={targetBranchId ?? ''}
+              disabled={busy || (isChangeBrief && job.targetBranchId !== null)}
               onChange={(e) => {
                 setTargetBranchId(e.target.value || null);
               }}
             >
-              <option value="">A new change for this import</option>
+              <option value="">{isChangeBrief ? 'A new Propose change' : 'A new change for this import'}</option>
               {changeBranches.map((b) => (
                 <option key={b.id} value={b.id}>
                   {b.title ?? b.name}
@@ -361,8 +390,8 @@ export function CaptureReviewView({ modelId, orgId, jobId, reviewQueueHref }: Ca
                 {status === 'closing' ? 'Finishing…' : 'Finish review'}
               </Button>
             ) : (
-              <Button variant="primary" disabled={!!applyDisabledReason} title={applyDisabledReason ?? undefined} onClick={() => { void apply().then((result) => { if (result) setApplyMessage(applyResultMessage(result)); }); }}>
-                {status === 'applying' ? 'Applying…' : 'Apply decisions'}
+              <Button variant="primary" disabled={!!applyDisabledReason} title={applyDisabledReason ?? undefined} onClick={runApply}>
+                {status === 'applying' ? 'Applying…' : isChangeBrief ? 'Apply to draft Change' : 'Apply decisions'}
               </Button>
             )}
           </div>
@@ -371,6 +400,7 @@ export function CaptureReviewView({ modelId, orgId, jobId, reviewQueueHref }: Ca
               Nothing left to apply — every remaining candidate is rejected. Finish review closes it without creating a change.
             </Text>
           )}
+          {isChangeBrief && candidates.length === 0 && <Text as="p" size="sm">No applicable edits were found. Start a new draft with more specific system or relationship details.</Text>}
           {applyDisabledReason && (
             <Text as="p" tone="muted" size="xs">
               {applyDisabledReason}
@@ -381,6 +411,7 @@ export function CaptureReviewView({ modelId, orgId, jobId, reviewQueueHref }: Ca
               {applyMessage}
             </Text>
           )}
+          {isChangeBrief && appliedBranchId && <LinkButton to={changeHref(appliedBranchId)} variant="secondary">Open draft Change</LinkButton>}
           {error !== null && (
             <Text as="p" size="sm">
               {error}
@@ -412,7 +443,7 @@ export function CaptureReviewView({ modelId, orgId, jobId, reviewQueueHref }: Ca
         </div>
       )}
 
-      {notInFile.length > 0 && (
+      {!isChangeBrief && notInFile.length > 0 && (
         <div className={styles.header}>
           <Panel>
             <CollapsibleSection title="Not in file" meta={`(${String(notInFile.length)})`} defaultOpen={false}>
@@ -465,7 +496,7 @@ export function CaptureReviewView({ modelId, orgId, jobId, reviewQueueHref }: Ca
                     mainElementById={mainElementById}
                     mainRelationshipById={mainRelationshipById}
                     draftElementById={draftElementById}
-                    canReview={canReview}
+                    canReview={canReview && !busy}
                     selected={candidate.id === effectiveSelectedId}
                     onSelect={() => {
                       setSelectedId(candidate.id);

@@ -34,6 +34,7 @@
  */
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.115.0';
 import { corsHeaders } from '../../_shared/cors.ts';
+import { CHANGE_BRIEF_FILENAME } from '../../../../src/contracts/capture.ts';
 import { buildRealCaptureRunDeps, readJob } from './db.ts';
 import { runCaptureRunStep } from '../../../../src/capture/captureRunStep.ts';
 
@@ -74,6 +75,21 @@ Deno.serve(async (req: Request) => {
     const callerClient = createClient(supabaseUrl, supabaseAnonKey, { global: { headers: { Authorization: authHeader } } });
     const authorizedJob = await readJob(callerClient, jobId);
     if (!authorizedJob) return jsonResponse({ status: 'error', message: 'Capture job not found, or you are not a contributor+ member of its organisation.' }, 404);
+
+    if (authorizedJob.inputKind === 'change_brief') {
+      const [organisation, model] = await Promise.all([
+        callerClient.from('organisations').select('ai_assistant_enabled').eq('id', authorizedJob.orgId).maybeSingle(),
+        callerClient.from('models').select('id').eq('id', authorizedJob.modelId).eq('org_id', authorizedJob.orgId).maybeSingle(),
+      ]);
+      if (model.error || !model.data || authorizedJob.inputRef !== `capture-inputs/${authorizedJob.orgId}/${authorizedJob.modelId}/${authorizedJob.id}/${CHANGE_BRIEF_FILENAME}` || authorizedJob.targetBranchId !== null) {
+        return jsonResponse({ status: 'error', message: 'The change brief does not belong to this model.' }, 403);
+      }
+      const { data, error } = organisation;
+      if (error) throw new Error('Could not check the organisation AI setting.');
+      if ((data as { ai_assistant_enabled?: boolean } | null)?.ai_assistant_enabled !== true) {
+        return jsonResponse({ status: 'error', message: 'Enable Ask Atlas in organisation settings to draft with AI.' }, 403);
+      }
+    }
 
     // Step 2: service role for everything else. The caller's own session JWT
     // is forwarded through to llm-proxy — not the service-role key, which is

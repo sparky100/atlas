@@ -533,7 +533,7 @@ One ingestion run (ADR-004).
 | Column | Type | Constraints |
 |---|---|---|
 | `model_id` | uuid | → `models(id)` |
-| `input_kind` | text | not null, `check (input_kind in ('spreadsheet','pdf','text'))` |
+| `input_kind` | text | not null, `check (input_kind in ('spreadsheet','pdf','text','change_brief'))` |
 | `input_ref` | text | not null — storage pointer |
 | `status` | capture_status | not null default `pending` |
 | `resulting_branch_id` | uuid | → `branches(id)`, nullable until parsed; must be `kind = 'capture_draft'` |

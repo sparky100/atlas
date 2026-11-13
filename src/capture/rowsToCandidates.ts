@@ -60,6 +60,8 @@ export interface RowCandidate {
   mustMatchExisting?: boolean;
   /** A `supports` candidate from a row that named exactly one capability, so it may be that capability's primary. It is proposed `secondary` when the capability already has a live primary — which, on a re-import, is usually this same system's own link; `resolveRelationshipCandidate` (`runCapture.ts`) restores `primary` when the existing edge it matches is that primary one, so re-importing the same data is not a conflict. */
   primaryEligible?: boolean;
+  /** Create-time defaults on a change brief must not update a matched element. */
+  defaultedAttributes?: readonly string[];
 }
 
 export interface RowsToCandidatesInput {

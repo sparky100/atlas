@@ -18,7 +18,10 @@ import type { SourceRef } from './sourceRef';
 
 export type CaptureStatus = 'pending' | 'parsed' | 'reviewed' | 'discarded';
 
-export type CaptureInputKind = 'spreadsheet' | 'pdf' | 'text';
+export type CaptureInputKind = 'spreadsheet' | 'pdf' | 'text' | 'change_brief';
+
+export const CHANGE_BRIEF_FILENAME = 'change-brief.txt';
+export const MAX_CHANGE_BRIEF_CHARS = 4_000;
 
 /** {stage, done, total, startedAt, updatedAt} — persisted after every bounded step (K-12) so a crash loses at most one chunk of work. */
 export interface CaptureJobProgress {

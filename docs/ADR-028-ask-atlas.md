@@ -82,7 +82,7 @@ A fixed fixture model and **25 to 40 questions** with the element ids a correct 
 
 ## Out of scope
 
-Writing or proposing changes (a later, separately approved step: drafts through the capture pipeline into the review queue, never to main or a head table); stored conversations; questions across several models; comment bodies and capture drafts as sources; asking about a draft change (F16 adds the ref); voice; any provider other than the proxy's.
+Writing from Ask Atlas chat; stored conversations; questions across several models; comment bodies and capture drafts as sources; asking about a draft change (F16 adds the ref); voice; any provider other than the proxy's.
 
 ## Consequences
 
@@ -96,3 +96,7 @@ Writing or proposing changes (a later, separately approved step: drafts through 
 1. Per-question limits: 6 rounds, 2,000 tokens a round, ~60,000 characters of tool results. [as above; revisit after the evaluation set runs]
 2. Which model: the proxy's configured default, not chosen by the caller. [yes]
 3. Stored conversations. [not in this version]
+
+### Follow-on: draft a Change
+
+The separate **Draft with AI** action uses Capture and the existing organisation AI setting. Reviewers apply selected suggestions to a draft Propose Change. See [the implementation plan](PLAN-ai-change-drafting.md).
