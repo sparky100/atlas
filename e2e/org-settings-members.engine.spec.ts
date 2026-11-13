@@ -68,7 +68,7 @@ test('owner renames the organisation, changes a member’s role, and removes a m
   // load, not a text node.
   const newName = `Renamed Org ${randomUUID().slice(0, 8)}`;
   await page.getByLabel('Name', { exact: true }).fill(newName);
-  await page.getByRole('button', { name: 'Save' }).click();
+  await page.locator('form').filter({ has: page.getByLabel('Name', { exact: true }) }).getByRole('button', { name: 'Save', exact: true }).click();
   await expect(page.getByRole('heading', { name: 'Organisation settings' })).toBeVisible({ timeout: 15_000 });
   await expect(page.getByLabel('Name', { exact: true })).toHaveValue(newName);
 

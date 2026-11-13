@@ -13,7 +13,7 @@ test('Home offers the Claude Desktop download and the file is served', async ({ 
   await signUpCreateOrgAndModel(page, 'goldenpath-mcp');
 
   // Back to Home through the brand link, as a person would.
-  await page.getByRole('link', { name: 'Atlas' }).click();
+  await page.getByRole('link', { name: 'Atlas', exact: true }).click();
   const card = page.getByTestId('connect-claude-desktop');
   await expect(card.getByRole('heading', { name: 'Connect Claude Desktop' })).toBeVisible();
 

@@ -46,7 +46,7 @@ test('start a decision from a critical-support-end health finding, choose the on
   await page.goto(`/o/${orgSlug}/m/${modelSlug}`);
   await expect(page.getByRole('heading', { name: 'Assurance' })).toBeVisible();
   await expect(page.getByText('1 critical system past or near vendor support end')).toBeVisible();
-  await expect(page.getByText('SAP PM', { exact: true })).toBeVisible();
+  await expect(page.getByText('SAP PM', { exact: true }).first()).toBeVisible();
   await page.getByRole('link', { name: 'Start a decision →' }).click();
 
   // 2. Lands on /decisions with title/context/link pre-filled.

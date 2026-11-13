@@ -36,7 +36,7 @@ test('comment on an element from a change\'s view, mention a member, see it in t
 
   // Back as the owner: into the model, a change, and a draft-only system.
   // `inviteMemberFromHome` leaves `page` on Org settings, not OrgHome.
-  await page.getByRole('link', { name: 'Atlas' }).click();
+  await page.getByRole('link', { name: 'Atlas', exact: true }).click();
   await page.getByRole('link', { name: orgName }).click();
   await page.getByRole('link', { name: /goldenpath8 Model/ }).click();
   await page.getByRole('link', { name: 'Changes' }).click();
@@ -82,6 +82,7 @@ test('comment on an element from a change\'s view, mention a member, see it in t
   // joined member (`listMembers`'s own `order('joined_at')`), so their row
   // is always first regardless of how many others exist.
   await submitForReviewWithReviewers(page, true, { selfApproves: true });
+  await expect(page).toHaveURL(/\/review\//, { timeout: 15_000 });
   await expect(page.getByText('pending', { exact: true }).first()).toBeVisible();
   const approveButton = page.getByRole('button', { name: 'Approve' });
   await expect(approveButton).toBeEnabled();

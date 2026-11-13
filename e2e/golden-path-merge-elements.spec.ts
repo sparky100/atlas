@@ -31,7 +31,7 @@ test('merge two near-duplicate systems, find the old name by search, then undo',
   await goToModelHome(page);
   const searchBox = page.getByPlaceholder('Search or create a capability, system, or actor…');
   await searchBox.fill('Customer Billing Systm');
-  await page.getByRole('link', { name: 'Customer Billing System', exact: true }).click();
+  await page.getByRole('link', { name: 'Customer Billing System', exact: true }).first().click();
   await expect(page.getByRole('heading', { name: 'Customer Billing System' })).toBeVisible();
 
   // Undo, from the same toast the merge itself reported (`ToastHost.tsx`
@@ -44,6 +44,6 @@ test('merge two near-duplicate systems, find the old name by search, then undo',
   // matching its exact original name, not a substring both would satisfy.
   await goToModelHome(page);
   await searchBox.fill('Customer Billing Systm');
-  await page.getByRole('link', { name: 'Customer Billing Systm', exact: true }).click();
+  await page.getByRole('link', { name: 'Customer Billing Systm', exact: true }).first().click();
   await expect(page.getByRole('heading', { name: 'Customer Billing Systm' })).toBeVisible();
 });

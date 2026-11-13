@@ -55,7 +55,7 @@ test('accounts and access: invite, accept, assign a role, then share a model rea
   // 4. A second organisation to share into — "New organisation" from Home
   // (the owner already has one org, so this is the additional-org path,
   // not the zero-org "Just me"/"My organisation" choice).
-  await page.getByRole('link', { name: 'Atlas' }).click();
+  await page.getByRole('link', { name: 'Atlas', exact: true }).click();
   await page.getByRole('button', { name: 'New organisation' }).click();
   const secondOrgName = `${prefix} Second Org ${randomUUID().slice(0, 8)}`;
   await page.getByPlaceholder('Organisation name').fill(secondOrgName);
@@ -70,20 +70,20 @@ test('accounts and access: invite, accept, assign a role, then share a model rea
   // 5. Share the first model with the second org, read-only, from Model
   // settings — "current main" (the version field's own default), never a
   // pinned tag, which the golden path doesn't need.
-  await page.getByRole('link', { name: 'Atlas' }).click();
+  await page.getByRole('link', { name: 'Atlas', exact: true }).click();
   await page.getByRole('link', { name: orgName }).click();
   await page.getByRole('link', { name: modelName }).click();
   await page.getByRole('button', { name: 'Model actions' }).click();
   await page.getByRole('link', { name: 'Model settings' }).click();
   await expect(page.getByRole('heading', { name: 'Share with another organisation' })).toBeVisible();
   await page.getByLabel('Organisation slug').fill(secondOrgSlug);
-  await page.getByRole('button', { name: 'Share', exact: true }).click();
+  await page.locator('form').filter({ has: page.getByLabel('Organisation slug') }).getByRole('button', { name: 'Share', exact: true }).click();
   await expect(page.getByText(secondOrgName)).toBeVisible({ timeout: 15_000 });
   await expect(page.getByText('current main', { exact: true })).toBeVisible();
 
   // 6. The second org's own "Shared with us" entry resolves — read-only,
   // never the owning org's settings menu.
-  await page.getByRole('link', { name: 'Atlas' }).click();
+  await page.getByRole('link', { name: 'Atlas', exact: true }).click();
   await page.getByRole('link', { name: secondOrgName }).click();
   await expect(page.getByRole('button', { name: /Shared with us/ })).toBeVisible();
   await expect(page.getByText(`from ${orgName}`)).toBeVisible();

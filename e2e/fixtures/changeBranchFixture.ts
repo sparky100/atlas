@@ -94,7 +94,7 @@ export async function signInExistingUser(page: Page, email: string, password: st
   await page.goto('/sign-in');
   await page.getByLabel('Email').fill(email);
   await page.getByLabel('Password').fill(password);
-  await page.getByRole('button', { name: 'Sign in' }).click();
+  await page.getByRole('button', { name: 'Sign in', exact: true }).click();
   const displayNameHeading = page.getByRole('heading', { name: 'What should we call you?' });
   const orgsHeading = page.getByRole('heading', { name: 'Your organisations' });
   await expect(displayNameHeading.or(orgsHeading)).toBeVisible();

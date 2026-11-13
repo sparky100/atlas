@@ -44,7 +44,7 @@ test('a replaces edge clears lifecycle exposure on the map and in the critical-e
   await page.goto(`/o/${orgSlug}/m/${modelSlug}/e/${systemId}?ref=main`);
   await expect(page.getByRole('heading', { name: 'Legacy Billing System' })).toBeVisible();
   await page.getByRole('button', { name: '✎ Edit' }).click();
-  await page.getByLabel('Planned end').fill(isoDateDaysFromNow(60));
+  await page.getByLabel('Planned end', { exact: true }).fill(isoDateDaysFromNow(60));
   await page.getByLabel('Criticality').selectOption('critical');
   await page.getByRole('button', { name: 'Save' }).click();
   await expect(page.getByRole('button', { name: '✎ Edit' })).toBeVisible();

@@ -32,7 +32,7 @@ test('an option that removes an IT/OT boundary crossing shows only the scoped-cr
   await page.getByRole('button', { name: '✎ Edit' }).click();
   await page.getByLabel('Domain').selectOption('ot');
   await page.getByRole('button', { name: 'Save' }).click();
-  await expect(page.getByText('ot', { exact: true }).first()).toBeVisible();
+  await expect(page.getByText('OT', { exact: true }).first()).toBeVisible();
 
   // 2. An unrelated, third system — never declared as a decision concern,
   // and never connected to A or B — purely to populate "Also affected"

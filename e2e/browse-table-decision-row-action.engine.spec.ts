@@ -52,8 +52,8 @@ test('start a decision from one row of the critical-support-end finding\'s own f
   // 2. The browse table, filtered to this finding — both systems show up,
   // each with its own "Start a decision" row action.
   await expect(page).toHaveURL(/\/elements\?filter=critical-support-end/);
-  await expect(page.getByRole('link', { name: /SAP PM$/ })).toBeVisible();
-  await expect(page.getByRole('link', { name: /SAP FI$/ })).toBeVisible();
+  await expect(page.getByRole('row').getByRole('link', { name: /SAP PM$/ })).toBeVisible();
+  await expect(page.getByRole('row').getByRole('link', { name: /SAP FI$/ })).toBeVisible();
   const sapFiRow = page.getByRole('row', { name: /SAP FI/ });
   await sapFiRow.getByRole('link', { name: 'Start a decision →' }).click();
 

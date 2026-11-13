@@ -14,7 +14,7 @@ import { createModel } from '../src/db/models';
 import { createOrganisation } from '../src/db/organisations';
 import { loadEnv } from '../src/db/env';
 
-test('element rename: no standalone "Rename" control; the header menu opens it in place of the static title', async ({ page }) => {
+test('element rename: no standalone "Rename" control; clicking the title opens it in place', async ({ page }) => {
   const env = loadEnv();
 
   const email = `element-rename-${randomUUID()}@example.test`;
@@ -70,23 +70,14 @@ test('element rename: no standalone "Rename" control; the header menu opens it i
   await page.goto(`/o/${orgSlug}/m/${modelSlug}/e/${capabilityId}`);
   await expect(page.getByRole('heading', { name: 'Finance' })).toBeVisible();
 
-  // No stray control between Edit and Attributes at all any more (Prompt
-  // 7k item 5 folded the old standalone "Retract" button into this same
-  // header menu, generalised to "Remove from model…") — "Rename" is
-  // CSS-hidden (same collapsed-by-default shape as "Copy element ID", D1's
-  // own menu item) until the menu opens, checked by visibility, not DOM
-  // presence, since it's still in the DOM either way.
-  const renameMenuItem = page.getByRole('button', { name: 'Rename', exact: true });
-  await expect(renameMenuItem).not.toBeVisible();
-  await expect(page.getByRole('button', { name: 'Remove from model…' })).not.toBeVisible();
-
-  // The header menu is where both live now.
+  // Rename is not in the actions menu any more (it duplicated the title):
+  // the title itself is the control, same as element-rename-any-type.
   await page.getByRole('button', { name: 'Element actions' }).click();
-  await expect(renameMenuItem).toBeVisible();
-  await expect(page.getByRole('button', { name: 'Remove from model…' })).toBeVisible();
-  await renameMenuItem.click();
+  await expect(page.getByRole('button', { name: 'Rename', exact: true })).toHaveCount(0);
+  await page.getByRole('button', { name: 'Element actions' }).click();
+  await page.getByRole('button', { name: 'Finance', exact: true }).click();
 
-  // Picking it swaps the static h1 for an inline input, right where the
+  // Clicking it swaps the static h1 for an inline input, right where the
   // name was — not a separate row. Scoped to the `<header>` (a plain HTML
   // landmark, not a CSS-module class — ElementHeader.tsx's own root tag):
   // a bare `getByRole('textbox')` also matches the Comments section's own
@@ -101,8 +92,7 @@ test('element rename: no standalone "Rename" control; the header menu opens it i
   await expect(page.getByRole('heading', { name: 'Financial Management' })).toBeVisible();
 
   // Cancelling a second rename leaves the name untouched.
-  await page.getByRole('button', { name: 'Element actions' }).click();
-  await page.getByRole('button', { name: 'Rename', exact: true }).click();
+  await page.getByRole('button', { name: 'Financial Management', exact: true }).click();
   await page.locator('header').getByRole('textbox').fill('Something Else Entirely');
   await page.getByRole('button', { name: 'Cancel' }).click();
   await expect(page.getByRole('heading', { name: 'Financial Management' })).toBeVisible();

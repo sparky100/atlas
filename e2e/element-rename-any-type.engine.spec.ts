@@ -171,7 +171,7 @@ test('tapping the title on the element page opens the same inline rename as the 
   if (!seedResult.ok) throw new Error(`seeding element-rename-any-type (title tap) fixture: ${seedResult.message}`);
 
   await page.goto(`/o/${orgSlug}/m/${modelSlug}/e/${actorId}`);
-  const titleButton = page.getByRole('button', { name: oldName });
+  const titleButton = page.getByRole('button', { name: oldName, exact: true });
   await expect(titleButton).toBeVisible();
   await titleButton.click();
 

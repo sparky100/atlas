@@ -37,7 +37,7 @@ test('save a view as a report, keep a copy of it, and download it', async ({ pag
   await page.getByRole('button', { name: 'Save a copy now' }).click();
   await expect(page.getByText('Saved a copy. It will not change when the report or the model does.')).toBeVisible();
   await page.getByRole('heading', { name: 'Saved copies' }).scrollIntoViewIfNeeded();
-  await page.getByRole('link', { name: 'Estate costs' }).last().click();
+  await page.getByRole('link', { name: /As at / }).last().click();
   await expect(page.getByText(/Saved copy, /).first()).toBeVisible();
   await expect(page.getByText('Ledger System').first()).toBeVisible();
 

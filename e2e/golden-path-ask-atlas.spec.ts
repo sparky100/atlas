@@ -66,7 +66,7 @@ test('switch Ask Atlas on, ask a question, and follow a cited element', async ({
   await expect(allow).toBeChecked();
 
   // Back into the model and ask.
-  await page.getByRole('link', { name: 'Atlas' }).click();
+  await page.getByRole('link', { name: 'Atlas', exact: true }).click();
   await page.getByRole('link', { name: orgName }).click();
   await page.getByRole('link', { name: modelName }).click();
   await clickNavItem(page, 'Ask Atlas');

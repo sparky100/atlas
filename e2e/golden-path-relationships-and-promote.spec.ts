@@ -49,16 +49,16 @@ test('add and remove a uses relationship, then promote a secondary supports edge
   const capabilityRow = (name: string) => page.locator('[class*="rowGroup"]').filter({ hasText: name });
   const capOneRow = capabilityRow('Capability One');
   const capTwoRow = capabilityRow('Capability Two');
-  await expect(capOneRow.getByText('secondary', { exact: true })).toBeVisible();
-  await expect(capTwoRow.getByText('secondary', { exact: true })).toBeVisible();
+  await expect(capOneRow.getByText('Also', { exact: true })).toBeVisible();
+  await expect(capTwoRow.getByText('Also', { exact: true })).toBeVisible();
 
   await capOneRow.getByRole('button', { name: 'Show attributes' }).click();
   await capOneRow.getByRole('button', { name: 'Edit', exact: true }).click();
   await capOneRow.getByLabel('Role').selectOption('primary');
   await capOneRow.getByRole('button', { name: 'Save', exact: true }).click();
 
-  await expect(capabilityRow('Capability One').getByText('primary', { exact: true })).toBeVisible();
-  await expect(capabilityRow('Capability Two').getByText('secondary', { exact: true })).toBeVisible();
+  await expect(capabilityRow('Capability One').getByText('Main', { exact: true })).toBeVisible();
+  await expect(capabilityRow('Capability Two').getByText('Also', { exact: true })).toBeVisible();
 
   // No horizontal overflow (meaningful at 390): each relationship row packs
   // an endpoint link, a role chip and a provenance badge onto one flex

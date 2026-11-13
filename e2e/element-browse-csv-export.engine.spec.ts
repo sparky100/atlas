@@ -102,14 +102,14 @@ test('Export CSV downloads all matching elements from the second page', async ({
   await expect(page.getByText('Asset Management', { exact: true })).toHaveCount(0);
   const pages = page.getByRole('navigation', { name: 'Elements pages' });
   await expect(pages.getByRole('status')).toHaveText('Showing 1–50 of 51');
-  await expect(page.getByRole('link', { name: 'Test system 50', exact: true })).toHaveCount(0);
+  await expect(page.getByRole('link', { name: /Test system 50/ })).toHaveCount(0);
   await pages.getByRole('button', { name: 'Next page' }).click();
   await expect(pages.getByRole('status')).toHaveText('Showing 51–51 of 51');
-  await expect(page.getByRole('link', { name: 'Test system 50', exact: true })).toBeVisible();
-  await expect(page.getByRole('link', { name: 'Field Sensor Gateway', exact: true })).toHaveCount(0);
+  await expect(page.getByRole('link', { name: /Test system 50/ })).toBeVisible();
+  await expect(page.getByRole('link', { name: /Field Sensor Gateway/ })).toHaveCount(0);
   await page.setViewportSize({ width: 390, height: 844 });
   await expect(pages.getByRole('status')).toHaveText('Showing 51–51 of 51');
-  await expect(page.getByRole('link', { name: 'Test system 50', exact: true })).toBeVisible();
+  await expect(page.getByRole('link', { name: /Test system 50/ })).toBeVisible();
 
   const downloadPromise = page.waitForEvent('download');
   await page.getByRole('button', { name: 'Export CSV' }).click();
@@ -139,7 +139,7 @@ test('Export CSV downloads all matching elements from the second page', async ({
 
   await page.getByPlaceholder('Search by name or owner…').fill('Field Sensor Gateway');
   await expect(pages).toHaveCount(0);
-  await expect(page.getByRole('link', { name: 'Field Sensor Gateway', exact: true })).toBeVisible();
+  await expect(page.getByRole('link', { name: /Field Sensor Gateway/ })).toBeVisible();
 
   await page.getByPlaceholder('Search by name or owner…').clear();
   await page.getByRole('button', { name: 'Save as report…' }).click();
@@ -151,5 +151,5 @@ test('Export CSV downloads all matching elements from the second page', async ({
   const reportPages = page.getByRole('navigation', { name: 'Report pages' });
   await reportPages.getByRole('button', { name: 'Next page' }).click();
   await expect(reportPages.getByRole('status')).toHaveText('Showing 51–51 of 51');
-  await expect(page.getByRole('link', { name: 'Test system 50', exact: true })).toHaveAttribute('href', `/o/${orgSlug}/m/${modelSlug}/e/${lastSystemId}?ref=main`);
+  await expect(page.getByRole('link', { name: /Test system 50/ })).toHaveAttribute('href', `/o/${orgSlug}/m/${modelSlug}/e/${lastSystemId}?ref=main`);
 });

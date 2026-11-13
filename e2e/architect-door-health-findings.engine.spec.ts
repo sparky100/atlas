@@ -112,7 +112,7 @@ test('architect door: health findings name systems with no capability, capabilit
 
   await page.goto(`/o/${orgSlug}/m/${modelSlug}`);
   // The org's creator is its owner, so the default door is already architect.
-  await expect(page.getByRole('heading', { name: 'Health findings' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Health findings', exact: true })).toBeVisible();
   // Scoped to the Health findings panel itself for every "must not appear"
   // check below — Recent activity (elsewhere on this door) links every
   // element the seeding commit touched, regardless of finding status, so a
@@ -254,8 +254,10 @@ test('architect-door layout prompt: a finding with more than three items collaps
   // convention front-doors-and-browse.engine.spec.ts's own row-link
   // assertions already use.
   await expect(page).toHaveURL(/\/elements\?filter=unlinked-systems/);
-  await expect(page.getByRole('link', { name: /System 01/ })).toBeVisible();
-  await expect(page.getByRole('link', { name: /System 22/ })).toBeVisible();
+  // Scoped to the table: the filtered browse page now also carries its own
+  // Health findings panel, which links the same systems.
+  await expect(page.getByRole('row').getByRole('link', { name: /System 01/ })).toBeVisible();
+  await expect(page.getByRole('row').getByRole('link', { name: /System 22/ })).toBeVisible();
 });
 
 test('Sprint U4-1 B3: capability ownership inherits from an owned ancestor; an unowned subtree lists only its highest unowned ancestor', async ({ page }) => {
