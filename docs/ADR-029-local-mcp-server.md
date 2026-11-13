@@ -49,7 +49,7 @@ The tool results go to whichever AI app the user connected (their own choice of 
 `mcp/` in this repository, a small package built on the official MCP TypeScript SDK (`@modelcontextprotocol/sdk`), with its own pnpm scripts (the repository's only package manager is pnpm). It imports `src/tools/` and `src/contracts/` directly and is bundled with esbuild into one file, the same technique the edge functions use.
 
 - `pnpm mcp:bundle` produces `mcp.mjs` plus a Claude Desktop extension (`.mcpb`) with a manifest, and a `version.json`, into `public/downloads/`. The outputs are git-ignored and built in the app's `prebuild` step, so every deploy serves a bundle from the same commit (Flow's approach; no binaries in git, nothing to keep in step by hand).
-- A **"Connect Claude Desktop" card on Home** offers the download, shows the bundle version, and gives three install steps and a copy-paste config snippet for other apps. It contains only the public Supabase URL and anon key, which every browser already receives.
+- A **quiet "Use Atlas from Claude Desktop" line on Home** (steps folded under "How to set it up") offers the download, shows the bundle version, and gives three install steps and a copy-paste config snippet for other apps. It contains only the public Supabase URL and anon key, which every browser already receives.
 - An update check compares the installed version with `version.json` and says when a newer one exists (optional, off by a setting).
 
 **Dependency:** `@modelcontextprotocol/sdk` (and `zod`, already present). Approved by Simon on 2026-11-06 (he answered yes to the question in the thread; record here if this was read wrongly).
@@ -96,7 +96,7 @@ A hosted or remote MCP server with OAuth (what some competitors ship); write too
 
 **No packaging dependency was added.** A `.mcpb` is a plain zip, so `scripts/zipFiles.ts` writes it with `node:zlib` (deterministic, tested with `unzip -t` where available). Only the MCP SDK was approved as a new dependency. The trade-off: the official `mcpb validate` is not run; the manifest is checked by `scripts/bundleMcp.test.ts` instead, and the first real install in Claude Desktop is the true check.
 
-Home shows a "Connect Claude Desktop" card only when `/downloads/mcp-version.json` exists and parses; otherwise nothing is rendered. Playwright: `e2e/golden-path-connect-claude-desktop.spec.ts`.
+Home shows the Claude Desktop line only when `/downloads/mcp-version.json` exists and parses; otherwise nothing is rendered. Playwright: `e2e/golden-path-connect-claude-desktop.spec.ts`.
 
 ## Built in step 6
 

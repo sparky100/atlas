@@ -25,7 +25,7 @@ export async function checkForUpdate(opts: { fetchFn: typeof fetch; versionUrl: 
     if (!response.ok) return null;
     const body = (await response.json()) as Partial<VersionFile> | null;
     if (typeof body?.version !== 'string' || !isNewer(body.version, opts.current)) return null;
-    return `A newer version of the Atlas connection is available (${body.version}; this is ${opts.current}). Tell the person they can download it from Atlas, Home, "Connect Claude Desktop".`;
+    return `A newer version of the Atlas connection is available (${body.version}; this is ${opts.current}). Tell the person they can download it from Atlas, Home, "Use Atlas from Claude Desktop".`;
   } catch {
     return null;
   }

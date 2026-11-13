@@ -44,7 +44,7 @@ export function resolveSettings(input: SettingsInput): SettingsResult {
   const url = clean(input.env.ATLAS_URL) ?? input.baked?.url ?? null;
   const anonKey = clean(input.env.ATLAS_ANON_KEY) ?? input.baked?.anonKey ?? null;
   if (!url || !anonKey) {
-    return { ok: false, message: 'This copy of the Atlas server does not know which Atlas to connect to. Download it again from Atlas (Home, "Connect Claude Desktop"), or set ATLAS_URL and ATLAS_ANON_KEY.' };
+    return { ok: false, message: 'This copy of the Atlas server does not know which Atlas to connect to. Download it again from Atlas (Home, "Use Atlas from Claude Desktop"), or set ATLAS_URL and ATLAS_ANON_KEY.' };
   }
   const configDir = clean(input.env.ATLAS_MCP_HOME) ?? defaultConfigDir(input.platform, input.env, input.homedir);
   return { ok: true, settings: { url, anonKey, configDir, email: clean(input.env.ATLAS_EMAIL), password: clean(input.env.ATLAS_PASSWORD) } };
