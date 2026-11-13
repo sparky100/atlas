@@ -234,7 +234,7 @@ A report that uses a health-finding filter cannot be saved yet; the page says so
 
 ## Connect Claude Desktop
 
-If you use Claude Desktop, you can ask it about your models directly. **Home → Connect Claude Desktop** has the download (the card only appears when your Atlas has one published).
+If you use Claude Desktop, you can ask it about your models directly. **Home** has a small "Use Atlas from Claude Desktop" line with the download, and a "How to set it up" fold-out (the line only appears when your Atlas has one published).
 
 1. Download the Atlas extension and open the file. Claude Desktop asks you to install it.
 2. Enter the email and password you use for Atlas when it asks. The password is kept in your computer's secure storage.

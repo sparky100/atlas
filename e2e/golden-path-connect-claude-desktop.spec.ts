@@ -1,7 +1,7 @@
 /**
  * Connect Claude Desktop golden path (F16, ADR-029) — click-only from Home,
  * at both 1280 and 390: a signed-in person with an organisation sees the
- * "Connect Claude Desktop" card on Home, and its download link serves the
+ * small Claude Desktop download line on Home, and its download link serves the
  * extension that `pnpm build` (its `prebuild` step, `pnpm mcp:bundle`) just
  * published. The extension is a real zip, and the version file beside it
  * names the same version the card shows.
@@ -15,7 +15,11 @@ test('Home offers the Claude Desktop download and the file is served', async ({ 
   // Back to Home through the brand link, as a person would.
   await page.getByRole('link', { name: 'Atlas' }).click();
   const card = page.getByTestId('connect-claude-desktop');
-  await expect(card.getByRole('heading', { name: 'Connect Claude Desktop' })).toBeVisible();
+  // A quiet line, not a panel: the steps stay folded until asked for.
+  await expect(card.getByRole('heading')).toHaveCount(0);
+  await expect(card.getByText('Open the downloaded file')).toBeHidden();
+  await card.getByText('How to set it up').click();
+  await expect(card.getByText('Open the downloaded file')).toBeVisible();
 
   const download = card.getByRole('link', { name: 'Download the Atlas extension' });
   await expect(download).toHaveAttribute('href', '/downloads/atlas.mcpb');
