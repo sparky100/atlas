@@ -29,7 +29,6 @@ import type { ElementsHeadRow, RelationshipsHeadRow } from '../../contracts/rows
 import { Button } from '../components/Button/Button';
 import { Chip } from '../components/Chip/Chip';
 import { CollapsibleSection } from '../components/CollapsibleSection/CollapsibleSection';
-import { ConfidenceDots } from '../components/ConfidenceDots/ConfidenceDots';
 import { ElementTypeGlyph } from '../components/ElementTypeGlyph/ElementTypeGlyph';
 import { Text } from '../components/Text/Text';
 import { candidateRefLabel } from './candidateRefLabel';
@@ -74,6 +73,12 @@ function formatValue(value: unknown): string {
   if (value === null || value === undefined) return '—';
   if (typeof value === 'string') return value;
   return JSON.stringify(value);
+}
+
+/** Turns an attribute key such as `lifecycleStatus` into "Lifecycle status". */
+function fieldLabel(key: string): string {
+  const spaced = key.replace(/([a-z0-9])([A-Z])/g, '$1 $2').toLowerCase();
+  return spaced.charAt(0).toUpperCase() + spaced.slice(1);
 }
 
 export function CaptureCandidateRow({
@@ -144,14 +149,18 @@ export function CaptureCandidateRow({
   const mainRow = candidate.draftSubjectId !== null ? (candidate.proposal.kind === 'element' ? mainElementById.get(candidate.draftSubjectId) : mainRelationshipById.get(candidate.draftSubjectId)) : undefined;
   const attributes = attributesRecord(candidate);
 
+  const matchedName = candidate.match.elementId !== undefined ? mainElementById.get(candidate.match.elementId)?.name : undefined;
+  // Plain-English description of what the file row was matched to. Never shows the matching method or a score.
   const matchLine =
-    candidate.match.level === 'exact_id'
-      ? 'Matched: Atlas id'
-      : candidate.match.level === 'alias'
-        ? `Matched: alias${candidate.match.aliasType ? ` (${candidate.match.aliasType})` : ''}`
-        : candidate.match.level === 'name_context'
-          ? `Matched: name+context ${candidate.match.score.toFixed(2)}`
-          : 'Matched: none (new)';
+    candidate.match.level === 'none'
+      ? candidate.class === 'invalid' || candidate.class === 'unsourced' ? null : 'Not in the model yet'
+      : candidate.match.level === 'name_context'
+        ? matchedName !== undefined
+          ? `Looks like ${matchedName}. Is it the same thing?`
+          : 'Looks like something already in the model. Is it the same thing?'
+        : matchedName !== undefined
+          ? `Already in the model as ${matchedName}`
+          : 'Already in the model';
 
   return (
     <li
@@ -172,9 +181,6 @@ export function CaptureCandidateRow({
         <Text as="span" size="lg">
           {candidate.proposal.kind === 'element' ? name : `${candidate.relationshipType ?? ''} · ${fromLabel ?? '?'} → ${toLabel ?? '?'}`}
         </Text>
-        <Chip tone="neutral">{candidate.class}</Chip>
-        <ConfidenceDots confidence={candidate.confidence} />
-        {candidate.reimportStatus !== null && <Chip tone="neutral">{candidate.reimportStatus}</Chip>}
         {/* PR16: a decided candidate's own state was previously visible only as "the Undo button appeared" — no chip actually named which decision was staged. Reads the same `decision !== null` state the Undo button already keys off (including `confirm`'s own system-default `accepted`, staged before any reviewer acts) rather than also checking `decidedBy` — `stageMany`'s own optimistic local update never sets `decidedBy` (a server-only column), so gating on it would make this chip lag one reload behind every other piece of this row's own feedback. */}
         {candidate.decision !== null && <Chip tone={candidate.decision === 'rejected' ? 'neutral' : 'ok'}>{candidate.decision}</Chip>}
       </div>
@@ -185,20 +191,22 @@ export function CaptureCandidateRow({
         </Text>
       )}
 
-      <Text as="p" tone="muted" size="sm">
-        {matchLine}
-      </Text>
+      {matchLine !== null && (
+        <Text as="p" tone="muted" size="sm">
+          {matchLine}
+        </Text>
+      )}
 
       {candidate.match.similar.length > 0 && (
         <Text as="p" tone="muted" size="sm">
-          ⚠ Similar: {candidate.match.similar.map((s) => `${s.name} (${s.score.toFixed(2)})`).join(', ')}
+          Also similar to: {candidate.match.similar.map((s) => s.name).join(', ')}
         </Text>
       )}
 
       {/* §10's `new` row: "the alias proposals that would be recorded" — shown whenever the candidate carries any (a level-2/3 match or an intra-document group can too, §7.6), not only for `new`, so accepting or merging never teaches the matcher something the reviewer wasn't shown first (issue #284). */}
       {candidate.aliasProposals.length > 0 && (
         <Text as="p" tone="muted" size="sm">
-          Will also remember: {candidate.aliasProposals.map((a) => `${a.type} "${a.value}"`).join(', ')}
+          We\u2019ll recognise {candidate.aliasProposals.map((a) => `\u201c${a.value}\u201d`).join(', ')} next time
         </Text>
       )}
 
@@ -221,14 +229,14 @@ export function CaptureCandidateRow({
             if (JSON.stringify(mainValue) === JSON.stringify(value)) return null;
             return (
               <div key={key} className={styles.attributeRow}>
-                <Text as="span" size="sm" mono>
-                  {key}
+                <Text as="span" size="sm">
+                  {fieldLabel(key)}
                 </Text>
                 <Text as="span" size="sm" tone="muted">
-                  main: {formatValue(mainValue)}
+                  Now: {formatValue(mainValue)}
                 </Text>
                 <Text as="span" size="sm">
-                  proposed: {formatValue(value)}
+                  From the file: {formatValue(value)}
                 </Text>
               </div>
             );
@@ -238,8 +246,8 @@ export function CaptureCandidateRow({
         <div>
           {Object.entries(attributes).map(([key, value]) => (
             <div key={key} className={styles.attributeRow}>
-              <Text as="span" size="sm" mono>
-                {key}
+              <Text as="span" size="sm">
+                {fieldLabel(key)}
               </Text>
               <Text as="span" size="sm">
                 {formatValue(value)}
@@ -295,7 +303,7 @@ export function CaptureCandidateRow({
               onSetPendingAmbiguousTarget('new');
             }}
           >
-            n. None of these — treat as new
+            n. None of these. Add it as new.
           </Button>
         </div>
       )}
@@ -313,7 +321,7 @@ export function CaptureCandidateRow({
                   }
             }
           >
-            Accept
+            {candidate.class === 'update' || candidate.class === 'conflict' ? "Use the file's version" : candidate.class === 'new' ? 'Add' : 'Accept'}
           </Button>
           <Button
             variant="secondary"
@@ -321,7 +329,7 @@ export function CaptureCandidateRow({
               onDecide('rejected');
             }}
           >
-            {candidate.class === 'conflict' ? 'Keep main' : candidate.class === 'gone' ? 'Ignore' : 'Reject'}
+            {candidate.class === 'conflict' || candidate.class === 'update' ? 'Keep what we have' : candidate.class === 'gone' ? 'Ignore' : candidate.class === 'new' ? "Don't add" : 'Reject'}
           </Button>
           {candidate.decision !== null && (
             <Button

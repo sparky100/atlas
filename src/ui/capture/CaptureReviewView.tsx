@@ -66,12 +66,12 @@ const CLASS_LABEL: Record<CandidateClass, string> = {
   unsourced: 'Unsourced',
   invalid: 'Invalid',
   duplicate_in_target: 'Already proposed in this change',
-  ambiguous: 'Ambiguous',
-  conflict: 'Conflicts',
+  ambiguous: 'Check these match',
+  conflict: 'Needs your decision',
   new: 'New',
-  update: 'Updates',
-  gone: 'Gone',
-  confirm: 'Confirmations',
+  update: 'Changes',
+  gone: 'Not in the file',
+  confirm: 'Already up to date',
 };
 
 function isTypingTarget(target: EventTarget | null): boolean {
@@ -97,7 +97,7 @@ export function CaptureReviewView({ modelId, orgId, jobId, reviewQueueHref }: Ca
   const [pendingAmbiguousTargets, setPendingAmbiguousTargets] = useState<Map<UUID, PendingAmbiguousTarget>>(new Map());
   const [applyMessage, setApplyMessage] = useState<string | null>(null);
   /** Class groups the reviewer has collapsed — toggled by the group header; a collapsed group hides its candidates but keeps its count. */
-  const [collapsedGroups, setCollapsedGroups] = useState<ReadonlySet<CandidateClass>>(new Set());
+  const [collapsedGroups, setCollapsedGroups] = useState<ReadonlySet<CandidateClass>>(new Set<CandidateClass>(['confirm']));
   /**
    * The one thing the header's own "N candidate(s) · M decided" summary
    * couldn't answer: *which* ones. Found the hard way — a 147-candidate
@@ -419,9 +419,11 @@ export function CaptureReviewView({ modelId, orgId, jobId, reviewQueueHref }: Ca
           )}
           {canDiscard && <DiscardCaptureButton label="Discard this draft…" confirmText="Discard the whole import? Nothing from it reaches the model; decisions so far stay on record." onConfirm={runDiscard} />}
           {canReview && (
-            <Text as="p" tone="faint" size="xs" className={styles.shortcuts}>
-              j/k select · a accept · r reject · u undo · e edit · s split · m merge into… · 1-5/n pick (ambiguous) · x select (confirm/new, then a/r bulk-acts) · t change · ⌘/Ctrl+Enter apply / finish
-            </Text>
+            <CollapsibleSection title="Keyboard shortcuts" defaultOpen={false}>
+              <Text as="p" tone="faint" size="xs" className={styles.shortcuts}>
+                j/k select · a accept · r reject · u undo · e edit · s split · m merge into… · 1-5/n pick a match · x select (up to date or new, then a/r for several) · t change · ⌘/Ctrl+Enter apply / finish
+              </Text>
+            </CollapsibleSection>
           )}
         </Panel>
       </div>
