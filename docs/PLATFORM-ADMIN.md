@@ -7,10 +7,11 @@ A platform administrator is scoped to the whole deployment instead.
 
 ## What a platform admin can do today
 
-Exactly one thing: view and change `llm-proxy`'s own application-level
-settings (provider, model, per-org rate-limit cap, optionally the API key)
-at `/platform-admin`, reachable from the account menu once granted. Nothing
-else in this product checks platform-admin status yet.
+Two things, both at `/platform-admin`, reachable from the account menu once granted. Nothing else in this product checks platform-admin status.
+
+1. **See every organisation and person** (read-only). The Organisations list shows created date, people, elements on main, changes and active people in the last 30 days, last sign-in and last change. The People list shows email, each organisation with role and join date, sign-up date, last sign-in and last change, with a search by email. Anything with no sign-in or change in 30 days gets a "Not used in 30+ days" marker. Counts and dates only; no element names or other model content. "Last signed in" comes from `auth.users.last_sign_in_at`; "last change" is the newest commit the person (or organisation) made, so a read-only user shows "Never" for changes. Both come from `atlas.platform_admin_organisations()` / `atlas.platform_admin_people()` (`20261114080000_platform_admin_overview.sql`), which raise unless `atlas.is_platform_admin()` is exactly true (written `is not true`, so a NULL cannot pass), never consult org roles, and so refuse an organisation Owner.
+2. **View and change `llm-proxy`'s own application-level
+settings** (provider, model, per-org rate-limit cap, optionally the API key).
 
 Provider is a real picker, not a label — `LLM_PROXY_PROVIDER_OPTIONS`
 (`src/ui/admin/useLlmProxyConfig.ts`) holds one entry today ("Anthropic"),
