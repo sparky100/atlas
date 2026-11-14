@@ -56,6 +56,9 @@ describe('llm-proxy platform-admin RPCs against a real local Supabase', () => {
 
   afterEach(async () => {
     await service.from('platform_config').delete().eq('key', 'llm');
+    // The saved key lives in Vault, not on the row deleted above: clear it through the admin RPC so tests stay independent.
+    await admin.client.schema('atlas').rpc('set_platform_llm_config', { p_model: 'claude-opus-5', p_rate_limit_per_hour: 50, p_provider: 'anthropic', p_api_key: null, p_clear_api_key: true });
+    await service.from('platform_config').delete().eq('key', 'llm');
   });
 
   it('a non-admin is refused on both get and set', async () => {
@@ -79,7 +82,11 @@ describe('llm-proxy platform-admin RPCs against a real local Supabase', () => {
     await setLlmProxyConfig(admin.client, { provider: 'anthropic', model: 'claude-sonnet-5', rateLimitPerHour: 90 });
 
     const { data } = await service.from('platform_config').select('value').eq('key', 'llm').maybeSingle();
-    expect(data).toMatchObject({ value: { provider: 'anthropic', model: 'claude-sonnet-5', rateLimitPerHour: 90, apiKey: 'sk-ant-original' } });
+    expect(data).toMatchObject({ value: { provider: 'anthropic', model: 'claude-sonnet-5', rateLimitPerHour: 90 } });
+    // The key is in Vault, never on the platform_config row.
+    expect(data?.value).not.toHaveProperty('apiKey');
+    const stored = await service.schema('atlas').rpc('platform_llm_api_key');
+    expect(stored.data).toBe('sk-ant-original');
 
     const getResult = await getLlmProxyConfig(admin.client);
     expect(getResult).toEqual({ status: 'ok', config: { provider: 'anthropic', model: 'claude-sonnet-5', rateLimitPerHour: 90, hasApiKey: true } });
@@ -94,6 +101,20 @@ describe('llm-proxy platform-admin RPCs against a real local Supabase', () => {
 
     const { data } = await service.from('platform_config').select('value').eq('key', 'llm').maybeSingle();
     expect(data?.value).not.toHaveProperty('apiKey');
+    const stored = await service.schema('atlas').rpc('platform_llm_api_key');
+    expect(stored.data).toBeNull();
+  });
+
+  it('nobody but the service role can read the saved key, and it is never written to platform_config', async () => {
+    await setLlmProxyConfig(admin.client, { provider: 'anthropic', model: 'claude-opus-5', rateLimitPerHour: 75, apiKey: 'sk-ant-secret' });
+    const asAdmin = await admin.client.schema('atlas').rpc('platform_llm_api_key');
+    expect(asAdmin.error).not.toBeNull();
+    const asOrdinary = await ordinaryUser.client.schema('atlas').rpc('platform_llm_api_key');
+    expect(asOrdinary.error).not.toBeNull();
+    const asSignedOut = await createSupabaseClient(env).schema('atlas').rpc('platform_llm_api_key');
+    expect(asSignedOut.error).not.toBeNull();
+    const { data } = await service.from('platform_config').select('value').eq('key', 'llm').maybeSingle();
+    expect(JSON.stringify(data)).not.toContain('sk-ant-secret');
   });
 
   it('get returns "anthropic" (the only real provider) and nulls/hasApiKey:false when no override row exists at all', async () => {

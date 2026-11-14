@@ -73,6 +73,10 @@ anyone else's.
   `has_api_key`. `atlas.set_platform_llm_config` leaves an existing key
   untouched unless a new one is supplied or `p_clear_api_key` is explicitly
   passed, so the UI never needs to display or round-trip a live secret.
+- The key is stored in Supabase Vault (secret `platform:llm_api_key`), never
+  in `platform_config`, from `20261114090000_security_hardening.sql`.
+  `llm-proxy` reads it through `atlas.platform_llm_api_key()`, which only the
+  service role can call.
 - `atlas.set_platform_llm_config` also rejects any `p_provider` other than
   `'anthropic'` — the config shape has room for a second provider, but
   nothing routes to one yet, and storing an id `llm-proxy` would silently

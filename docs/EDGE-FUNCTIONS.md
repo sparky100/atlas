@@ -145,9 +145,13 @@ values ('llm', '{"provider": "anthropic", "model": "claude-opus-5", "rateLimitPe
 on conflict (key) do update set value = excluded.value, updated_at = now();
 ```
 
-Any of `provider` (string), `model` (string), `rateLimitPerHour` (number),
-or `apiKey` (string — overrides `ANTHROPIC_API_KEY` for every org) can be
-set; an absent field falls back to its own env var. Deleting the row (or
+Any of `provider` (string), `model` (string) or `rateLimitPerHour` (number)
+can be set; an absent field falls back to its own env var. The provider API
+key is no longer kept on this row: it lives in Supabase Vault
+(`platform:llm_api_key`, set from the platform admin page) and overrides
+`ANTHROPIC_API_KEY` for every org. A legacy `apiKey` on the row is still read
+until `20261114090000_security_hardening.sql` moves it into Vault. Deploy
+`llm-proxy` before pushing that migration (`supabase functions deploy llm-proxy`). Deleting the row (or
 never creating it) falls back to the env-var secrets above entirely — the
 function's original, pre-follow-up behaviour.
 
