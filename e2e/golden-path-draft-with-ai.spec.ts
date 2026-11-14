@@ -5,8 +5,9 @@ test('enable Draft with AI and send a change brief to capture review', async ({ 
   const { orgName, modelName } = await signUpCreateOrgAndModel(page, 'goldenpath-ai-draft');
   await goToModelHome(page);
   await clickNavItem(page, 'Changes');
-  await expect(page.getByRole('heading', { name: 'Changes', exact: true })).toBeVisible();
-  await expect(page.getByRole('button', { name: 'Draft with AI' })).toHaveCount(0);
+  await expect(page.getByRole('heading', { name: 'Changes', exact: true, level: 1 })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Describe your own' })).toHaveCount(0);
+  await expect(page.getByText('Draft with AI is off for this organisation.')).toBeVisible();
 
   await clickNavItem(page, 'Ask Atlas');
   await page.getByRole('link', { name: 'organisation settings' }).click();
@@ -24,7 +25,9 @@ test('enable Draft with AI and send a change brief to capture review', async ({ 
   await page.route('**/functions/v1/capture-run', async (route) => {
     await route.fulfill({ json: { status: 'noop', jobStatus: 'pending' } });
   });
-  await page.getByRole('button', { name: 'Draft with AI' }).click();
+  await expect(page.getByText('Draft with AI is off for this organisation.')).toHaveCount(0);
+  await expect(page.getByRole('button', { name: 'Replace a system' })).toBeVisible();
+  await page.getByRole('button', { name: 'Describe your own' }).click();
   await page.getByLabel('Change title').fill('Replace the CRM');
   await page.getByLabel('Change brief').fill('Introduce NextCRM to support Customer Onboarding first.');
   await page.getByRole('button', { name: 'Generate draft' }).click();

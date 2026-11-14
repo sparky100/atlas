@@ -21,6 +21,7 @@ import { useRouteTiming } from '../perf/useRouteTiming';
 import { useChangeSummaries } from './useChangeSummaries';
 import { focusImpact } from './impactFocus';
 import { useChanges } from './useChanges';
+import { DraftWithAi } from './DraftWithAi';
 import styles from './ChangesView.module.css';
 
 export interface ChangesViewProps {
@@ -31,6 +32,10 @@ export interface ChangesViewProps {
   modelSlug: string;
   /** Contributor+ (ADR-009, `branches_insert`'s RLS) — omitted entirely, not shown disabled, otherwise (the same convention `canEditOnMain`'s callers already use). */
   canCreate: boolean;
+  /** The organisation's Ask Atlas setting, which also switches Draft with AI on. */
+  aiEnabled?: boolean;
+  /** Owners can switch the setting on, so the "off" hint links them to it. */
+  isOwner?: boolean;
 }
 
 /**
@@ -42,7 +47,7 @@ export interface ChangesViewProps {
  * summary, and the merge review queue are later Sprint C1 steps — this is
  * create + list + a status chip only.
  */
-export function ChangesView({ modelId, orgId, userId, orgSlug, modelSlug, canCreate }: ChangesViewProps) {
+export function ChangesView({ modelId, orgId, userId, orgSlug, modelSlug, canCreate, aiEnabled = false, isOwner = false }: ChangesViewProps) {
   const navigate = useNavigate();
   const { setRef } = useSelectedRef();
   const { status, branches, error, mainHeadCommitId, createChange } = useChanges(modelId, orgId, userId);
@@ -56,6 +61,8 @@ export function ChangesView({ modelId, orgId, userId, orgSlug, modelSlug, canCre
   // point with no fixed default per `branchIntent.ts`'s own
   // `defaultIntentForEntryPoint` doc comment — the person picks explicitly.
   const [intent, setIntent] = useState<BranchIntent>('propose');
+  // While the AI draft form is open it replaces the manual fields, so the page has one form at a time.
+  const [aiOpen, setAiOpen] = useState(false);
   // F0: "correct/explore need no date at all" — same per-intent rule the
   // change page's own edit form already applies; the create form didn't
   // (a real bug: the date field used to render unconditionally here).
@@ -95,113 +102,137 @@ export function ChangesView({ modelId, orgId, userId, orgSlug, modelSlug, canCre
           <Text as="h2" size="lg">
             New change
           </Text>
-          <form
-            className={styles.form}
-            onSubmit={(e) => {
-              e.preventDefault();
-              void createChange({ name, title, description, targetDate, intent }).then((branch) => {
-                if (branch) {
-                  setName('');
-                  setTitle('');
-                  setDescription('');
-                  setTargetDate('');
-                  setIntent('propose');
-                  // "The create-change flow lands you inside" — a freshly
-                  // created change is always `draft`, so unlike
-                  // `ChangePage.tsx`'s own "Edit in this change" there is no
-                  // `canWorkInThisChange`-style gate to repeat here; select
-                  // it as the active ref and go straight to its own page,
-                  // same as clicking "Edit in this change" would.
-                  setRef({ kind: 'branch', branchId: branch.id });
-                  void navigate(`/o/${orgSlug}/m/${modelSlug}/changes/${branch.id}`);
-                }
-              });
-            }}
-          >
-            <input
-              className={styles.input}
-              type="text"
-              placeholder="Name (e.g. retire-legacy-crm)"
-              value={name}
-              onChange={(e) => {
-                setName(e.target.value);
-              }}
-              disabled={!mainHeadCommitId}
+          {aiEnabled && userId && (
+            <DraftWithAi
+              modelId={modelId}
+              orgId={orgId}
+              userId={userId}
+              basePath={`/o/${orgSlug}/m/${modelSlug}`}
+              commitId={mainHeadCommitId}
+              onOpenChange={setAiOpen}
             />
-            <input
-              className={styles.input}
-              type="text"
-              placeholder="Title (e.g. Retire the legacy CRM)"
-              value={title}
-              onChange={(e) => {
-                setTitle(e.target.value);
+          )}
+          {!aiEnabled && (
+            <Text as="p" tone="muted" size="sm">
+              Draft with AI is off for this organisation.{' '}
+              {isOwner ? (
+                <>
+                  Switch it on under Ask Atlas in <Link to={`/o/${orgSlug}/settings`}>organisation settings</Link>.
+                </>
+              ) : (
+                'Ask an owner to switch it on.'
+              )}
+            </Text>
+          )}
+          {!aiOpen && (
+            <form
+              className={styles.form}
+              onSubmit={(e) => {
+                e.preventDefault();
+                void createChange({ name, title, description, targetDate, intent }).then((branch) => {
+                  if (branch) {
+                    setName('');
+                    setTitle('');
+                    setDescription('');
+                    setTargetDate('');
+                    setIntent('propose');
+                    // "The create-change flow lands you inside" — a freshly
+                    // created change is always `draft`, so unlike
+                    // `ChangePage.tsx`'s own "Edit in this change" there is no
+                    // `canWorkInThisChange`-style gate to repeat here; select
+                    // it as the active ref and go straight to its own page,
+                    // same as clicking "Edit in this change" would.
+                    setRef({ kind: 'branch', branchId: branch.id });
+                    void navigate(`/o/${orgSlug}/m/${modelSlug}/changes/${branch.id}`);
+                  }
+                });
               }}
-              disabled={!mainHeadCommitId}
-            />
-            <textarea
-              className={styles.textarea}
-              placeholder="Description (optional)"
-              value={description}
-              onChange={(e) => {
-                setDescription(e.target.value);
-              }}
-              disabled={!mainHeadCommitId}
-            />
-            {/* Prompt pack F0: no fixed default for this one surface (see `intent`'s own state comment) — an explicit choice, always. */}
-            <div className={styles.formRow}>
-              <Text as="label" size="sm" tone="muted">
-                Why
-              </Text>
-              <select
+            >
+              <input
                 className={styles.input}
-                value={intent}
+                type="text"
+                placeholder="Name (e.g. retire-legacy-crm)"
+                value={name}
                 onChange={(e) => {
-                  const nextIntent = e.target.value as BranchIntent;
-                  setIntent(nextIntent);
-                  // A hidden field's stale value should never get submitted
-                  // once the reviewer's own choice has hidden it away —
-                  // matches `dateFieldLabelForIntent`'s own "correct/explore
-                  // need no date at all".
-                  if (dateFieldLabelForIntent(nextIntent) === null) setTargetDate('');
+                  setName(e.target.value);
                 }}
                 disabled={!mainHeadCommitId}
-              >
-                {NEW_CHANGE_INTENT_OPTIONS.map((option) => (
-                  <option key={option.value} value={option.value}>
-                    {option.label}
-                  </option>
-                ))}
-              </select>
-            </div>
-            {/* `explore` isn't offered above — see `NEW_CHANGE_INTENT_OPTIONS`'s
-                own doc comment: a candidate future is an option on a decision,
-                not a free-standing change. The hint names the real home rather
-                than silently hiding the fourth choice. */}
-            <Text as="p" tone="muted" size="xs">
-              Exploring candidate futures? Start a decision and add options there.
-            </Text>
-            {dateFieldLabel !== null && (
+              />
+              <input
+                className={styles.input}
+                type="text"
+                placeholder="Title (e.g. Retire the legacy CRM)"
+                value={title}
+                onChange={(e) => {
+                  setTitle(e.target.value);
+                }}
+                disabled={!mainHeadCommitId}
+              />
+              <textarea
+                className={styles.textarea}
+                placeholder="Description (optional)"
+                value={description}
+                onChange={(e) => {
+                  setDescription(e.target.value);
+                }}
+                disabled={!mainHeadCommitId}
+              />
+              {/* Prompt pack F0: no fixed default for this one surface (see `intent`'s own state comment) — an explicit choice, always. */}
               <div className={styles.formRow}>
                 <Text as="label" size="sm" tone="muted">
-                  {dateFieldLabel}
+                  Why
                 </Text>
-                <input
+                <select
                   className={styles.input}
-                  type="date"
-                  value={targetDate}
+                  value={intent}
                   onChange={(e) => {
-                    setTargetDate(e.target.value);
+                    const nextIntent = e.target.value as BranchIntent;
+                    setIntent(nextIntent);
+                    // A hidden field's stale value should never get submitted
+                    // once the reviewer's own choice has hidden it away —
+                    // matches `dateFieldLabelForIntent`'s own "correct/explore
+                    // need no date at all".
+                    if (dateFieldLabelForIntent(nextIntent) === null) setTargetDate('');
                   }}
                   disabled={!mainHeadCommitId}
-                />
+                >
+                  {NEW_CHANGE_INTENT_OPTIONS.map((option) => (
+                    <option key={option.value} value={option.value}>
+                      {option.label}
+                    </option>
+                  ))}
+                </select>
               </div>
-            )}
-            <div className={styles.formRow}>
-              <Button variant="primary" type="submit" disabled={status === 'creating' || !mainHeadCommitId}>
-                {status === 'creating' ? 'Creating…' : 'Create change'}
-              </Button>
-            </div>
-          </form>
+              {/* `explore` isn't offered above — see `NEW_CHANGE_INTENT_OPTIONS`'s
+                  own doc comment: a candidate future is an option on a decision,
+                  not a free-standing change. The hint names the real home rather
+                  than silently hiding the fourth choice. */}
+              <Text as="p" tone="muted" size="xs">
+                Exploring candidate futures? Start a decision and add options there.
+              </Text>
+              {dateFieldLabel !== null && (
+                <div className={styles.formRow}>
+                  <Text as="label" size="sm" tone="muted">
+                    {dateFieldLabel}
+                  </Text>
+                  <input
+                    className={styles.input}
+                    type="date"
+                    value={targetDate}
+                    onChange={(e) => {
+                      setTargetDate(e.target.value);
+                    }}
+                    disabled={!mainHeadCommitId}
+                  />
+                </div>
+              )}
+              <div className={styles.formRow}>
+                <Button variant="primary" type="submit" disabled={status === 'creating' || !mainHeadCommitId}>
+                  {status === 'creating' ? 'Creating…' : 'Create change'}
+                </Button>
+              </div>
+            </form>
+          )}
           {!mainHeadCommitId && (
             <Text as="p" tone="muted" size="sm">
               This model has nothing on main yet — there is nothing to base a change on.

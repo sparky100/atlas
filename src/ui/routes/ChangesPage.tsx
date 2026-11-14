@@ -1,5 +1,5 @@
 import { Loading } from '../components/Loading/Loading';
-import { Link, useParams } from 'react-router';
+import { useParams } from 'react-router';
 import { AppHeader } from '../components/AppHeader/AppHeader';
 import { Breadcrumb } from '../components/Breadcrumb/Breadcrumb';
 import { ModelNav } from '../components/ModelNav/ModelNav';
@@ -7,7 +7,6 @@ import navStyles from '../components/ModelNav/ModelNav.module.css';
 import { PageIntro } from '../components/PageIntro/PageIntro';
 import { Text } from '../components/Text/Text';
 import { WORK_COPY } from '../work/workCopy';
-import { DraftWithAi } from '../changes/DraftWithAi';
 import { ChangesView } from '../changes/ChangesView';
 import { ChangesTabs } from '../changes/ChangesTabs/ChangesTabs';
 import { useAuth } from '../auth/useAuth';
@@ -71,22 +70,7 @@ export function ChangesPage() {
           </div>
           <PageIntro>{WORK_COPY.change}</PageIntro>
           <ChangesTabs orgSlug={orgSlug ?? ''} modelSlug={model.slug} modelId={model.id} current="all" />
-          {canCreate && userId && organisation?.ai_assistant_enabled && (
-            <DraftWithAi key={model.id} modelId={model.id} orgId={organisation.id} userId={userId} basePath={`/o/${orgSlug ?? ''}/m/${model.slug}`} />
-          )}
-          {canCreate && organisation && !organisation.ai_assistant_enabled && (
-            <Text as="p" tone="muted" size="sm">
-              Draft with AI is off for this organisation.{' '}
-              {role === 'owner' ? (
-                <>
-                  Switch it on under Ask Atlas in <Link to={`/o/${orgSlug ?? ''}/settings`}>organisation settings</Link>.
-                </>
-              ) : (
-                'Ask an owner to switch it on.'
-              )}
-            </Text>
-          )}
-          <ChangesView modelId={model.id} orgId={organisation?.id ?? ''} userId={userId} orgSlug={orgSlug ?? ''} modelSlug={model.slug} canCreate={canCreate} />
+          <ChangesView modelId={model.id} orgId={organisation?.id ?? ''} userId={userId} orgSlug={orgSlug ?? ''} modelSlug={model.slug} canCreate={canCreate} aiEnabled={organisation?.ai_assistant_enabled === true} isOwner={role === 'owner'} />
         </main>
       </div>
     </div>
