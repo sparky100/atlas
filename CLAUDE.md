@@ -28,7 +28,7 @@ These are not style preferences. Violating one is a defect, whatever else the ch
    - Every `SECURITY DEFINER` function checks its caller inside the function, written fail-closed (`atlas.has_role(...) is not true`, never `if not atlas.has_role(...)`), and has `revoke execute ... from public, anon` unless it is a deliberate signed-out entry point. Trigger-only and helper functions are not callable through the API at all.
    - Every owner-only or role-gated function ships with an integration test that calls it as a signed-in user from a different organisation.
    - No secret is stored in plain text in a table, a migration, a config file or the repo. Secrets live in Supabase Vault or function secrets, and the UI shows only whether one is set.
-   - Run the Supabase security advisors (`get_advisors`, type security) before every release and report any new ERROR or WARN in the sprint summary.
+   - **No change may introduce a Supabase advisor finding.** Run the Supabase security and performance advisors (`get_advisors`) before and after every migration, and again before release. The set of findings afterwards must be the same as or smaller than before: a new ERROR, WARN or INFO (for example a function callable by `anon`, a table without a policy, a mutable `search_path`, a `SECURITY DEFINER` view) blocks the change until it is fixed, never waived or left for later. Report the before and after counts in the sprint summary. New functions therefore set `search_path`, revoke `anon` and `public` execute, and new tables enable RLS with a policy in the same migration.
    - A feature that changes who can see or change data (RLS, grants, edge function auth, API keys, SSO) says so plainly in its PR, with the test that proves the boundary.
 
 ## Code layout
