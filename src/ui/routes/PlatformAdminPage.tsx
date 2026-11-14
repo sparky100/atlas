@@ -1,18 +1,18 @@
 import { Loading } from '../components/Loading/Loading';
+import { PlatformAdminOverview } from '../admin/PlatformAdminOverview';
 import { PlatformAdminView } from '../admin/PlatformAdminView';
 import { usePlatformAdmin } from '../admin/usePlatformAdmin';
 import { AppHeader } from '../components/AppHeader/AppHeader';
 import { EmptyState } from '../components/EmptyState/EmptyState';
 import { Text } from '../components/Text/Text';
 import { useAuth } from '../auth/useAuth';
-import styles from './ProfilePage.module.css';
+import styles from './PlatformAdminPage.module.css';
 
 /**
  * `/platform-admin` — top-level, not org-scoped, Atlas's first cross-org
  * role (`supabase/migrations/20260917030000_platform_admin.sql`'s own
- * module comment has the full design). Same shape as `ProfilePage.tsx`
- * (the only other top-level settings-style route), reusing its module CSS
- * directly rather than a near-identical copy.
+ * module comment has the full design). Same shape as `ProfilePage.tsx`,
+ * with its own wider layout because the lists are tables.
  *
  * Unlike `OrganisationSettingsView.tsx` (where every member sees *some* of
  * the page, just with management sections hidden), a non-admin here sees
@@ -34,7 +34,12 @@ export function PlatformAdminPage() {
         </Text>
         {loading && <Loading />}
         {!loading && !isPlatformAdmin && <EmptyState>You don&apos;t have access to this page.</EmptyState>}
-        {!loading && isPlatformAdmin && <PlatformAdminView />}
+        {!loading && isPlatformAdmin && (
+          <>
+            <PlatformAdminOverview />
+            <PlatformAdminView />
+          </>
+        )}
       </main>
     </div>
   );

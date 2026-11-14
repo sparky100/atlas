@@ -49,6 +49,14 @@ test('a platform admin can view and change LLM proxy settings from the user menu
   await page.getByRole('link', { name: 'Platform admin' }).click();
   await expect(page.getByRole('heading', { name: 'Platform admin' })).toBeVisible();
 
+  // Organisations and People lists: the admin's own account shows up, with a join date and a last sign-in.
+  await expect(page.getByRole('heading', { name: /^Organisations \(/ })).toBeVisible();
+  await expect(page.getByRole('heading', { name: /^People \(/ })).toBeVisible();
+  await page.getByLabel('Search people by email').fill(email);
+  await expect(page.getByRole('row', { name: new RegExp(email) })).toBeVisible();
+  await page.screenshot({ path: 'test-results/platform-admin-overview.png', fullPage: true });
+  await page.getByLabel('Search people by email').fill('');
+
   await page.getByLabel('Model').selectOption('claude-sonnet-5');
   await page.getByLabel(/Rate limit/).fill('42');
   await page.getByRole('button', { name: 'Save', exact: true }).click();
