@@ -9,6 +9,7 @@ import { BriefSlotPicker } from './BriefSlotPicker';
 import {
   CHANGE_BRIEF_TEMPLATES,
   missingBriefSlots,
+  renderBrief,
   renderBriefText,
   type BriefSlotValues,
   type ChangeBriefTemplate,
@@ -60,7 +61,7 @@ export function DraftWithAi({ modelId, orgId, userId, basePath, elementName, com
     setTitleEdited(false);
     setBriefEdited(false);
     setTitle(chosen ? renderBriefText(chosen.title, chosen.slots, {}) : '');
-    setBrief(chosen ? renderBriefText(chosen.brief, chosen.slots, {}) : '');
+    setBrief(chosen ? renderBrief(chosen, {}) : '');
     setOpen(true);
   };
 
@@ -77,7 +78,7 @@ export function DraftWithAi({ modelId, orgId, userId, basePath, elementName, com
     const next: BriefSlotValues = { ...values, [key]: { name } };
     setValues(next);
     if (!titleEdited) setTitle(renderBriefText(template.title, template.slots, next));
-    if (!briefEdited) setBrief(renderBriefText(template.brief, template.slots, next));
+    if (!briefEdited) setBrief(renderBrief(template, next));
   };
 
   if (!open) {

@@ -5,6 +5,7 @@ import type { ElementsHeadRow } from '../contracts/rows';
 import { emptyHead } from '../engine/deltas';
 import type { LlmRequest } from './llm/client';
 import { buildMatchIndex } from './matchIndex';
+import { PROMPT_B_SCHEMA } from './prompts/b';
 import { CHANGE_BRIEF_SYSTEM } from './prompts/changeBrief';
 import { runCapture } from './runCapture';
 
@@ -63,6 +64,33 @@ describe('AI change briefs', () => {
       { class: 'new', proposal: { name: 'NextCRM', attributes: { lifecycleStatus: 'planned' } }, aliasProposals: [] },
       { class: 'new', relationshipType: 'supports', proposal: { to: { elementId: 'onboarding' }, attributes: { role: 'secondary' } } },
     ] });
+  });
+
+  it('replaces a system: plans the new one, marks the old one retiring and links them with replaces', async () => {
+    const text = 'Introduce MPRS 2 as a planned system that replaces MPRS. Set the lifecycle status of MPRS to retiring. The planned end of MPRS is 2027-03-31.';
+    const { complete, result } = draft(text, {
+      elements: [
+        { elementType: 'system', name: 'MPRS 2', namePassage: 'Introduce MPRS 2', nameConfidence: 0.9, parentName: null, attributes: [] },
+        { elementType: 'system', name: 'MPRS', namePassage: 'Set the lifecycle status of MPRS to retiring.', nameConfidence: 0.9, parentName: null, attributes: [
+          { key: 'lifecycleStatus', value: 'retiring', passage: 'Set the lifecycle status of MPRS to retiring.', confidence: 0.9 },
+          { key: 'plannedEnd', value: '2027-03-31', passage: 'The planned end of MPRS is 2027-03-31.', confidence: 0.9 },
+        ] },
+      ],
+      relationships: [{ relationshipType: 'replaces', fromName: 'MPRS 2', toName: 'MPRS', passage: 'MPRS 2 as a planned system that replaces MPRS', confidence: 0.9, attributes: [] }],
+    }, [modelElement('mprs', 'MPRS')]);
+    const outcome = await result;
+    expect(outcome).toMatchObject({ status: 'parsed' });
+    const candidates = (outcome as { candidates: { class: string; relationshipType?: string; proposal: { name?: string; attributes: Record<string, unknown>; from?: { elementId?: string }; to?: { elementId?: string } } }[] }).candidates;
+    expect(candidates.find((c) => c.proposal.name === 'MPRS 2')).toMatchObject({ class: 'new', proposal: { attributes: { lifecycleStatus: 'planned' } } });
+    expect(candidates.find((c) => c.proposal.name === 'MPRS')).toMatchObject({ proposal: { attributes: { lifecycleStatus: 'retiring', plannedEnd: '2027-03-31' } } });
+    expect(candidates.find((c) => c.relationshipType === 'replaces')).toMatchObject({ class: 'new', proposal: { to: { elementId: 'mprs' } } });
+    // The brief schema allows replaces; the one used for documents does not.
+    const format = complete.mock.calls[0]?.[0]?.format as unknown as { schema: { properties: { relationships: { items: { properties: { relationshipType: { enum: string[] } } } } } } };
+    expect(format.schema.properties.relationships.items.properties.relationshipType.enum).toContain('replaces');
+  });
+
+  it('ignores replaces when a document, not a brief, is being read', () => {
+    expect(PROMPT_B_SCHEMA.properties.relationships.items.properties.relationshipType.enum).not.toContain('replaces');
   });
 
   it('leaves an ambiguous endpoint invalid and an invented quote unsourced', async () => {

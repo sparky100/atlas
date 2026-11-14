@@ -52,7 +52,7 @@ import { normaliseName } from './normalise';
 import { parseBool, parseDate, parseEmail, parseName } from './normaliseValue';
 import { buildPromptBUserMessage, PROMPT_B_ELEMENT_TYPES, PROMPT_B_RELATIONSHIP_TYPES, PROMPT_B_SCHEMA, PROMPT_B_SYSTEM, type PromptBChunkLocation } from './prompts/b';
 import type { buildChangeBriefContext } from './changeBriefContext';
-import { CHANGE_BRIEF_SYSTEM } from './prompts/changeBrief';
+import { CHANGE_BRIEF_SCHEMA, CHANGE_BRIEF_SYSTEM } from './prompts/changeBrief';
 import { applyRequiredDefaults, type RowCandidate } from './rowsToCandidates';
 
 export class ExtractProseError extends Error {}
@@ -80,7 +80,7 @@ const promptBResponseSchema = z.object({
   ),
   relationships: z.array(
     z.object({
-      relationshipType: z.enum(PROMPT_B_RELATIONSHIP_TYPES),
+      relationshipType: z.enum([...PROMPT_B_RELATIONSHIP_TYPES, 'replaces']),
       fromName: z.string(),
       toName: z.string(),
       passage: z.string(),
@@ -348,7 +348,7 @@ export async function extractProseChunk(input: ExtractProseChunkInput): Promise<
     effort: isChangeBrief ? 'low' : PROMPT_B_EFFORT,
     ...(isChangeBrief ? { maxTokens: 4000 } : {}),
     system: isChangeBrief ? CHANGE_BRIEF_SYSTEM : PROMPT_B_SYSTEM,
-    format: { type: 'json_schema', schema: PROMPT_B_SCHEMA },
+    format: { type: 'json_schema', schema: isChangeBrief ? CHANGE_BRIEF_SCHEMA : PROMPT_B_SCHEMA },
     stream: true,
     messages: [{ role: 'user', content: userMessage }],
   });
@@ -374,7 +374,7 @@ export async function extractProseChunk(input: ExtractProseChunkInput): Promise<
     : result.data.elements;
   const relationships = isChangeBrief
     ? result.data.relationships.filter((relationship) => relationship.relationshipType !== 'owns' && mentions(relationship.fromName) && mentions(relationship.toName))
-    : result.data.relationships;
+    : result.data.relationships.filter((relationship) => relationship.relationshipType !== 'replaces');
   const built: BuiltCandidate[] = [
     ...elements.map((raw) => buildElementCandidate(raw, input.chunkText, input.sourceRefForOffset, isChangeBrief)),
     ...relationships.map((raw) => buildRelationshipCandidate(isChangeBrief ? { ...raw, attributes: raw.attributes.filter((attribute) => attribute.key === 'description') } : raw, input.chunkText, input.sourceRefForOffset)),
