@@ -40,7 +40,7 @@ export function parseRefParam(raw: string | undefined | null): Ref {
 }
 
 export function refParamOf(ref: Ref): string {
-  if (ref.kind === 'main') return 'live model';
+  if (ref.kind === 'main') return 'main';
   if (ref.kind === 'tag') return `tag:${ref.name}`;
   if (ref.kind === 'commit') return `commit:${ref.commitId}`;
   return `branch:${ref.branchId}`;
