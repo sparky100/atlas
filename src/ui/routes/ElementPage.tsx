@@ -1,5 +1,5 @@
 import { Loading } from '../components/Loading/Loading';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Link, useLocation, useNavigate, useParams, useSearchParams } from 'react-router';
 import { ATTRIBUTE_SCHEMA_BY_TYPE, attributeDefinitionToFieldSchema, type AttributeFieldSchema } from '../../contracts/attributeSchema';
 import type { ElementsHeadRow, FactsRow } from '../../contracts/rows';
@@ -141,7 +141,7 @@ export function ElementPage() {
   // Prompt 7k item 5: "Retire…"/"Remove from model…" — same inline-panel
   // convention as `proposingChange` above, one at a time (opening either
   // closes the other, same as `editor`'s own idle/editing exclusivity).
-  const [retiring, setRetiring] = useState(false);
+  const [retiring, setRetiring] = useState(() => searchParams.get('action') === 'retire');
   const [removingFromModel, setRemovingFromModel] = useState(false);
   // F4's own "Merge into…" from the duplicates report (`mergePrefill.ts`):
   // `?mergeTargetId=...&mergeTargetName=...` opens this panel already
@@ -293,6 +293,20 @@ export function ElementPage() {
     expectedHeadCommitId: data?.commitId ?? '',
     onSaved: reloadAfterCommit,
   });
+  // The guided changes on the Changes page ("Retire a system", "Change
+  // details") land here with `?action=retire` or `?action=edit`, so the same
+  // panel the Edit and Retire buttons open is already open. Edit is applied once,
+  // and only when the person could have pressed that button themselves; the
+  // Retire panel is opened by its initial state and already needs `canEdit`.
+  const requestedAction = searchParams.get('action');
+  const actionApplied = useRef(false);
+  useEffect(() => {
+    if (actionApplied.current || !canEdit || !data || editor.status !== 'idle') return;
+    if (requestedAction === 'edit') {
+      actionApplied.current = true;
+      editor.startEditing();
+    }
+  }, [requestedAction, canEdit, data, editor]);
   // ADR-025: "Still accurate", behind the same gate as Edit.
   const attestation = useAttestation({ modelId: model?.id ?? '', orgId: organisation?.id ?? '', userId, branch: editingBranch, onConfirmed: reloadAfterCommit });
   // Sprint U4-1 D3: called unconditionally, same reasoning as `editor`
@@ -408,7 +422,7 @@ export function ElementPage() {
                 </Text>
               </div>
             )}
-            {retiring && (state.data.element.element_type === 'system' || state.data.element.element_type === 'container') && (
+            {retiring && canEdit && (state.data.element.element_type === 'system' || state.data.element.element_type === 'container') && (
               <RetireAction
                 modelId={model.id}
                 orgId={organisation?.id ?? ''}
@@ -418,7 +432,7 @@ export function ElementPage() {
                 relationships={state.data.relationships}
                 relationshipFacts={state.data.relationshipFacts}
                 searchCommitId={searchCommitId ?? state.data.commitId}
-                branch={editingBranch ?? PLACEHOLDER_BRANCH}
+                branch={editingBranch}
                 expectedHeadCommitId={state.data.commitId}
                 onRetired={() => {
                   setRetiring(false);

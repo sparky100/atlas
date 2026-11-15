@@ -22,6 +22,7 @@ import { useChangeSummaries } from './useChangeSummaries';
 import { focusImpact } from './impactFocus';
 import { useChanges } from './useChanges';
 import { DraftWithAi } from './DraftWithAi';
+import { GuidedChange, type GuidedChangeStart } from './GuidedChange';
 import styles from './ChangesView.module.css';
 
 export interface ChangesViewProps {
@@ -88,6 +89,20 @@ export function ChangesView({ modelId, orgId, userId, orgSlug, modelSlug, canCre
   // group shows only when it has an open change, rather than four sections
   // where most read "nothing here" on a small model.
   const { waitingForReview, openByIntent, merged, cancelled, closed } = groupChangesList(branches);
+  // A standard change: start a "propose" change with a plain title, select it, then
+  // open the screen that does the job on it (Retire panel, edit form, or the add box).
+  const startGuided = ({ kind, system }: GuidedChangeStart) => {
+    const title = kind === 'add' ? 'Add a new system' : kind === 'retire' ? `Retire ${system?.name ?? 'a system'}` : `Change details of ${system?.name ?? 'a system'}`;
+    const slug = title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 60);
+    void createChange({ name: `${slug}-${Date.now().toString(36)}`, title, description: '', targetDate: '', intent: 'propose' }).then((branch) => {
+      if (!branch) return;
+      setRef({ kind: 'branch', branchId: branch.id });
+      const base = `/o/${orgSlug}/m/${modelSlug}`;
+      const refParam = `ref=branch:${branch.id}`;
+      if (kind === 'add' || !system) void navigate(`${base}?${refParam}`);
+      else void navigate(`${base}/e/${system.id}?${refParam}&action=${kind === 'retire' ? 'retire' : 'edit'}`);
+    });
+  };
   const hasOpen = waitingForReview.length > 0 || openByIntent.some((g) => g.branches.length > 0);
   const endedSections = [
     { title: 'Merged', branches: merged },
@@ -102,6 +117,9 @@ export function ChangesView({ modelId, orgId, userId, orgSlug, modelSlug, canCre
           <Text as="h2" size="lg">
             New change
           </Text>
+          {mainHeadCommitId !== null && !aiOpen && (
+            <GuidedChange modelId={modelId} commitId={mainHeadCommitId} busy={status === 'creating'} onStart={startGuided} />
+          )}
           {aiEnabled && userId && (
             <DraftWithAi
               modelId={modelId}
