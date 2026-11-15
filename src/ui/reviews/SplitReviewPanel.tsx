@@ -148,10 +148,10 @@ export function SplitReviewPanel({ modelId, branch, mainHeadCommitId, review, ca
   return (
     <Panel>
       <Text as="h2" size="lg">
-        Split — deliver part of this change now
+        Deliver part of this change now
       </Text>
       <Text as="p" tone="muted" size="sm">
-        Accept a subset of this change's own edits into a new, immediately-merged change. The rest stays here, untouched, for a later review.
+        Choose some of this change's edits to go live straight away, as a separate change. The rest stays here, untouched, for a later review.
       </Text>
 
       {includedSubjects.length > 0 && (
@@ -234,7 +234,7 @@ export function SplitReviewPanel({ modelId, branch, mainHeadCommitId, review, ca
           void confirmSplit();
         }}
       >
-        {status === 'working' ? 'Splitting…' : closure && closure.accepted.size > 0 ? `Split ${String(closure.accepted.size)} item${closure.accepted.size === 1 ? '' : 's'} & merge now` : 'Select items to split off'}
+        {status === 'working' ? 'Delivering…' : closure && closure.accepted.size > 0 ? `Deliver ${String(closure.accepted.size)} item${closure.accepted.size === 1 ? '' : 's'} now` : 'Select items to deliver'}
       </Button>
     </Panel>
   );

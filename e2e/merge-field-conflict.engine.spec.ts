@@ -90,7 +90,7 @@ test('a field conflict renders with its three-way context, resolves with one cli
   await page.goto(`/o/${orgSlug}/m/${modelSlug}/review/${mergeRequestId}`);
 
   // The field-conflict card, with its three-way context (SPEC §7.4).
-  await expect(page.getByRole('heading', { name: 'Field conflicts' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Values you and someone else both changed' })).toBeVisible();
   const card = page.locator('li', { hasText: 'Payments Service' }).filter({ hasText: 'vendor' });
   await expect(card.getByText('Branch Value')).toBeVisible();
   await expect(card.getByText('Main Value')).toBeVisible();
@@ -116,10 +116,10 @@ test('a field conflict renders with its three-way context, resolves with one cli
   // One-click resolution: "keep this change" (SPEC §7.4's first action).
   await card.getByRole('button', { name: 'Keep this change' }).click();
   await expect(card.getByText('Staged: keep this change')).toBeVisible();
-  await page.getByRole('button', { name: /Push refresh \(1 resolved\) & resubmit/ }).click();
+  await page.getByRole('button', { name: /Bring up to date \(1 decided\) and resubmit/ }).click();
 
   // Refreshed: the conflict is gone, Approve is enabled.
-  await expect(page.getByRole('heading', { name: 'Field conflicts' })).toHaveCount(0);
+  await expect(page.getByRole('heading', { name: 'Values you and someone else both changed' })).toHaveCount(0);
   await expect(approveButton).toBeEnabled();
   await approveButton.click();
   await expect(page.getByText('approved', { exact: true }).first()).toBeVisible();
