@@ -75,7 +75,7 @@ Elements connect through **relationships**, which you record yourself:
 - **replaces** — one system or module replaces another (recorded when you retire something with a replacement).
 - **enables** — a capability enables a value-stream stage.
 
-Systems carry attributes such as lifecycle (planned, active, retiring, retired), criticality, run cost, planned action, hosting model and provider, IT/OT domain, vendor, version, introduced, planned end and vendor support end. Owners can add **custom attributes** for their organisation (Organisation settings).
+Systems carry attributes such as lifecycle (planned, active, retiring, retired), criticality, run cost, planned action, hosting model and provider, IT/OT domain, AI agent (how it acts: suggests only, acts with approval, or acts alone), vendor, version, introduced, planned end and vendor support end. Owners can add **custom attributes** for their organisation (Organisation settings).
 
 ## Finding your way around
 

@@ -137,6 +137,7 @@ export const FINDING_FILTER_OPTIONS: readonly { value: string; label: string }[]
   { value: 'unowned-capabilities', label: 'Capabilities with no owner' },
   { value: 'stale-attributes', label: 'Items not checked recently' },
   { value: 'no-technical-owner', label: 'Systems with no technical owner' },
+  { value: 'ai-agent-no-technical-owner', label: 'AI agents that act alone with no technical owner' },
   { value: 'critical-no-business-owner', label: 'Critical systems with no business owner' },
   { value: 'critical-exposed', label: 'Critical systems exposed with no replacement' },
   { value: 'unused-integration-platform', label: 'Unused integration platforms' },

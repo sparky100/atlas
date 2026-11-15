@@ -87,13 +87,22 @@ describe('ATTRIBUTE_SCHEMA_BY_TYPE', () => {
     }
   });
 
-  it('only annualRunCost, importance and disposition declare an emptyLabel, and only annualRunCost, disposition and isExternal declare help text — every other field keeps §4.3\'s bare "—" and a silent row', () => {
+  it('only annualRunCost, importance, disposition and aiAutonomy declare an emptyLabel, and only annualRunCost, disposition, isExternal and aiAutonomy declare help text — every other field keeps §4.3\'s bare "—" and a silent row', () => {
     for (const type of ELEMENT_TYPES) {
       for (const field of ATTRIBUTE_SCHEMA_BY_TYPE[type]) {
-        if (field.key !== 'annualRunCost' && field.key !== 'disposition' && field.key !== 'isExternal') expect(field.help, `${type}.${field.key}`).toBeUndefined();
-        if (field.key !== 'annualRunCost' && field.key !== 'importance' && field.key !== 'disposition') expect(field.emptyLabel, `${type}.${field.key}`).toBeUndefined();
+        if (field.key !== 'annualRunCost' && field.key !== 'disposition' && field.key !== 'isExternal' && field.key !== 'aiAutonomy') expect(field.help, `${type}.${field.key}`).toBeUndefined();
+        if (field.key !== 'annualRunCost' && field.key !== 'importance' && field.key !== 'disposition' && field.key !== 'aiAutonomy') expect(field.emptyLabel, `${type}.${field.key}`).toBeUndefined();
       }
     }
+  });
+});
+
+describe('System AI autonomy (agents in EA, step 1)', () => {
+  it('is an optional enum on a system only, with plain-English labels and an empty label for "not an agent"', () => {
+    const field = ATTRIBUTE_SCHEMA_BY_TYPE.system.find((f) => f.key === 'aiAutonomy');
+    expect(field).toMatchObject({ required: false, kind: 'enum', options: ['suggests', 'acts_with_approval', 'acts_alone'], emptyLabel: 'Not an AI agent' });
+    expect(field?.optionLabels).toEqual({ suggests: 'Suggests only', acts_with_approval: 'Acts with approval', acts_alone: 'Acts alone' });
+    expect(ATTRIBUTE_SCHEMA_BY_TYPE.container.some((f) => f.key === 'aiAutonomy')).toBe(false);
   });
 });
 

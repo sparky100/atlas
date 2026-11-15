@@ -556,6 +556,19 @@ export function findSystemsWithoutTechnicalOwner(elements: readonly ElementsHead
 }
 
 /**
+ * AI agents that act alone (`aiAutonomy: 'acts_alone'`) and have no `owns`
+ * edge with `role: 'technical'` — nobody is answerable for something that
+ * acts without anyone checking first. Same technical-owner definition as
+ * `findSystemsWithoutTechnicalOwner` above. A system with no `aiAutonomy`
+ * is not an agent and is never flagged; one that suggests or acts with
+ * approval has a person in the loop and is left to the general check.
+ */
+export function findAiAgentsActingAloneWithoutTechnicalOwner(elements: readonly ElementsHeadRow[], ownsEdges: readonly RelationshipsHeadRow[]): ElementsHeadRow[] {
+  const technicallyOwnedIds = new Set(ownsEdges.filter((edge) => attributesRecord(edge.attributes).role === 'technical').map((edge) => edge.to_element_id));
+  return elements.filter((element) => attributesRecord(element.attributes).aiAutonomy === 'acts_alone' && !technicallyOwnedIds.has(element.element_id));
+}
+
+/**
  * Capabilities with no owner, itself or inherited (this module's own
  * comment explains both halves of "owner"). Returns only the *highest*
  * unowned ancestor per unowned subtree — a child whose parent is also

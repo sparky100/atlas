@@ -78,9 +78,19 @@ const EXPORT_LABEL_OVERRIDES: Readonly<Record<string, string>> = {
   'system.domain': 'IT/OT domain',
 };
 
+/**
+ * Fields left out of the spreadsheet export because the importer has no
+ * column for them yet — writing one would make a re-import of this product's
+ * own export fail to read a header (`exportRoundTrip.test.ts`). Importer
+ * changes are off-limits, so the field is left out until the importer is
+ * taught it, rather than exported and then not read back. The JSON
+ * "Export everything" file still carries it.
+ */
+const NOT_YET_IMPORTABLE: ReadonlySet<string> = new Set(['system.aiAutonomy']);
+
 export function coreColumnsForType(type: ElementType): ExportColumn[] {
   return ATTRIBUTE_SCHEMA_BY_TYPE[type]
-    .filter((field) => !field.hidden)
+    .filter((field) => !field.hidden && !NOT_YET_IMPORTABLE.has(`${type}.${field.key}`))
     .map((field) => ({ key: field.key, label: EXPORT_LABEL_OVERRIDES[`${type}.${field.key}`] ?? field.label }));
 }
 

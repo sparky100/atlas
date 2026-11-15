@@ -288,6 +288,14 @@ export function ArchitectHome({ data, insights, role, orgSlug, modelSlug, onShow
       browseHref: browseHref('no-technical-owner'),
     },
     {
+      key: 'ai-agent-no-technical-owner',
+      count: insightsData.aiAgentsWithoutTechnicalOwner.length,
+      summary: `${String(insightsData.aiAgentsWithoutTechnicalOwner.length)} AI ${plural(insightsData.aiAgentsWithoutTechnicalOwner.length, 'agent', 'agents')} that act alone with no technical owner`,
+      items: elementItems(insightsData.aiAgentsWithoutTechnicalOwner),
+      severity: 'high',
+      browseHref: browseHref('ai-agent-no-technical-owner'),
+    },
+    {
       key: 'critical-no-business-owner',
       count: insightsData.criticalSystemsWithoutBusinessOwner.length,
       summary: `${String(insightsData.criticalSystemsWithoutBusinessOwner.length)} critical ${plural(insightsData.criticalSystemsWithoutBusinessOwner.length, 'system', 'systems')} with no business owner`,

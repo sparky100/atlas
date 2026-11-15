@@ -640,6 +640,10 @@ A one-off backfill (`scripts/stripSeedCodes.ts`, model-scoped, same shape as `sc
 
 ---
 
+### Amended (agents in EA, step 1): an AI agent is a system with an `aiAutonomy` attribute
+
+AI agents are **systems**, not a new element type and not a `kind`. `SystemAttributes.aiAutonomy` (`suggests` | `acts_with_approval` | `acts_alone`, optional) records how freely an agent acts; absent means "not an AI agent". It is a separate attribute rather than a `SystemKind` value because a non-application kind moves a system out of its capability lane (`SystemKind`'s own comment) and an agent supports capabilities like any application. What an agent reaches is the existing `uses`/`flows_to` relationships (data classification and IT/OT crossings apply unchanged); who answers for it is the existing `owns` roles; model vendor and version are the existing `vendor`/`version`. Value validation is client-side only, as for every system attribute, so there is no migration and no advisor effect. One finding, `ai-agent-no-technical-owner` (an agent that acts alone with no `role: technical` owner), is added to Where to focus, the Elements Finding filter and the tools' `list_health_findings`. The spreadsheet export leaves the column out until the importer can read it back (importer changes are off-limits); the JSON export carries it. Services, a data layer and runtime monitoring remain excluded. See `plans/PROPOSAL-agents-in-ea.md` in project files.
+
 ## Deferred to follow-up ADRs
 
 Named explicitly so they aren't mistaken for settled: multi-branch to-be composition and its conflict-resolution UX (ADR-005); the decisions/evidence workflow layer on top of ADR-013's data shape; delta retention/compaction policy (ADR-002); the full `type_schemas` JSON-Schema generator and validator (ADR-001, ADR-015), deferred to Sprint K1; and the standing duplicates report (ADR-019's own point 3, now decided in full by its "Amended (F4, ...)" paragraph above, ahead of the build itself — `docs/prompts/atlas-prompt-pack.md`'s own F4 entry tracks progress).
