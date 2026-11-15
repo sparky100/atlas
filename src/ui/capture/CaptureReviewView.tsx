@@ -128,6 +128,8 @@ export function CaptureReviewView({ modelId, orgId, jobId, reviewQueueHref }: Ca
     return candidates.filter((c) => (decisionFilter === 'needsReview' ? c.decision === null : c.decision !== null));
   }, [candidates, decisionFilter, blockedCandidateIds]);
 
+  // The Blocked filter exists to show those items, so it opens every group — a blocked item sitting in a group collapsed by default (`confirm`) would otherwise leave the filter looking empty.
+  const isGroupCollapsed = (cls: CandidateClass): boolean => decisionFilter !== 'blocked' && collapsedGroups.has(cls);
   const grouped = useMemo(() => CLASS_ORDER.map((cls) => ({ cls, items: filteredCandidates.filter((c) => c.class === cls) })).filter((g) => g.items.length > 0), [filteredCandidates]);
   const flat = useMemo(() => grouped.flatMap((g) => g.items), [grouped]);
 
@@ -475,12 +477,12 @@ export function CaptureReviewView({ modelId, orgId, jobId, reviewQueueHref }: Ca
         grouped.map(({ cls, items }) => (
           <div key={cls} className={styles.group}>
             <div className={styles.groupHeaderRow}>
-              <button type="button" className={styles.groupHeader} aria-expanded={!collapsedGroups.has(cls)} onClick={() => { toggleGroup(cls); }}>
+              <button type="button" className={styles.groupHeader} aria-expanded={!isGroupCollapsed(cls)} onClick={() => { toggleGroup(cls); }}>
                 <Text as="h2" size="lg">
                   {CLASS_LABEL[cls]} ({items.length})
                 </Text>
                 <Text as="span" tone="muted" size="sm">
-                  {collapsedGroups.has(cls) ? 'Show ▸' : 'Hide ▾'}
+                  {isGroupCollapsed(cls) ? 'Show ▸' : 'Hide ▾'}
                 </Text>
               </button>
               {canReview && MULTI_SELECT_CLASSES.has(cls) && (
@@ -489,7 +491,7 @@ export function CaptureReviewView({ modelId, orgId, jobId, reviewQueueHref }: Ca
                 </Button>
               )}
             </div>
-            {!collapsedGroups.has(cls) && (
+            {!isGroupCollapsed(cls) && (
               <ul className={styles.list} role="listbox">
                 {items.map((candidate) => (
                   <CaptureCandidateRow
