@@ -20,6 +20,8 @@
 import type { CandidateRef, CaptureCandidate } from '../contracts/capture';
 import type { UUID } from '../contracts/delta';
 
+const ALREADY_ON_TARGET_CLASSES: ReadonlySet<CaptureCandidate['class']> = new Set(['update', 'confirm', 'conflict']);
+
 function refsOf(candidate: CaptureCandidate): readonly CandidateRef[] {
   if (candidate.proposal.kind === 'element') return candidate.proposal.parent !== null ? [candidate.proposal.parent] : [];
   return [candidate.proposal.from, candidate.proposal.to];
@@ -28,7 +30,8 @@ function refsOf(candidate: CaptureCandidate): readonly CandidateRef[] {
 export function findBlockedCandidates(candidates: readonly CaptureCandidate[]): ReadonlySet<UUID> {
   const decisionByDraftSubjectId = new Map<UUID, CaptureCandidate['decision']>();
   for (const c of candidates) {
-    if (c.draftSubjectId !== null) decisionByDraftSubjectId.set(c.draftSubjectId, c.decision);
+    // A matched element (`update`/`confirm`/`conflict`) is already on the target branch, so a reference to it resolves whatever its own decision is — it can't make anything that points at it fail to apply. Only an element this draft would *create* (or a still-ambiguous one) can leave a dangling reference.
+    if (c.draftSubjectId !== null && !ALREADY_ON_TARGET_CLASSES.has(c.class)) decisionByDraftSubjectId.set(c.draftSubjectId, c.decision);
   }
 
   const blocked = new Set<UUID>();

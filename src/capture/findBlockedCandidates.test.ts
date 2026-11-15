@@ -131,4 +131,10 @@ describe('findBlockedCandidates', () => {
 
     expect(findBlockedCandidates([rejected, editedRel])).toEqual(new Set(['rel']));
   });
+  it('does not flag an accepted module whose platform is a matched change that is still undecided — the platform is already in the model, so Apply resolves it', () => {
+    const platformUpdate = candidate({ id: 'platform', seq: 1, class: 'update', elementType: 'system', draftSubjectId: 'main-platform', decision: null, proposal: { kind: 'element', elementType: 'system', name: 'SAP', parent: null, attributes: {} } });
+    const module = candidate({ id: 'module', seq: 2, class: 'confirm', elementType: 'container', draftSubjectId: 'main-module', decision: 'accepted', proposal: { kind: 'element', elementType: 'container', name: 'Finance', parent: { kind: 'existing', elementId: 'main-platform' }, attributes: {} } });
+
+    expect(findBlockedCandidates([platformUpdate, module])).toEqual(new Set());
+  });
 });
