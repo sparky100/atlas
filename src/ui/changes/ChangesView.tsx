@@ -48,6 +48,8 @@ export interface ChangesViewProps {
  * summary, and the merge review queue are later Sprint C1 steps — this is
  * create + list + a status chip only.
  */
+const joinClasses = (...names: (string | undefined)[]): string => names.filter(Boolean).join(' ');
+
 export function ChangesView({ modelId, orgId, userId, orgSlug, modelSlug, canCreate, aiEnabled = false, isOwner = false }: ChangesViewProps) {
   const navigate = useNavigate();
   const { setRef } = useSelectedRef();
@@ -187,7 +189,7 @@ export function ChangesView({ modelId, orgId, userId, orgSlug, modelSlug, canCre
                 disabled={!mainHeadCommitId}
               />
               <textarea
-                className={`${styles.textarea} ${styles.full}`}
+                className={joinClasses(styles.textarea, styles.full)}
                 placeholder="Description (optional)"
                 value={description}
                 onChange={(e) => {
@@ -244,7 +246,7 @@ export function ChangesView({ modelId, orgId, userId, orgSlug, modelSlug, canCre
                   />
                 </div>
               )}
-              <div className={`${styles.formRow} ${styles.full}`}>
+              <div className={joinClasses(styles.formRow, styles.full)}>
                 <Button variant="primary" type="submit" disabled={status === 'creating' || !mainHeadCommitId}>
                   {status === 'creating' ? 'Creating…' : 'Create change'}
                 </Button>
