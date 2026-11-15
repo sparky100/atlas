@@ -143,7 +143,7 @@ export function OrganisationSettingsView({ organisation, role, userId, onChanged
             The fewest architect approvals a change review must have before it can merge.
           </Text>
           {canManage && (
-            <Button variant="primary" type="submit" disabled={status === 'saving'}>
+            <Button variant="secondary" type="submit" disabled={status === 'saving'}>
               {status === 'saving' ? 'Saving…' : 'Save'}
             </Button>
           )}
@@ -181,7 +181,7 @@ export function OrganisationSettingsView({ organisation, role, userId, onChanged
               }}
             />
             {canSetReviewPeriod ? (
-              <Button variant="primary" type="submit" disabled={status === 'saving' || reviewDays < 1 || reviewDays > 90}>
+              <Button variant="secondary" type="submit" disabled={status === 'saving' || reviewDays < 1 || reviewDays > 90}>
                 {status === 'saving' ? 'Saving…' : 'Save'}
               </Button>
             ) : (
@@ -224,7 +224,7 @@ export function OrganisationSettingsView({ organisation, role, userId, onChanged
               }}
             />
             {canSetReviewPeriod ? (
-              <Button variant="primary" type="submit" disabled={status === 'saving' || staleMonths < 1 || staleMonths > 60}>
+              <Button variant="secondary" type="submit" disabled={status === 'saving' || staleMonths < 1 || staleMonths > 60}>
                 {status === 'saving' ? 'Saving…' : 'Save'}
               </Button>
             ) : (
@@ -389,7 +389,7 @@ export function OrganisationSettingsView({ organisation, role, userId, onChanged
                 </option>
               ))}
             </select>
-            <Button variant="primary" type="submit">
+            <Button variant="secondary" type="submit">
               Send invite
             </Button>
           </form>
