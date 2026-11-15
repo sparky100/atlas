@@ -155,26 +155,9 @@
  */
 .cardGrid {
   display: grid;
-  grid-template-columns: repeat(1, minmax(0, 1fr));
+  /* As many columns as fit, each at least 240px: 1 on a narrow window, 4 on a laptop, 8+ on a 2560 monitor, and it follows a live window resize with no breakpoints. */
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
   gap: var(--space-2);
-}
-
-@media (min-width: 768px) {
-  .cardGrid {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-}
-
-@media (min-width: 1024px) {
-  .cardGrid {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-  }
-}
-
-@media (min-width: 1280px) {
-  .cardGrid {
-    grid-template-columns: repeat(4, minmax(0, 1fr));
-  }
 }
 
 /**

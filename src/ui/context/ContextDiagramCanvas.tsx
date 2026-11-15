@@ -24,6 +24,7 @@ import {
   type Point,
 } from './contextDiagramLayout';
 import { edgeLabel, type ContextGroup } from './contextGrouping';
+import { useRefitOnResize } from '../landscape/useRefitOnResize';
 import styles from './ContextDiagramCanvas.module.css';
 
 export interface ContextDiagramCanvasProps {
@@ -260,6 +261,8 @@ export function ContextDiagramCanvas({ group, layoutWidthHint, neighbourContextH
     if (!wrapper) return;
     setTransform(computeFitTransform(layout.width, layout.height, wrapper.clientWidth, wrapper.clientHeight));
   }, [layout.width, layout.height]);
+
+  useRefitOnResize(wrapperRef, () => transform, setTransform, (w, h) => computeFitTransform(layout.width, layout.height, w, h));
 
   useEffect(() => {
     fitToView();

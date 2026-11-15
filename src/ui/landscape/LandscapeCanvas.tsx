@@ -13,6 +13,7 @@ import { BOUNDARY_MARGIN, computeLandscapeChannels, laneAt, laneLabelLeftInset, 
 import { landscapeTileColourFor } from './landscapeColour';
 import { quantizeScale, wheelZoomFactor } from './zoom';
 import { DIFF_MARKER, diffBorderColour, polylineMidpoint } from '../components/DiffBadge/diffCanvas';
+import { useRefitOnResize } from './useRefitOnResize';
 import styles from './LandscapeCanvas.module.css';
 
 
@@ -472,6 +473,8 @@ export function LandscapeCanvas({
     if (!wrapper) return;
     setTransform(computeFitTransform(layout.width, layout.height, wrapper.clientWidth, wrapper.clientHeight));
   }, [layout.width, layout.height]);
+
+  useRefitOnResize(wrapperRef, () => transform, setTransform, (w, h) => computeFitTransform(layout.width, layout.height, w, h));
 
   // Item 1: "fit-to-view on load" — every load computes a fresh `layout`
   // object now (item 6), so this effect, keyed on `layout`'s own identity,
