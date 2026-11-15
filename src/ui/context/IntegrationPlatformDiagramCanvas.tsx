@@ -141,7 +141,7 @@ function wrapTwoLines(ctx: CanvasRenderingContext2D, text: string, maxWidth: num
   return [firstLine, truncate(ctx, secondLine, maxWidth)];
 }
 
-function drawPill(ctx: CanvasRenderingContext2D, text: string, x: number, cy: number, tokens: CanvasTokens, warn: boolean, anchor: 'centre' | 'left', maxTextWidth: number): void {
+function drawPill(ctx: CanvasRenderingContext2D, text: string, x: number, cy: number, tokens: CanvasTokens, crossing: boolean, anchor: 'centre' | 'left', maxTextWidth: number): void {
   if (text.trim().length === 0) return;
   const paddingX = 8;
   // The full text is on hover and in the flows list below.
@@ -154,10 +154,11 @@ function drawPill(ctx: CanvasRenderingContext2D, text: string, x: number, cy: nu
   roundRectPath(ctx, cx - w / 2, cy - h / 2, w, h, h / 2);
   ctx.fillStyle = tokens.surfaceRaised;
   ctx.fill();
-  ctx.strokeStyle = warn ? tokens.statusWarn : tokens.border;
-  ctx.lineWidth = warn ? 1.5 : 1;
+  // An IT/OT crossing is marked by a heavier outline and the "IT/OT" text in the pill, never by a status colour (orange means "retiring" on tiles).
+  ctx.strokeStyle = crossing ? tokens.borderStrong : tokens.border;
+  ctx.lineWidth = crossing ? 2 : 1;
   ctx.stroke();
-  ctx.fillStyle = warn ? tokens.statusWarn : tokens.textMuted;
+  ctx.fillStyle = tokens.textMuted;
   ctx.fillText(shown, cx, cy);
 }
 
@@ -173,11 +174,11 @@ function drawPill(ctx: CanvasRenderingContext2D, text: string, x: number, cy: nu
  * module comment names both simplifications).
  *
  * IT/OT boundary crossings (the prompt's own "highlighted"): a crossing
- * edge draws in `--status-warn` rather than the ordinary border colour,
- * the same tone `DOMAIN_TONE.ot` already uses for "this is the fact worth
- * a second look" elsewhere in the product — never colour-only, since the
- * classification pill on that same edge is real text a screen reader (or
- * a colour-blind reviewer) can still read.
+ * edge draws as a heavier line, and its pill carries the text "IT/OT". No
+ * status colour is used: colours keep one meaning across the app, and
+ * `--status-warn` already means "retiring" on a tile. The classification
+ * text stays uncoloured too, so sensitivity and boundary crossing read
+ * as separate facts.
  *
  * "Platform · Module": a source/target tile's own label reads
  * `moduleDisplayNameFromMap(element, elementsById)`, not the raw
@@ -249,11 +250,11 @@ export function IntegrationPlatformDiagramCanvas({ hub, sourceIds, targetIds, ed
       const flowIsEmphasised = (edge: { sourceId: UUID; targetId: UUID }): boolean => hoveredId !== null && (edge.sourceId === hoveredId || edge.targetId === hoveredId);
       const flowIsFaded = (edge: { sourceId: UUID; targetId: UUID }): boolean => hoveredId !== null && !flowIsEmphasised(edge);
 
-      const drawPolyline = (points: readonly { x: number; y: number }[], warn: boolean, arrowAtEnd: boolean, emphasised: boolean, faded: boolean): void => {
+      const drawPolyline = (points: readonly { x: number; y: number }[], crossing: boolean, arrowAtEnd: boolean, emphasised: boolean, faded: boolean): void => {
         ctx.save();
         ctx.globalAlpha = faded ? 0.2 : 1;
-        ctx.strokeStyle = warn ? tokens.statusWarn : emphasised ? tokens.text : tokens.borderStrong;
-        ctx.lineWidth = emphasised ? 2.5 : warn ? 2 : 1.5;
+        ctx.strokeStyle = emphasised ? tokens.text : tokens.borderStrong;
+        ctx.lineWidth = crossing ? 3.5 : emphasised ? 2.5 : 1.5;
         ctx.lineJoin = 'round';
         ctx.beginPath();
         points.forEach((p, i) => {
@@ -275,7 +276,7 @@ export function IntegrationPlatformDiagramCanvas({ hub, sourceIds, targetIds, ed
         ctx.lineTo(-8, -4);
         ctx.lineTo(-8, 4);
         ctx.closePath();
-        ctx.fillStyle = warn ? tokens.statusWarn : emphasised ? tokens.text : tokens.borderStrong;
+        ctx.fillStyle = emphasised ? tokens.text : tokens.borderStrong;
         ctx.fill();
         ctx.restore();
       };
@@ -389,7 +390,7 @@ export function IntegrationPlatformDiagramCanvas({ hub, sourceIds, targetIds, ed
           const pillMaxWidth = PILL_RUN_WIDTH * transform.scale - 16;
           drawPill(ctx, edge.verbLabel.trim() === '' ? String(edge.flowNumber) : `${String(edge.flowNumber)} · ${edge.verbLabel}`, vx, vy, tokens, edge.crossesBoundary, 'left', pillMaxWidth);
           const [cx, cy] = toScreen(edge.classificationLabelAnchor.x, edge.classificationLabelAnchor.y);
-          drawPill(ctx, edge.classificationLabel ? `${String(edge.flowNumber)} · ${edge.classificationLabel}` : String(edge.flowNumber), cx, cy, tokens, edge.crossesBoundary, 'centre', pillMaxWidth);
+          drawPill(ctx, [String(edge.flowNumber), edge.crossesBoundary ? 'IT/OT' : '', edge.classificationLabel ?? ''].filter((part) => part !== '').join(' · '), cx, cy, tokens, edge.crossesBoundary, 'centre', pillMaxWidth);
           ctx.globalAlpha = 1;
         }
         ctx.textAlign = 'left';

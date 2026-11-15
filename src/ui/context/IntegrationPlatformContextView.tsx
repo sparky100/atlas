@@ -97,6 +97,13 @@ export function IntegrationPlatformContextView({ hub, flows, endpoints, interfac
     };
   });
 
+  // A key for the diagram, listing only what is actually drawn in it (no entry for something that isn't there).
+  const diagramElements = [hub, ...sourceIds, ...targetIds].map((x) => (typeof x === 'string' ? endpoints.get(x) : x));
+  const legendItems: string[] = [];
+  if (edgeInputs.some((e) => e.crossesBoundary)) legendItems.push('Heavy line, tagged IT/OT: the flow crosses between IT and OT');
+  if (diagramElements.some((e) => e !== undefined && attributesRecord(e.attributes).lifecycleStatus === 'retiring')) legendItems.push('Cream tile: retiring');
+  if (diagramElements.some((e) => e !== undefined && attributesRecord(e.attributes).isExternal === true)) legendItems.push('Dashed tile: outside our organisation');
+
   return (
     <div>
       <div className={styles.hub}>
@@ -121,6 +128,13 @@ export function IntegrationPlatformContextView({ hub, flows, endpoints, interfac
       ) : (
         <>
           <div className={styles.diagram}>
+            {legendItems.length > 0 && (
+              <ul className={styles.legend} aria-label="Key to the diagram">
+                {legendItems.map((item) => (
+                  <li key={item}>{item}</li>
+                ))}
+              </ul>
+            )}
             <IntegrationPlatformDiagramCanvas hub={hub} interfaces={interfaces} sourceIds={sourceIds} targetIds={targetIds} edges={edgeInputs} elementsById={endpoints} neighbourContextHref={neighbourContextHref} elementHref={elementHref} />
           </div>
           <div className={styles.flowsList}>
