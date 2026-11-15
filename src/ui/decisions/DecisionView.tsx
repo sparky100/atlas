@@ -7,7 +7,6 @@ import { Button } from '../components/Button/Button';
 import { Chip } from '../components/Chip/Chip';
 import { CommentsSection } from '../components/CommentsSection/CommentsSection';
 import { ElementTypeGlyph } from '../components/ElementTypeGlyph/ElementTypeGlyph';
-import { EmptyState } from '../components/EmptyState/EmptyState';
 import { Panel } from '../components/Panel/Panel';
 import { Text } from '../components/Text/Text';
 import { useAuth } from '../auth/useAuth';
@@ -232,9 +231,7 @@ export function DecisionView({ modelId, decisionId, orgId, orgSlug, modelSlug, r
         <Text as="h2" size="lg">
           Concerns
         </Text>
-        {elementLinks.length === 0 ? (
-          <EmptyState>No capabilities or systems linked yet.</EmptyState>
-        ) : (
+        {elementLinks.length === 0 ? null : (
           <ul className={styles.linkList}>
             {elementLinks.map((link) => {
               const element = linkedElementsById.get(link.linked_id);
@@ -281,147 +278,147 @@ export function DecisionView({ modelId, decisionId, orgId, orgSlug, modelSlug, r
         )}
       </Panel>
 
-      <Panel>
-        <Text as="h2" size="lg">
-          Criteria
-        </Text>
-        {branchLinks.length === 0 ? (
-          <EmptyState>No options added yet.</EmptyState>
-        ) : (
-          (() => {
-            const criteriaOptions: DecisionCriteriaOption[] = branchLinks
-              .map((link) => linkedBranchesById.get(link.linked_id))
-              .filter((b): b is NonNullable<typeof b> => b !== undefined)
-              .map((b) => ({
-                branchId: b.id,
-                label: intentHeaderLine(b),
-                status: b.status,
-                isChosen: decision.branch_id === b.id,
-                summary: comparison.status === 'ready' ? (comparison.optionSummaries.get(b.id) ?? null) : null,
-                canChoose: canChoose && b.status === 'draft',
-              }));
-            return (
-              <DecisionCriteriaGrid
-                decisionId={decisionId}
-                options={criteriaOptions}
-                canRate={canRate}
-                userId={userId}
-                neededBy={decision.needed_by}
-                orgSlug={orgSlug}
-                modelSlug={modelSlug}
-                onChoose={(branchId) => {
-                  setChoosingBranchId(branchId);
-                  setReasons('');
-                }}
-                canWorkOnChange={canCreateChangeBranch(role)}
-                onWorkOnThisChange={(branchId) => {
-                  setRef({ kind: 'branch', branchId });
-                  void navigate(`/o/${orgSlug}/m/${modelSlug}/changes/${branchId}`);
-                }}
-                ratingsState={ratingsState}
-              />
-            );
-          })()
-        )}
-        {branchLinks.some((link) => !linkedBranchesById.get(link.linked_id)) && (
-          <Text as="p" tone="muted" size="sm">
-            A linked change that no longer resolves.
+      {branchLinks.length > 0 && (
+        <Panel>
+          <Text as="h2" size="lg">
+            Criteria
           </Text>
-        )}
-
-        {choosingBranchId !== null && (
-          <div className={styles.field}>
-            <Text as="label" size="sm" tone="muted">
-              Why this option
+          {branchLinks.length === 0 ? null : (
+            (() => {
+              const criteriaOptions: DecisionCriteriaOption[] = branchLinks
+                .map((link) => linkedBranchesById.get(link.linked_id))
+                .filter((b): b is NonNullable<typeof b> => b !== undefined)
+                .map((b) => ({
+                  branchId: b.id,
+                  label: intentHeaderLine(b),
+                  status: b.status,
+                  isChosen: decision.branch_id === b.id,
+                  summary: comparison.status === 'ready' ? (comparison.optionSummaries.get(b.id) ?? null) : null,
+                  canChoose: canChoose && b.status === 'draft',
+                }));
+              return (
+                <DecisionCriteriaGrid
+                  decisionId={decisionId}
+                  options={criteriaOptions}
+                  canRate={canRate}
+                  userId={userId}
+                  neededBy={decision.needed_by}
+                  orgSlug={orgSlug}
+                  modelSlug={modelSlug}
+                  onChoose={(branchId) => {
+                    setChoosingBranchId(branchId);
+                    setReasons('');
+                  }}
+                  canWorkOnChange={canCreateChangeBranch(role)}
+                  onWorkOnThisChange={(branchId) => {
+                    setRef({ kind: 'branch', branchId });
+                    void navigate(`/o/${orgSlug}/m/${modelSlug}/changes/${branchId}`);
+                  }}
+                  ratingsState={ratingsState}
+                />
+              );
+            })()
+          )}
+          {branchLinks.some((link) => !linkedBranchesById.get(link.linked_id)) && (
+            <Text as="p" tone="muted" size="sm">
+              A linked change that no longer resolves.
             </Text>
-            <textarea
-              className={styles.textarea}
-              placeholder="The reasons this option was chosen over the others"
-              value={reasons}
-              onChange={(e) => {
-                setReasons(e.target.value);
+          )}
+
+          {choosingBranchId !== null && (
+            <div className={styles.field}>
+              <Text as="label" size="sm" tone="muted">
+                Why this option
+              </Text>
+              <textarea
+                className={styles.textarea}
+                placeholder="The reasons this option was chosen over the others"
+                value={reasons}
+                onChange={(e) => {
+                  setReasons(e.target.value);
+                }}
+              />
+              <div className={styles.addOptionForm}>
+                <Button
+                  variant="primary"
+                  disabled={optionsState.status === 'choosing' || reasons.trim().length === 0}
+                  onClick={() => {
+                    void optionsState.chooseOption(decisionId, choosingBranchId, reasons).then((chosen) => {
+                      if (chosen) setChoosingBranchId(null);
+                    });
+                  }}
+                >
+                  {optionsState.status === 'choosing' ? 'Choosing…' : 'Confirm choice'}
+                </Button>
+                <Button
+                  variant="ghost"
+                  onClick={() => {
+                    setChoosingBranchId(null);
+                  }}
+                >
+                  Cancel
+                </Button>
+              </div>
+            </div>
+          )}
+
+          {canAddOption && !addingOption && (
+            <Button
+              variant="secondary"
+              onClick={() => {
+                setAddingOption(true);
+                setOptionName('');
+                setOptionTitle('');
               }}
-            />
+            >
+              + Add an option
+            </Button>
+          )}
+          {canAddOption && addingOption && (
             <div className={styles.addOptionForm}>
+              <input
+                className={styles.input}
+                type="text"
+                placeholder="Name (e.g. replace-with-workday)"
+                value={optionName}
+                onChange={(e) => {
+                  setOptionName(e.target.value);
+                }}
+              />
+              <input
+                className={styles.input}
+                type="text"
+                placeholder="Title (e.g. Replace with Workday)"
+                value={optionTitle}
+                onChange={(e) => {
+                  setOptionTitle(e.target.value);
+                }}
+              />
               <Button
                 variant="primary"
-                disabled={optionsState.status === 'choosing' || reasons.trim().length === 0}
+                disabled={optionsState.status === 'adding' || optionName.trim().length === 0}
                 onClick={() => {
-                  void optionsState.chooseOption(decisionId, choosingBranchId, reasons).then((chosen) => {
-                    if (chosen) setChoosingBranchId(null);
+                  if (!userId) return;
+                  void optionsState.addOption({ orgId, modelId, decisionId, name: optionName, title: optionTitle, userId, projectId: decision.project_id }).then((added) => {
+                    if (added) setAddingOption(false);
                   });
                 }}
               >
-                {optionsState.status === 'choosing' ? 'Choosing…' : 'Confirm choice'}
+                {optionsState.status === 'adding' ? 'Adding…' : 'Add option'}
               </Button>
               <Button
                 variant="ghost"
                 onClick={() => {
-                  setChoosingBranchId(null);
+                  setAddingOption(false);
                 }}
               >
                 Cancel
               </Button>
             </div>
-          </div>
-        )}
-
-        {canAddOption && !addingOption && (
-          <Button
-            variant="secondary"
-            onClick={() => {
-              setAddingOption(true);
-              setOptionName('');
-              setOptionTitle('');
-            }}
-          >
-            + Add an option
-          </Button>
-        )}
-        {canAddOption && addingOption && (
-          <div className={styles.addOptionForm}>
-            <input
-              className={styles.input}
-              type="text"
-              placeholder="Name (e.g. replace-with-workday)"
-              value={optionName}
-              onChange={(e) => {
-                setOptionName(e.target.value);
-              }}
-            />
-            <input
-              className={styles.input}
-              type="text"
-              placeholder="Title (e.g. Replace with Workday)"
-              value={optionTitle}
-              onChange={(e) => {
-                setOptionTitle(e.target.value);
-              }}
-            />
-            <Button
-              variant="primary"
-              disabled={optionsState.status === 'adding' || optionName.trim().length === 0}
-              onClick={() => {
-                if (!userId) return;
-                void optionsState.addOption({ orgId, modelId, decisionId, name: optionName, title: optionTitle, userId, projectId: decision.project_id }).then((added) => {
-                  if (added) setAddingOption(false);
-                });
-              }}
-            >
-              {optionsState.status === 'adding' ? 'Adding…' : 'Add option'}
-            </Button>
-            <Button
-              variant="ghost"
-              onClick={() => {
-                setAddingOption(false);
-              }}
-            >
-              Cancel
-            </Button>
-          </div>
-        )}
-        {optionsState.error !== null && <Text as="p">{optionsState.error}</Text>}
-      </Panel>
+          )}
+          {optionsState.error !== null && <Text as="p">{optionsState.error}</Text>}
+        </Panel>
+      )}
 
       {decision.status === 'accepted' && chosenBranch !== undefined && (
         <DecisionGoLive
@@ -554,25 +551,25 @@ export function DecisionView({ modelId, decisionId, orgId, orgSlug, modelSlug, r
         </Panel>
       )}
 
-      <Panel>
-        <Text as="h2" size="lg">
-          Arguments
-        </Text>
-        {args.length === 0 ? (
-          <EmptyState>No arguments recorded yet — recorded once this decision is chosen.</EmptyState>
-        ) : (
-          <ul className={styles.linkList}>
-            {args.map((arg) => (
-              <li key={arg.id} className={styles.linkRow}>
-                <Chip tone={arg.stance === 'for' ? 'ok' : arg.stance === 'against' ? 'danger' : 'neutral'}>{arg.stance}</Chip>
-                <Text as="span" size="sm">
-                  {arg.body}
-                </Text>
-              </li>
-            ))}
-          </ul>
-        )}
-      </Panel>
+      {args.length > 0 && (
+        <Panel>
+          <Text as="h2" size="lg">
+            Arguments
+          </Text>
+          {args.length === 0 ? null : (
+            <ul className={styles.linkList}>
+              {args.map((arg) => (
+                <li key={arg.id} className={styles.linkRow}>
+                  <Chip tone={arg.stance === 'for' ? 'ok' : arg.stance === 'against' ? 'danger' : 'neutral'}>{arg.stance}</Chip>
+                  <Text as="span" size="sm">
+                    {arg.body}
+                  </Text>
+                </li>
+              ))}
+            </ul>
+          )}
+        </Panel>
+      )}
 
       <Panel>
         <Text as="h2" size="lg">

@@ -786,9 +786,7 @@ export function ArchitectHome({ data, insights, role, orgSlug, modelSlug, onShow
               <Text as="p" tone="muted" size="sm">
                 Loading…
               </Text>
-            ) : insightsData.recentCommits.length === 0 ? (
-              <EmptyState>No activity on main yet.</EmptyState>
-            ) : (
+            ) : insightsData.recentCommits.length === 0 ? null : (
               <>
                 <ul className={styles.commitList}>{shownActivity.map(activityRow)}</ul>
                 {restActivity.length > 0 && (

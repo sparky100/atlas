@@ -4,7 +4,6 @@ import type { ElementsHeadRow } from '../../../contracts/rows';
 import type { DeltaHistoryRow } from '../../../db/elements';
 import { Button } from '../Button/Button';
 import { formatAge } from '../../time';
-import { EmptyState } from '../EmptyState/EmptyState';
 import { Text } from '../Text/Text';
 import { buildRelationshipParticipantsById, summariseHistoryEntry } from './historyTimelineSummary';
 import styles from './HistoryTimeline.module.css';
@@ -47,7 +46,7 @@ export function HistoryTimeline({ history, elementId, relationshipEndpoints, ret
   );
 
   if (history.length === 0) {
-    return <EmptyState>No history recorded yet.</EmptyState>;
+    return null;
   }
 
   const visible = history.slice(0, visibleCount);

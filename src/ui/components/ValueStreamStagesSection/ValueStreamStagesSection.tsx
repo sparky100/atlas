@@ -1,6 +1,5 @@
 import { Link } from 'react-router';
 import type { ElementsHeadRow } from '../../../contracts/rows';
-import { EmptyState } from '../EmptyState/EmptyState';
 import { ElementTypeGlyph } from '../ElementTypeGlyph/ElementTypeGlyph';
 import { ReorderButtons, type ReorderButtonsContext } from '../ReorderButtons/ReorderButtons';
 import { Text } from '../Text/Text';
@@ -25,7 +24,7 @@ export interface ValueStreamStagesSectionProps {
  * meaningful sequence here, not an alphabetical accident.
  */
 export function ValueStreamStagesSection({ orgSlug, modelSlug, stages, reorderContext }: ValueStreamStagesSectionProps) {
-  if (stages.length === 0) return <EmptyState>No stages recorded yet.</EmptyState>;
+  if (stages.length === 0) return null;
 
   const ordered = [...stages].sort(compareBySiblingOrder);
   return (

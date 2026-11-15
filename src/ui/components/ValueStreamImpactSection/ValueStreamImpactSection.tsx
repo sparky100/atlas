@@ -1,6 +1,5 @@
 import { Link } from 'react-router';
 import { ElementTypeGlyph } from '../ElementTypeGlyph/ElementTypeGlyph';
-import { EmptyState } from '../EmptyState/EmptyState';
 import { Text } from '../Text/Text';
 import type { AffectedValueStream } from '../../valueStreams/impactTraversal';
 import styles from './ValueStreamImpactSection.module.css';
@@ -19,7 +18,7 @@ export interface ValueStreamImpactSectionProps {
  * this element's capabilities enables it.
  */
 export function ValueStreamImpactSection({ orgSlug, modelSlug, affected }: ValueStreamImpactSectionProps) {
-  if (affected.length === 0) return <EmptyState>No value stream reaches this element yet.</EmptyState>;
+  if (affected.length === 0) return null;
 
   return (
     <ul className={styles.list}>

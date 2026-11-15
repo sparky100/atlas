@@ -365,7 +365,7 @@ export function ElementBrowseTable({ state, orgSlug, modelSlug, modelId, filenam
 
   if (state.status === 'loading') return <Loading />;
   if (state.status === 'error') return <Text as="p">{state.message}</Text>;
-  if (state.status === 'refNotFound') return <Text as="p">Nothing here yet.</Text>;
+  if (state.status === 'refNotFound') return <Text as="p">That version of the model could not be found. Pick another from the version picker at the top.</Text>;
 
   const elementHref = (elementId: string) => `/o/${orgSlug}/m/${modelSlug}/e/${elementId}`;
   // F1 PR4: this table's own picker options — non-deprecated, and applying
