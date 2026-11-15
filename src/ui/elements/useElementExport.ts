@@ -6,6 +6,11 @@ import { reportError } from '../errors/errorBannerStore';
 import { supabase } from '../supabaseClient';
 import { elementBrowseRowsToCsv, sanitizeForFilename } from './elementExport';
 import { loadExportData, type LoadedExportData } from './loadExportData';
+import { getModelName, listAllElements } from '../../db/elementBrowse';
+import { listAllRelationships } from '../../db/elements';
+import { listFactsForCommit } from '../../db/healthFindings';
+import { listSourcesForModel } from '../../db/sources';
+import { buildModelSnapshot } from '../exports/modelSnapshot';
 
 export type ElementExportStatus = 'idle' | 'working';
 
@@ -24,6 +29,8 @@ export interface UseElementExportResult {
   error: string | null;
   exportCsv: () => Promise<void>;
   exportXlsx: () => Promise<void>;
+  /** "Export everything (JSON)" — the whole model at the commit being viewed, whatever filter the list has on. */
+  exportJson: () => Promise<void>;
 }
 
 function downloadBlob(blob: Blob, filename: string): void {
@@ -95,5 +102,30 @@ export function useElementExport({ modelId, commitId, definitions, rows, filenam
     }
   }, [load, rows, definitions, filenameBase]);
 
-  return { status, error, exportCsv, exportXlsx };
+  const exportJson = useCallback(async () => {
+    setError(null);
+    setStatus('working');
+    try {
+      if (!commitId) {
+        setError('This model has no commits yet.');
+        return;
+      }
+      const [elements, relationships, facts, sources, modelName] = await Promise.all([
+        listAllElements(supabase, commitId),
+        listAllRelationships(supabase, commitId),
+        listFactsForCommit(supabase, commitId),
+        listSourcesForModel(supabase, modelId),
+        getModelName(supabase, modelId),
+      ]);
+      const snapshot = buildModelSnapshot({ modelId, modelName: modelName ?? filenameBase, commitId, exportedAt: new Date(), elements, relationships, facts, sources, definitions });
+      downloadBlob(new Blob([JSON.stringify(snapshot, null, 2)], { type: 'application/json' }), `${sanitizeForFilename(modelName ?? filenameBase)}-everything.json`);
+    } catch (e) {
+      reportError("Couldn't export.", e);
+      setError(e instanceof Error ? e.message : 'Could not export.');
+    } finally {
+      setStatus('idle');
+    }
+  }, [commitId, modelId, definitions, filenameBase]);
+
+  return { status, error, exportCsv, exportXlsx, exportJson };
 }

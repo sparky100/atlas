@@ -146,3 +146,11 @@ export const FINDING_FILTER_OPTIONS: readonly { value: string; label: string }[]
   { value: 'capability-no-supporters', label: 'Capabilities with no supporters' },
   { value: 'outgoing-no-retiring-change', label: 'Planned to move or switch off, nothing retiring it' },
 ];
+
+/** A model's own display name, for a file's header — `null` if the model can't be read. */
+export async function getModelName(supabase: Client, modelId: UUID): Promise<string | null> {
+  const { data, error } = await supabase.from('models').select('name').eq('id', modelId).maybeSingle();
+  if (error) throw new Error(error.message);
+  const name: unknown = data?.name;
+  return typeof name === 'string' ? name : null;
+}

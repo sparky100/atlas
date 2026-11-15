@@ -523,6 +523,16 @@ export function ElementBrowseTable({ state, orgSlug, modelSlug, modelId, filenam
         >
           Export XLSX
         </Button>
+        <Button
+          variant="secondary"
+          title="One JSON file with the whole model — every element, relationship, value and where it came from — whatever filter is on."
+          disabled={exportState.status === 'working'}
+          onClick={() => {
+            void exportState.exportJson();
+          }}
+        >
+          Export everything (JSON)
+        </Button>
         {onImportClick && (
           <Button variant="secondary" onClick={onImportClick}>
             Import…
