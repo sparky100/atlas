@@ -11,6 +11,7 @@ import { platformTileElement } from './platformTileElement';
 import { quantizeScale, wheelZoomFactor } from '../landscape/zoom';
 import { NODE_WIDTH } from '../landscape/layout';
 import { allPlatformFlowTilesOf, computeIntegrationPlatformContextLayout, PILL_RUN_WIDTH, type IntegrationPlatformContextLayout, type PlatformFlowEdgeInput, type PlatformFlowTile } from './integrationPlatformContextLayout';
+import { useRefitOnResize } from '../landscape/useRefitOnResize';
 import styles from './IntegrationPlatformDiagramCanvas.module.css';
 
 export interface IntegrationPlatformDiagramCanvasProps {
@@ -200,6 +201,8 @@ export function IntegrationPlatformDiagramCanvas({ hub, sourceIds, targetIds, ed
     if (!wrapper) return;
     setTransform(computeFitTransform(layout.width, layout.height, wrapper.clientWidth, wrapper.clientHeight));
   }, [layout.width, layout.height]);
+
+  useRefitOnResize(wrapperRef, () => transform, setTransform, (w, h) => computeFitTransform(layout.width, layout.height, w, h));
 
   useEffect(() => {
     fitToView();
