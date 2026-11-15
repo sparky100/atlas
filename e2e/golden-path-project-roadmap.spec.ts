@@ -32,7 +32,7 @@ test('roadmap grouped by project: the project\'s change lands under the project,
   await goToModelHome(page);
   await clickNavItem(page, 'Projects');
   await page.getByLabel('Project title').fill('CRM replacement');
-  await page.getByLabel('Owner').selectOption({ index: 1 });
+  await page.getByLabel('Architect').selectOption({ index: 1 });
   await page.getByRole('button', { name: 'Start project' }).click();
   await expect(page.getByRole('heading', { name: 'CRM replacement', level: 1 })).toBeVisible();
 

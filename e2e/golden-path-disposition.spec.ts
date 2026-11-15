@@ -44,7 +44,7 @@ test('disposition: Migrate raises a finding, a project retires the system, the f
   await expect(page.getByRole('heading', { name: 'Start a project' })).toBeVisible();
   await expect(page.getByLabel('Project title')).toHaveValue('Move Legacy Payroll to another system');
   await expect(page.getByRole('button', { name: 'Remove Legacy Payroll' })).toBeVisible();
-  await page.getByLabel('Owner').selectOption({ index: 1 });
+  await page.getByLabel('Architect').selectOption({ index: 1 });
   await page.getByRole('button', { name: 'Start project' }).click();
   await expect(page.getByRole('heading', { name: 'Move Legacy Payroll to another system', level: 1 })).toBeVisible();
 

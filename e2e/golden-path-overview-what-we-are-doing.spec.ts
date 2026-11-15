@@ -31,7 +31,7 @@ test("Overview's \"What we're doing\" shows a project and a decision outside any
   const projectTitle = `Repairs replacement ${randomUUID().slice(0, 8)}`;
   await page.getByRole('link', { name: 'Start a project', exact: true }).click();
   await page.getByLabel('Project title').fill(projectTitle);
-  await page.getByLabel('Owner').selectOption({ index: 1 });
+  await page.getByLabel('Architect').selectOption({ index: 1 });
   await page.getByLabel('Target date').fill('2027-03-31');
   await page.getByRole('button', { name: 'Start project' }).click();
   await expect(page.getByRole('heading', { name: projectTitle, level: 1 })).toBeVisible();
@@ -84,7 +84,7 @@ test("a weak tile says what's in hand: nothing at first, then the project starte
   // Start a project from the tile itself — its scope is already the capability.
   await tileCard.getByRole('link', { name: 'Start a project →' }).click();
   await expect(page.getByLabel('Project title')).toHaveValue('Who supports Housing Repairs');
-  await page.getByLabel('Owner').selectOption({ index: 1 });
+  await page.getByLabel('Architect').selectOption({ index: 1 });
   await page.getByRole('button', { name: 'Start project' }).click();
   await expect(page.getByRole('heading', { name: 'Who supports Housing Repairs', level: 1 })).toBeVisible();
 
@@ -112,7 +112,7 @@ test("What's recent lists a project closed since the last version, and it leaves
   const projectTitle = `Repairs pilot ${randomUUID().slice(0, 8)}`;
   await page.getByRole('link', { name: 'Start a project', exact: true }).click();
   await page.getByLabel('Project title').fill(projectTitle);
-  await page.getByLabel('Owner').selectOption({ index: 1 });
+  await page.getByLabel('Architect').selectOption({ index: 1 });
   await page.getByRole('button', { name: 'Start project' }).click();
   await expect(page.getByRole('heading', { name: projectTitle, level: 1 })).toBeVisible();
   await page.getByRole('button', { name: 'Close project' }).click();

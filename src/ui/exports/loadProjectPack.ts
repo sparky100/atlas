@@ -72,6 +72,7 @@ export async function loadProjectPack(args: { modelId: UUID; modelName: string; 
     date,
     project,
     ownerName: nameOfUser(project.owner_id),
+    projectManagerName: project.project_manager_id ? nameOfUser(project.project_manager_id) : project.project_manager_name,
     scope: scopeIds.map((id) => ({ name: elementName(id), typeLabel: elementsById.get(id)?.element_type ?? 'element' })),
     touchedNotDeclared: difference.touchedNotDeclared.map(elementName),
     declaredNotTouched: difference.declaredNotTouched.map(elementName),

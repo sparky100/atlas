@@ -11,6 +11,8 @@ function project(overrides: Partial<ProjectRow> = {}): ProjectRow {
     title: 'Replace the CRM',
     purpose: 'The CRM is out of support.',
     owner_id: 'u',
+    project_manager_id: null,
+    project_manager_name: null,
     status: 'active',
     start_date: '2026-10-01',
     target_date: '2027-03-31',
@@ -85,6 +87,7 @@ function input(overrides: Partial<ProjectPackInput> = {}): ProjectPackInput {
     date: '2026-10-02',
     project: project(),
     ownerName: 'Sam',
+    projectManagerName: null,
     scope: [{ name: 'Customer management', typeLabel: 'capability' }],
     touchedNotDeclared: [],
     declaredNotTouched: [],
@@ -108,7 +111,7 @@ describe('buildProjectPackMarkdown (F13 step 2)', () => {
     expect(md).toContain('# Project pack: Replace the CRM');
     expect(md).toContain('Acme · exported 2026-10-02 from Atlas');
     expect(md).toContain('**Status:** Active');
-    expect(md).toContain('**Owner:** Sam');
+    expect(md).toContain('**Architect:** Sam');
     expect(md).toContain('**Target:** 2027-03-31');
     expect(md).toContain('**Progress:** 0 open changes · 0 merged · 0 open decisions · 0 decided');
     expect(md).toContain('## Purpose\n\nThe CRM is out of support.');

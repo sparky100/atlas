@@ -38,7 +38,7 @@ test('cancel a decision: it stays in the log as cancelled with its reason, its d
 
   await clickNavItem(page, 'Projects');
   await page.getByLabel('Project title').fill(PROJECT);
-  await page.getByLabel('Owner').selectOption({ index: 1 });
+  await page.getByLabel('Architect').selectOption({ index: 1 });
   await page.getByRole('button', { name: 'Start project' }).click();
   await expect(page.getByRole('heading', { name: PROJECT, level: 1 })).toBeVisible();
 

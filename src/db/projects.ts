@@ -19,6 +19,8 @@ export interface CreateProjectInput {
   title: string;
   purpose: string;
   ownerId: UUID;
+  projectManagerId?: UUID | null;
+  projectManagerName?: string | null;
   startDate?: string | null;
   targetDate?: string | null;
   sourceFindingKey?: string | null;
@@ -33,6 +35,8 @@ export async function createProject(supabase: Client, input: CreateProjectInput)
     title: input.title,
     purpose: input.purpose,
     owner_id: input.ownerId,
+    project_manager_id: input.projectManagerId ?? null,
+    project_manager_name: input.projectManagerName ?? null,
     start_date: input.startDate ?? null,
     target_date: input.targetDate ?? null,
     source_finding_key: input.sourceFindingKey ?? null,
@@ -64,6 +68,8 @@ export interface UpdateProjectInput {
   title?: string;
   purpose?: string;
   ownerId?: UUID;
+  projectManagerId?: UUID | null;
+  projectManagerName?: string | null;
   startDate?: string | null;
   targetDate?: string | null;
 }
@@ -80,6 +86,8 @@ export async function updateProject(supabase: Client, projectId: UUID, input: Up
   if (input.title !== undefined) patch.title = input.title;
   if (input.purpose !== undefined) patch.purpose = input.purpose;
   if (input.ownerId !== undefined) patch.owner_id = input.ownerId;
+  if (input.projectManagerId !== undefined) patch.project_manager_id = input.projectManagerId;
+  if (input.projectManagerName !== undefined) patch.project_manager_name = input.projectManagerName;
   if (input.startDate !== undefined) patch.start_date = input.startDate;
   if (input.targetDate !== undefined) patch.target_date = input.targetDate;
   const { data, error } = await supabase.from('projects').update(patch).eq('id', projectId).select('id');

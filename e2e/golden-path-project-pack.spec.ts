@@ -37,7 +37,7 @@ test('project pack: decide and design inside a project, attach evidence, downloa
   // A project from the finding, its scope already filled in.
   await page.getByRole('link', { name: 'Start a project →' }).click();
   await expect(page.getByLabel('Project title')).toHaveValue(PROJECT_TITLE);
-  await page.getByLabel('Owner').selectOption({ index: 1 });
+  await page.getByLabel('Architect').selectOption({ index: 1 });
   await page.getByRole('button', { name: 'Start project' }).click();
   await expect(page.getByRole('heading', { name: PROJECT_TITLE, level: 1 })).toBeVisible();
 
