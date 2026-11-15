@@ -206,7 +206,7 @@ export function CaptureCandidateRow({
       {/* §10's `new` row: "the alias proposals that would be recorded" — shown whenever the candidate carries any (a level-2/3 match or an intra-document group can too, §7.6), not only for `new`, so accepting or merging never teaches the matcher something the reviewer wasn't shown first (issue #284). */}
       {candidate.aliasProposals.length > 0 && (
         <Text as="p" tone="muted" size="sm">
-          We\u2019ll recognise {candidate.aliasProposals.map((a) => `\u201c${a.value}\u201d`).join(', ')} next time
+          {'We\u2019ll recognise'} {candidate.aliasProposals.map((a) => `\u201c${a.value}\u201d`).join(', ')} next time
         </Text>
       )}
 
