@@ -222,6 +222,9 @@ export const DISPOSITION_LABELS: Readonly<Record<Disposition, string>> = Object.
 
 export const DISPOSITION_HELP = 'What we intend to do with this: keep it as it is, invest in it, move it to another system, or switch it off.';
 
+/** What the "Outside our organisation" field means — shown under the edit control (`AttributeFieldMeta.help`). */
+export const EXTERNAL_HELP = 'Yes if another party runs it, such as a regulator, supplier or industry body. A tool a vendor hosts for you is still ours: leave this as No.';
+
 const SYSTEM_META: Record<keyof SystemAttributes, AttributeFieldMeta> = {
   lifecycleStatus: { label: 'Lifecycle', required: true, kind: 'enum', options: LIFECYCLE_STATUS_OPTIONS },
   // S1 item 11: "shown by lifecycle in the header" — ElementHeader.tsx
@@ -229,7 +232,7 @@ const SYSTEM_META: Record<keyof SystemAttributes, AttributeFieldMeta> = {
   version: { label: 'Version', required: false, kind: 'text' },
   vendor: { label: 'Vendor', required: false, kind: 'text' },
   description: { label: 'Description', required: false, kind: 'text', multiline: true },
-  isExternal: { label: 'External', required: true, kind: 'boolean' },
+  isExternal: { label: 'Outside our organisation', required: true, kind: 'boolean', help: EXTERNAL_HELP },
   externalOrganisation: { label: 'External organisation', required: false, kind: 'text' },
   introduced: { label: 'Introduced', required: false, kind: 'date' },
   plannedEnd: { label: 'Planned end', required: false, kind: 'date' },
@@ -283,7 +286,7 @@ export const INTERFACE_TYPE_LABELS: Readonly<Record<InterfaceType, string>> = Ob
 const CONTAINER_META: Record<keyof ContainerAttributes, AttributeFieldMeta> = {
   technology: { label: 'Technology', required: false, kind: 'text' },
   description: { label: 'Description', required: false, kind: 'text', multiline: true },
-  isExternal: { label: 'External', required: true, kind: 'boolean' },
+  isExternal: { label: 'Outside our organisation', required: true, kind: 'boolean', help: EXTERNAL_HELP },
   introduced: { label: 'Introduced', required: false, kind: 'date' },
   plannedEnd: { label: 'Planned end', required: false, kind: 'date' },
   // "Platforms and modules": a module's own override of its platform's
@@ -340,7 +343,7 @@ const ACTOR_META: Record<keyof ActorAttributes, AttributeFieldMeta> = {
   description: { label: 'Description', required: false, kind: 'text', multiline: true },
   email: { label: 'Email', required: false, kind: 'text' },
   orgUnit: { label: 'Org unit', required: false, kind: 'text' },
-  isExternal: { label: 'External', required: true, kind: 'boolean' },
+  isExternal: { label: 'Outside our organisation', required: true, kind: 'boolean', help: EXTERNAL_HELP },
   externalOrganisation: { label: 'External organisation', required: false, kind: 'text' },
   // F3a: an actor's member link is a uuid reference into auth.users, not a
   // free-text/selected attribute — excluded from the generic Attributes

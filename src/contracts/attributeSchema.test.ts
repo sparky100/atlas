@@ -87,10 +87,10 @@ describe('ATTRIBUTE_SCHEMA_BY_TYPE', () => {
     }
   });
 
-  it('only annualRunCost, importance and disposition declare an emptyLabel, and only annualRunCost and disposition declare help text — every other field keeps §4.3\'s bare "—" and a silent row', () => {
+  it('only annualRunCost, importance and disposition declare an emptyLabel, and only annualRunCost, disposition and isExternal declare help text — every other field keeps §4.3\'s bare "—" and a silent row', () => {
     for (const type of ELEMENT_TYPES) {
       for (const field of ATTRIBUTE_SCHEMA_BY_TYPE[type]) {
-        if (field.key !== 'annualRunCost' && field.key !== 'disposition') expect(field.help, `${type}.${field.key}`).toBeUndefined();
+        if (field.key !== 'annualRunCost' && field.key !== 'disposition' && field.key !== 'isExternal') expect(field.help, `${type}.${field.key}`).toBeUndefined();
         if (field.key !== 'annualRunCost' && field.key !== 'importance' && field.key !== 'disposition') expect(field.emptyLabel, `${type}.${field.key}`).toBeUndefined();
       }
     }
