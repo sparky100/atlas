@@ -32,7 +32,7 @@ const sys = { isExternal: false, lifecycleStatus: 'active' };
 const ELEMENTS: ElementsHeadRow[] = [
   el('00000000-0000-4000-8000-000000000001', 'system', 'SAP', null, { ...sys, kind: 'platform' }),
   el('00000000-0000-4000-8000-000000000002', 'system', 'Salesforce', null, { ...sys, kind: 'platform' }),
-  el('00000000-0000-4000-8000-000000000003', 'system', 'Aurora', null, sys),
+  el('00000000-0000-4000-8000-000000000003', 'system', 'Aurora', null, { ...sys, aiAutonomy: 'acts_alone' }),
   el('00000000-0000-4000-8000-000000000011', 'container', 'PM', '00000000-0000-4000-8000-000000000001', { isExternal: false }),
   el('00000000-0000-4000-8000-000000000012', 'container', 'PM', '00000000-0000-4000-8000-000000000002', { isExternal: false }),
   el('00000000-0000-4000-8000-000000000013', 'container', 'ESCOMS', '00000000-0000-4000-8000-000000000002', { isExternal: false }),
@@ -107,6 +107,16 @@ describe('exporting a model and importing it into an empty one', () => {
     expect(parents.filter(([, parent]) => parent === null)).toEqual([]);
     expect(parents.filter(([name]) => name === 'PM').map(([, parent]) => parent).sort()).toEqual([idOf('SAP'), idOf('Salesforce')].sort());
     expect(parents.find(([name]) => name === 'ESCOMS')?.[1]).toBe(idOf('Salesforce'));
+  });
+
+  it('brings an AI agent\'s "how it acts" back, and leaves systems that are not agents without one', async () => {
+    const { candidates } = await reimport();
+    const attributesOf = (name: string) => {
+      const proposal = candidates.find((c) => c.kind === 'element' && c.elementType === 'system' && nameOf(c) === name)?.proposal;
+      return proposal?.kind === 'element' ? (proposal.attributes as Record<string, unknown>) : {};
+    };
+    expect(attributesOf('Aurora').aiAutonomy).toBe('acts_alone');
+    expect(attributesOf('SAP').aiAutonomy).toBeUndefined();
   });
 
   it('rebuilds the capability tree even though the sheet lists a child before its parent', async () => {
