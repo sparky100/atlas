@@ -17,29 +17,54 @@ const base: ReportSpec = {
 };
 
 describe("specSummary", () => {
-  it("says no filters for an unfiltered table", () => {
-    expect(specSummary(base)).toBe("Table · no filters");
+  it("says what an unfiltered table lists", () => {
+    expect(specSummary(base)).toBe("Table of systems");
   });
-  it("lists filters and the chart grouping", () => {
-    const spec: ReportSpec = {
+  it("turns the costly, poor fit signal into words", () => {
+    expect(
+      specSummary({
+        ...base,
+        filters: [
+          { field: "elementType", operator: "neq", value: "container" },
+          { field: "signalKeys", operator: "contains", value: "|costly_poor_fit|" },
+        ],
+      }),
+    ).toBe("Table of systems that cost a lot and fit poorly");
+  });
+  it("uses the app's labels for fields and values, with no keys or pipes", () => {
+    const s = specSummary({
       ...base,
       filters: [
-        { field: "disposition", operator: "eq", value: "Eliminate" },
-        { field: "runCost", operator: "gt", value: 1000000 },
+        { field: "elementType", operator: "neq", value: "container" },
+        { field: "cost", operator: "in", value: ["1m_5m", "over_5m"] },
+        { field: "disposition", operator: "eq", value: "eliminate" },
         { field: "owner", operator: "isEmpty", value: null },
       ],
       groupBy: "criticality",
-      splitBy: "disposition",
+      splitBy: "fit",
       presentation: { kind: "barByField" },
-    };
-    expect(specSummary(spec)).toBe(
-      "Bar chart by criticality, split by disposition · disposition is Eliminate; runCost > 1000000; owner is empty",
+    });
+    expect(s).toBe(
+      "Bar chart of systems with no owner where run cost is £1m–£5m or over £5m and planned action is switch off by criticality, split by fit",
     );
+    expect(s).not.toMatch(/[|_]|elementType|signalKeys/);
   });
-  it("mentions the row limit", () => {
+  it("names a finding by its own title", () => {
+    expect(
+      specSummary({
+        ...base,
+        source: "findings",
+        filters: [{ field: "findingKey", operator: "eq", value: "critical-no-business-owner" }],
+      }),
+    ).toBe("Table of critical systems with no business owner");
+  });
+  it("mentions the row limit and counts", () => {
     expect(
       specSummary({ ...base, presentation: { kind: "table", limit: 5 } }),
-    ).toBe("Table, top 5 · no filters");
+    ).toBe("Table of the top 5 systems");
+    expect(specSummary({ ...base, presentation: { kind: "count" } })).toBe(
+      "Number of systems",
+    );
   });
 });
 
@@ -52,7 +77,7 @@ describe("sourceLabel", () => {
 describe("matchesSearch", () => {
   it("matches any field case-insensitively and an empty query matches all", () => {
     expect(
-      matchesSearch(["Costly, poor fit", "Table · no filters"], "POOR"),
+      matchesSearch(["Costly, poor fit", "Table of systems"], "POOR"),
     ).toBe(true);
     expect(matchesSearch(["Costly, poor fit"], "migrate")).toBe(false);
     expect(matchesSearch(["x"], "  ")).toBe(true);
