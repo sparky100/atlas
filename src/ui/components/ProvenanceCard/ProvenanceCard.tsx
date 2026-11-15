@@ -3,7 +3,6 @@ import type { CapabilityMapRow } from '../../../db/capabilityMapTemplates';
 import type { SourceRow } from '../../../db/types';
 import { formatRelativeTime } from '../../time';
 import { Button } from '../Button/Button';
-import { ConfidenceDots } from '../ConfidenceDots/ConfidenceDots';
 import { Text } from '../Text/Text';
 import styles from './ProvenanceCard.module.css';
 
@@ -91,17 +90,6 @@ export function ProvenanceCard({ fact, source, history, onRetryHistory, seededFr
         <Text size="sm" as="span">
           {formatRelativeTime(recordedDateStr, now)}
         </Text>
-      </div>
-      <div className={styles.row}>
-        <Text size="sm" tone="muted" as="span">
-          Confidence
-        </Text>
-        <span className={styles.confidenceValue}>
-          <ConfidenceDots confidence={fact.confidence} />
-          <Text size="sm" as="span">
-            {fact.confidence.toFixed(2)}
-          </Text>
-        </span>
       </div>
       <div className={styles.chain}>
         {history.status === 'loading' && <div role="status"><Text size="sm" tone="muted">Loading history…</Text></div>}

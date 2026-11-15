@@ -14,7 +14,7 @@ const meta = {
   title: 'Foundations/ProvenanceBadge',
   component: ProvenanceBadge,
   parameters: { layout: 'padded' },
-  args: { sourceKind: 'manual', date: NOW, confidence: 1 },
+  args: { sourceKind: 'manual', date: NOW },
 } satisfies Meta<typeof ProvenanceBadge>;
 
 export default meta;
@@ -26,22 +26,22 @@ export const AllSourceKinds: Story = {
       <tbody>
         {(
           [
-            ['spreadsheet', 2, 0.72],
-            ['document', 3, 0.95],
-            ['interview', 1, 1],
-            ['manual', 0, 1],
-            ['capture_job', 5, 0.62],
-            ['template', 20, 0.9],
-            ['merge_resolution', 14, 1],
-            ['attestation', 0, 1],
+            ['spreadsheet', 2],
+            ['document', 3],
+            ['interview', 1],
+            ['manual', 0],
+            ['capture_job', 5],
+            ['template', 20],
+            ['merge_resolution', 14],
+            ['attestation', 0],
           ] as const
-        ).map(([kind, age, confidence]) => (
+        ).map(([kind, age]) => (
           <tr key={kind}>
             <td style={{ padding: '4px 16px 4px 0' }}>
               <Text>{kind}</Text>
             </td>
             <td style={{ padding: '4px 0' }}>
-              <ProvenanceBadge sourceKind={kind} date={monthsAgo(age)} confidence={confidence} now={NOW} />
+              <ProvenanceBadge sourceKind={kind} date={monthsAgo(age)} now={NOW} />
             </td>
           </tr>
         ))}
@@ -55,11 +55,11 @@ export const StaleVsFresh: Story = {
     <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-2)' }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-3)' }}>
         <Text>Fresh (2mo)</Text>
-        <ProvenanceBadge sourceKind="manual" date={monthsAgo(2)} confidence={1} now={NOW} />
+        <ProvenanceBadge sourceKind="manual" date={monthsAgo(2)} now={NOW} />
       </div>
       <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-3)' }}>
         <Text>Stale (14mo, past STALE_AFTER_MONTHS)</Text>
-        <ProvenanceBadge sourceKind="spreadsheet" date={monthsAgo(14)} confidence={0.72} now={NOW} />
+        <ProvenanceBadge sourceKind="spreadsheet" date={monthsAgo(14)} now={NOW} />
       </div>
     </div>
   ),
