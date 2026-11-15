@@ -605,8 +605,12 @@ export interface ProjectRow {
   title: string;
   /** The problem or opportunity, in plain words. */
   purpose: string;
-  /** Accountable for delivering the project — distinct from any decision's own owner. */
+  /** The architect — accountable for delivering the project; distinct from any decision's own owner. */
   owner_id: UUID;
+  /** Optional project manager who is an Atlas user; at most one of this and `project_manager_name`. */
+  project_manager_id: UUID | null;
+  /** Optional project manager as a plain name (not an Atlas user). */
+  project_manager_name: string | null;
   status: ProjectStatus;
   start_date: string | null;
   target_date: string | null;

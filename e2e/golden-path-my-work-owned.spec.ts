@@ -30,7 +30,7 @@ test('My work lists the decisions and projects you own, each opening its own pag
   await showView(page, 'Overview');
   await page.getByRole('link', { name: 'Start a project', exact: true }).click();
   await page.getByLabel('Project title').fill(projectTitle);
-  await page.getByLabel('Owner').selectOption({ index: 1 });
+  await page.getByLabel('Architect').selectOption({ index: 1 });
   await page.getByLabel('Target date').fill('2027-03-31');
   await page.getByRole('button', { name: 'Start project' }).click();
   await expect(page.getByRole('heading', { name: projectTitle, level: 1 })).toBeVisible();

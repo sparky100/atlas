@@ -40,6 +40,8 @@ export interface ProjectPackInput {
   date: string;
   project: ProjectRow;
   ownerName: string;
+  /** The project manager's name, or null when none is set. */
+  projectManagerName: string | null;
   scope: readonly ProjectPackScopeItem[];
   /** Names of elements the project's changes touch that aren't in the declared scope (ADR-024 §5). */
   touchedNotDeclared: readonly string[];
@@ -115,7 +117,7 @@ function changeLines(change: ProjectPackChange): string[] {
  * check whether "no decisions" meant none or a missing export.
  */
 export function buildProjectPackMarkdown(input: ProjectPackInput): string {
-  const { modelName, date, project, ownerName, scope, touchedNotDeclared, declaredNotTouched, decisions, constrainingDecisions, changes, evidence } = input;
+  const { modelName, date, project, ownerName, projectManagerName, scope, touchedNotDeclared, declaredNotTouched, decisions, constrainingDecisions, changes, evidence } = input;
   const progress = projectProgress(
     changes.map((c) => c.branch),
     decisions.map((d) => d.decision),
@@ -126,7 +128,8 @@ export function buildProjectPackMarkdown(input: ProjectPackInput): string {
   lines.push(`${modelName} · exported ${date} from Atlas`);
   lines.push('');
   lines.push(`**Status:** ${projectStatusLabel(project.status)}`);
-  lines.push(`**Owner:** ${ownerName}`);
+  lines.push(`**Architect:** ${ownerName}`);
+  if (projectManagerName) lines.push(`**Project manager:** ${projectManagerName}`);
   if (project.start_date) lines.push(`**Start:** ${project.start_date}`);
   if (project.target_date) lines.push(`**Target:** ${project.target_date}`);
   if ((project.status === 'closed' || project.status === 'cancelled') && project.closed_at) {

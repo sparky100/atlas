@@ -71,6 +71,8 @@ function project(overrides: Partial<ProjectRow>): ProjectRow {
     title: 'p',
     purpose: '',
     owner_id: 'u',
+    project_manager_id: null,
+    project_manager_name: null,
     status: 'active',
     start_date: null,
     target_date: null,

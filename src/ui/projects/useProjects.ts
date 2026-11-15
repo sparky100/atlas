@@ -11,6 +11,8 @@ export interface CreateProjectFormInput {
   title: string;
   purpose: string;
   ownerId: UUID;
+  projectManagerId?: UUID | null;
+  projectManagerName?: string | null;
   /** ISO `YYYY-MM-DD`, or `''` for none. */
   startDate: string;
   targetDate: string;
@@ -87,6 +89,8 @@ export function useProjects(modelId: UUID, orgId: UUID, userId: UUID | null): Us
           title,
           purpose: input.purpose.trim(),
           ownerId: input.ownerId,
+          projectManagerId: input.projectManagerId ?? null,
+          projectManagerName: input.projectManagerName?.trim() ? input.projectManagerName.trim() : null,
           startDate: input.startDate === '' ? null : input.startDate,
           targetDate: input.targetDate === '' ? null : input.targetDate,
           sourceFindingKey: input.sourceFindingKey ?? null,

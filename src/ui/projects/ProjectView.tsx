@@ -16,6 +16,8 @@ import { CommentsSection } from '../components/CommentsSection/CommentsSection';
 import { EmptyState } from '../components/EmptyState/EmptyState';
 import { Panel } from '../components/Panel/Panel';
 import { Text } from '../components/Text/Text';
+import { ProjectManagerField } from './ProjectManagerField';
+import { projectManagerFromRow, projectManagerToInput, type ProjectManagerValue } from './projectManagerValue';
 import { DecisionLinkPicker } from '../decisions/DecisionLinkPicker';
 import { decisionStatusLabel, decisionStatusTone } from '../decisions/decisionStatus';
 import { reportError } from '../errors/errorBannerStore';
@@ -90,7 +92,7 @@ export function ProjectView({ data, modelName, orgId, modelId, orgSlug, modelSlu
 
   return (
     <div className={styles.page}>
-      <ProjectHeader project={project} ownerName={nameOfUser(project.owner_id)} progress={progress} />
+      <ProjectHeader project={project} ownerName={nameOfUser(project.owner_id)} managerName={project.project_manager_id ? nameOfUser(project.project_manager_id) : project.project_manager_name} progress={progress} />
 
       <ProjectPackActions data={data} modelId={modelId} modelName={modelName} nameOfUser={nameOfUser} />
 
@@ -316,13 +318,16 @@ function ProjectPackActions({ data, modelId, modelName, nameOfUser }: { data: Pr
   );
 }
 
-function ProjectHeader({ project, ownerName, progress }: { project: ProjectRow; ownerName: string; progress: ReturnType<typeof projectProgress> }) {
+function ProjectHeader({ project, ownerName, managerName, progress }: { project: ProjectRow; ownerName: string; managerName: string | null; progress: ReturnType<typeof projectProgress> }) {
   return (
     <div className={styles.header}>
       <div className={styles.meta}>
         <Chip tone={projectStatusTone(project.status)}>{projectStatusLabel(project.status)}</Chip>
         <Text as="span" size="sm">
-          Owner: {ownerName}
+          Architect: {ownerName}
+        </Text>
+        <Text as="span" size="sm">
+          Project manager: {managerName ?? 'Not set'}
         </Text>
         {project.start_date !== null && (
           <Text as="span" size="sm" tone="muted">
@@ -603,6 +608,7 @@ function ProjectEditPanel({ project, members, onSaved }: { project: ProjectRow; 
   const [title, setTitle] = useState(project.title);
   const [purpose, setPurpose] = useState(project.purpose);
   const [ownerId, setOwnerId] = useState(project.owner_id);
+  const [manager, setManager] = useState<ProjectManagerValue>(() => projectManagerFromRow(project));
   const [startDate, setStartDate] = useState(project.start_date ?? '');
   const [targetDate, setTargetDate] = useState(project.target_date ?? '');
   const [error, setError] = useState<string | null>(null);
@@ -633,7 +639,7 @@ function ProjectEditPanel({ project, members, onSaved }: { project: ProjectRow; 
             setError('The target date is before the start date.');
             return;
           }
-          void updateProject(supabase, project.id, { title: title.trim(), purpose: purpose.trim(), ownerId, startDate: startDate === '' ? null : startDate, targetDate: targetDate === '' ? null : targetDate }).then(
+          void updateProject(supabase, project.id, { title: title.trim(), purpose: purpose.trim(), ownerId, ...projectManagerToInput(manager), startDate: startDate === '' ? null : startDate, targetDate: targetDate === '' ? null : targetDate }).then(
             () => {
               setEditing(false);
               onSaved();
@@ -647,13 +653,14 @@ function ProjectEditPanel({ project, members, onSaved }: { project: ProjectRow; 
       >
         <input className={styles.input} aria-label="Project title" value={title} onChange={(e) => { setTitle(e.target.value); }} />
         <textarea className={styles.input} aria-label="Purpose" value={purpose} onChange={(e) => { setPurpose(e.target.value); }} />
-        <select className={styles.input} aria-label="Owner" value={ownerId} onChange={(e) => { setOwnerId(e.target.value); }}>
+        <select className={styles.input} aria-label="Architect" value={ownerId} onChange={(e) => { setOwnerId(e.target.value); }}>
           {members.map((m) => (
             <option key={m.id} value={m.id}>
               {m.label}
             </option>
           ))}
         </select>
+        <ProjectManagerField value={manager} members={members} onChange={setManager} selectClassName={styles.input} inputClassName={styles.input} />
         <input className={styles.input} type="date" aria-label="Start date" value={startDate} onChange={(e) => { setStartDate(e.target.value); }} />
         <input className={styles.input} type="date" aria-label="Target date" value={targetDate} onChange={(e) => { setTargetDate(e.target.value); }} />
         <div className={styles.meta}>

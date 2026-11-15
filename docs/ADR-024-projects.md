@@ -38,7 +38,9 @@ Three things need deciding that neither ADR-001 nor ADR-013/022 answers:
 | `model_id` | `uuid not null → models` | a project belongs to one model |
 | `title` | `text not null`, non-blank | |
 | `purpose` | `text not null default ''` | the problem or opportunity, in plain words (the role `decisions.statement` plays for a decision) |
-| `owner_id` | `uuid not null → auth.users` | who is accountable for delivering it — distinct from any decision's own owner |
+| `owner_id` | `uuid not null → auth.users` | the architect: who is accountable for delivering it — distinct from any decision's own owner (shown as "Architect" in the UI) |
+| `project_manager_id` | `uuid` (no FK, no index — see `20261115130000_project_manager.sql`) | optional: the project manager, when they are an Atlas user |
+| `project_manager_name` | `text`, 1–200 characters | optional: the project manager as a plain name, when they are not an Atlas user; at most one of the two is set |
 | `status` | `text not null default 'active'`, check in `('active','on_hold','closed','cancelled')` | RPC-only past creation (§4) |
 | `start_date` | `date` nullable | |
 | `target_date` | `date` nullable | when the project as a whole is meant to be done — distinct from each change's own `branches.target_date` |
@@ -74,7 +76,7 @@ Three things need deciding that neither ADR-001 nor ADR-013/022 answers:
 ### 4. Lifecycle and permissions
 
 - **Create:** owner/architect/contributor, mirroring `decisions_insert`. Always created `active`.
-- **Edit** `title`/`purpose`/`owner_id`/`start_date`/`target_date`: the project's creator or owner, or an org owner/architect, while `active` or `on_hold`.
+- **Edit** `title`/`purpose`/`owner_id`/`project_manager_id`/`project_manager_name`/`start_date`/`target_date`: the project's creator or owner, or an org owner/architect, while `active` or `on_hold`.
 - **Status:** `atlas.set_project_status(project_id, status, reason)` only. `active ⇄ on_hold` freely; `→ closed` or `→ cancelled` subject to P4, with `close_reason` required for `cancelled`. `closed`/`cancelled` are terminal; reopening is a new project (a decision is superseded, not reopened, for the same reason).
 - **Viewers** read everything, as for decisions.
 

@@ -15,6 +15,8 @@ import type { DecisionPrefill } from '../decisions/decisionPrefill';
 import { DecisionLinkPicker } from '../decisions/DecisionLinkPicker';
 import { useMembers } from '../orgs/useMembers';
 import { groupProjectsByStatus, projectStatusLabel, projectStatusTone } from './projectModel';
+import { ProjectManagerField } from './ProjectManagerField';
+import { NO_PROJECT_MANAGER, projectManagerToInput, type ProjectManagerValue } from './projectManagerValue';
 import { projectFormFromPrefill } from './projectPrefill';
 import { useProjects } from './useProjects';
 import styles from './ProjectsView.module.css';
@@ -45,6 +47,7 @@ export function ProjectsView({ modelId, orgId, userId, orgSlug, modelSlug, canCr
   const [title, setTitle] = useState(() => initial?.title ?? '');
   const [purpose, setPurpose] = useState(() => initial?.purpose ?? '');
   const [ownerId, setOwnerId] = useState(userId ?? '');
+  const [manager, setManager] = useState<ProjectManagerValue>(NO_PROJECT_MANAGER);
   const [startDate, setStartDate] = useState('');
   const [targetDate, setTargetDate] = useState('');
   const [scope, setScope] = useState<{ elementId: UUID; name: string }[]>(() => initial?.scope ?? []);
@@ -66,6 +69,7 @@ export function ProjectsView({ modelId, orgId, userId, orgSlug, modelSlug, canCr
                 title,
                 purpose,
                 ownerId,
+                ...projectManagerToInput(manager),
                 startDate,
                 targetDate,
                 ...(initial?.sourceFindingKey ? { sourceFindingKey: initial.sourceFindingKey } : {}),
@@ -97,7 +101,7 @@ export function ProjectsView({ modelId, orgId, userId, orgSlug, modelSlug, canCr
             <div className={styles.formRow}>
               <label htmlFor="project-owner">
                 <Text as="span" size="sm" tone="muted">
-                  Owner
+                  Architect
                 </Text>
               </label>
               <select
@@ -108,13 +112,25 @@ export function ProjectsView({ modelId, orgId, userId, orgSlug, modelSlug, canCr
                   setOwnerId(e.target.value);
                 }}
               >
-                <option value="">Choose an owner…</option>
+                <option value="">Choose an architect…</option>
                 {members.map((m) => (
                   <option key={m.member.user_id} value={m.member.user_id}>
                     {profileLabel(m.profile)}
                   </option>
                 ))}
               </select>
+            </div>
+            <div className={styles.formRow}>
+              <Text as="span" size="sm" tone="muted">
+                Project manager
+              </Text>
+              <ProjectManagerField
+                value={manager}
+                members={members.map((m) => ({ id: m.member.user_id, label: profileLabel(m.profile) }))}
+                onChange={setManager}
+                selectClassName={styles.select}
+                inputClassName={styles.input}
+              />
             </div>
             <div className={styles.formRow}>
               <label htmlFor="project-start">

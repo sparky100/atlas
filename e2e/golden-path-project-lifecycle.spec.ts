@@ -31,7 +31,7 @@ test('project lifecycle: start from a finding, decide inside it, deliver the cho
   await expect(page.getByRole('heading', { name: 'Start a project' })).toBeVisible();
   await expect(page.getByLabel('Project title')).toHaveValue(PROJECT_TITLE);
   await expect(page.getByRole('button', { name: 'Remove Housing Repairs' })).toBeVisible();
-  await page.getByLabel('Owner').selectOption({ index: 1 });
+  await page.getByLabel('Architect').selectOption({ index: 1 });
   await page.getByRole('button', { name: 'Start project' }).click();
   await expect(page.getByRole('heading', { name: PROJECT_TITLE, level: 1 })).toBeVisible();
   await expectNavCurrent(page, 'Projects');

@@ -20,7 +20,7 @@ function decision(n: number, over: Partial<DecisionRow> = {}): DecisionRow {
   return { id: uid(n), org_id: uid(900), model_id: uid(901), title: `Decision ${String(n)}`, statement: 'Which way?', status: 'proposed', owner_id: uid(902), needed_by: '2026-12-15', source_finding_key: null, lens_map_url: null, decided_by: null, decided_at: null, cancel_reason: null, branch_id: null, superseded_decision_id: null, project_id: null, created_by: uid(902), created_at: '', ...over };
 }
 function project(n: number, over: Partial<ProjectRow> = {}): ProjectRow {
-  return { id: uid(n), org_id: uid(900), model_id: uid(901), title: `Project ${String(n)}`, purpose: 'Retire the legacy estate', owner_id: uid(902), status: 'active', start_date: '2026-01-01', target_date: '2027-01-01', source_finding_key: null, closed_by: null, closed_at: null, close_reason: null, created_by: uid(902), created_at: '', ...over };
+  return { id: uid(n), org_id: uid(900), model_id: uid(901), title: `Project ${String(n)}`, purpose: 'Retire the legacy estate', owner_id: uid(902), project_manager_id: null, project_manager_name: null, status: 'active', start_date: '2026-01-01', target_date: '2027-01-01', source_finding_key: null, closed_by: null, closed_at: null, close_reason: null, created_by: uid(902), created_at: '', ...over };
 }
 
 describe('list_changes', () => {

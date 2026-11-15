@@ -167,6 +167,32 @@ describe('projects (ADR-024) against a real local Supabase', () => {
       const { error } = await contributor.client.from('projects').update({ status: 'closed' }).eq('id', project.id).select('id');
       expect(error).not.toBeNull();
     });
+
+    it('a project manager round-trips as a member id or a plain name, never both; only an editor may set it', async () => {
+      const project = await newProject(contributor);
+      expect(project.project_manager_id).toBeNull();
+      expect(project.project_manager_name).toBeNull();
+
+      await updateProject(contributor.client, project.id, { projectManagerId: viewer.id, projectManagerName: null });
+      let after = await getProject(viewer.client, project.id);
+      expect(after?.project_manager_id).toBe(viewer.id);
+      expect(after?.project_manager_name).toBeNull();
+
+      await updateProject(contributor.client, project.id, { projectManagerId: null, projectManagerName: 'Priya Shah' });
+      after = await getProject(viewer.client, project.id);
+      expect(after?.project_manager_id).toBeNull();
+      expect(after?.project_manager_name).toBe('Priya Shah');
+
+      // Both at once, a blank name and an over-long name are refused by the database.
+      await expect(updateProject(contributor.client, project.id, { projectManagerId: viewer.id, projectManagerName: 'Priya Shah' })).rejects.toThrow();
+      await expect(updateProject(contributor.client, project.id, { projectManagerId: null, projectManagerName: '   ' })).rejects.toThrow();
+      await expect(updateProject(contributor.client, project.id, { projectManagerId: null, projectManagerName: 'x'.repeat(201) })).rejects.toThrow();
+
+      // Same edit rights as every other project field.
+      await expect(updateProject(otherContributor.client, project.id, { projectManagerName: 'Not mine' })).rejects.toThrow();
+      await expect(updateProject(viewer.client, project.id, { projectManagerName: 'Not mine' })).rejects.toThrow();
+      await expect(updateProject(outsider.client, project.id, { projectManagerName: 'Not mine' })).rejects.toThrow();
+    });
   });
 
   describe('status (§4, P4)', () => {
