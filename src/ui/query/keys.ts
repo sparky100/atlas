@@ -19,6 +19,8 @@ import type { Ref } from '../../db/ref';
 export const queryKeys = {
   organisationBySlug: (slug: string) => ['organisation', 'bySlug', slug] as const,
   modelsForOrg: (orgId: UUID | null) => ['models', 'forOrg', orgId] as const,
+  /** Published sample models (ADR-033): product content, the same for everyone. */
+  sampleModels: () => ['sampleModels'] as const,
   mainBranch: (modelId: UUID | null) => ['branch', 'main', modelId] as const,
   editingBranch: (modelId: UUID | null, ref: Ref) => ['branch', 'editing', modelId, ref.kind, ref.kind === 'branch' ? ref.branchId : null] as const,
   membership: (orgId: UUID | null, userId: UUID | null) => ['membership', orgId, userId] as const,

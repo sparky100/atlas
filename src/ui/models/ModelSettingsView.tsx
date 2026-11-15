@@ -10,10 +10,12 @@ import { TypedNameConfirm } from '../components/TypedNameConfirm/TypedNameConfir
 import type { ModelRow, MemberRole } from '../../db/types';
 import { defaultCopyName, slugForCopy } from '../../db/copyModel';
 import { canArchiveModel, canCopyModel, canDeleteModel, canRestoreModel } from '../orgs/roleGates';
+import { usePlatformAdmin } from '../admin/usePlatformAdmin';
 import { useCopyModel } from './useCopyModel';
 import { useModels } from './useModels';
 import { useModelSettings } from './useModelSettings';
 import { useModelSharing } from './useModelSharing';
+import { usePublishSampleModel } from './usePublishSampleModel';
 import styles from './ModelSettingsView.module.css';
 
 export interface ModelSettingsViewProps {
@@ -42,6 +44,10 @@ export function ModelSettingsView({ model, role, orgId, orgSlug, onChanged }: Mo
   const canCopy = canCopyModel(role);
   const { models: orgModels } = useModels(canCopy ? orgId : null);
   const copying = useCopyModel(model, userId);
+  const { isPlatformAdmin } = usePlatformAdmin(userId);
+  const publishing = usePublishSampleModel(model, userId);
+  const [sampleSlug, setSampleSlug] = useState(model.slug);
+  const sampleSlugId = useId();
   const [copyName, setCopyName] = useState<string | null>(null);
   const copyNameId = useId();
   const [targetOrgSlug, setTargetOrgSlug] = useState('');
@@ -174,6 +180,48 @@ export function ModelSettingsView({ model, role, orgId, orgSlug, onChanged }: Mo
           {copying.copied !== null && (
             <Text as="p">
               Copied {copying.copied.elements} elements and {copying.copied.relationships} relationships. <Link to={`/o/${orgSlug}/m/${copying.copied.model.slug}/start`}>Open {copying.copied.model.name}</Link>
+            </Text>
+          )}
+        </Panel>
+      )}
+
+      {isPlatformAdmin && (
+        <Panel>
+          <Text as="h2" size="lg">
+            Publish as a sample model
+          </Text>
+          <Text as="p" tone="muted" size="sm">
+            Platform admins only. Makes how this model stands today available to every organisation as a "Start with a sample model" choice on an empty model list. Each publish is a new version; people who already added an earlier one keep their own copy. Names of people and links out are left out. Make sure nothing in this model is private.
+          </Text>
+          <form
+            className={styles.form}
+            onSubmit={(e) => {
+              e.preventDefault();
+              void publishing.publish(sampleSlug);
+            }}
+          >
+            <label htmlFor={sampleSlugId}>
+              <Text as="span" size="sm">
+                Short name (lowercase letters, numbers and hyphens)
+              </Text>
+            </label>
+            <input
+              id={sampleSlugId}
+              className={styles.input}
+              type="text"
+              value={sampleSlug}
+              onChange={(e) => {
+                setSampleSlug(e.target.value);
+              }}
+            />
+            <Button variant="primary" type="submit" disabled={publishing.status === 'publishing'}>
+              {publishing.status === 'publishing' ? 'Publishing…' : 'Publish sample'}
+            </Button>
+          </form>
+          {publishing.error !== null && <Text as="p">{publishing.error}</Text>}
+          {publishing.published !== null && (
+            <Text as="p">
+              Published version {publishing.published.version} with {publishing.published.elements} elements and {publishing.published.relationships} relationships.
             </Text>
           )}
         </Panel>
