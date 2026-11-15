@@ -18,6 +18,7 @@ import {
   findCapabilitiesWithoutOwner,
   findCriticalExposedSystems,
   findCriticalSystemsPastOrNearSupportEnd,
+  findAiAgentsActingAloneWithoutTechnicalOwner,
   findCriticalSystemsWithoutBusinessOwner,
   findPlatformSupportsThatShouldMoveToModule,
   findSystemsSupportingEssentialFunctionWithoutTechnicalOwner,
@@ -95,6 +96,7 @@ export type ElementBrowseFilter =
   | 'unowned-capabilities'
   | 'stale-attributes'
   | 'no-technical-owner'
+  | 'ai-agent-no-technical-owner'
   | 'critical-no-business-owner'
   | 'critical-exposed'
   | 'unused-integration-platform'
@@ -372,6 +374,9 @@ export function useElementBrowse(
         const systems = elements.filter((e) => e.element_type === 'system');
         const containers = elements.filter((e) => e.element_type === 'container');
         ids = new Set(findSystemsWithoutTechnicalOwner([...systems, ...containers], ownsEdges).map((e) => e.element_id));
+      } else if (filter === 'ai-agent-no-technical-owner') {
+        const systems = elements.filter((e) => e.element_type === 'system');
+        ids = new Set(findAiAgentsActingAloneWithoutTechnicalOwner(systems, ownsEdges).map((e) => e.element_id));
       } else if (filter === 'critical-no-business-owner') {
         const systems = elements.filter((e) => e.element_type === 'system');
         const containers = elements.filter((e) => e.element_type === 'container');

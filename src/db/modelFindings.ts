@@ -4,6 +4,7 @@ import {
   computeStaleAttributesFinding,
   findCapabilitiesWithNoSupporters,
   findCapabilitiesWithoutOwner,
+  findAiAgentsActingAloneWithoutTechnicalOwner,
   findCriticalExposedSystems,
   findCriticalSystemsPastOrNearSupportEnd,
   findCriticalSystemsWithoutBusinessOwner,
@@ -45,6 +46,7 @@ export function computeFindings({ snapshot, facts, retiredByOpenChanges, now, st
   out.set('unowned-capabilities', findCapabilitiesWithoutOwner(capabilities, supports, owns));
   out.set('stale-attributes', computeStaleAttributesFinding(facts, elements, now, staleAfterMonths).staleElements);
   out.set('no-technical-owner', findSystemsWithoutTechnicalOwner(systemsAndModules, owns));
+  out.set('ai-agent-no-technical-owner', findAiAgentsActingAloneWithoutTechnicalOwner(systems, owns));
   out.set('critical-no-business-owner', findCriticalSystemsWithoutBusinessOwner(systemsAndModules, owns));
   out.set('critical-exposed', findCriticalExposedSystems(systems, now, replacedElementIds(replaces)));
   out.set('unused-integration-platform', findUnusedIntegrationPlatforms(systems, usesAndFlows, containers));

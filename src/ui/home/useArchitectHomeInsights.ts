@@ -17,6 +17,7 @@ import {
   listOpenProjectScopeForModel,
   loadElementsRetiredByOpenChanges,
   type ElementProjectScope,
+  findAiAgentsActingAloneWithoutTechnicalOwner,
   findCriticalSystemsWithoutBusinessOwner,
   findExternalInterfacesMissingClassification,
   findExternalOrganisationAccess,
@@ -82,6 +83,7 @@ export interface ArchitectHomeInsightsData {
   /** Prompt 7k item 2's role-aware finding: systems with no `owns` edge carrying `role: 'technical'`. */
   systemsWithoutTechnicalOwner: ElementsHeadRow[];
   /** Prompt 7k item 1: critical systems with no `owns` edge carrying `role: 'business'`. */
+  aiAgentsWithoutTechnicalOwner: ElementsHeadRow[];
   criticalSystemsWithoutBusinessOwner: ElementsHeadRow[];
   /** Prompt 7k item 1: critical systems whose `plannedEnd` falls within `STALE_AFTER_MONTHS`, with no planned replacement (see `findCriticalExposedSystems`'s own comment on that half). */
   criticalExposedSystems: ElementsHeadRow[];
@@ -235,6 +237,7 @@ export function useArchitectHomeInsights(modelId: UUID, userId: UUID | null): Ar
             // owner from the platform itself, so a module missing one is
             // exactly as real a finding as a system missing one.
             systemsWithoutTechnicalOwner: findSystemsWithoutTechnicalOwner([...systems, ...containers], ownsEdges),
+            aiAgentsWithoutTechnicalOwner: findAiAgentsActingAloneWithoutTechnicalOwner(systems, ownsEdges),
             criticalSystemsWithoutBusinessOwner: findCriticalSystemsWithoutBusinessOwner([...systems, ...containers], ownsEdges),
             criticalExposedSystems: findCriticalExposedSystems(systems, new Date(), replacedElementIds(replacesEdges)),
             boundaryCrossingsMissingVerb: findBoundaryCrossingsMissingVerb(usesAndFlowsToEdges, usesAndFlowsToEndpointsById),

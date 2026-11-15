@@ -19,6 +19,7 @@ import {
   findSystemsSupportingEssentialFunctionWithoutTechnicalOwner,
   findSystemsWithoutCapability,
   findSystemsWithoutTechnicalOwner,
+  findAiAgentsActingAloneWithoutTechnicalOwner,
   findUnlabeledVerbRelationships,
   findUnusedIntegrationInterfaces,
   findUnusedIntegrationPlatforms,
@@ -341,6 +342,26 @@ describe('findSystemsWithoutTechnicalOwner (Prompt 7k item 2)', () => {
     const pm = container('pm', 'sap');
     const owns = [relationship('r1', 'owns', 'actor-1', 'sap', { role: 'technical' }), relationship('r2', 'owns', 'actor-1', 'fi', { role: 'technical' })];
     expect(findSystemsWithoutTechnicalOwner([sap, fi, pm], owns).map((e) => e.element_id)).toEqual(['pm']);
+  });
+});
+
+describe('findAiAgentsActingAloneWithoutTechnicalOwner (agents in EA, step 1)', () => {
+  it('flags only agents that act alone and have no technical owner', () => {
+    const systems = [
+      system('alone-unowned', { aiAutonomy: 'acts_alone' }),
+      system('alone-owned', { aiAutonomy: 'acts_alone' }),
+      system('approval-unowned', { aiAutonomy: 'acts_with_approval' }),
+      system('suggests-unowned', { aiAutonomy: 'suggests' }),
+      system('not-an-agent'),
+    ];
+    const owns = [relationship('r1', 'owns', 'actor-1', 'alone-owned', { role: 'technical' })];
+    expect(findAiAgentsActingAloneWithoutTechnicalOwner(systems, owns).map((s) => s.element_id)).toEqual(['alone-unowned']);
+  });
+
+  it('a business-role owner does not count as a technical owner', () => {
+    const systems = [system('a', { aiAutonomy: 'acts_alone' })];
+    const owns = [relationship('r1', 'owns', 'actor-1', 'a', { role: 'business' })];
+    expect(findAiAgentsActingAloneWithoutTechnicalOwner(systems, owns).map((s) => s.element_id)).toEqual(['a']);
   });
 });
 

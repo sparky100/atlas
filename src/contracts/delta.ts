@@ -125,6 +125,14 @@ export type SystemDomain = 'it' | 'ot' | 'hybrid';
  * already treats `'platform'` the same as every other non-`'application'`
  * kind), never a capability lane.
  */
+/**
+ * How freely an AI agent acts (Proposal: agents in EA, step 1). Absent means
+ * "not an AI agent" — there is no `'none'` value, so a blank field and a
+ * non-agent can never disagree. A separate field, not a `SystemKind`
+ * value, because a non-application kind moves a system out of its
+ * capability lane (`SystemKind`'s own comment) and an agent must stay in one.
+ */
+export type AiAutonomy = 'suggests' | 'acts_with_approval' | 'acts_alone';
 export type SystemKind = 'application' | 'integration_platform' | 'data_platform' | 'infrastructure' | 'platform';
 /** S1 item 11a: adds `'organisation'` — a third-party entity (a regulator, a supplier) rather than an internal person or team; almost always paired with `isExternal: true`, though not enforced (an organisation subtype merely names the *kind* of actor, `isExternal` is the separate fact about whether it's outside the enterprise). */
 export type ActorSubtype = 'person' | 'team' | 'organisation';
@@ -297,6 +305,8 @@ export interface SystemAttributes {
   domain?: SystemDomain;
   /** Prompt 7k item 4: application, integration/data platform, or infrastructure — drives the landscape's platform band and which systems `via` (below) may reference. Optional; absent reads as `'application'` (`SystemKind`'s own comment). */
   kind?: SystemKind;
+  /** Set only on an AI agent: how freely it acts — suggests, acts with a person's approval, or acts alone. Absent = not an AI agent. */
+  aiAutonomy?: AiAutonomy;
   /**
    * Prompt 7k item 5: vendor support end (e.g. an OS/platform's end-of-
    * support date) — distinct from `plannedEnd`, which is *this estate's*
