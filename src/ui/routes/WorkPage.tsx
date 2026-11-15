@@ -47,9 +47,9 @@ export function WorkPage() {
   const base = `/o/${orgSlug ?? ''}/m/${model.slug}`;
   const cards: { title: string; line: string; href: string; extra?: string | undefined }[] = [
     { title: 'Waiting for review', line: WORK_COPY.review, href: `${base}/review`, extra: waiting === null ? undefined : waiting === 0 ? 'Nothing waiting' : `${String(waiting)} waiting` },
-    { title: 'Changes', line: WORK_COPY.change, href: `${base}/changes` },
-    { title: 'Decisions', line: WORK_COPY.decision, href: `${base}/decisions` },
     { title: 'Projects', line: WORK_COPY.project, href: `${base}/projects` },
+    { title: 'Decisions', line: WORK_COPY.decision, href: `${base}/decisions` },
+    { title: 'Changes', line: WORK_COPY.change, href: `${base}/changes` },
   ];
 
   return (
@@ -71,18 +71,18 @@ export function WorkPage() {
               Start something
             </Text>
             <div className={workStyles.startButtons}>
-              <Link to={`${base}/changes`}>
-                <Button variant="primary">Make a change</Button>
+              <Link to={`${base}/projects`}>
+                <Button variant="secondary">Start a project</Button>
               </Link>
               <Link to={`${base}/decisions`}>
                 <Button variant="secondary">Compare options (decision)</Button>
               </Link>
-              <Link to={`${base}/projects`}>
-                <Button variant="secondary">Start a project</Button>
+              <Link to={`${base}/changes`}>
+                <Button variant="primary">Make a change</Button>
               </Link>
             </div>
             <Text as="p" size="sm" tone="muted">
-              Not sure which? Make a change if you already know the edit. Compare options if you are still choosing. Start a project to keep several of either together.
+              Not sure which? Start a project to keep several decisions or changes together. Compare options if you are still choosing. Make a change if you already know the edit.
             </Text>
           </section>
           <ul className={workStyles.cards}>
