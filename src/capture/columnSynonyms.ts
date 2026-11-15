@@ -57,7 +57,7 @@ const COLUMN_SYNONYMS_RAW: Readonly<Record<ColumnRole, readonly string[]>> = {
   lifecycleStatus: ['Status', 'Lifecycle', 'State', 'Live?', 'Lifecycle (module override)'],
   introduced: ['Go-live', 'Implemented', 'Start date', 'In service since', 'Introduced'],
   plannedEnd: ['End of life', 'Contract end', 'Decommission date', 'Retire by', 'Planned end'],
-  isExternal: ['Hosted', 'SaaS?', 'External', 'Internal/External'],
+  isExternal: ['Hosted', 'SaaS?', 'External', 'Internal/External', 'Outside our organisation'],
   externalOrganisation: ['Operated by', 'Third party', 'External organisation'],
   hostingModel: ['Hosting model', 'Deployment model', 'On-prem/cloud', 'Hosting model (module override)'],
   hostingProvider: ['Hosting provider', 'Data centre', 'Cloud provider', 'Hosting provider (module override)'],

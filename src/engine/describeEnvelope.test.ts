@@ -49,7 +49,7 @@ describe('describeEnvelope', () => {
 
   it('element.update (a boolean attribute): renders Yes/No, not true/false', () => {
     const delta = base({ kind: 'element.update', elementId: 'powerOn', elementType: 'system', attribute: 'isExternal', value: true, previousDeltaId: 'p1' });
-    expect(describeEnvelope([delta], nameLookup)).toBe('Set PowerON external to Yes');
+    expect(describeEnvelope([delta], nameLookup)).toBe('Set PowerON outside our organisation to Yes');
   });
 
   it('element.update (a long free-text value): truncates at ~40 chars with an ellipsis, S1 item 10', () => {
