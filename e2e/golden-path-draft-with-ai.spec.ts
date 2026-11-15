@@ -26,7 +26,7 @@ test('enable Draft with AI and send a change brief to capture review', async ({ 
     await route.fulfill({ json: { status: 'noop', jobStatus: 'pending' } });
   });
   await expect(page.getByText('Draft with AI is off for this organisation.')).toHaveCount(0);
-  await expect(page.getByRole('button', { name: 'Replace a system' })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Add an integration' })).toBeVisible();
   await page.getByRole('button', { name: 'Describe your own' }).click();
   await page.getByLabel('Change title').fill('Replace the CRM');
   await page.getByLabel('Change brief').fill('Introduce NextCRM to support Customer Onboarding first.');

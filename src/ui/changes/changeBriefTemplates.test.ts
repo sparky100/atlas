@@ -1,9 +1,20 @@
 import { describe, expect, it } from 'vitest';
 import { MAX_CHANGE_BRIEF_CHARS } from '../../contracts/capture';
-import { CHANGE_BRIEF_TEMPLATES, missingBriefSlots, renderBrief, renderBriefText } from './changeBriefTemplates';
+import { CHANGE_BRIEF_TEMPLATES, missingBriefSlots, renderBrief, renderBriefText, type ChangeBriefTemplate } from './changeBriefTemplates';
 
-const replace = CHANGE_BRIEF_TEMPLATES.find((t) => t.id === 'replace-system');
-if (!replace) throw new Error('replace-system template missing');
+/** A template with an optional blank and a text blank, to cover the blank-filling rules the live pills no longer use. */
+const sample: ChangeBriefTemplate = {
+  id: 'sample',
+  pill: 'Sample',
+  title: 'Swap {oldSystem} for {newSystem}',
+  brief: 'Introduce {newSystem} to replace {oldSystem}.',
+  briefExtras: [{ slot: 'endDate', text: 'The planned end of {oldSystem} is {endDate}.' }],
+  slots: [
+    { key: 'oldSystem', label: 'System being replaced', kind: 'system' },
+    { key: 'newSystem', label: 'New system', kind: 'text' },
+    { key: 'endDate', label: 'Old system ends on (optional)', kind: 'date', optional: true },
+  ],
+};
 
 describe('change brief templates', () => {
   it('has unique ids and pill labels', () => {
@@ -36,27 +47,21 @@ describe('change brief templates', () => {
   });
 
   it('shows unfilled blanks as bracketed labels and fills chosen ones', () => {
-    expect(renderBriefText(replace.title, replace.slots, {})).toBe('Replace [System being replaced] with [New system]');
-    expect(renderBrief(replace, { oldSystem: { name: 'Legacy CRM' }, newSystem: { name: 'NextCRM' } })).toBe(
-      'Introduce NextCRM as a planned system that replaces Legacy CRM. Set the lifecycle status of Legacy CRM to retiring.',
-    );
+    expect(renderBriefText(sample.title, sample.slots, {})).toBe('Swap [System being replaced] for [New system]');
+    expect(renderBrief(sample, { oldSystem: { name: 'Legacy CRM' }, newSystem: { name: 'NextCRM' } })).toBe('Introduce NextCRM to replace Legacy CRM.');
   });
 
-  it('asks for the old system to be retiring, and adds its planned end only when a date is given', () => {
+  it('adds an optional sentence only when its blank is filled', () => {
     const base = { oldSystem: { name: 'MPRS' }, newSystem: { name: 'MPRS 2' } };
-    expect(renderBrief(replace, base)).toContain('Set the lifecycle status of MPRS to retiring.');
-    expect(renderBrief(replace, base)).not.toContain('planned end');
-    expect(renderBrief(replace, { ...base, endDate: { name: '2027-03-31' } })).toBe(
-      'Introduce MPRS 2 as a planned system that replaces MPRS. Set the lifecycle status of MPRS to retiring. The planned end of MPRS is 2027-03-31.',
-    );
+    expect(renderBrief(sample, base)).not.toContain('planned end');
+    expect(renderBrief(sample, { ...base, endDate: { name: '2027-03-31' } })).toBe('Introduce MPRS 2 to replace MPRS. The planned end of MPRS is 2027-03-31.');
   });
 
-  it('adds a go-live sentence to a new system only when a date is given', () => {
-    const introduce = CHANGE_BRIEF_TEMPLATES.find((t) => t.id === 'introduce-system');
-    if (!introduce) throw new Error('introduce-system template missing');
-    const base = { newSystem: { name: 'NextCRM' }, capability: { name: 'Onboarding' } };
-    expect(renderBrief(introduce, base)).toBe('Introduce NextCRM as a planned system that supports Onboarding.');
-    expect(renderBrief(introduce, { ...base, goLive: { name: '2027-06-01' } })).toBe('Introduce NextCRM as a planned system that supports Onboarding. NextCRM goes live on 2027-06-01.');
+  it('leaves the standard changes to the guided forms, not AI pills', () => {
+    const ids = CHANGE_BRIEF_TEMPLATES.map((t) => t.id);
+    expect(ids).not.toContain('replace-system');
+    expect(ids).not.toContain('introduce-system');
+    expect(ids).not.toContain('plan-end');
   });
 
   it('has no pill that needs a removal to be complete', () => {
@@ -65,9 +70,8 @@ describe('change brief templates', () => {
   });
 
   it('lists the blanks still to fill and treats whitespace as empty', () => {
-    expect(missingBriefSlots(replace, {})).toEqual(['System being replaced', 'New system']);
-    expect(missingBriefSlots(replace, { oldSystem: { name: 'A' }, newSystem: { name: 'B' } })).toEqual([]);
-    expect(missingBriefSlots(replace, { oldSystem: { name: 'Legacy CRM' }, newSystem: { name: '  ' } })).toEqual(['New system']);
-    expect(missingBriefSlots(replace, { oldSystem: { name: 'Legacy CRM' }, newSystem: { name: 'NextCRM' } })).toEqual([]);
+    expect(missingBriefSlots(sample, {})).toEqual(['System being replaced', 'New system']);
+    expect(missingBriefSlots(sample, { oldSystem: { name: 'A' }, newSystem: { name: 'B' } })).toEqual([]);
+    expect(missingBriefSlots(sample, { oldSystem: { name: 'Legacy CRM' }, newSystem: { name: '  ' } })).toEqual(['New system']);
   });
 });

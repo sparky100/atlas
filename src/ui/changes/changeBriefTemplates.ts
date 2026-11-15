@@ -3,17 +3,16 @@
  * that the person fills by picking real systems and capabilities from the
  * model (so the AI is never guessing which system "the CRM" means).
  *
+ * Only changes that are genuinely loose belong here. The exact, standard ones
+ * (add a new system, retire a system with or without a replacement, change a
+ * system's details) are guided forms with no AI (`GuidedChange.tsx`), so there
+ * is no pill for them.
+ *
  * These are wording only. Every template sticks to what the drafting prompt
- * (`src/capture/prompts/changeBrief.ts`) can actually propose: new systems,
- * uses/flows_to relationships between named systems, supports relationships
- * to a named capability, and a system's planned end date. Nothing here
- * promises dependency removals, because drafting does not infer them (the
- * `note` on a template says what is left to the reviewer). That is also why
- * there is no "move a capability" pill: moving means the old support stops,
- * which is a removal. A replacement asks for the `replaces` link (which moves
- * the old system's capability support across when applied), the old system's
- * lifecycle status set to retiring, and its planned end if a date is given,
- * because the prompt only does those when the brief says so explicitly.
+ * (`src/capture/prompts/changeBrief.ts`) can actually propose, and nothing here
+ * promises dependency removals, because drafting does not infer them. That is
+ * also why there is no "move a capability" pill: moving means the old support
+ * stops, which is a removal.
  */
 export type BriefSlotKind = 'system' | 'capability' | 'text' | 'date';
 
@@ -48,32 +47,6 @@ export type BriefSlotValues = Readonly<Record<string, BriefSlotValue | undefined
 
 export const CHANGE_BRIEF_TEMPLATES: readonly ChangeBriefTemplate[] = [
   {
-    id: 'replace-system',
-    pill: 'Replace a system',
-    title: 'Replace {oldSystem} with {newSystem}',
-    brief: 'Introduce {newSystem} as a planned system that replaces {oldSystem}. Set the lifecycle status of {oldSystem} to retiring.',
-    briefExtras: [{ slot: 'endDate', text: 'The planned end of {oldSystem} is {endDate}.' }],
-    slots: [
-      { key: 'oldSystem', label: 'System being replaced', kind: 'system' },
-      { key: 'newSystem', label: 'New system', kind: 'text' },
-      { key: 'endDate', label: 'Old system ends on (optional)', kind: 'date', optional: true },
-    ],
-    note: 'Atlas adds the new system, links it to the old one, moves the old system\'s capability support across and marks the old one as retiring. Integrations and owners are not copied: the change page shows what is left once you apply it.',
-  },
-  {
-    id: 'introduce-system',
-    pill: 'Introduce a new system',
-    title: 'Introduce {newSystem}',
-    brief: 'Introduce {newSystem} as a planned system that supports {capability}.',
-    briefExtras: [{ slot: 'goLive', text: '{newSystem} goes live on {goLive}.' }],
-    slots: [
-      { key: 'newSystem', label: 'New system', kind: 'text' },
-      { key: 'capability', label: 'Capability it supports', kind: 'capability' },
-      { key: 'goLive', label: 'Goes live on (optional)', kind: 'date', optional: true },
-    ],
-    note: 'It is added as an "Also" system for the capability. Owners and integrations are left for you to add.',
-  },
-  {
     id: 'add-integration',
     pill: 'Add an integration',
     title: 'Connect {from} to {to}',
@@ -92,17 +65,7 @@ export const CHANGE_BRIEF_TEMPLATES: readonly ChangeBriefTemplate[] = [
       { key: 'system', label: 'System', kind: 'system' },
       { key: 'capability', label: 'Capability', kind: 'capability' },
     ],
-    note: 'It is added as an "Also" system. Anything it takes over from is left for you to change at review. To swap one whole system for another, use Replace a system.',
-  },
-  {
-    id: 'plan-end',
-    pill: 'Plan an end date',
-    title: 'Plan the end of {system}',
-    brief: '{system} will reach its planned end on {date}.',
-    slots: [
-      { key: 'system', label: 'System', kind: 'system' },
-      { key: 'date', label: 'Planned end date', kind: 'date' },
-    ],
+    note: 'It is added as an "Also" system. Anything it takes over from is left for you to change at review. To retire a system and replace it, use Retire a system.',
   },
 ];
 
