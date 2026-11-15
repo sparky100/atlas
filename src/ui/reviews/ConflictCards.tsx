@@ -346,7 +346,7 @@ export function IdentityWarningCard({
   return (
     <li className={styles.card}>
       <div className={styles.cardTitle}>
-        <Chip tone="info">{finding.class === 'identity:strong' ? 'identity (strong)' : 'identity'}</Chip>
+        <Chip tone="neutral">{finding.class === 'identity:strong' ? 'identity (strong)' : 'identity'}</Chip>
         <Text as="span" size="lg">
           {subjectName(heads, finding.subjectId)}
         </Text>

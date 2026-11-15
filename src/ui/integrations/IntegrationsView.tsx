@@ -187,7 +187,7 @@ export function IntegrationsView({ data, elementHref }: IntegrationsViewProps) {
                           <td><Link to={elementHref(row.target.element_id)}>{row.targetName}</Link></td>
                           <td><Text as="span" size="sm" tone="muted">{row.linkType === 'uses' ? 'uses' : 'flows to'}</Text></td>
                           <td>{row.protocol ? <Text as="span" size="sm">{row.protocol}</Text> : <Text as="span" tone="faint" size="sm">Not recorded</Text>}</td>
-                          <td>{row.dataClassification ? <Chip tone="info">{row.dataClassification}</Chip> : <Text as="span" tone="faint" size="sm">—</Text>}</td>
+                          <td>{row.dataClassification ? <Chip tone="neutral">{row.dataClassification}</Chip> : <Text as="span" tone="faint" size="sm">—</Text>}</td>
                           <td>
                             <button type="button" className={styles.expandButton} aria-expanded={expanded} aria-label={`${expanded ? 'Collapse' : 'Expand'} ${row.sourceName} to ${row.targetName}`} onClick={() => { toggleExpand(row.relationshipId); }}>
                               {expanded ? '▾' : '▸'}
