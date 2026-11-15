@@ -5,6 +5,7 @@ import { AppHeader } from '../components/AppHeader/AppHeader';
 import { Breadcrumb } from '../components/Breadcrumb/Breadcrumb';
 import { ModelNav } from '../components/ModelNav/ModelNav';
 import navStyles from '../components/ModelNav/ModelNav.module.css';
+import { PageIntro } from '../components/PageIntro/PageIntro';
 import { Text } from '../components/Text/Text';
 import { EditingBranchBanner } from '../branches/EditingBranchBanner/EditingBranchBanner';
 import { ViewingBranchBanner } from '../branches/ViewingBranchBanner/ViewingBranchBanner';
@@ -67,6 +68,7 @@ export function IntegrationsPage() {
               Integrations
             </Text>
           </div>
+          <PageIntro>How systems connect to each other, and the platforms and interfaces they go through.</PageIntro>
 
           {state.status === 'loading' && <Loading />}
           {state.status === 'error' && <Text as="p">{state.message}</Text>}

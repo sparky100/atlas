@@ -6,6 +6,7 @@ import { Breadcrumb } from '../components/Breadcrumb/Breadcrumb';
 import { Button } from '../components/Button/Button';
 import { ModelNav } from '../components/ModelNav/ModelNav';
 import navStyles from '../components/ModelNav/ModelNav.module.css';
+import { PageIntro } from '../components/PageIntro/PageIntro';
 import { Text } from '../components/Text/Text';
 import { useAuth } from '../auth/useAuth';
 import { EditingBranchBanner } from '../branches/EditingBranchBanner/EditingBranchBanner';
@@ -149,6 +150,7 @@ export function RoadmapPage() {
               </div>
             )}
           </div>
+          <PageIntro>Planned changes laid out over time, so you can see what is coming and when.</PageIntro>
           {roadmapExport.error !== null && <Text as="p">{roadmapExport.error}</Text>}
 
           {state.status === 'loading' && <Loading />}

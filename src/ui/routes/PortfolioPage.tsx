@@ -5,6 +5,7 @@ import { AppHeader } from '../components/AppHeader/AppHeader';
 import { Breadcrumb } from '../components/Breadcrumb/Breadcrumb';
 import { ModelNav } from '../components/ModelNav/ModelNav';
 import navStyles from '../components/ModelNav/ModelNav.module.css';
+import { PageIntro } from '../components/PageIntro/PageIntro';
 import { Text } from '../components/Text/Text';
 import { EditingBranchBanner } from '../branches/EditingBranchBanner/EditingBranchBanner';
 import { ViewingBranchBanner } from '../branches/ViewingBranchBanner/ViewingBranchBanner';
@@ -78,6 +79,7 @@ export function PortfolioPage() {
               Portfolio
             </Text>
           </div>
+          <PageIntro>Your systems side by side, with their planned action and lifecycle.</PageIntro>
 
           {state.status === 'loading' && <Loading />}
           {state.status === 'error' && <Text as="p">{state.message}</Text>}

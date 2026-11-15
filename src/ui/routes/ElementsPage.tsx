@@ -10,6 +10,7 @@ import { ModelNav } from '../components/ModelNav/ModelNav';
 import navStyles from '../components/ModelNav/ModelNav.module.css';
 import { Button } from '../components/Button/Button';
 import { Panel } from '../components/Panel/Panel';
+import { PageIntro } from '../components/PageIntro/PageIntro';
 import { Text } from '../components/Text/Text';
 import { StaleReminderBar } from '../elements/StaleReminderBar';
 import { useAuth } from '../auth/useAuth';
@@ -271,6 +272,7 @@ export function ElementsPage() {
           <Text as="h1" size="2xl">
             Elements
           </Text>
+          <PageIntro>Every system, capability and other element in the model, in one searchable table.</PageIntro>
           {canShowSearch && mainBranch && (
             // One search box by default (the table's own filter below): the
             // search-or-create control — a multi-type pool download plus its
