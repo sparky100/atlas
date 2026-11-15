@@ -5,6 +5,7 @@ import { ElementTypeGlyph } from '../ElementTypeGlyph/ElementTypeGlyph';
 import { ReorderButtons, type ReorderButtonsContext } from '../ReorderButtons/ReorderButtons';
 import { Text } from '../Text/Text';
 import { compareBySiblingOrder } from '../../elements/siblingOrder';
+import { ValueStreamStageNudge } from './ValueStreamStageNudge';
 import styles from './ValueStreamStagesSection.module.css';
 
 export interface ValueStreamStagesSectionProps {
@@ -28,6 +29,8 @@ export function ValueStreamStagesSection({ orgSlug, modelSlug, stages, reorderCo
 
   const ordered = [...stages].sort(compareBySiblingOrder);
   return (
+    <>
+    <ValueStreamStageNudge stageCount={ordered.length} />
     <ul className={styles.list}>
       {ordered.map((stage, index) => (
         <li key={stage.element_id} className={styles.row}>
@@ -41,5 +44,6 @@ export function ValueStreamStagesSection({ orgSlug, modelSlug, stages, reorderCo
         </li>
       ))}
     </ul>
+    </>
   );
 }

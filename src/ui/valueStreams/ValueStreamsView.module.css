@@ -21,8 +21,11 @@
 }
 
 .stages {
-  display: flex;
-  flex-wrap: wrap;
+  /* One line, always: stages share the row width equally and never wrap onto a second line. Text wraps inside each box, so a box grows taller rather than wider. minmax(0, 1fr) lets a column shrink below its content width as the window resizes. */
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: minmax(0, 1fr);
+  align-items: stretch;
   gap: var(--space-4);
 }
 
@@ -31,8 +34,9 @@
   flex-direction: column;
   align-items: flex-start;
   gap: var(--space-1);
-  min-width: 140px;
+  min-width: 0;
   padding: var(--space-2);
+  overflow-wrap: anywhere;
   border: var(--border-width) solid var(--border-strong);
   border-radius: var(--radius-sm);
   background: var(--surface);

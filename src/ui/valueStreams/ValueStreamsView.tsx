@@ -1,4 +1,5 @@
 import { Link } from 'react-router';
+import { ValueStreamStageNudge } from '../components/ValueStreamStagesSection/ValueStreamStageNudge';
 import type { UUID } from '../../contracts/delta';
 import { CollapsibleSection } from '../components/CollapsibleSection/CollapsibleSection';
 import { Text } from '../components/Text/Text';
@@ -85,6 +86,7 @@ function StreamRow({ row, selectedStageId, onInspectStage, compact, elementHref,
           {description}
         </Text>
       )}
+      <ValueStreamStageNudge stageCount={row.stages.length} />
       <div className={styles.stages}>
         {row.stages.length === 0 ? (
           <Text as="p" size="sm" tone="muted">
