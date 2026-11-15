@@ -100,10 +100,10 @@ test('review queue split: accept one of two independent systems, preview, split,
   await page.goto(`/o/${orgSlug}/m/${modelSlug}/changes/${branchId}`);
   await expect(page.getByText('proposed', { exact: true }).first()).toBeVisible();
 
-  // Step 5's own "Delivered / remaining" panel (ChangeView.tsx,
+  // Step 5's own "Parts of this change" panel (ChangeView.tsx,
   // resolveChangeLineage) — real data now that a real split exists, not
   // the always-empty state it rendered before any split mechanic did.
-  const deliveredPanel = page.locator('section, div').filter({ hasText: 'Delivered / remaining' }).last();
+  const deliveredPanel = page.locator('section, div').filter({ hasText: 'Parts of this change' }).last();
   await expect(deliveredPanel.getByText('delivered', { exact: true })).toBeVisible();
 
 });

@@ -1,11 +1,9 @@
 import { Loading } from '../components/Loading/Loading';
-import { Link, useParams, useSearchParams } from 'react-router';
+import { useParams, useSearchParams } from 'react-router';
 import { AppHeader } from '../components/AppHeader/AppHeader';
 import { Breadcrumb } from '../components/Breadcrumb/Breadcrumb';
-import { Button } from '../components/Button/Button';
 import { ModelNav } from '../components/ModelNav/ModelNav';
 import navStyles from '../components/ModelNav/ModelNav.module.css';
-import { Text } from '../components/Text/Text';
 import { ChangeOrigin } from '../changes/ChangeOrigin';
 import { ChangeView } from '../changes/ChangeView';
 import { intentHeaderLine } from '../changes/branchIntent';
@@ -19,7 +17,6 @@ import { isViewingMode } from '../branches/viewingMode';
 import { useModels } from '../models/useModels';
 import { canCreateChangeBranch, useMembership } from '../orgs/useMembership';
 import { useOrganisationBySlug } from '../orgs/useOrganisationBySlug';
-import { refQueryParam } from '../../db/ref';
 import styles from './ViewPage.module.css';
 
 /**
@@ -62,7 +59,7 @@ export function ChangePage() {
   const { orgSlug, modelSlug, branchId } = useParams<{ orgSlug: string; modelSlug: string; branchId: string }>();
   const [searchParams] = useSearchParams();
   const { userId } = useAuth();
-  const { ref, setRef } = useSelectedRef();
+  const { ref } = useSelectedRef();
   const viewing = isViewingMode(searchParams);
 
   const { organisation, loading: orgLoading } = useOrganisationBySlug(orgSlug ?? '');
@@ -71,7 +68,6 @@ export function ChangePage() {
   const { role } = useMembership(organisation?.id ?? null, userId);
   const canEdit = canCreateChangeBranch(role);
   const { branch, reload: reloadBranch } = useChange(branchId ?? '');
-  const isSelected = ref.kind === 'branch' && ref.branchId === branchId;
 
   if (orgLoading || modelsLoading || !model) {
     return (
@@ -102,40 +98,24 @@ export function ChangePage() {
             <EditingBranchBanner activeRef={ref} modelId={model.id} orgSlug={orgSlug ?? ''} modelSlug={model.slug} showModeShortcuts={false} showSubmitForReview={false} />
           )}
           <Breadcrumb org={{ label: organisation?.name ?? '', href: `/o/${orgSlug ?? ''}` }} model={{ label: model.name, href: `/o/${orgSlug ?? ''}/m/${model.slug}` }} refLabel={refLabel} />
-          <div className={styles.headerRow}>
-            <Text as="h1" size="2xl">
-              {/* Prompt pack F0: the header line names the change's own
-                  "why" (Recording:/Proposing:/Correction/Exploring:) — see
-                  `branchIntent.ts`'s own doc comment for the exact four
-                  sentences and why `correct` gets no title suffix. Falls
-                  back to the plain title/name this page always showed
-                  before F0 (a `null` branch — still loading — or an
-                  `intent` of `null`, which is real only for a change
-                  branch created before this migration existed). */}
-              {branch ? intentHeaderLine(branch) : 'Change'}
-            </Text>
-            {branchId && (
-              <div className={styles.headerActions}>
-                {canEdit && branch?.status === 'draft' && (
-                  <Button
-                    variant={isSelected ? 'ghost' : 'primary'}
-                    disabled={isSelected}
-                    onClick={() => {
-                      setRef({ kind: 'branch', branchId });
-                    }}
-                  >
-                    {isSelected ? 'Editing in this change' : 'Edit in this change'}
-                  </Button>
-                )}
-                <Link to={`/o/${orgSlug ?? ''}/m/${model.slug}/landscape?${refQueryParam({ kind: 'branch', branchId }, true)}`}>
-                  <Button variant="secondary">View this change</Button>
-                </Link>
-              </div>
-            )}
-          </div>
-          {branch && <ChangeOrigin branch={branch} orgSlug={orgSlug ?? ''} modelSlug={model.slug} />}
-          {branch && <ChangeProjectAssignment branch={branch} modelId={model.id} orgSlug={orgSlug ?? ''} modelSlug={model.slug} canEdit={canEdit} onMoved={reloadBranch} />}
-          <ChangeView orgId={organisation?.id ?? ''} modelId={model.id} branchId={branchId ?? ''} orgSlug={orgSlug ?? ''} modelSlug={model.slug} role={role} canEdit={canEdit} />
+          <ChangeView
+            orgId={organisation?.id ?? ''}
+            modelId={model.id}
+            branchId={branchId ?? ''}
+            orgSlug={orgSlug ?? ''}
+            modelSlug={model.slug}
+            role={role}
+            canEdit={canEdit}
+            heading={branch ? intentHeaderLine(branch) : 'Change'}
+            aboutExtras={
+              branch ? (
+                <>
+                  <ChangeOrigin branch={branch} orgSlug={orgSlug ?? ''} modelSlug={model.slug} />
+                  <ChangeProjectAssignment branch={branch} modelId={model.id} orgSlug={orgSlug ?? ''} modelSlug={model.slug} canEdit={canEdit} onMoved={reloadBranch} />
+                </>
+              ) : null
+            }
+          />
         </main>
       </div>
     </div>

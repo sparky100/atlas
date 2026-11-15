@@ -1,6 +1,6 @@
 import type { UUID } from '../../contracts/delta';
 import { Button } from '../components/Button/Button';
-import { Chip } from '../components/Chip/Chip';
+import { Panel } from '../components/Panel/Panel';
 import { Text } from '../components/Text/Text';
 import type { BranchRow } from '../../db/types';
 import { groupStructuralFindings } from '../../engine/structuralFindingGroups';
@@ -19,7 +19,7 @@ export interface BranchRebasePanelProps {
 }
 
 /**
- * A draft change's own "rebase on main" (Sprint C1 step 8, the user's
+ * A draft change's own "bring up to date" (internally a rebase on main) (Sprint C1 step 8, the user's
  * brief: "Rebase branch on new main head with conflict surfacing") —
  * lets the author pull in main *before* ever submitting for review, so a
  * long-lived draft doesn't first discover it's behind at review time.
@@ -35,8 +35,10 @@ export interface BranchRebasePanelProps {
 export function BranchRebasePanel({ modelId, branch, userId, canEdit, onRebased }: BranchRebasePanelProps) {
   const rebase = useBranchRebase(modelId, branch, userId, onRebased);
 
-  if (rebase.state.status === 'loading') return <Text tone="muted">Checking against main…</Text>;
-  if (rebase.state.status === 'error') return <Text as="p">{rebase.state.message}</Text>;
+  // Nothing to show until there is something to decide: a "checking…" flash or a
+  // "nothing to do" reassurance would only add noise to the change page.
+  if (rebase.state.status === 'loading') return null;
+  if (rebase.state.status === 'error') return rebase.state.quiet ? null : <Text as="p">{rebase.state.message}</Text>;
 
   const { review } = rebase.state;
   const { classification, threeWay } = review;
@@ -46,29 +48,32 @@ export function BranchRebasePanel({ modelId, branch, userId, canEdit, onRebased 
   const { retractions, duplicates, cardinalities } = groupStructuralFindings(review);
   const structuralCardCount = retractions.length + duplicates.length + cardinalities.length;
 
-  if (threeWay.upToDateWithMain && classification.findings.length === 0) {
-    return (
-      <Text as="p" tone="muted" size="sm">
-        Up to date with main.
-      </Text>
-    );
-  }
+  if (threeWay.upToDateWithMain && classification.findings.length === 0) return null;
 
   return (
-    <div>
-      <div className={styles.summary}>
-        <Chip tone={threeWay.upToDateWithMain ? 'ok' : 'warn'}>{threeWay.upToDateWithMain ? 'up to date' : 'behind main'}</Chip>
-        {blockingFindings.length > 0 && (
-          <Text as="span" tone="muted" size="sm">
-            {blockingFindings.length} blocking conflict{blockingFindings.length === 1 ? '' : 's'}
-          </Text>
-        )}
-        {identityFindings.length > 0 && (
-          <Text as="span" tone="faint" size="xs">
-            {identityFindings.length} identity warning{identityFindings.length === 1 ? '' : 's'}
-          </Text>
-        )}
-      </div>
+    <Panel>
+      <Text as="h2" size="lg">
+        {threeWay.upToDateWithMain ? 'Some of your edits need a decision' : 'The model has changed since you started'}
+      </Text>
+      <Text as="p" tone="muted" size="sm">
+        {threeWay.upToDateWithMain
+          ? 'Sort these out before you send the change for review.'
+          : 'Bring this change up to date so it is checked against the latest version. If something you edited was also changed by someone else, you will be asked which to keep.'}
+      </Text>
+      {(blockingFindings.length > 0 || identityFindings.length > 0) && (
+        <div className={styles.summary}>
+          {blockingFindings.length > 0 && (
+            <Text as="span" tone="muted" size="sm">
+              {blockingFindings.length} {blockingFindings.length === 1 ? 'clash' : 'clashes'} to sort out
+            </Text>
+          )}
+          {identityFindings.length > 0 && (
+            <Text as="span" tone="faint" size="xs">
+              {identityFindings.length} possible {identityFindings.length === 1 ? 'duplicate' : 'duplicates'}
+            </Text>
+          )}
+        </div>
+      )}
 
       {rebase.actionError !== null && <Text as="p">{rebase.actionError}</Text>}
 
@@ -81,7 +86,7 @@ export function BranchRebasePanel({ modelId, branch, userId, canEdit, onRebased 
               void rebase.pushRebase();
             }}
           >
-            {rebase.stagedChoiceCount > 0 ? `Rebase on main (${String(rebase.stagedChoiceCount)} resolved)` : 'Rebase on main'}
+            {rebase.stagedChoiceCount > 0 ? `Bring up to date (${String(rebase.stagedChoiceCount)} decided)` : 'Bring up to date'}
           </Button>
         </div>
       )}
@@ -89,7 +94,7 @@ export function BranchRebasePanel({ modelId, branch, userId, canEdit, onRebased 
       {structuralCardCount > 0 && (
         <div className={styles.section}>
           <Text as="h3" size="md">
-            Structural conflicts
+            Links and retirements that clash
           </Text>
           <ul className={styles.cardList}>
             {retractions.map((data) => (
@@ -120,7 +125,7 @@ export function BranchRebasePanel({ modelId, branch, userId, canEdit, onRebased 
       {fieldConflictFindings.length > 0 && (
         <div className={styles.section}>
           <Text as="h3" size="md">
-            Field conflicts
+            Values you and someone else both changed
           </Text>
           <ul className={styles.cardList}>
             {fieldConflictFindings.map((finding) => (
@@ -141,7 +146,7 @@ export function BranchRebasePanel({ modelId, branch, userId, canEdit, onRebased 
       {identityFindings.length > 0 && (
         <div className={styles.section}>
           <Text as="h3" size="md">
-            Identity warnings
+            Possible duplicates
           </Text>
           <ul className={styles.cardList}>
             {identityFindings.map((finding, i) => (
@@ -159,6 +164,6 @@ export function BranchRebasePanel({ modelId, branch, userId, canEdit, onRebased 
           </ul>
         </div>
       )}
-    </div>
+    </Panel>
   );
 }
