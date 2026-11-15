@@ -822,7 +822,7 @@ export function ElementPage() {
               <div className={styles.rightColumn}>
                 {/* These three load just after the rest of the page (`ElementPageData.secondary`): until then show "loading", never their empty value as if it were the answer. */}
                 <CollapsibleSection title="Changes touching this">
-                  {state.data.secondary === 'ready' ? <ChangesTouchingSection inFlightBranches={state.data.inFlightBranches} /> : <SecondaryPlaceholder status={state.data.secondary} />}
+                  {state.data.secondary === 'ready' ? <ChangesTouchingSection inFlightBranches={state.data.inFlightBranches} projectTitles={state.data.projectTitles} orgSlug={organisation?.slug ?? ''} modelSlug={model.slug} /> : <SecondaryPlaceholder status={state.data.secondary} />}
                 </CollapsibleSection>
                 <CollapsibleSection title="History">
                   {state.data.secondary === 'ready' ? (
