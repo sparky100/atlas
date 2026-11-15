@@ -12,6 +12,7 @@ import { useModelsSharedWithOrg } from '../orgs/useModelsSharedWithOrg';
 import { useOrganisationBySlug } from '../orgs/useOrganisationBySlug';
 import { useOrganisations } from '../orgs/useOrganisations';
 import { useModels } from '../models/useModels';
+import { SampleModelOffer } from '../models/SampleModelOffer';
 import styles from './OrgHome.module.css';
 
 /** Org home: the model list for one organisation, plus the org switcher and role-gated "New model" (Sprint U1 step 2). */
@@ -88,6 +89,9 @@ export function OrgHome() {
             await createModel(name, slug, userId);
           }}
         />
+        {canCreateModel(role) && !modelsLoading && activeModels.length === 0 && (
+          <SampleModelOffer orgId={organisation.id} orgSlug={organisation.slug} userId={userId} existingSlugs={models.map((m) => m.slug)} />
+        )}
         {sharedModels.length > 0 && (
           // F7 item 4: "Shared with us" — every model another organisation
           // has granted this org read-only access to, view-only, resolving

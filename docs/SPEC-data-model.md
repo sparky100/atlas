@@ -844,6 +844,10 @@ superseding `listPublishedCapabilityMaps`) lists both statuses, flagged
 "Draft" in the UI — never indistinguishable from a reviewed, published
 map.
 
+#### `sample_models`
+
+A published, versioned sample model a new organisation can copy into itself (`docs/ADR-033-sample-models.md`, `supabase/migrations/20261115120000_sample_models.sql`). Product content, like `capability_maps`: no `org_id`. `id`, `slug` (lowercase words joined by single hyphens), `version` (>= 1, unique with `slug`), `name`, `description`, `payload jsonb` (an object holding non-empty `elementsHead` and the arrays `relationshipsHead`, `facts`, `sources`, `aliases`; `src/contracts/sampleModel.ts`), `published_by` (indexed), `created_at`. Row-level security is on: select for any signed-in user; insert only by a platform admin publishing as themselves (`published_by = auth.uid()` and a row of their own in `platform_admins`). There is no update or delete policy and `update`, `delete` and `truncate` are revoked from `authenticated`, so a published version is never changed or removed (rule 5); a new publish is a new version. A payload holds no person's id (`asserted_by` is the nil id) and no link out (`uri` is null). No database function is involved.
+
 ### 3.11 Saved reports, saved copies and dashboards
 
 Workflow records on the same tier as `projects` and `decisions` (ADR-027, `supabase/migrations/20261106010000_saved_reports.sql`): never a delta, never folded into a head, never in a version. Deleting every row of all four tables loses no model information (ADR-011's litmus test for the definitions; see `report_snapshots` for the one table that is a record rather than a hint). Contract: `src/contracts/reportSpec.ts` (`ReportSpec`, `parseReportSpec`); evaluator: `src/engine/reportQuery.ts`; rows and queries: `src/db/types.ts`, `src/db/reports.ts`.
@@ -1022,6 +1026,10 @@ The two-round-trip design's orphaned-commit tradeoff (a lost race leaving a perm
 ### 5.6 Copying a model (ADR-030)
 
 `atlas.copy_model` is the one operation that writes a commit into a model on behalf of a *different* model's content: owner-only (`has_role(org, 'owner')`, checked in the function), same organisation, one ordinary `manual` commit titled "Copied from <name>" whose deltas carry each copied fact's original provenance against re-keyed `sources` rows. It refuses if the source's main head moved after the client read it. History, changes, decisions, comments, private reports and shares are not copied. See `docs/ADR-030-copy-model.md`.
+
+### 5.7 Copying a sample model (ADR-033)
+
+A sample is copied into a new model in the caller's *own* organisation with no new database function, using four ordinary paths, each under the caller's own row-level security: create the model (`models_insert`: owner or architect), insert its sources (`sources_insert`), commit the deltas to its main branch as one `manual` commit titled "Copied from the <name> sample" (`atlas.commit_deltas`, which checks the caller's role itself), and insert its aliases (`aliases_insert`). Each copied fact keeps its original confidence, source reference and date. Sources of a kind the ordinary insert policy refuses (a capability map, a capture job, a person, a merge, an attestation) become plain `document` sources with the same name, so no id from the sample's organisation is referenced; a capability map's `template_code` aliases are not copied. The steps are separate calls, not one transaction; a failure after the model exists leaves it partly filled and tells the person so. Reports and dashboards are not part of a sample. See `docs/ADR-033-sample-models.md`.
 
 ## 6. Head rebuild and its proof
 
