@@ -1,9 +1,15 @@
+/* Two or more columns on a wide card, one on a phone; text areas, pickers and the button take the full row. */
 .form {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-2);
-  margin-top: var(--space-2);
-  max-width: 480px;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: var(--space-3);
+  align-items: start;
+  margin-top: var(--space-3);
+  max-width: 1100px;
+}
+
+.form > * {
+  grid-column: 1 / -1;
 }
 
 .formRow {
@@ -11,6 +17,17 @@
   align-items: center;
   gap: var(--space-2);
   flex-wrap: wrap;
+}
+
+.form > .formRow {
+  grid-column: auto;
+  flex-direction: column;
+  align-items: stretch;
+  gap: var(--space-1);
+}
+
+.form > button {
+  justify-self: start;
 }
 
 .input,

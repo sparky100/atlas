@@ -43,6 +43,9 @@
   --space-4: 16px;
   --space-6: 24px;
   --space-8: 32px;
+  /* Page content widths: lists and reports use the wide cap so a large monitor is used; detail pages a medium one; forms and settings stay narrow for readability. */
+  --page-max-wide: 2200px;
+  --page-max-medium: 1600px;
   --space-12: 48px;
   --space-16: 64px;
 
