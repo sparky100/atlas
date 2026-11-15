@@ -4,7 +4,7 @@ import { useLocation } from 'react-router';
 import type { UUID } from '../../contracts/delta';
 import { countProposedDecisions } from '../../db/decisions';
 import { reportError } from '../errors/errorBannerStore';
-import { useAfterFirstPaint } from '../perf/useAfterFirstPaint';
+import { useAfterPageData } from '../perf/useAfterPageData';
 import { queryKeys } from '../query/keys';
 import { supabase } from '../supabaseClient';
 
@@ -17,7 +17,7 @@ import { supabase } from '../supabaseClient';
  */
 export function useProposedDecisionCount(modelId: UUID | null): number | null {
   const { pathname } = useLocation();
-  const afterFirstPaint = useAfterFirstPaint();
+  const afterPageData = useAfterPageData();
   const { data, refetch } = useQuery({
     queryKey: queryKeys.proposedDecisionCount(modelId),
     queryFn: async () => {
@@ -29,11 +29,11 @@ export function useProposedDecisionCount(modelId: UUID | null): number | null {
         throw e;
       }
     },
-    enabled: modelId !== null && afterFirstPaint,
+    enabled: modelId !== null && afterPageData,
     staleTime: 0,
   });
   useEffect(() => {
-    if (modelId !== null && afterFirstPaint) void refetch();
-  }, [pathname, modelId, refetch, afterFirstPaint]);
+    if (modelId !== null && afterPageData) void refetch();
+  }, [pathname, modelId, refetch, afterPageData]);
   return data ?? null;
 }

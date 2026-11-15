@@ -3,7 +3,7 @@ import type { UUID } from '../../contracts/delta';
 import { countCaptureDraftsAwaitingReview } from '../../db/captureJobs';
 import { countReviewQueueMergeRequests } from '../../db/mergeRequests';
 import { reportError } from '../errors/errorBannerStore';
-import { useAfterFirstPaint } from '../perf/useAfterFirstPaint';
+import { useAfterPageData } from '../perf/useAfterPageData';
 import { queryKeys } from '../query/keys';
 import { supabase } from '../supabaseClient';
 
@@ -21,7 +21,7 @@ import { supabase } from '../supabaseClient';
  * badge shows nothing rather than a guessed zero.
  */
 export function useReviewQueueCount(modelId: UUID | null): number | null {
-  const afterFirstPaint = useAfterFirstPaint();
+  const afterPageData = useAfterPageData();
   const { data } = useQuery({
     queryKey: queryKeys.reviewQueueCount(modelId),
     queryFn: async () => {
@@ -34,7 +34,7 @@ export function useReviewQueueCount(modelId: UUID | null): number | null {
         throw e;
       }
     },
-    enabled: modelId !== null && afterFirstPaint,
+    enabled: modelId !== null && afterPageData,
     staleTime: 0,
   });
   return data ?? null;
