@@ -25,23 +25,26 @@
   padding-left: calc(var(--space-3) - 3px);
 }
 
+/* One changed field per line: label, what the model has now, what the file says — lined up in the same three columns on every row, so rows read down the page instead of flowing into a ragged second column. */
 .attributeRow {
-  display: flex;
+  display: grid;
+  grid-template-columns: minmax(7rem, 10rem) 1fr 1fr;
   align-items: baseline;
   gap: var(--space-2);
-  flex-wrap: wrap;
 }
 
-.attributeColumns {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: var(--space-2);
-}
-
+.attributeColumns,
 .attributeColumnsThree {
-  display: grid;
-  grid-template-columns: 1fr 1fr 1fr;
-  gap: var(--space-2);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+
+@media (max-width: 640px) {
+  .attributeRow {
+    grid-template-columns: 1fr;
+    gap: 0;
+  }
 }
 
 .warnings {
