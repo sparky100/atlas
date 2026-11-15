@@ -450,9 +450,26 @@ interface LlmProxyConfig {
   rateLimitPerHour: number;
 }
 
+/** The saved provider key from Vault, or '' when none is saved or the function does not exist yet. */
+async function loadVaultApiKey(supabaseUrl: string, serviceRoleKey: string): Promise<string> {
+  try {
+    const res = await fetch(`${supabaseUrl}/rest/v1/rpc/platform_llm_api_key`, {
+      method: 'POST',
+      headers: { apikey: serviceRoleKey, Authorization: `Bearer ${serviceRoleKey}`, 'Content-Type': 'application/json', 'Content-Profile': 'atlas' },
+      body: '{}',
+    });
+    if (!res.ok) return '';
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment -- Deno runtime, no shared type-checking with src/.
+    const value = await res.json();
+    return typeof value === 'string' ? value : '';
+  } catch {
+    return '';
+  }
+}
+
 /**
  * Application-level config (E4 follow-up) — reads `platform_config`'s own
- * `key = 'llm'` row via a plain REST call under the service-role key (the
+ * `key = 'llm'` row (and the provider key from Vault) via a plain REST call under the service-role key (the
  * same shape Des-Studio's own `loadConfig()` uses), falling back
  * field-by-field to this function's own env-var secrets when the table has
  * no row, the fetch fails, or a given field isn't set on the row it does
@@ -479,9 +496,13 @@ async function loadConfig(supabaseUrl: string, serviceRoleKey: string): Promise<
     const rows = await res.json();
     if (!Array.isArray(rows) || rows.length === 0) return envDefaults;
     const cfg: Record<string, unknown> = (rows[0] as { value?: Record<string, unknown> })?.value ?? {};
+    // The saved key lives in Supabase Vault (atlas.platform_llm_api_key, service role only).
+    // A legacy plain-text `apiKey` on the row is still honoured until the hardening
+    // migration (20261114090000) moves it, so this function can be deployed first.
+    const vaultKey = await loadVaultApiKey(supabaseUrl, serviceRoleKey);
     return {
       model: typeof cfg.model === 'string' && cfg.model !== '' ? cfg.model : envDefaults.model,
-      apiKey: typeof cfg.apiKey === 'string' && cfg.apiKey !== '' ? cfg.apiKey : envDefaults.apiKey,
+      apiKey: vaultKey !== '' ? vaultKey : typeof cfg.apiKey === 'string' && cfg.apiKey !== '' ? cfg.apiKey : envDefaults.apiKey,
       rateLimitPerHour: typeof cfg.rateLimitPerHour === 'number' && cfg.rateLimitPerHour > 0 ? cfg.rateLimitPerHour : envDefaults.rateLimitPerHour,
     };
   } catch (e) {
