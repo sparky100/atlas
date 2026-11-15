@@ -187,7 +187,7 @@ export function ChangesView({ modelId, orgId, userId, orgSlug, modelSlug, canCre
                 disabled={!mainHeadCommitId}
               />
               <textarea
-                className={styles.textarea}
+                className={`${styles.textarea} ${styles.full}`}
                 placeholder="Description (optional)"
                 value={description}
                 onChange={(e) => {
@@ -196,7 +196,7 @@ export function ChangesView({ modelId, orgId, userId, orgSlug, modelSlug, canCre
                 disabled={!mainHeadCommitId}
               />
               {/* Prompt pack F0: no fixed default for this one surface (see `intent`'s own state comment) — an explicit choice, always. */}
-              <div className={styles.formRow}>
+              <div className={styles.field}>
                 <Text as="label" size="sm" tone="muted">
                   Why
                 </Text>
@@ -225,11 +225,11 @@ export function ChangesView({ modelId, orgId, userId, orgSlug, modelSlug, canCre
                   own doc comment: a candidate future is an option on a decision,
                   not a free-standing change. The hint names the real home rather
                   than silently hiding the fourth choice. */}
-              <Text as="p" tone="muted" size="xs">
+              <Text as="p" tone="muted" size="xs" className={styles.full}>
                 Exploring candidate futures? Start a decision and add options there.
               </Text>
               {dateFieldLabel !== null && (
-                <div className={styles.formRow}>
+                <div className={styles.field}>
                   <Text as="label" size="sm" tone="muted">
                     {dateFieldLabel}
                   </Text>
@@ -244,7 +244,7 @@ export function ChangesView({ modelId, orgId, userId, orgSlug, modelSlug, canCre
                   />
                 </div>
               )}
-              <div className={styles.formRow}>
+              <div className={`${styles.formRow} ${styles.full}`}>
                 <Button variant="primary" type="submit" disabled={status === 'creating' || !mainHeadCommitId}>
                   {status === 'creating' ? 'Creating…' : 'Create change'}
                 </Button>
