@@ -22,6 +22,7 @@ import { canDiscardCaptureJob, useMembership } from '../orgs/useMembership';
 import { captureInputFormatLabel, captureJobStatusLabel, captureJobStatusTone } from './captureJobStatus';
 import { DiscardCaptureButton } from './DiscardCaptureButton';
 import { useCaptureJobs } from './useCaptureJob';
+import { ImportHelpers } from '../import/ImportHelpers';
 import { UploadCaptureDialog } from './UploadCaptureDialog';
 import styles from './CaptureJobListView.module.css';
 
@@ -70,6 +71,8 @@ export function CaptureJobListView({ modelId, orgId, orgSlug, modelSlug, canCrea
         )}
       </div>
 
+      {canCreate && <ImportHelpers modelId={modelId} modelSlug={modelSlug} />}
+
       {!canCreate && (
         <Panel>
           <Text as="p" size="sm">
@@ -104,6 +107,7 @@ export function CaptureJobListView({ modelId, orgId, orgSlug, modelSlug, canCrea
             setUploadOpen(false);
           }}
           modelId={modelId}
+          modelSlug={modelSlug}
           createJob={createJob}
           status={status}
           error={error}
