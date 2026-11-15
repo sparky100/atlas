@@ -1,14 +1,12 @@
 import { Loading } from '../components/Loading/Loading';
-import { useState } from 'react';
+import { useState, type ReactNode } from 'react';
 import { Link, useNavigate } from 'react-router';
 import type { UUID } from '../../contracts/delta';
 import { Button } from '../components/Button/Button';
 import { Chip } from '../components/Chip/Chip';
 import { CollapsibleSection } from '../components/CollapsibleSection/CollapsibleSection';
 import { CommentsSection } from '../components/CommentsSection/CommentsSection';
-import { ConfidenceDots } from '../components/ConfidenceDots/ConfidenceDots';
 import { ElementTypeGlyph } from '../components/ElementTypeGlyph/ElementTypeGlyph';
-import { EmptyState } from '../components/EmptyState/EmptyState';
 import { LinkButton } from '../components/Button/LinkButton';
 import { Panel } from '../components/Panel/Panel';
 import { Text } from '../components/Text/Text';
@@ -21,10 +19,12 @@ import { formatDateTime } from '../time';
 import { canApproveOrMergeRequest, canCancelChange } from '../orgs/useMembership';
 import { BranchRebasePanel } from '../reviews/BranchRebasePanel';
 import { supabase } from '../supabaseClient';
+import { refQueryParam } from '../../db/ref';
 import { dateFieldLabelForIntent, intentReviewWeight, isDateRequiredForIntent } from './branchIntent';
 import { branchStatusTone } from './branchStatus';
 import { deriveChangeStep } from './changeStepper';
 import { describeDelta } from './changeSummaryFormat';
+import { hasImpactProblems } from './hasImpactProblems';
 import { ImpactProblemsPanel } from './ImpactProblemsPanel';
 import { describeImpactReasons, describeValueStreamReasons, focusImpact } from './impactFocus';
 import { Stepper } from './Stepper/Stepper';
@@ -50,6 +50,10 @@ export interface ChangeViewProps {
   role: MemberRole | null;
   /** Contributor+ (ADR-009) — the same gate `ChangesView`'s create form uses; a viewer sees the change read-only. */
   canEdit: boolean;
+  /** The page title line (the change's own "why" and name), drawn in the header with the actions. */
+  heading: string;
+  /** Where the change came from and which project it belongs to, drawn first under "about this change". */
+  aboutExtras?: ReactNode;
 }
 
 /**
@@ -93,7 +97,7 @@ export interface ChangeViewProps {
 /** How many subjects to show in "Edits on this change" before collapsing behind "View more" — same pattern as CaptureJobListView.tsx's own PAGE_SIZE, for the identical reason: a capture-driven change can carry hundreds of edits. */
 const EDITED_SUBJECTS_PAGE_SIZE = 20;
 
-export function ChangeView({ orgId, modelId, branchId, orgSlug, modelSlug, role, canEdit }: ChangeViewProps) {
+export function ChangeView({ orgId, modelId, branchId, orgSlug, modelSlug, role, canEdit, heading, aboutExtras }: ChangeViewProps) {
   const { userId } = useAuth();
   const { status, branch, error, updateMetadata, reload } = useChange(branchId);
   const summaryState = useChangeSummary(modelId, branch);
@@ -187,23 +191,179 @@ export function ChangeView({ orgId, modelId, branchId, orgSlug, modelSlug, role,
     setEditing(true);
   };
 
+  const isSelected = ref.kind === 'branch' && ref.branchId === branchId;
+  const summaryReady = summaryState.status === 'ready';
+  const hasEdits = summaryReady && summaryState.summary.subjects.length > 0;
+  const canSubmit = canEdit && branch.status === 'draft' && openRequest === null;
+  // One clear main action for the stage the change is in.
+  const submitIsPrimary = canSubmit && hasEdits;
+  const editIsPrimary = canEdit && branch.status === 'draft' && !isSelected && !submitIsPrimary;
+  const oneStepApprove = openRequest && intentReviewWeight(intent) === 'single' && canApproveOrMergeRequest(role) && (openRequest.status === 'pending' || openRequest.status === 'approved');
+  const editInLandscapeHref = `/o/${orgSlug}/m/${modelSlug}/landscape?${refQueryParam({ kind: 'branch', branchId }, false)}`;
+  const impactHasContent =
+    summaryReady &&
+    impact !== null &&
+    (hasImpactProblems(summaryState.summary.impactProblems) ||
+      impact.shownCapabilities.length + impact.collapsedCapabilities.length + impact.shownValueStreams.length + impact.collapsedValueStreams.length > 0 ||
+      summaryState.summary.otherOpenChanges.length > 0 ||
+      summaryState.summary.captureDraftOverlaps.length > 0);
+
   return (
     <div>
-      <div className={styles.meta}>
-        <Chip tone={branchStatusTone(branch.status)}>{branch.status}</Chip>
-        {dateFieldLabel !== null && branch.target_date !== null && (
-          <Text as="span" tone="muted" size="sm">
-            {dateFieldLabel}: {branch.target_date}
-          </Text>
+      {/* Actions: the title, where the change stands, and the one thing to do next. */}
+      <div className={styles.header}>
+        <div className={styles.headerTop}>
+          <div className={styles.headerTitle}>
+            <Text as="h1" size="2xl">
+              {heading}
+            </Text>
+            <div className={styles.meta}>
+              <Chip tone={branchStatusTone(branch.status)}>{branch.status}</Chip>
+              {dateFieldLabel !== null && branch.target_date !== null && (
+                <Text as="span" tone="muted" size="sm">
+                  {dateFieldLabel}: {branch.target_date}
+                </Text>
+              )}
+              <Text as="span" tone="faint" size="xs">
+                Updated {formatDateTime(branch.updated_at)}
+              </Text>
+            </div>
+          </div>
+          <div className={styles.headerActions}>
+            {canEdit && branch.status === 'draft' && (
+              <Button
+                variant={editIsPrimary ? 'primary' : 'secondary'}
+                disabled={isSelected}
+                onClick={() => {
+                  setRef({ kind: 'branch', branchId });
+                }}
+              >
+                {isSelected ? 'Editing in this change' : 'Edit in this change'}
+              </Button>
+            )}
+            {canSubmit && (
+              <Button
+                variant={submitIsPrimary ? 'primary' : 'secondary'}
+                disabled={submission.status === 'submitting'}
+                onClick={() => {
+                  if (isMultiReviewerIntent) {
+                    setPickingReviewers(true);
+                  } else {
+                    void submission.submit(null).then((mergeRequestId) => {
+                      if (!mergeRequestId) return;
+                      afterSubmitted(mergeRequestId);
+                    });
+                  }
+                }}
+              >
+                {submission.status === 'submitting' ? 'Submitting…' : 'Submit for review'}
+              </Button>
+            )}
+            {oneStepApprove && (
+              <Button
+                variant="primary"
+                disabled={approveAndMergeState.status === 'working'}
+                onClick={() => {
+                  void approveAndMergeState.approveAndMerge(openRequest, branch).then((merged) => {
+                    if (!merged) return;
+                    reload();
+                    reloadOpenRequest();
+                  });
+                }}
+              >
+                {approveAndMergeState.status === 'working' ? 'Merging…' : 'Approve & merge'}
+              </Button>
+            )}
+            {openRequest && (
+              <LinkButton to={`/o/${orgSlug}/m/${modelSlug}/review/${openRequest.id}`} variant={oneStepApprove ? 'secondary' : 'primary'}>
+                Open review →
+              </LinkButton>
+            )}
+            <Link to={`/o/${orgSlug}/m/${modelSlug}/landscape?${refQueryParam({ kind: 'branch', branchId }, true)}`}>
+              <Button variant="secondary">View this change</Button>
+            </Link>
+            {canEdit && branch.status === 'draft' && !editing && (
+              <Button variant="ghost" onClick={startEditing}>
+                Edit title and description
+              </Button>
+            )}
+            {canCancelChange(role, branch, userId) && !cancelling && (
+              <Button
+                variant="destructive"
+                onClick={() => {
+                  setCancelReason('');
+                  setCancelling(true);
+                }}
+              >
+                Cancel this change…
+              </Button>
+            )}
+          </div>
+        </div>
+        {/* The stepper needs to know whether an open merge request exists;
+            `undefined` means still loading, so it waits rather than rendering
+            with a momentarily-wrong "no request" assumption. */}
+        {openRequest !== undefined && <Stepper derived={deriveChangeStep(branch, openRequest)} />}
+        {pickingReviewers && (
+          <ReviewerPicker
+            orgId={orgId}
+            modelId={modelId}
+            branch={branch}
+            submitting={submission.status === 'submitting'}
+            onCancel={() => {
+              setPickingReviewers(false);
+            }}
+            onSubmit={(reviewers) => {
+              void submission.submit(reviewers).then((mergeRequestId) => {
+                if (!mergeRequestId) return;
+                setPickingReviewers(false);
+                afterSubmitted(mergeRequestId);
+              });
+            }}
+          />
         )}
-        <Text as="span" tone="faint" size="xs">
-          Updated {formatDateTime(branch.updated_at)}
-        </Text>
+        {submission.error !== null && <Text as="p">{submission.error}</Text>}
+        {approveAndMergeState.error !== null && <Text as="p">{approveAndMergeState.error}</Text>}
+        {error !== null && <Text as="p">{error}</Text>}
+        {cancelling && (
+          <div className={styles.editForm}>
+            <textarea
+              className={styles.textarea}
+              placeholder="Reason (required)"
+              value={cancelReason}
+              onChange={(e) => {
+                setCancelReason(e.target.value);
+              }}
+            />
+            <div className={styles.actions}>
+              <Button
+                variant="destructive"
+                disabled={cancellation.status === 'cancelling'}
+                onClick={() => {
+                  void cancellation.cancel(cancelReason).then((cancelled) => {
+                    if (!cancelled) return;
+                    setCancelling(false);
+                    if (ref.kind === 'branch' && ref.branchId === branchId) clearRef();
+                    reload();
+                  });
+                }}
+              >
+                {cancellation.status === 'cancelling' ? 'Cancelling…' : 'Confirm cancel'}
+              </Button>
+              <Button
+                variant="ghost"
+                onClick={() => {
+                  setCancelling(false);
+                }}
+              >
+                Back
+              </Button>
+            </div>
+            {cancellation.error !== null && <Text as="p">{cancellation.error}</Text>}
+          </div>
+        )}
       </div>
 
-      {/* S1 item 4: "listed ... with a reason" — the cancelled branch's own
-          page is where that reason actually lives; the collapsed list on
-          ChangesPage only names the change, not why. */}
       {branch.status === 'cancelled' && (
         <Panel>
           <Text as="p" size="sm">
@@ -221,477 +381,328 @@ export function ChangeView({ orgId, modelId, branchId, orgSlug, modelSlug, role,
         </Panel>
       )}
 
-      {/* Item 1: the stepper needs to know whether an open merge request
-          exists (for the Draft/"sent back" sentence and the In
-          review/Approved current-step distinction) — `openRequest` is
-          already fetched for the Review panel below; `undefined` means
-          still loading, so the stepper waits rather than rendering with a
-          momentarily-wrong "no request" assumption. */}
-      {openRequest !== undefined && <Stepper derived={deriveChangeStep(branch, openRequest)} />}
+      {/* Only appears when the model has moved on (or an edit needs a decision). */}
+      {branch.status === 'draft' && openRequest === null && <BranchRebasePanel modelId={modelId} branch={branch} userId={userId} canEdit={canEdit} onRebased={reload} />}
 
-      {error !== null && <Text as="p">{error}</Text>}
+      <div className={impactHasContent ? styles.layout : styles.layoutSingle}>
+        {/* Change information */}
+        <div className={styles.column}>
+          {aboutExtras}
 
-      {branch.status === 'draft' && openRequest === null && (
-        <Panel>
-          <Text as="h2" size="lg">
-            Rebase
-          </Text>
-          <BranchRebasePanel modelId={modelId} branch={branch} userId={userId} canEdit={canEdit} onRebased={reload} />
-        </Panel>
-      )}
-
-      {(branch.status === 'draft' || openRequest !== null) && (
-        <Panel>
-          <Text as="h2" size="lg">
-            Review
-          </Text>
-          {openRequest === undefined && (
-            <Text tone="muted" size="sm">
-              Checking for an open review request…
-            </Text>
-          )}
-          {openRequest === null && branch.status === 'draft' && (
-            <>
-              <Text as="p" tone="muted" size="sm">
-                Submitting opens the review queue for this change — a reviewer sees every edit, conflict, and affected capability before it can merge into main.
-              </Text>
-              {canEdit && (
-                <Button
-                  variant="primary"
-                  disabled={submission.status === 'submitting'}
-                  onClick={() => {
-                    if (isMultiReviewerIntent) {
-                      setPickingReviewers(true);
-                    } else {
-                      void submission.submit(null).then((mergeRequestId) => {
-                        if (!mergeRequestId) return;
-                        afterSubmitted(mergeRequestId);
-                      });
-                    }
-                  }}
-                >
-                  {submission.status === 'submitting' ? 'Submitting…' : 'Submit for review'}
-                </Button>
-              )}
-              {pickingReviewers && (
-                <ReviewerPicker
-                  orgId={orgId}
-                  modelId={modelId}
-                  branch={branch}
-                  submitting={submission.status === 'submitting'}
-                  onCancel={() => {
-                    setPickingReviewers(false);
-                  }}
-                  onSubmit={(reviewers) => {
-                    void submission.submit(reviewers).then((mergeRequestId) => {
-                      if (!mergeRequestId) return;
-                      setPickingReviewers(false);
-                      afterSubmitted(mergeRequestId);
-                    });
-                  }}
-                />
-              )}
-              {submission.error !== null && <Text as="p">{submission.error}</Text>}
-            </>
-          )}
-          {openRequest && (
-            <div className={styles.subjectTitle}>
-              <Chip tone={branchStatusTone(branch.status)}>{branch.status}</Chip>
-              <LinkButton to={`/o/${orgSlug}/m/${modelSlug}/review/${openRequest.id}`} variant="secondary">
-                Open review →
-              </LinkButton>
-            </div>
-          )}
-          {/* F0's resolved review-weight decision: record/correct get this
-              one-click shortcut alongside "Open review →" above — the same
-              atlas.approve_merge_request/atlas.merge_branch RPCs a reviewer
-              would otherwise click through on the review request's own
-              page, called in sequence from here instead. propose/explore
-              keep that page as their only path (ReviewQueueView.tsx's own
-              intent filter is what actually keeps them off the shared
-              queue list; this button simply never renders for them). */}
-          {openRequest && intentReviewWeight(intent) === 'single' && canApproveOrMergeRequest(role) && (openRequest.status === 'pending' || openRequest.status === 'approved') && (
-            <>
-              <Button
-                variant="primary"
-                disabled={approveAndMergeState.status === 'working'}
-                onClick={() => {
-                  void approveAndMergeState.approveAndMerge(openRequest, branch).then((merged) => {
-                    if (!merged) return;
-                    reload();
-                    reloadOpenRequest();
+          {!editing ? (
+            (branch.description !== null || (canEdit && branch.status === 'draft')) && (
+              <Panel>
+                <div className={styles.field}>
+                  <Text as="h2" size="lg">
+                    Description
+                  </Text>
+                  <Text as="p" tone={branch.description ? 'default' : 'muted'}>
+                    {branch.description ?? 'Add a short description so reviewers know why.'}
+                  </Text>
+                </div>
+              </Panel>
+            )
+          ) : (
+            <Panel>
+              <form
+                className={styles.editForm}
+                onSubmit={(e) => {
+                  e.preventDefault();
+                  void updateMetadata({
+                    title: title.trim().length > 0 ? title.trim() : null,
+                    description: description.trim().length > 0 ? description.trim() : null,
+                    // `correct`/`explore` have no date field at all (see
+                    // `dateFieldLabelForIntent`) — omitted from the patch entirely,
+                    // not sent as `null`, so an unrelated edit never clears a date.
+                    ...(dateFieldLabel !== null ? { targetDate: targetDate.trim().length > 0 ? targetDate.trim() : null } : {}),
+                  }).then(() => {
+                    setEditing(false);
                   });
                 }}
               >
-                {approveAndMergeState.status === 'working' ? 'Merging…' : 'Approve & merge'}
-              </Button>
-              {approveAndMergeState.error !== null && <Text as="p">{approveAndMergeState.error}</Text>}
-            </>
-          )}
-        </Panel>
-      )}
-
-      {/* S1 item 4: "Cancel a change: proposer or owner/architect, Draft or
-          Proposed." Closing this also closes any open merge request
-          (atlas.cancel_change's own comment) — the queue and My changes
-          both drop it without either of them needing a change of their
-          own (a closed request is no longer "open"; a cancelled branch was
-          never in `MY_OPEN_STATUSES` to begin with). */}
-      {canCancelChange(role, branch, userId) && (
-        <Panel>
-          <Text as="h2" size="lg">
-            Cancel this change
-          </Text>
-          {!cancelling ? (
-            <Button
-              variant="destructive"
-              onClick={() => {
-                setCancelReason('');
-                setCancelling(true);
-              }}
-            >
-              Cancel this change…
-            </Button>
-          ) : (
-            <div className={styles.editForm}>
-              <textarea
-                className={styles.textarea}
-                placeholder="Reason (required)"
-                value={cancelReason}
-                onChange={(e) => {
-                  setCancelReason(e.target.value);
-                }}
-              />
-              <div className={styles.actions}>
-                <Button
-                  variant="destructive"
-                  disabled={cancellation.status === 'cancelling'}
-                  onClick={() => {
-                    void cancellation.cancel(cancelReason).then((cancelled) => {
-                      if (!cancelled) return;
-                      setCancelling(false);
-                      // Same "only clear it if it was actually this branch"
-                      // care every other exit path here already takes.
-                      if (ref.kind === 'branch' && ref.branchId === branchId) clearRef();
-                      reload();
-                    });
-                  }}
-                >
-                  {cancellation.status === 'cancelling' ? 'Cancelling…' : 'Confirm cancel'}
-                </Button>
-                <Button
-                  variant="ghost"
-                  onClick={() => {
-                    setCancelling(false);
-                  }}
-                >
-                  Back
-                </Button>
-              </div>
-              {cancellation.error !== null && <Text as="p">{cancellation.error}</Text>}
-            </div>
-          )}
-        </Panel>
-      )}
-
-      {!editing ? (
-        <Panel>
-          <div className={styles.field}>
-            <Text as="h2" size="lg">
-              Description
-            </Text>
-            <Text as="p" tone={branch.description ? 'default' : 'muted'}>
-              {branch.description ?? 'No description.'}
-            </Text>
-          </div>
-          {canEdit && (
-            <Button variant="secondary" onClick={startEditing}>
-              Edit
-            </Button>
-          )}
-        </Panel>
-      ) : (
-        <Panel>
-          <form
-            className={styles.editForm}
-            onSubmit={(e) => {
-              e.preventDefault();
-              void updateMetadata({
-                title: title.trim().length > 0 ? title.trim() : null,
-                description: description.trim().length > 0 ? description.trim() : null,
-                // F0: `correct`/`explore` have no date field at all (see
-                // `dateFieldLabelForIntent`'s own doc comment) — omitted
-                // from the patch entirely, not sent as `null`, so an
-                // unrelated edit never silently clears a date a `record`/
-                // `propose` change already had before an intent change
-                // (intent editing isn't UI yet, but the column itself is).
-                ...(dateFieldLabel !== null ? { targetDate: targetDate.trim().length > 0 ? targetDate.trim() : null } : {}),
-              }).then(() => {
-                setEditing(false);
-              });
-            }}
-          >
-            <input
-              className={styles.input}
-              type="text"
-              placeholder="Title"
-              value={title}
-              onChange={(e) => {
-                setTitle(e.target.value);
-              }}
-            />
-            <textarea
-              className={styles.textarea}
-              placeholder="Description"
-              value={description}
-              onChange={(e) => {
-                setDescription(e.target.value);
-              }}
-            />
-            {/* F0: "delivered date" for record, "target date" for propose
-                — the same `branches.target_date` column either way (a
-                deliberate reuse, `branchIntent.ts`'s own doc comment);
-                `correct`/`explore` need no date at all, so the field is
-                omitted entirely rather than shown disabled. */}
-            {dateFieldLabel !== null && (
-              <div className={styles.dateField}>
-                <Text as="label" size="sm" tone="muted">
-                  {dateFieldLabel}
-                  {isDateRequiredForIntent(intent) ? ' (required)' : ''}
-                </Text>
                 <input
                   className={styles.input}
-                  type="date"
-                  required={isDateRequiredForIntent(intent)}
-                  value={targetDate}
+                  type="text"
+                  placeholder="Title"
+                  value={title}
                   onChange={(e) => {
-                    setTargetDate(e.target.value);
+                    setTitle(e.target.value);
                   }}
                 />
-              </div>
-            )}
-            <div className={styles.actions}>
-              <Button variant="primary" type="submit" disabled={status === 'saving'}>
-                Save
-              </Button>
-              <Button
-                variant="ghost"
-                type="button"
-                onClick={() => {
-                  setEditing(false);
-                }}
-              >
-                Cancel
-              </Button>
-            </div>
-          </form>
-        </Panel>
-      )}
-
-      {importSummary.state.status !== 'none' && (
-        <Panel>
-          <Text as="h2" size="lg">
-            Import summary
-          </Text>
-          {importSummary.state.status === 'loading' && <Loading />}
-          {importSummary.state.status === 'error' && <Text as="p">{importSummary.state.message}</Text>}
-          {importSummary.state.status === 'ready' && (
-            <>
-              <Text as="p" size="sm" tone="muted">
-                From {importSummary.state.fileName}
-              </Text>
-              <div className={styles.importCounts}>
-                <Chip tone="info">{summaryState.status === 'ready' ? summaryState.summary.subjects.filter((s) => s.subjectType === 'element' && (s.elementType === 'system' || s.elementType === 'container') && s.deltas.some((d) => d.kind === 'element.create')).length : 0} new</Chip>
-                <Chip tone="info">{summaryState.status === 'ready' ? summaryState.summary.subjects.filter((s) => s.subjectType === 'element' && (s.elementType === 'system' || s.elementType === 'container') && !s.deltas.some((d) => d.kind === 'element.create')).length : 0} changed</Chip>
-                {importSummary.state.notInFile.length > 0 && <Chip tone="warn">{importSummary.state.notInFile.length} not in file</Chip>}
-              </div>
-              {importSummary.state.notInFile.length > 0 && (
-                <ul className={styles.subjectList}>
-                  {importSummary.state.notInFile.map((element) => (
-                    <li key={element.elementId} className={styles.subjectRow}>
-                      <div className={styles.subjectTitle}>
-                        <ElementTypeGlyph type={element.elementType} />
-                        <Text as="span" size="lg">
-                          {element.name}
-                        </Text>
-                      </div>
-                      {canEdit && (
-                        <Button variant="secondary" disabled={importSummary.retiring === element.elementId} onClick={() => { void importSummary.retire(element); }}>
-                          {importSummary.retiring === element.elementId ? 'Retiring…' : 'Retire'}
-                        </Button>
-                      )}
-                    </li>
-                  ))}
-                </ul>
-              )}
-            </>
+                <textarea
+                  className={styles.textarea}
+                  placeholder="Description"
+                  value={description}
+                  onChange={(e) => {
+                    setDescription(e.target.value);
+                  }}
+                />
+                {dateFieldLabel !== null && (
+                  <div className={styles.dateField}>
+                    <Text as="label" size="sm" tone="muted">
+                      {dateFieldLabel}
+                      {isDateRequiredForIntent(intent) ? ' (required)' : ''}
+                    </Text>
+                    <input
+                      className={styles.input}
+                      type="date"
+                      required={isDateRequiredForIntent(intent)}
+                      value={targetDate}
+                      onChange={(e) => {
+                        setTargetDate(e.target.value);
+                      }}
+                    />
+                  </div>
+                )}
+                <div className={styles.actions}>
+                  <Button variant="primary" type="submit" disabled={status === 'saving'}>
+                    Save
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    type="button"
+                    onClick={() => {
+                      setEditing(false);
+                    }}
+                  >
+                    Cancel
+                  </Button>
+                </div>
+              </form>
+            </Panel>
           )}
-        </Panel>
-      )}
 
-      <Panel>
-        <Text as="h2" size="lg">
-          Edits on this change
-        </Text>
-        {summaryState.status === 'loading' && <Loading />}
-        {summaryState.status === 'error' && <Text as="p">{summaryState.message}</Text>}
-        {summaryState.status === 'ready' && summaryState.summary.subjects.length === 0 && <EmptyState>No edits yet — this change hasn't diverged from main.</EmptyState>}
-        {summaryState.status === 'ready' && summaryState.summary.subjects.length > 0 && (
-          <>
-            <ul className={styles.subjectList}>
-              {summaryState.summary.subjects.slice(0, visibleSubjectCount).map((subject) => (
-                <li key={subject.subjectId} className={styles.subjectRow}>
-                  <div className={styles.subjectTitle}>
-                    {subject.subjectType === 'element' && <ElementTypeGlyph type={subject.elementType} />}
-                    <Text as="span" size="lg">
-                      {subject.name}
-                    </Text>
-                  </div>
-                  <ul className={styles.deltaList}>
-                    {subject.deltas.map((delta) => {
-                      const source = summaryState.summary.sourcesById.get(delta.sourceId);
-                      return (
-                        <li key={delta.id} className={styles.deltaRow}>
-                          <Text as="span" size="sm">
-                            {describeDelta(delta)}
-                          </Text>
-                          <Text as="span" tone="muted" size="sm">
-                            {source?.name ?? delta.sourceId}
-                          </Text>
-                          <ConfidenceDots confidence={delta.confidence} />
-                        </li>
-                      );
-                    })}
-                  </ul>
-                </li>
-              ))}
-            </ul>
-            {summaryState.summary.subjects.length > visibleSubjectCount && (
-              <Button variant="ghost" onClick={() => { setVisibleSubjectCount((c) => c + EDITED_SUBJECTS_PAGE_SIZE); }}>
-                View more ({summaryState.summary.subjects.length - visibleSubjectCount} more)
-              </Button>
-            )}
-          </>
-        )}
-      </Panel>
-
-      <Panel>
-        <Text as="h2" size="lg">
-          Comments on this change
-        </Text>
-        <CommentsSection orgId={orgId} modelId={modelId} userId={userId} role={role} anchorType="change" anchorId={branchId} branchId={branchId} />
-      </Panel>
-
-      {summaryState.status === 'ready' && <ImpactProblemsPanel problems={summaryState.summary.impactProblems} orgSlug={orgSlug} modelSlug={modelSlug} />}
-
-      <Panel>
-        <Text as="h2" size="lg">
-          Affected capabilities
-        </Text>
-        {impact?.shownCapabilities.length === 0 && <EmptyState>No capabilities are affected by this change yet.</EmptyState>}
-        {impact?.focused && (
-          <Text as="p" tone="muted" size="sm">
-            In this project&apos;s declared scope.
-          </Text>
-        )}
-        {impact && impact.shownCapabilities.length > 0 && <AffectedCapabilityList capabilities={impact.shownCapabilities} orgSlug={orgSlug} modelSlug={modelSlug} />}
-        {impact && impact.collapsedCapabilities.length > 0 && (
-          <CollapsibleSection title="Also reached, outside the project's scope" meta={`(${String(impact.collapsedCapabilities.length)})`} defaultOpen={false}>
-            <AffectedCapabilityList capabilities={impact.collapsedCapabilities} orgSlug={orgSlug} modelSlug={modelSlug} />
-          </CollapsibleSection>
-        )}
-      </Panel>
-
-      <Panel>
-        <Text as="h2" size="lg">
-          Affected value streams
-        </Text>
-        {impact?.shownValueStreams.length === 0 && <EmptyState>No value stream is affected by this change yet.</EmptyState>}
-        {impact && impact.shownValueStreams.length > 0 && <AffectedValueStreamList valueStreams={impact.shownValueStreams} orgSlug={orgSlug} modelSlug={modelSlug} />}
-        {impact && impact.collapsedValueStreams.length > 0 && (
-          <CollapsibleSection title="Also reached, outside the project's scope" meta={`(${String(impact.collapsedValueStreams.length)})`} defaultOpen={false}>
-            <AffectedValueStreamList valueStreams={impact.collapsedValueStreams} orgSlug={orgSlug} modelSlug={modelSlug} />
-          </CollapsibleSection>
-        )}
-      </Panel>
-
-      <Panel>
-        <Text as="h2" size="lg">
-          Other open changes touching the same elements
-        </Text>
-        {summaryState.status === 'ready' && summaryState.summary.otherOpenChanges.length === 0 && <EmptyState>No other open change touches the same elements.</EmptyState>}
-        {summaryState.status === 'ready' && summaryState.summary.otherOpenChanges.length > 0 && (
-          <ul className={styles.branchList}>
-            {summaryState.summary.otherOpenChanges.map(({ branch: other, sharedElementNames }) => (
-              <li key={other.id} className={styles.branchRow}>
-                <div className={styles.branchText}>
-                  <Text as="span">{other.title ?? other.name}</Text>
-                  <Text as="p" tone="muted" size="sm">
-                    Both touch {sharedElementNames.join(', ')}
+          {importSummary.state.status !== 'none' && (
+            <Panel>
+              <Text as="h2" size="lg">
+                Import summary
+              </Text>
+              {importSummary.state.status === 'loading' && <Loading />}
+              {importSummary.state.status === 'error' && <Text as="p">{importSummary.state.message}</Text>}
+              {importSummary.state.status === 'ready' && (
+                <>
+                  <Text as="p" size="sm" tone="muted">
+                    From {importSummary.state.fileName}
                   </Text>
-                </div>
-                <div className={styles.branchActions}>
-                  <Chip tone={branchStatusTone(other.status)}>{other.status}</Chip>
-                  <LinkButton to={`/o/${orgSlug}/m/${modelSlug}/changes/${other.id}`} variant="secondary">
-                    Open →
-                  </LinkButton>
-                </div>
-              </li>
-            ))}
-          </ul>
-        )}
-        {summaryState.status === 'ready' && summaryState.summary.captureDraftOverlaps.length > 0 && (
-          <CollapsibleSection title="Unreviewed import drafts touching these elements" meta={`(${String(summaryState.summary.captureDraftOverlaps.length)})`} defaultOpen={false}>
-            <ul className={styles.branchList}>
-              {summaryState.summary.captureDraftOverlaps.map(({ title, draftCount, latestJobId, sharedElementNames }) => (
-                <li key={title} className={styles.branchRow}>
-                  <div className={styles.branchText}>
-                    <Text as="span">{title}</Text>
-                    <Text as="p" tone="muted" size="sm">
-                      {draftCount > 1 ? `${String(draftCount)} drafts · ` : ''}Both touch {sharedElementNames.join(', ')}
-                    </Text>
+                  <div className={styles.importCounts}>
+                    <Chip tone="info">{summaryState.status === 'ready' ? summaryState.summary.subjects.filter((s) => s.subjectType === 'element' && (s.elementType === 'system' || s.elementType === 'container') && s.deltas.some((d) => d.kind === 'element.create')).length : 0} new</Chip>
+                    <Chip tone="info">{summaryState.status === 'ready' ? summaryState.summary.subjects.filter((s) => s.subjectType === 'element' && (s.elementType === 'system' || s.elementType === 'container') && !s.deltas.some((d) => d.kind === 'element.create')).length : 0} changed</Chip>
+                    {importSummary.state.notInFile.length > 0 && <Chip tone="warn">{importSummary.state.notInFile.length} not in file</Chip>}
                   </div>
-                  {latestJobId !== null && (
+                  {importSummary.state.notInFile.length > 0 && (
+                    <ul className={styles.subjectList}>
+                      {importSummary.state.notInFile.map((element) => (
+                        <li key={element.elementId} className={styles.subjectRow}>
+                          <div className={styles.subjectTitle}>
+                            <ElementTypeGlyph type={element.elementType} />
+                            <Text as="span" size="lg">
+                              {element.name}
+                            </Text>
+                          </div>
+                          {canEdit && (
+                            <Button variant="secondary" disabled={importSummary.retiring === element.elementId} onClick={() => { void importSummary.retire(element); }}>
+                              {importSummary.retiring === element.elementId ? 'Retiring…' : 'Retire'}
+                            </Button>
+                          )}
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </>
+              )}
+            </Panel>
+          )}
+
+          {summaryState.status === 'loading' && (
+            <Panel>
+              <Loading />
+            </Panel>
+          )}
+          {summaryState.status === 'error' && (
+            <Panel>
+              <Text as="p">{summaryState.message}</Text>
+            </Panel>
+          )}
+          {summaryState.status === 'ready' && summaryState.summary.subjects.length === 0 && importSummary.state.status === 'none' && canEdit && branch.status === 'draft' && (
+            <div className={styles.nextStep}>
+              <Text as="p" size="lg">
+                Nothing has been changed yet.
+              </Text>
+              <Text as="p" tone="muted" size="sm">
+                Open a system, make your edit and save it. It will appear here, together with what it affects.
+              </Text>
+              <LinkButton to={editInLandscapeHref} variant={isSelected ? 'primary' : 'secondary'}>
+                {isSelected ? 'Carry on editing' : 'Open the landscape to edit'}
+              </LinkButton>
+            </div>
+          )}
+          {summaryState.status === 'ready' && summaryState.summary.subjects.length > 0 && (
+            <Panel>
+              <Text as="h2" size="lg">
+                What this change does
+              </Text>
+              <ul className={styles.subjectList}>
+                {summaryState.summary.subjects.slice(0, visibleSubjectCount).map((subject) => (
+                  <li key={subject.subjectId} className={styles.subjectRow}>
+                    <div className={styles.subjectTitle}>
+                      {subject.subjectType === 'element' && <ElementTypeGlyph type={subject.elementType} />}
+                      <Text as="span" size="lg">
+                        {subject.name}
+                      </Text>
+                    </div>
+                    <ul className={styles.deltaList}>
+                      {subject.deltas.map((delta) => {
+                        const source = summaryState.summary.sourcesById.get(delta.sourceId);
+                        return (
+                          <li key={delta.id} className={styles.deltaRow}>
+                            <Text as="span" size="sm">
+                              {describeDelta(delta)}
+                            </Text>
+                            <Text as="span" tone="muted" size="sm">
+                              {source?.name ?? delta.sourceId}
+                            </Text>
+                          </li>
+                        );
+                      })}
+                    </ul>
+                  </li>
+                ))}
+              </ul>
+              {summaryState.summary.subjects.length > visibleSubjectCount && (
+                <Button variant="ghost" onClick={() => { setVisibleSubjectCount((c) => c + EDITED_SUBJECTS_PAGE_SIZE); }}>
+                  View more ({summaryState.summary.subjects.length - visibleSubjectCount} more)
+                </Button>
+              )}
+            </Panel>
+          )}
+
+          <Panel>
+            <Text as="h2" size="lg">
+              Comments
+            </Text>
+            <CommentsSection orgId={orgId} modelId={modelId} userId={userId} role={role} anchorType="change" anchorId={branchId} branchId={branchId} />
+          </Panel>
+
+          {summaryState.status === 'ready' && summaryState.lineage.splits.length > 0 && (
+            <Panel>
+              <Text as="h2" size="lg">
+                Parts of this change
+              </Text>
+              <ul className={styles.branchList}>
+                {summaryState.lineage.splits.map((split) => (
+                  <li key={split.id} className={styles.branchRow}>
+                    <div className={styles.branchText}>
+                      <Text as="span">{split.title ?? split.name}</Text>
+                    </div>
                     <div className={styles.branchActions}>
-                      <LinkButton to={`/o/${orgSlug}/m/${modelSlug}/review/capture/${latestJobId}`} variant="secondary">
-                        Review →
+                      <Chip tone={branchStatusTone(split.status)}>{split.status === 'merged' ? 'delivered' : split.status}</Chip>
+                      <LinkButton to={`/o/${orgSlug}/m/${modelSlug}/changes/${split.id}`} variant="secondary">
+                        Open →
                       </LinkButton>
                     </div>
-                  )}
-                </li>
-              ))}
-            </ul>
-          </CollapsibleSection>
-        )}
-      </Panel>
+                  </li>
+                ))}
+              </ul>
+            </Panel>
+          )}
+          {summaryState.status === 'ready' && summaryState.lineage.splits.length === 0 && branch.split_from && (
+            <Text as="p" tone="muted" size="sm">
+              This change was taken out of a larger change.
+            </Text>
+          )}
+        </div>
 
-      <Panel>
-        <Text as="h2" size="lg">
-          Delivered / remaining
-        </Text>
-        {summaryState.status === 'ready' && summaryState.lineage.splits.length === 0 && (
-          <Text as="p" tone="muted">
-            {branch.split_from ? 'This change was split from another one.' : 'Not split yet — everything is still on this change.'}
-          </Text>
+        {/* Change impact: only when there is something to say, problems first. */}
+        {impactHasContent && (
+          <div className={styles.column}>
+            <ImpactProblemsPanel problems={summaryState.summary.impactProblems} orgSlug={orgSlug} modelSlug={modelSlug} />
+
+            {impact.shownCapabilities.length + impact.collapsedCapabilities.length > 0 && (
+              <Panel>
+                <Text as="h2" size="lg">
+                  Affected capabilities
+                </Text>
+                {impact.focused && (
+                  <Text as="p" tone="muted" size="sm">
+                    In this project&apos;s declared scope.
+                  </Text>
+                )}
+                {impact.shownCapabilities.length > 0 && <AffectedCapabilityList capabilities={impact.shownCapabilities} orgSlug={orgSlug} modelSlug={modelSlug} />}
+                {impact.collapsedCapabilities.length > 0 && (
+                  <CollapsibleSection title="Also reached, outside the project's scope" meta={`(${String(impact.collapsedCapabilities.length)})`} defaultOpen={false}>
+                    <AffectedCapabilityList capabilities={impact.collapsedCapabilities} orgSlug={orgSlug} modelSlug={modelSlug} />
+                  </CollapsibleSection>
+                )}
+              </Panel>
+            )}
+
+            {impact.shownValueStreams.length + impact.collapsedValueStreams.length > 0 && (
+              <Panel>
+                <Text as="h2" size="lg">
+                  Affected value streams
+                </Text>
+                {impact.shownValueStreams.length > 0 && <AffectedValueStreamList valueStreams={impact.shownValueStreams} orgSlug={orgSlug} modelSlug={modelSlug} />}
+                {impact.collapsedValueStreams.length > 0 && (
+                  <CollapsibleSection title="Also reached, outside the project's scope" meta={`(${String(impact.collapsedValueStreams.length)})`} defaultOpen={false}>
+                    <AffectedValueStreamList valueStreams={impact.collapsedValueStreams} orgSlug={orgSlug} modelSlug={modelSlug} />
+                  </CollapsibleSection>
+                )}
+              </Panel>
+            )}
+
+            {(summaryState.summary.otherOpenChanges.length > 0 || summaryState.summary.captureDraftOverlaps.length > 0) && (
+              <Panel>
+                <Text as="h2" size="lg">
+                  Other open changes touching the same elements
+                </Text>
+                {summaryState.summary.otherOpenChanges.length > 0 && (
+                  <ul className={styles.branchList}>
+                    {summaryState.summary.otherOpenChanges.map(({ branch: other, sharedElementNames }) => (
+                      <li key={other.id} className={styles.branchRow}>
+                        <div className={styles.branchText}>
+                          <Text as="span">{other.title ?? other.name}</Text>
+                          <Text as="p" tone="muted" size="sm">
+                            Both touch {sharedElementNames.join(', ')}
+                          </Text>
+                        </div>
+                        <div className={styles.branchActions}>
+                          <Chip tone={branchStatusTone(other.status)}>{other.status}</Chip>
+                          <LinkButton to={`/o/${orgSlug}/m/${modelSlug}/changes/${other.id}`} variant="secondary">
+                            Open →
+                          </LinkButton>
+                        </div>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+                {summaryState.summary.captureDraftOverlaps.length > 0 && (
+                  <CollapsibleSection title="Unreviewed import drafts touching these elements" meta={`(${String(summaryState.summary.captureDraftOverlaps.length)})`} defaultOpen={false}>
+                    <ul className={styles.branchList}>
+                      {summaryState.summary.captureDraftOverlaps.map(({ title, draftCount, latestJobId, sharedElementNames }) => (
+                        <li key={title} className={styles.branchRow}>
+                          <div className={styles.branchText}>
+                            <Text as="span">{title}</Text>
+                            <Text as="p" tone="muted" size="sm">
+                              {draftCount > 1 ? `${String(draftCount)} drafts · ` : ''}Both touch {sharedElementNames.join(', ')}
+                            </Text>
+                          </div>
+                          {latestJobId !== null && (
+                            <div className={styles.branchActions}>
+                              <LinkButton to={`/o/${orgSlug}/m/${modelSlug}/review/capture/${latestJobId}`} variant="secondary">
+                                Review →
+                              </LinkButton>
+                            </div>
+                          )}
+                        </li>
+                      ))}
+                    </ul>
+                  </CollapsibleSection>
+                )}
+              </Panel>
+            )}
+          </div>
         )}
-        {summaryState.status === 'ready' && summaryState.lineage.splits.length > 0 && (
-          <ul className={styles.branchList}>
-            {summaryState.lineage.splits.map((split) => (
-              <li key={split.id} className={styles.branchRow}>
-                <div className={styles.branchText}>
-                  <Text as="span">{split.title ?? split.name}</Text>
-                </div>
-                <div className={styles.branchActions}>
-                  <Chip tone={branchStatusTone(split.status)}>{split.status === 'merged' ? 'delivered' : split.status}</Chip>
-                  <LinkButton to={`/o/${orgSlug}/m/${modelSlug}/changes/${split.id}`} variant="secondary">
-                    Open →
-                  </LinkButton>
-                </div>
-              </li>
-            ))}
-          </ul>
-        )}
-      </Panel>
+      </div>
     </div>
   );
 }

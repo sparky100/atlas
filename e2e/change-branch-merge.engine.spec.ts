@@ -51,7 +51,7 @@ test('create a change, edit it on its own branch, view it, submit, approve, and 
   // 2. The change's own page: draft, up to date, nothing to review yet.
   await expect(page.getByRole('heading', { name: changeTitle })).toBeVisible();
   await expect(page.getByText('draft', { exact: true })).toBeVisible();
-  await expect(page.getByText('Up to date with main.')).toBeVisible();
+  await expect(page.getByText('The model has changed since you started')).toHaveCount(0);
   const branchIdMatch = /\/changes\/([^/?]+)/.exec(page.url());
   if (!branchIdMatch?.[1]) throw new Error(`could not read the branch id out of ${page.url()}`);
   const branchId = branchIdMatch[1];
@@ -106,7 +106,7 @@ test('create a change, edit it on its own branch, view it, submit, approve, and 
 
   // 5. The change page's own summary of its deltas (Sprint C1 step 6).
   await page.goto(`/o/${orgSlug}/m/${modelSlug}/changes/${branchId}`);
-  await expect(page.getByText('Edits on this change')).toBeVisible();
+  await expect(page.getByText('What this change does')).toBeVisible();
   await expect(page.getByText('vendor → Acme Corp')).toBeVisible();
 
   // 6. Submit for review (Sprint C1 step 7) — lands on the review request's own page.

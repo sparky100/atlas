@@ -20,7 +20,7 @@ export interface BranchRebaseData {
   mainHeadCommitId: UUID;
 }
 
-export type BranchRebaseState = { status: 'loading' } | { status: 'error'; message: string } | ({ status: 'ready' } & BranchRebaseData);
+export type BranchRebaseState = { status: 'loading' } | { status: 'error'; message: string; quiet?: boolean } | ({ status: 'ready' } & BranchRebaseData);
 
 export type ActionStatus = 'idle' | 'working';
 
@@ -60,7 +60,7 @@ export function useBranchRebase(modelId: UUID, branch: BranchRow, userId: UUID |
       .then((computed) => {
         if (cancelled) return;
         if (!computed) {
-          setState({ status: 'error', message: 'This change has no commits of its own yet — there is nothing to rebase.' });
+          setState({ status: 'error', message: 'This change has no commits of its own yet — there is nothing to bring up to date.', quiet: true });
           return;
         }
         setState({ status: 'ready', review: computed.review, mainHeadCommitId: computed.mainHeadCommitId });

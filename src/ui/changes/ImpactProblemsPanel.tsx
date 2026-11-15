@@ -9,11 +9,8 @@ import type { ImpactProblems, NamedElement } from '../../engine/changeImpactProb
 import { Chip } from '../components/Chip/Chip';
 import { Panel } from '../components/Panel/Panel';
 import { Text } from '../components/Text/Text';
+import { hasImpactProblems } from './hasImpactProblems';
 import styles from './ChangeView.module.css';
-
-function hasImpactProblems(problems: ImpactProblems): boolean {
-  return problems.capabilitiesLeftWithoutSystem.length > 0 || problems.providerProblems.length > 0;
-}
 
 export function ImpactProblemsPanel({ problems, orgSlug, modelSlug }: { problems: ImpactProblems; orgSlug: string; modelSlug: string }) {
   if (!hasImpactProblems(problems)) return null;
