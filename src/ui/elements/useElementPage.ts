@@ -18,6 +18,7 @@ import {
   type DeltaHistoryRow,
 } from '../../db/elements';
 import { listBranchesByIds } from '../../db/branches';
+import { listProjectsForModel } from '../../db/projects';
 import { listDecisionLinksForDecision, listDecisionsLinkingElements } from '../../db/decisions';
 import { buildRelationshipParticipantsById } from '../components/HistoryTimeline/historyTimelineSummary';
 import {
@@ -67,6 +68,8 @@ export interface ElementPageData {
    */
   history: DeltaHistoryRow[];
   inFlightBranches: BranchRow[];
+  /** Project id → title, for the projects the in-flight changes belong to (so the element page can link each change's project). */
+  projectTitles: Map<string, string>;
   /**
    * The page shows its element, facts, relationships, modules and flows as soon as those arrive; history, in-flight
    * changes and decisions (the three lower-right sections, which nothing above depends on) load straight after and
@@ -403,6 +406,7 @@ export function useElementPage(
           sources,
           history: [],
           inFlightBranches: [],
+          projectTitles: new Map(),
           flowsViaThisPlatform: flowsVia.flows,
           flowsViaThisPlatformEndpoints: flowsVia.endpoints,
           moduleSupportsEdges: moduleSupports.edges,
@@ -425,7 +429,11 @@ export function useElementPage(
         );
         const [elementDecisions, history, inFlightBranches] = await Promise.all([loadDecisions(), historyPromise, listInFlightBranchesTouchingSubject(supabase, modelId, elementId)]);
         const { relationshipEndpoints, retractedElementNames } = await loadHistoryEndpoints(liveEndpoints, history);
-        applySecondary({ elementDecisions, history, inFlightBranches, relationshipEndpoints, retractedElementNames, secondary: 'ready' });
+        const projectTitles = new Map<string, string>();
+        if (inFlightBranches.some((b) => b.project_id !== null)) {
+          for (const project of await listProjectsForModel(supabase, modelId)) projectTitles.set(project.id, project.title);
+        }
+        applySecondary({ elementDecisions, history, inFlightBranches, projectTitles, relationshipEndpoints, retractedElementNames, secondary: 'ready' });
       } catch (e: unknown) {
         reportError("Couldn't load this element's history, changes and decisions.", e);
         applySecondary({ secondary: 'error' });
