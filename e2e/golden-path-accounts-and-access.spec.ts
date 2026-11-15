@@ -79,7 +79,7 @@ test('accounts and access: invite, accept, assign a role, then share a model rea
   await page.getByLabel('Organisation slug').fill(secondOrgSlug);
   await page.locator('form').filter({ has: page.getByLabel('Organisation slug') }).getByRole('button', { name: 'Share', exact: true }).click();
   await expect(page.getByText(secondOrgName)).toBeVisible({ timeout: 15_000 });
-  await expect(page.getByText('current main', { exact: true })).toBeVisible();
+  await expect(page.getByText('live model', { exact: true })).toBeVisible();
 
   // 6. The second org's own "Shared with us" entry resolves — read-only,
   // never the owning org's settings menu.

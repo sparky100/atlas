@@ -197,7 +197,7 @@ export function SplitReviewPanel({ modelId, branch, mainHeadCommitId, review, ca
               <li key={b.subjectId}>
                 <Text as="span" size="sm" tone="muted">
                   {labelFor(subjects, b.subjectId)} — still needed by {labelFor(subjects, b.dependentSubjectId)}
-                  {b.dependentIsPreExisting ? ' (already on main)' : ''}. Select it too, or leave both for later.
+                  {b.dependentIsPreExisting ? ' (already in the live model)' : ''}. Select it too, or leave both for later.
                 </Text>
               </li>
             ))}

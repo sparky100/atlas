@@ -81,7 +81,7 @@ export function ProjectView({ data, modelName, orgId, modelId, orgSlug, modelSlu
   };
   const elementName = (id: UUID) => {
     const element = elementsById.get(id);
-    return element ? moduleDisplayNameFromMap(element, elementsById) : (touched.find((t) => t.elementId === id)?.createdName ?? 'An element not on main yet');
+    return element ? moduleDisplayNameFromMap(element, elementsById) : (touched.find((t) => t.elementId === id)?.createdName ?? 'An element not in the live model yet');
   };
 
   const scopeIds = links.filter((l) => l.linked_type === 'element').map((l) => l.linked_id);

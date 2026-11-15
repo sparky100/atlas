@@ -44,7 +44,7 @@ export function ProposeChangePicker({ modelId, orgId, userId, onChosen, onCancel
   return (
     <div className={styles.proposePanel}>
       <Text as="p" size="sm">
-        You can propose this as part of a change, not add it to main directly.
+        You can propose this as part of a change, not add it to the live model directly.
       </Text>
       {status === 'loading' && (
         <Text as="p" tone="muted" size="sm">

@@ -43,7 +43,7 @@ export interface EditingBranchBannerProps {
 /**
  * Sprint 7i item 2 / S1 item 1 (docs/prompts/atlas-prompt-pack.md): "While
  * a change is selected, every page shows a persistent banner: 'Editing in
- * change: <name>' with To-be/Diff shortcuts and 'Back to main'" — S1 item
+ * change: <name>' with To-be/Diff shortcuts and 'Back to the live model'" — S1 item
  * 1 adds the other half of leaving a change: "'Submit for review' (finish;
  * Proposed; ref -> main). Never one button for both." Until now, submitting
  * only existed on the change's own page (`ChangeView.tsx`); a reviewer or
@@ -51,7 +51,7 @@ export interface EditingBranchBannerProps {
  * no way to finish a change without first navigating back to it.
  *
  * "Leave" vs "finish," same distinction `ChangeView.tsx`'s own module
- * comment already draws for its copy of this action: "Back to main" leaves
+ * comment already draws for its copy of this action: "Back to the live model" leaves
  * a still-editable Draft in place (nothing changes about the branch
  * itself); "Submit for review" finishes it — the branch goes read-only for
  * the proposer the instant it's Proposed (`canEditBranch`'s own
@@ -112,7 +112,7 @@ export function EditingBranchBanner({ activeRef, modelId, orgSlug, modelSlug, sh
   // remembered choice for this model," and that choice was never touched,
   // so it immediately read the still-stored branch back out of
   // `sessionStorage` and wrote `?ref=branch:…` right back into the URL —
-  // "Back to main" appeared to do nothing (or flash and revert). `clearRef()`
+  // "Back to the live model" appeared to do nothing (or flash and revert). `clearRef()`
   // (`useSelectedRef`) is the one function that clears the *stored*
   // selection and the URL together (and, since it clears `mode` too —
   // `SelectedRefProvider.setRef`'s own comment — there is nothing left for
@@ -163,7 +163,7 @@ export function EditingBranchBanner({ activeRef, modelId, orgSlug, modelSlug, sh
         </Button>
       )}
       <button type="button" className={[styles.link, styles.backToMain].join(' ')} onClick={backToMain}>
-        Back to main
+        Back to the live model
       </button>
       {showSubmitForReview && submission.error !== null && (
         <Text as="p" size="sm">

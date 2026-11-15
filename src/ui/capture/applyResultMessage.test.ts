@@ -2,8 +2,8 @@ import { describe, expect, it } from 'vitest';
 import { applyResultMessage } from './applyResultMessage';
 
 describe('applyResultMessage', () => {
-  it('says "Merged to main" when the auto-merge succeeded', () => {
-    expect(applyResultMessage({ appliedCount: 5, merged: true })).toBe('Applied 5 items. Merged to main.');
+  it('says "Merged into the live model" when the auto-merge succeeded', () => {
+    expect(applyResultMessage({ appliedCount: 5, merged: true })).toBe('Applied 5 items. Merged into the live model.');
   });
 
   it('says nothing extra when auto-merge was never attempted because the reviewer is not owner/architect', () => {

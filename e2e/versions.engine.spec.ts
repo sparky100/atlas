@@ -82,7 +82,7 @@ test('versions: tag main, open a tag read-only, and diff two tags', async ({ pag
   const versionList = page.getByRole('list');
   await page.getByPlaceholder('Version name (e.g. v2026-Q2)').fill('v1');
   await page.getByPlaceholder('Note (optional)').fill('First cut');
-  await page.getByRole('button', { name: 'Tag main now' }).click();
+  await page.getByRole('button', { name: 'Tag the live model now' }).click();
   await expect(versionList.getByText('v1', { exact: true })).toBeVisible();
   await expect(versionList.getByText('First cut')).toBeVisible();
 
@@ -108,7 +108,7 @@ test('versions: tag main, open a tag read-only, and diff two tags', async ({ pag
 
   await page.reload();
   await page.getByPlaceholder('Version name (e.g. v2026-Q2)').fill('v2');
-  await page.getByRole('button', { name: 'Tag main now' }).click();
+  await page.getByRole('button', { name: 'Tag the live model now' }).click();
   await expect(versionList.getByText('v2', { exact: true })).toBeVisible();
 
   // Open v1 read-only: the ref lands in the URL and the page renders (no

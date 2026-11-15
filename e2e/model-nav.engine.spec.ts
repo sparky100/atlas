@@ -183,7 +183,7 @@ test('model nav: five-item bottom bar with a More sheet; every model route withi
 
   // The nav's ref chip travels with it: main here, since nothing switched
   // to a branch or tag.
-  await expect(nav.getByText('main', { exact: true })).toBeVisible();
+  await expect(nav.getByText('live model', { exact: true })).toBeVisible();
 
   // An element page — reached from the home door's search, one tap off
   // the nav bar's own Home section, landing on a route the six nav items

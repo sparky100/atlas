@@ -168,7 +168,7 @@ export function DashboardView({ dashboard, orgId, modelId, modelName, userId, ro
       )}
       <div className={styles.headerRow} hidden={presenting}>
         <Text as="p" size="sm" tone="muted">
-          {dashboard.visibility === 'organisation' ? 'Shared with the organisation' : 'Private to you'} · live from main
+          {dashboard.visibility === 'organisation' ? 'Shared with the organisation' : 'Private to you'} · always current
         </Text>
         <div className={styles.row}>
           <Button
@@ -186,7 +186,7 @@ export function DashboardView({ dashboard, orgId, modelId, modelName, userId, ro
             disabled={!canExport}
             build={() => {
               if (!canExport) return null;
-              const stamp = { modelName, viewLabel: dashboard.name, refLabel: 'Main', date: exportDate() };
+              const stamp = { modelName, viewLabel: dashboard.name, refLabel: 'Live model', date: exportDate() };
               return { plan: dashboardExportPlan(exportItems, stamp), stamp };
             }}
           />

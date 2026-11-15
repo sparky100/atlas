@@ -40,7 +40,7 @@ export function parseRefParam(raw: string | undefined | null): Ref {
 }
 
 export function refParamOf(ref: Ref): string {
-  if (ref.kind === 'main') return 'main';
+  if (ref.kind === 'main') return 'live model';
   if (ref.kind === 'tag') return `tag:${ref.name}`;
   if (ref.kind === 'commit') return `commit:${ref.commitId}`;
   return `branch:${ref.branchId}`;
@@ -80,7 +80,7 @@ export function refQueryParam(ref: Ref, viewing: boolean): string {
  * nobody has a commit id memorised either way.
  */
 export function refLabelOf(ref: Ref, label?: string): string {
-  if (ref.kind === 'main') return 'main';
+  if (ref.kind === 'main') return 'live model';
   if (ref.kind === 'tag') return ref.name;
   if (ref.kind === 'commit') return label ?? `commit ${ref.commitId.slice(0, 8)}`;
   return `Change: ${label ?? ref.branchId.slice(0, 8)}`;

@@ -12,7 +12,7 @@ export interface ViewingBranchBannerProps {
  * S1 item 2 (docs/prompts/atlas-prompt-pack.md): "Reviewer view: review
  * request and change pages get 'View this change' ... opening a read-only
  * viewing ref with banner 'Viewing change: <name> (read-only)', edit
- * controls hidden, navigation keeps it, 'Back to main' exits. Distinct
+ * controls hidden, navigation keeps it, 'Back to the live model' exits. Distinct
  * from 'Work in this change'." Sibling to `EditingBranchBanner`, reusing
  * its exact CSS module — same shape (a label plus a trailing "Back to
  * main" link), deliberately *without* a "Submit for review" button or the
@@ -51,7 +51,7 @@ export function ViewingBranchBanner({ activeRef }: ViewingBranchBannerProps) {
         Viewing change: {label ?? activeRef.branchId.slice(0, 8)} (read-only)
       </Text>
       <Link to={backToMainHref} className={[styles.link, styles.backToMain].join(' ')}>
-        Back to main
+        Back to the live model
       </Link>
     </div>
   );

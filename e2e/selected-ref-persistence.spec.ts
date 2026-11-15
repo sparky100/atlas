@@ -128,7 +128,7 @@ test('a selected change persists through Home, search and create — the new ele
   // real, immediate exit: the banner gone, the URL reverted, and nothing
   // hands the branch ref back on the very next render (the regression
   // this test exists to catch — see the module comment above).
-  await page.getByRole('button', { name: 'Back to main' }).click();
+  await page.getByRole('button', { name: 'Back to the live model' }).click();
   await expect(page.getByText(`Editing in change: ${changeTitle}`)).not.toBeVisible();
   await expect(page).not.toHaveURL(refUrlPattern(branchId));
 
@@ -151,7 +151,7 @@ test('a selected change persists through Home, search and create — the new ele
   await page.getByRole('button', { name: `Create system "${secondSystemName}"` }).click();
   await expect(page.getByText('Adding to change:', { exact: false })).not.toBeVisible();
   await page.getByPlaceholder('One line — what this system is').fill('Proves Back to main actually cleared the selection.');
-  await expect(page.getByText('active on main', { exact: false })).toBeVisible();
+  await expect(page.getByText('active in the live model', { exact: false })).toBeVisible();
   await page.getByRole('button', { name: 'Skip capability' }).click();
 
   await expect(page.getByRole('heading', { name: secondSystemName })).toBeVisible({ timeout: 15_000 });

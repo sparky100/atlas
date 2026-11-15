@@ -59,7 +59,7 @@ test('propose a change from an element page as a contributor, edit, submit; appr
   // banner (item 2) shows it, with "Back to main".
   await expect(contributorPage).toHaveURL(/ref=branch:/);
   await expect(contributorPage.getByText(`Editing in change: ${changeName}`)).toBeVisible();
-  await expect(contributorPage.getByRole('button', { name: 'Back to main' })).toBeVisible();
+  await expect(contributorPage.getByRole('button', { name: 'Back to the live model' })).toBeVisible();
 
   const branchIdMatch = /ref=branch:([^&]+)/.exec(contributorPage.url());
   if (!branchIdMatch?.[1]) throw new Error(`could not read the branch id out of ${contributorPage.url()}`);
@@ -111,7 +111,7 @@ test('propose a change from an element page as a contributor, edit, submit; appr
   // 7. Stepper: Approved current, not yet merged.
   await page.goto(`/o/${orgSlug}/m/${modelSlug}/changes/${branchId}`);
   await expect(page.getByTestId('stepper-approved')).toHaveAttribute('data-step-state', 'current');
-  await expect(page.getByText('Approved, not yet merged. An owner or architect merges it into main.')).toBeVisible();
+  await expect(page.getByText('Approved, not yet merged. An owner or architect merges it into the live model.')).toBeVisible();
 
   await page.getByRole('link', { name: 'Open review →' }).click();
   await page.getByRole('button', { name: 'Merge' }).click();
@@ -120,7 +120,7 @@ test('propose a change from an element page as a contributor, edit, submit; appr
   // 8. Stepper: Merged, terminal; main now has the merged value.
   await page.goto(`/o/${orgSlug}/m/${modelSlug}/changes/${branchId}`);
   await expect(page.getByTestId('stepper-merged')).toHaveAttribute('data-step-state', 'current');
-  await expect(page.getByText('Merged into main.')).toBeVisible();
+  await expect(page.getByText('Merged into the live model.')).toBeVisible();
 
   await page.goto(`/o/${orgSlug}/m/${modelSlug}/e/${systemId}`);
   await expect(page.getByText('Ridgeline Systems', { exact: true })).toBeVisible();

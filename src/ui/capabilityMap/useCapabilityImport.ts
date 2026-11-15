@@ -100,7 +100,7 @@ export function useCapabilityImport(input: UseCapabilityImportInput): UseCapabil
 
       try {
         const main = await getMainBranch(supabase, modelId);
-        if (!main) throw new Error('main was not found for this model');
+        if (!main) throw new Error('The live model was not found.');
         const map = await getCapabilityMap(supabase, mapId);
         if (!map) throw new Error('This capability map no longer exists.');
         const items = await listCapabilityMapItems(supabase, mapId);

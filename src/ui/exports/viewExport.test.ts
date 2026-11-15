@@ -24,7 +24,7 @@ describe('viewExport (F13 step 1)', () => {
   });
 
   it('stampRefLabel: main, a version, a change by its name, or a commit', () => {
-    expect(stampRefLabel({ kind: 'main' })).toBe('Main');
+    expect(stampRefLabel({ kind: 'main' })).toBe('Live model');
     expect(stampRefLabel({ kind: 'tag', name: 'v2026-Q1' })).toBe('Version v2026-Q1');
     expect(stampRefLabel({ kind: 'branch', branchId: 'b1234567-0000' }, 'Housing CRM')).toBe('Change: Housing CRM');
     expect(stampRefLabel({ kind: 'branch', branchId: 'b1234567-0000' })).toBe('Change: b1234567');

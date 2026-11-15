@@ -20,7 +20,7 @@ test('setting a system\'s version shows it in the header next to lifecycle, is e
   // Tag v1 before the version is set — the diff below needs a real "before".
   await page.goto(`/o/${orgSlug}/m/${modelSlug}/versions`);
   await page.getByPlaceholder('Version name (e.g. v2026-Q2)').fill('v1');
-  await page.getByRole('button', { name: 'Tag main now' }).click();
+  await page.getByRole('button', { name: 'Tag the live model now' }).click();
   await expect(page.getByRole('list').getByText('v1', { exact: true })).toBeVisible();
 
   await page.goto(`/o/${orgSlug}/m/${modelSlug}/e/${systemId}`);
@@ -43,7 +43,7 @@ test('setting a system\'s version shows it in the header next to lifecycle, is e
   // raw storage key "version" (S1 item 10's own generic label machinery).
   await page.goto(`/o/${orgSlug}/m/${modelSlug}/versions`);
   await page.getByPlaceholder('Version name (e.g. v2026-Q2)').fill('v2');
-  await page.getByRole('button', { name: 'Tag main now' }).click();
+  await page.getByRole('button', { name: 'Tag the live model now' }).click();
   await expect(page.getByRole('list').getByText('v2', { exact: true })).toBeVisible();
 
   await page.getByRole('combobox').first().selectOption('tag:v2');

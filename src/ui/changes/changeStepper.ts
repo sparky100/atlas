@@ -108,14 +108,14 @@ export function deriveChangeStep(branch: Pick<BranchRow, 'status'> & { intent?: 
         steps: stepsWithStatesUpTo(3),
         rejected: false,
         cancelled: false,
-        sentence: 'Approved, not yet merged. An owner or architect merges it into main.',
+        sentence: 'Approved, not yet merged. An owner or architect merges it into the live model.',
       };
     case 'merged':
       return {
         steps: stepsWithStatesUpTo(4),
         rejected: false,
         cancelled: false,
-        sentence: 'Merged into main.',
+        sentence: 'Merged into the live model.',
       };
     case 'rejected':
       // Draft and Proposed did happen (a request must have existed to be
