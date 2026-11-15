@@ -65,7 +65,7 @@ function FactEvidence({ label, fact, source }: FactBadgeProps) {
   return (
     <>
       <button type="button" className={styles.trigger} popoverTarget={panelId} aria-label={heading} aria-haspopup="dialog">
-        <ProvenanceBadge sourceKind={source?.kind ?? 'manual'} date={new Date(fact.effective_date ?? fact.asserted_at)} confidence={fact.confidence} />
+        <ProvenanceBadge sourceKind={source?.kind ?? 'manual'} date={new Date(fact.effective_date ?? fact.asserted_at)} />
       </button>
       <div
         ref={panelRef}
