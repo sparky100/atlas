@@ -56,8 +56,8 @@ export interface CaptureReviewViewProps {
   reviewQueueHref: string;
 }
 
-/** Classes `x` multi-select (and so the bulk bar and a group's "Select all") covers — SPEC-capture.md §10, Sprint F2b. */
-const MULTI_SELECT_CLASSES: ReadonlySet<CandidateClass> = new Set(['confirm', 'new']);
+/** Classes `x` multi-select (and so the bulk bar and a group's "Select all") covers — SPEC-capture.md §10, Sprint F2b; `update` was added so a run of plain changes (e.g. dates filling blank fields) can be decided in one go — conflicts stay one at a time. */
+const MULTI_SELECT_CLASSES: ReadonlySet<CandidateClass> = new Set(['confirm', 'new', 'update']);
 
 /** SPEC §10's own queue order: needs-decision-first, bulk-accepted confirmations last. `duplicate_in_target` (issue #285) sits beside `invalid`/`unsourced` — no delta, needs the reviewer's attention before anything else. */
 const CLASS_ORDER: readonly CandidateClass[] = ['unsourced', 'invalid', 'duplicate_in_target', 'ambiguous', 'conflict', 'new', 'update', 'gone', 'confirm'];
