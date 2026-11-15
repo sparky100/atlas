@@ -363,9 +363,11 @@ export function CaptureReviewView({ modelId, orgId, jobId, reviewQueueHref }: Ca
             <Button variant={decisionFilter === 'decided' ? 'primary' : 'ghost'} onClick={() => { setDecisionFilter('decided'); }}>
               Decided ({decidedCount})
             </Button>
-            <Button variant={decisionFilter === 'blocked' ? 'primary' : 'ghost'} onClick={() => { setDecisionFilter('blocked'); }} title="Decided candidates that reference another candidate you rejected or haven't decided yet — Apply will fail on these.">
-              Blocked ({blockedCandidateIds.size})
-            </Button>
+            {(blockedCandidateIds.size > 0 || decisionFilter === 'blocked') && (
+              <Button variant={decisionFilter === 'blocked' ? 'primary' : 'ghost'} onClick={() => { setDecisionFilter('blocked'); }} title="Decided candidates that reference another candidate you rejected or haven't decided yet — Apply will fail on these.">
+                Blocked ({blockedCandidateIds.size})
+              </Button>
+            )}
           </div>
           <div className={styles.targetRow}>
             <Text as="label" size="sm" tone="muted">

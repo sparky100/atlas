@@ -32,6 +32,7 @@ import { CollapsibleSection } from '../components/CollapsibleSection/Collapsible
 import { ElementTypeGlyph } from '../components/ElementTypeGlyph/ElementTypeGlyph';
 import { Text } from '../components/Text/Text';
 import { candidateRefLabel } from './candidateRefLabel';
+import { newAliasValues, sameName } from './captureRowText';
 import { evidenceWarningLabel } from './evidenceWarningLabel';
 import styles from './CaptureCandidateRow.module.css';
 
@@ -154,13 +155,19 @@ export function CaptureCandidateRow({
   const matchLine =
     candidate.match.level === 'none'
       ? candidate.class === 'invalid' || candidate.class === 'unsourced' ? null : 'Not in the model yet'
-      : candidate.match.level === 'name_context'
+      : candidate.match.level === 'name_context' && !(matchedName !== undefined && name !== null && sameName(name, matchedName))
         ? matchedName !== undefined
           ? `Looks like ${matchedName}. Is it the same thing?`
           : 'Looks like something already in the model. Is it the same thing?'
         : matchedName !== undefined
           ? `Already in the model as ${matchedName}`
           : 'Already in the model';
+
+  // Only worth saying when it adds a name the row doesn't already show (its own, or the element it matched).
+  const recogniseValues = newAliasValues(
+    candidate.aliasProposals.map((a) => a.value),
+    [...(name !== null ? [name] : []), ...(matchedName !== undefined ? [matchedName] : [])],
+  );
 
   return (
     <li
@@ -204,9 +211,9 @@ export function CaptureCandidateRow({
       )}
 
       {/* §10's `new` row: "the alias proposals that would be recorded" — shown whenever the candidate carries any (a level-2/3 match or an intra-document group can too, §7.6), not only for `new`, so accepting or merging never teaches the matcher something the reviewer wasn't shown first (issue #284). */}
-      {candidate.aliasProposals.length > 0 && (
+      {recogniseValues.length > 0 && (
         <Text as="p" tone="muted" size="sm">
-          {'We\u2019ll recognise'} {candidate.aliasProposals.map((a) => `\u201c${a.value}\u201d`).join(', ')} next time
+          {'We\u2019ll recognise'} {recogniseValues.map((value) => `\u201c${value}\u201d`).join(', ')} next time
         </Text>
       )}
 
@@ -275,7 +282,7 @@ export function CaptureCandidateRow({
           mechanism every other section in this app already uses (no
           separate "show/hide" control invented for this one case) — the
           source ref stays visible in the header either way. */}
-      <CollapsibleSection title="Source passage" meta={formatSourceRef(candidate.evidence.sourceRef)} defaultOpen={false}>
+      <CollapsibleSection title="Where this came from" meta={formatSourceRef(candidate.evidence.sourceRef)} defaultOpen={false}>
         <Text as="p" size="sm" mono>
           {candidate.evidence.passage}
         </Text>
@@ -310,28 +317,33 @@ export function CaptureCandidateRow({
 
       {canReview && (
         <div className={styles.actions}>
-          <Button
-            variant="primary"
-            disabled={!canAccept}
-            onClick={
-              candidate.class === 'ambiguous'
-                ? acceptAmbiguous
-                : () => {
-                    onDecide('accepted');
-                  }
-            }
-          >
-            {candidate.class === 'update' || candidate.class === 'conflict' ? "Use the file's version" : candidate.class === 'new' ? 'Add' : 'Accept'}
-          </Button>
-          <Button
-            variant="secondary"
-            onClick={() => {
-              onDecide('rejected');
-            }}
-          >
-            {candidate.class === 'conflict' || candidate.class === 'update' ? 'Keep what we have' : candidate.class === 'gone' ? 'Ignore' : candidate.class === 'new' ? "Don't add" : 'Reject'}
-          </Button>
-          {candidate.decision !== null && (
+          {/* An item that is already up to date has nothing to accept or reject: it is only here to be seen (and, in bulk, via Select). */}
+          {candidate.class !== 'confirm' && (
+            <>
+              <Button
+                variant="primary"
+                disabled={!canAccept}
+                onClick={
+                  candidate.class === 'ambiguous'
+                    ? acceptAmbiguous
+                    : () => {
+                        onDecide('accepted');
+                      }
+                }
+              >
+                {candidate.class === 'update' || candidate.class === 'conflict' ? "Use the file's version" : candidate.class === 'new' ? 'Add' : 'Accept'}
+              </Button>
+              <Button
+                variant="secondary"
+                onClick={() => {
+                  onDecide('rejected');
+                }}
+              >
+                {candidate.class === 'conflict' || candidate.class === 'update' ? 'Keep what we have' : candidate.class === 'gone' ? 'Ignore' : candidate.class === 'new' ? "Don't add" : 'Reject'}
+              </Button>
+            </>
+          )}
+          {candidate.decision !== null && candidate.class !== 'confirm' && (
             <Button
               variant="ghost"
               onClick={() => {
@@ -341,7 +353,7 @@ export function CaptureCandidateRow({
               Undo
             </Button>
           )}
-          {candidate.class !== 'confirm' && !isDuplicateInTarget && (
+          {!isDuplicateInTarget && candidate.class !== 'confirm' && (
             <Button variant="ghost" onClick={editOpen ? onCloseEdit : onOpenEdit}>
               {isInvalidOrUnsourced ? 'Edit…' : 'Edit'}
             </Button>
