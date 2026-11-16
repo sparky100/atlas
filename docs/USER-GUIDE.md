@@ -96,6 +96,8 @@ On a phone, the bar at the bottom shows Home, Capabilities, Landscape and Change
 
 **The breadcrumb** at the top of a page shows where you are: `Org › Model › [ref] › …`. The `[ref]` chip says which state of the model you're looking at — the live model (shown as **live model**), a version like `v2026-Q1`, or a change like `Change: Housing CRM replacement`. Click it to switch. **Back to the live model** (in the banner shown while you look at a version or a change) returns you to the live model.
 
+**Keyboard shortcuts.** Number keys and **j**/**k** are only used where you work through a queue of items one after another: **Gaps → Fill in** and the import review. Everywhere else — change forms, decisions, planned actions, Retire — you click. In both queues, **j** moves to the next item, **k** goes back, and a number picks that numbered answer.
+
 **Every page has a URL.** You can bookmark or share a link to any element, change, decision, project or version, and it opens straight to it.
 
 ## Home
@@ -138,7 +140,7 @@ Rather than typing your landscape in by hand, you can feed Atlas source material
 
 1. Open **Import**. If you are starting from your own list, **Download a blank spreadsheet** gives you a workbook with the standard columns, a **Read me first** sheet that explains each one and the fixed choices, a Systems sheet and a Relationships sheet, with one clearly marked example row to delete. **AI prompt for preparing an import file** downloads instructions you can give an AI assistant to turn your notes into a file Atlas reads. Then upload a spreadsheet (CSV or XLSX), a JSON file or a PDF, or paste in free text — meeting notes, an email, anything describing systems, owners or relationships.
 2. Atlas reads it (using AI for documents and text; the standard column headings in a spreadsheet are recognised without it), matches what it finds against your model, and produces an **import draft**: proposed elements, relationships and values, each with a confidence and a note on where in the source it came from. Spreadsheet columns such as "Criticality", "TIME" or "Disposition" are recognised.
-3. Review the draft — from Import, or the **Waiting for review** tab of Changes. Accept, reject, edit, split or merge each proposal; the keyboard works too (**j**/**k** to move, **a** accept, **r** reject, **e** edit, **x** to select several). Choose a **target change**, then **Apply decisions** to write the accepted facts into it. On a phone, tick **Select** on rows (or **Select all** on a group) and use **Accept selected** / **Reject selected**. If you rejected everything, there's nothing to apply: the button becomes **Finish review**, which closes the draft without creating a change. To throw a draft away without reviewing it, use **Discard this draft…** on the review page, or **Discard** in the review queue; if the same file was imported several times, the queue offers **Discard N older copies** to keep just the newest.
+3. Review the draft — from Import, or the **Waiting for review** tab of Changes. Accept, reject, edit, split or merge each proposal; the keyboard works too (**j**/**k** to move to the next or previous row, **1**–**5** to pick a match, **a** accept, **r** reject, **e** edit, **x** to select several). Choose a **target change**, then **Apply decisions** to write the accepted facts into it. On a phone, tick **Select** on rows (or **Select all** on a group) and use **Accept selected** / **Reject selected**. If you rejected everything, there's nothing to apply: the button becomes **Finish review**, which closes the draft without creating a change. To throw a draft away without reviewing it, use **Discard this draft…** on the review page, or **Discard** in the review queue; if the same file was imported several times, the queue offers **Discard N older copies** to keep just the newest.
 
 Nothing reaches your model without this review, and it always lands in a change you then submit like any other.
 
@@ -218,7 +220,7 @@ Diagrams redraw to fit whenever you resize the window.
 - **Boundary crossings** — links across the IT/OT boundary.
 - **External interfaces** — links that cross the enterprise boundary without a data classification, and external organisations with access to your systems.
 - **Duplicates** — elements that look like the same thing recorded twice. **Check now** runs a fresh check; merge a pair, or dismiss it as not a duplicate.
-- **Gaps** — the systems missing a fit rating, an owner, a run cost, a criticality or a disposition. **Fill in** walks them one at a time: press a number to pick an answer and move on, **j** to skip, **k** to go back. Each answer is saved as you go.
+- **Gaps** — the systems missing a fit rating, an owner, a run cost, a criticality or a disposition. **Fill in** walks them one at a time: press a number to pick an answer and move on, **j** to skip, **k** to go back. Each answer is saved as you go. On an **owner** gap, if the owner you want isn't in the list, type its name and choose **+ Add “name” as a new owner**, then say whether it is an organisation, a team or a person. The same option appears wherever you add an owner on a system, capability or module page.
 
 ### Saved reports, copies and dashboards
 

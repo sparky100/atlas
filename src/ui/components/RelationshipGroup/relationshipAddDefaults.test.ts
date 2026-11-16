@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { RelationshipType } from '../../../contracts/delta';
 import { RELATIONSHIP_TYPES } from '../../../contracts/delta';
-import { defaultAttributesForPlainPick } from './relationshipAddDefaults';
+import { defaultAttributesForPlainPick, hasExactNameMatch, newOwnerAttributes } from './relationshipAddDefaults';
 
 describe('defaultAttributesForPlainPick (Sprint U4-1 B5 bugfix, extended by Prompt 7k item 2)', () => {
   it('supports gets an explicit { role: "secondary" } override — the first-link-or-inbound case B4 never prompts for', () => {
@@ -25,5 +25,19 @@ describe('defaultAttributesForPlainPick (Sprint U4-1 B5 bugfix, extended by Prom
     for (const type of others) {
       expect(defaultAttributesForPlainPick(type)).toBeUndefined();
     }
+  });
+});
+
+describe('inline new owner', () => {
+  it('an organisation is always outside ours', () => {
+    expect(newOwnerAttributes('organisation', false)).toEqual({ subtype: 'organisation', isExternal: true });
+  });
+  it('a team or person follows the tick', () => {
+    expect(newOwnerAttributes('team', false)).toEqual({ subtype: 'team', isExternal: false });
+    expect(newOwnerAttributes('person', true)).toEqual({ subtype: 'person', isExternal: true });
+  });
+  it('matches an existing name ignoring case and spaces', () => {
+    expect(hasExactNameMatch(' electralink ', ['Electralink'])).toBe(true);
+    expect(hasExactNameMatch('Electra', ['Electralink'])).toBe(false);
   });
 });
