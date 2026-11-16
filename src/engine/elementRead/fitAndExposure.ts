@@ -70,19 +70,76 @@ export function hasReachedPlannedEnd(element: ElementsHeadRow, elementsById: Rea
   return parentEnd !== null && parentEnd.getTime() <= now.getTime();
 }
 
+/** The element's own `introduced` date, or `null` if none is recorded or it is unreadable. */
+export function introducedOf(element: ElementsHeadRow): Date | null {
+  const value = attributesRecord(element.attributes).introduced;
+  if (typeof value !== 'string') return null;
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? null : date;
+}
+
+/** Where an element sits in time: not live yet, live, or gone. */
+export type LifecycleState = 'planned' | 'active' | 'retired';
+
 /**
- * The `supports` edges still "in force" today: those whose supporting system
- * or module has not yet reached its planned end. Retire with a replacement
- * copies the capability links to the replacement and keeps the old ones, so
- * before the end date both systems support the capability (the truth during a
- * migration), and from the end date the old system stops counting. An edge
- * whose supporter isn't in `elementsById` is kept — unknown is never "ended".
+ * The one start/end rule for systems, platforms and modules. An element is
+ * `planned` while its `introduced` date (or its parent platform's) is still
+ * ahead, `retired` once its `plannedEnd` (or its platform's) has been reached
+ * — or when it is marked `retired` and has no end date at all (the status is
+ * then the only fact there is) — and `active` otherwise. A missing or
+ * unreadable date never moves anything out of `active`. A marked-`retired`
+ * element that still has a future end date stays active until that date: the
+ * date wins. Pure: `now` is always the caller's.
+ */
+export function lifecycleStateOf(element: ElementsHeadRow, elementsById: ReadonlyMap<UUID, ElementsHeadRow>, now: Date = new Date()): LifecycleState {
+  const parent = element.parent_id !== null ? elementsById.get(element.parent_id) : undefined;
+  const chain = parent ? [element, parent] : [element];
+  const t = now.getTime();
+  for (const e of chain) {
+    const start = introducedOf(e);
+    if (start !== null && start.getTime() > t) return 'planned';
+  }
+  if (hasReachedPlannedEnd(element, elementsById, now)) return 'retired';
+  for (const e of chain) {
+    if (attributesRecord(e.attributes).lifecycleStatus === 'retired' && plannedEndOf(e) === null) return 'retired';
+  }
+  return 'active';
+}
+
+/** `true` when `element` is neither planned nor retired. Unknown elements are the caller's to keep. */
+export function isInForce(element: ElementsHeadRow, elementsById: ReadonlyMap<UUID, ElementsHeadRow>, now: Date = new Date()): boolean {
+  return lifecycleStateOf(element, elementsById, now) === 'active';
+}
+
+/**
+ * Relationships still "in force": a link is in force only when both ends are
+ * (an integration doesn't exist until it is live, and a retired system's
+ * links stop counting with it). An end that isn't in `elementsById` (a
+ * capability, an actor, anything unknown) is kept — only a dated system or
+ * module can take a link out.
+ */
+export function edgesInForce(edges: readonly RelationshipsHeadRow[], elementsById: ReadonlyMap<UUID, ElementsHeadRow>, now: Date = new Date()): RelationshipsHeadRow[] {
+  return edges.filter((edge) => {
+    const from = elementsById.get(edge.from_element_id);
+    const to = elementsById.get(edge.to_element_id);
+    return (!from || isInForce(from, elementsById, now)) && (!to || isInForce(to, elementsById, now));
+  });
+}
+
+/**
+ * The `supports` edges still "in force": those whose supporting system or
+ * module is active (introduced, and not past its end). Retire with a
+ * replacement copies the capability links to the replacement and keeps the
+ * old ones, so before the end date both systems support the capability (the
+ * truth during a migration), and from the end date the old system stops
+ * counting; a planned system doesn't count until introduced. An edge whose
+ * supporter isn't in `elementsById` is kept — unknown is never "ended".
  */
 export function supportsEdgesInForce(edges: readonly RelationshipsHeadRow[], elementsById: ReadonlyMap<UUID, ElementsHeadRow>, now: Date = new Date()): RelationshipsHeadRow[] {
   return edges.filter((edge) => {
     if (edge.relationship_type !== 'supports') return true;
     const supporter = elementsById.get(edge.from_element_id);
-    return !supporter || !hasReachedPlannedEnd(supporter, elementsById, now);
+    return !supporter || isInForce(supporter, elementsById, now);
   });
 }
 
