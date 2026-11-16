@@ -2,6 +2,8 @@ import { describe, expect, it } from 'vitest';
 import { EMPTY_ROADMAP_FILTERS } from './roadmapFilter';
 import {
   parseRoadmapFilters,
+  parseRoadmapShowPast,
+  roadmapShowPastToSearchParams,
   roadmapFiltersToSearchParams,
   parseRoadmapGroupBy,
   roadmapGroupByToSearchParams,
@@ -167,5 +169,16 @@ describe('roadmapStartMonthToSearchParams', () => {
     const prev = new URLSearchParams('start=2026-01');
     roadmapStartMonthToSearchParams(undefined, prev);
     expect(prev.get('start')).toBe('2026-01');
+  });
+});
+
+describe('past-year switch param', () => {
+  it('is off by default and round-trips through ?past=1', () => {
+    expect(parseRoadmapShowPast(new URLSearchParams())).toBe(false);
+    const on = roadmapShowPastToSearchParams(true, new URLSearchParams('horizon=1y'));
+    expect(on.get('past')).toBe('1');
+    expect(on.get('horizon')).toBe('1y');
+    expect(parseRoadmapShowPast(on)).toBe(true);
+    expect(roadmapShowPastToSearchParams(false, on).has('past')).toBe(false);
   });
 });

@@ -168,3 +168,15 @@
   outline-offset: 2px;
   border-radius: var(--radius-md);
 }
+
+/* "Show the past year": a faint band over the part of the track before today. Neutral on purpose — the today line keeps its one meaning. */
+.pastBand {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  background: var(--border);
+  opacity: 0.35;
+  border-radius: var(--radius-sm) 0 0 var(--radius-sm);
+  pointer-events: none;
+}

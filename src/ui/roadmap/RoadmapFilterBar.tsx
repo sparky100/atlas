@@ -31,6 +31,11 @@ export interface RoadmapFilterBarProps {
   /** Slide the fixed-horizon window back (-1) or forward (+1) by one nav step. Only offered when `horizon !== 'all'`. */
   onNudge: (direction: -1 | 1) => void;
   /** Re-center the fixed-horizon window on today. */
+  /** "Show the past year" — off by default, so the timeline starts at today. */
+  showPast: boolean;
+  onShowPastChange: (showPast: boolean) => void;
+  /** The window is already at its earliest month, so ← has nowhere to go. */
+  earlierDisabled: boolean;
   onResetToday: () => void;
   capabilitiesById: ReadonlyMap<UUID, ElementsHeadRow>;
   ownerActorsById: ReadonlyMap<UUID, ElementsHeadRow>;
@@ -83,7 +88,7 @@ function FacetDisclosure<T extends string>({ title, values, options, onToggle }:
  * own fork; this picks which *set of branches* the whole roadmap
  * includes (`roadmapEligibility.ts`'s own module comment).
  */
-export function RoadmapFilterBar({ filters, onFiltersChange, mode, onModeChange, groupBy, onGroupByChange, granularity, onGranularityChange, horizon, onHorizonChange, onNudge, onResetToday, capabilitiesById, ownerActorsById }: RoadmapFilterBarProps) {
+export function RoadmapFilterBar({ filters, onFiltersChange, mode, onModeChange, groupBy, onGroupByChange, granularity, onGranularityChange, horizon, onHorizonChange, onNudge, showPast, onShowPastChange, earlierDisabled, onResetToday, capabilitiesById, ownerActorsById }: RoadmapFilterBarProps) {
   const active = hasActiveRoadmapFilters(filters);
   // A sub-capability is labelled with its parent ("Billing › Invoicing") so two capabilities with the same name stay distinguishable.
   const capabilityOptions = [...capabilitiesById.values()]
@@ -140,9 +145,12 @@ export function RoadmapFilterBar({ filters, onFiltersChange, mode, onModeChange,
               All
             </button>
           </div>
+          <button type="button" className={showPast ? styles.modeActive : styles.mode} aria-pressed={showPast} onClick={() => { onShowPastChange(!showPast); }}>
+            Show the past year
+          </button>
           {horizon !== 'all' && (
             <div className={styles.nav} role="group" aria-label="Timeline navigation">
-              <button type="button" className={styles.navButton} onClick={() => { onNudge(-1); }} aria-label="Earlier">
+              <button type="button" className={styles.navButton} disabled={earlierDisabled} onClick={() => { onNudge(-1); }} aria-label="Earlier">
                 ←
               </button>
               <button type="button" className={styles.navButton} onClick={onResetToday}>

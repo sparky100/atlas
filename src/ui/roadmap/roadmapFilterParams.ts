@@ -120,3 +120,16 @@ export function roadmapStartMonthToSearchParams(start: Date | undefined, prev: U
   else next.delete('start');
   return next;
 }
+
+/** Whether "Show the past year" is on (`?past=1`); off by default, so the Roadmap starts at today. */
+export function parseRoadmapShowPast(searchParams: URLSearchParams): boolean {
+  return searchParams.get('past') === '1';
+}
+
+/** Copy-then-mutate — off (the default) deletes the param. */
+export function roadmapShowPastToSearchParams(showPast: boolean, prev: URLSearchParams): URLSearchParams {
+  const next = new URLSearchParams(prev);
+  if (showPast) next.set('past', '1');
+  else next.delete('past');
+  return next;
+}

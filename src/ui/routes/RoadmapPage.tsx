@@ -21,8 +21,8 @@ import { RoadmapFilterBar } from '../roadmap/RoadmapFilterBar';
 import { RoadmapView } from '../roadmap/RoadmapView';
 import { useRoadmap } from '../roadmap/useRoadmap';
 import { useRoadmapExport } from '../roadmap/useRoadmapExport';
-import { parseRoadmapFilters, roadmapFiltersToSearchParams, parseRoadmapGroupBy, roadmapGroupByToSearchParams, parseRoadmapGranularity, roadmapGranularityToSearchParams, parseRoadmapHorizon, roadmapHorizonToSearchParams, parseRoadmapStartMonth, roadmapStartMonthToSearchParams, type RoadmapGroupBy, type RoadmapGranularity, type RoadmapHorizon } from '../roadmap/roadmapFilterParams';
-import { defaultRoadmapWindowStart, shiftRoadmapWindowStart } from '../roadmap/roadmapTimelineScale';
+import { parseRoadmapFilters, roadmapFiltersToSearchParams, parseRoadmapGroupBy, roadmapGroupByToSearchParams, parseRoadmapGranularity, roadmapGranularityToSearchParams, parseRoadmapHorizon, roadmapHorizonToSearchParams, parseRoadmapStartMonth, roadmapStartMonthToSearchParams, parseRoadmapShowPast, roadmapShowPastToSearchParams, type RoadmapGroupBy, type RoadmapGranularity, type RoadmapHorizon } from '../roadmap/roadmapFilterParams';
+import { defaultRoadmapWindowStart, roadmapPastStart, shiftRoadmapWindowStart } from '../roadmap/roadmapTimelineScale';
 import type { RoadmapFilters } from '../roadmap/roadmapFilter';
 import type { RoadmapMode } from '../roadmap/roadmapEligibility';
 import styles from './RoadmapPage.module.css';
@@ -85,13 +85,21 @@ export function RoadmapPage() {
 
   const horizon = parseRoadmapHorizon(searchParams);
   const windowStart = parseRoadmapStartMonth(searchParams);
+  const showPast = parseRoadmapShowPast(searchParams);
+  const setShowPast = (next: boolean): void => {
+    // The window's earliest month moves with the switch, so drop any explicit start and let the default apply.
+    setSearchParams(roadmapStartMonthToSearchParams(undefined, roadmapShowPastToSearchParams(next, searchParams)));
+  };
+  const earliestStart = roadmapPastStart(new Date(), showPast);
   const setHorizon = (next: RoadmapHorizon): void => {
-    // Switching horizon re-centers the window — drop any explicit start so the default (centered on now) applies.
+    // Switching horizon restarts the window — drop any explicit start so the default (today, or a year back) applies.
     setSearchParams(roadmapStartMonthToSearchParams(undefined, roadmapHorizonToSearchParams(next, searchParams)));
   };
   const nudge = (direction: -1 | 1): void => {
-    const base = windowStart ?? defaultRoadmapWindowStart(horizon, new Date());
-    setSearchParams(roadmapStartMonthToSearchParams(shiftRoadmapWindowStart(base, direction), searchParams));
+    const base = windowStart ?? defaultRoadmapWindowStart(horizon, new Date(), showPast);
+    const shifted = shiftRoadmapWindowStart(base, direction);
+    // Never scroll back past the earliest month: the Roadmap starts at today (or a year back).
+    setSearchParams(roadmapStartMonthToSearchParams(shifted.getTime() < earliestStart.getTime() ? earliestStart : shifted, searchParams));
   };
   const resetToday = (): void => {
     setSearchParams(roadmapStartMonthToSearchParams(undefined, searchParams));
@@ -109,6 +117,7 @@ export function RoadmapPage() {
     granularity,
     horizon,
     windowStart,
+    showPast,
     filenameBase: model?.name ?? 'roadmap',
   });
   const hasNothingToExport = roadmapData === null || (groups.length === 0 && roadmapData.branchEvents.length === 0);
@@ -158,8 +167,8 @@ export function RoadmapPage() {
           {state.status === 'refNotFound' && <ModelEmptyState orgSlug={orgSlug ?? ''} modelSlug={modelSlug ?? ''} />}
           {state.status === 'ready' && (
             <>
-              <RoadmapFilterBar filters={filters} onFiltersChange={setFilters} mode={mode} onModeChange={setMode} groupBy={groupBy} onGroupByChange={setGroupBy} granularity={granularity} onGranularityChange={setGranularity} horizon={horizon} onHorizonChange={setHorizon} onNudge={nudge} onResetToday={resetToday} capabilitiesById={state.data.capabilitiesById} ownerActorsById={state.data.ownerActorsById} />
-              <RoadmapView groupsLabel={groupBy === 'valueStream' ? 'Value streams' : groupBy === 'project' ? 'Projects' : 'Capability domains'} groups={groups} branchEvents={state.data.branchEvents} mode={mode} filters={filters} granularity={granularity} horizon={horizon} windowStart={windowStart} orgSlug={organisation?.slug ?? ''} modelSlug={model.slug} />
+              <RoadmapFilterBar filters={filters} onFiltersChange={setFilters} mode={mode} onModeChange={setMode} groupBy={groupBy} onGroupByChange={setGroupBy} granularity={granularity} onGranularityChange={setGranularity} horizon={horizon} onHorizonChange={setHorizon} onNudge={nudge} showPast={showPast} onShowPastChange={setShowPast} earlierDisabled={(windowStart ?? earliestStart).getTime() <= earliestStart.getTime()} onResetToday={resetToday} capabilitiesById={state.data.capabilitiesById} ownerActorsById={state.data.ownerActorsById} />
+              <RoadmapView groupsLabel={groupBy === 'valueStream' ? 'Value streams' : groupBy === 'project' ? 'Projects' : 'Capability domains'} groups={groups} branchEvents={state.data.branchEvents} mode={mode} filters={filters} granularity={granularity} horizon={horizon} windowStart={windowStart} showPast={showPast} orgSlug={organisation?.slug ?? ''} modelSlug={model.slug} />
             </>
           )}
         </main>

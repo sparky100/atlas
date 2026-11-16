@@ -152,11 +152,36 @@ function addMonths(date: Date, months: number): Date {
   return new Date(date.getFullYear(), date.getMonth() + months, 1);
 }
 
-/** The default left edge of a fixed-horizon window — centered on `now`. */
-export function defaultRoadmapWindowStart(horizon: RoadmapHorizon, now: Date): Date {
-  const months = horizonDurationMonths(horizon);
-  if (months === null) return toMonthStart(now);
-  return addMonths(toMonthStart(now), -Math.floor(months / 2));
+/** How far back "Show the past year" reaches. */
+export const ROADMAP_PAST_MONTHS = 12;
+
+/** The earliest month the Roadmap shows: the start of this month, or a year earlier with "Show the past year" on. The Roadmap never scrolls back past this. */
+export function roadmapPastStart(now: Date, showPast: boolean): Date {
+  return addMonths(toMonthStart(now), showPast ? -ROADMAP_PAST_MONTHS : 0);
+}
+
+/** The default left edge of a window: today's month, or a year before it with "Show the past year" on. The `horizon` argument is kept so every horizon starts from the same place. */
+export function defaultRoadmapWindowStart(_horizon: RoadmapHorizon, now: Date, showPast = false): Date {
+  return roadmapPastStart(now, showPast);
+}
+
+/**
+ * The full range the "All" horizon shows: from {@link roadmapPastStart} to
+ * the latest date anywhere in scope (always at least a year ahead, so an
+ * empty or short roadmap still has an axis), padded on the right. Earlier
+ * dates never stretch the left edge — history is opt-in.
+ */
+export function computeRoadmapForwardRange(dates: readonly (string | undefined)[], now: Date, showPast: boolean): RoadmapTimelineRange {
+  const start = roadmapPastStart(now, showPast);
+  let latestMs = addMonths(toMonthStart(now), 12).getTime();
+  for (const d of dates.map(parseDate)) if (d !== null && d.getTime() > latestMs) latestMs = d.getTime();
+  return { start, end: new Date(latestMs + PAD_DAYS * MS_PER_DAY) };
+}
+
+/** True when the ISO date is a real date inside `range` — a marker outside it is left off rather than pinned to an edge. */
+export function isWithinRange(value: string | undefined, range: RoadmapTimelineRange): boolean {
+  const date = parseDate(value);
+  return date !== null && date.getTime() >= range.start.getTime() && date.getTime() <= range.end.getTime();
 }
 
 /**
