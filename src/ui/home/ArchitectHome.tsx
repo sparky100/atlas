@@ -8,6 +8,7 @@ import { FindingCard, type FindingCardAction } from '../components/HealthFinding
 import { joinWithMore, type HealthFindingItem } from '../components/HealthFinding/healthFindingFormat';
 import { Panel } from '../components/Panel/Panel';
 import { Text } from '../components/Text/Text';
+import { describeLifecycleMismatch } from '../../engine/elementRead/lifecycleDateMismatch';
 import type { ElementsHeadRow } from '../../contracts/rows';
 import type { MemberRole } from '../../db/types';
 import type { BoundaryCrossing, ExternalInterfaceCrossing, ExternalOrganisationAccess, PlatformFlowEndpoint, UnlabeledVerbRelationship } from '../../db/healthFindings';
@@ -268,6 +269,16 @@ export function ArchitectHome({ data, insights, role, orgSlug, modelSlug, onShow
       severity: 'medium',
       browseHref: browseHref('stale-attributes'),
       browseLabel: 'Check them →',
+    },
+    {
+      // Status and dates must tell the same story. The one-click fix sits on each row of the filtered list the card opens.
+      key: 'lifecycle-date-mismatch',
+      count: insightsData.lifecycleDateMismatches.length,
+      summary: `${String(insightsData.lifecycleDateMismatches.length)} ${plural(insightsData.lifecycleDateMismatches.length, 'system or module has', 'systems or modules have')} a status that doesn't match ${insightsData.lifecycleDateMismatches.length === 1 ? 'its' : 'their'} dates`,
+      items: insightsData.lifecycleDateMismatches.map((m) => ({ id: m.element.element_id, label: `${m.element.name}: ${describeLifecycleMismatch(m).replace(/^M/, 'm')}`, elementId: m.element.element_id })),
+      severity: 'medium',
+      browseHref: browseHref('lifecycle-date-mismatch'),
+      browseLabel: 'Review and fix →',
     },
     {
       key: 'unlabeled-relationships',

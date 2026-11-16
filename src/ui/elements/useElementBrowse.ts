@@ -34,6 +34,7 @@ import {
   type FactStalenessRow,
 } from '../../db/healthFindings';
 import { replacedElementIds } from '../../engine/elementRead/fitAndExposure';
+import { findLifecycleDateMismatches } from '../../engine/elementRead/lifecycleDateMismatch';
 import { listAllSupportsEdges } from '../../db/modelHome';
 import { computeCapabilityMapTree } from '../capabilityMap/layout';
 import { refParamOf, resolveBranchRef, resolveRef, type Ref } from '../../db/ref';
@@ -113,6 +114,8 @@ export type ElementBrowseFilter =
   | 'capability-no-supporters'
   /** F11: systems and modules marked Migrate or Eliminate with no open change retiring them (`findOutgoingWithoutRetiringChange`). */
   | 'outgoing-no-retiring-change'
+  /** Systems and modules whose lifecycle status and own dates disagree (`findLifecycleDateMismatches`). */
+  | 'lifecycle-date-mismatch'
   | CustomAttributeBrowseFilter
   | null;
 
@@ -423,6 +426,8 @@ export function useElementBrowse(
         const retiring = await b.getRetiredByOpenChanges();
         const candidates = elements.filter((e) => e.element_type === 'system' || e.element_type === 'container');
         ids = new Set(findOutgoingWithoutRetiringChange(candidates, retiring, elementsById).map((e) => e.element_id));
+      } else if (filter === 'lifecycle-date-mismatch') {
+        ids = new Set(findLifecycleDateMismatches(elements, new Date()).map((m) => m.element.element_id));
       } else if (filter !== null && typeof filter === 'object') {
         // F1 PR4: an org-defined attribute's own equality filter — `value`
         // arrives already parsed to the definition's `kind` by the caller,
