@@ -49,6 +49,8 @@ export const SYSTEM_COLUMN_HEADINGS: Readonly<Record<ImportColumn, string>> = {
   introduced: 'Introduced',
   planned_end: 'Planned end',
   support_ends_at: 'Vendor support ends',
+  ai_autonomy: 'AI agent: how it acts',
+  ai_use: 'Uses AI',
 };
 
 /** The relationships sheet's headings: the importer reads these case-insensitively, spaced or with underscores. */
@@ -107,6 +109,8 @@ const INSTRUCTIONS: readonly string[] = [
   '- Disposition: tolerate, invest, migrate, eliminate',
   '- IT/OT domain: it, ot, hybrid',
   '- Hosting model: on_premises, private_cloud, public_cloud, saas, hybrid',
+  '- AI agent: how it acts: suggests, acts_with_approval, acts_alone (leave blank if it is not an AI agent)',
+  '- Uses AI: built_in, external_service (leave blank if no AI, or if it is an agent)',
   '- Relationships, Type: uses or flows_to',
   '- Relationships, Data classification: public, official, official_sensitive, special_category (flows_to only)',
   '',

@@ -12,6 +12,7 @@
       "vendor": "Salesforce",
       "business_owner": "Chief Customer Officer",
       "technical_owner": "Customer Platforms Team",
+      "ai_use": "built_in",
       "description": "CRM, case management and workflow for domestic and SME customers.",
       "quote": "Meridian Energy Supply demo architecture (fictional organisation, illustrative)",
       "confidence": 0.9,
@@ -296,6 +297,7 @@
     },
     {
       "name": "Demand Forecasting Engine",
+      "ai_use": "external_service",
       "description": "Forecasts customer energy demand by half hour to support buying and balancing.",
       "capability": "Demand Forecasting",
       "kind": "application",
@@ -382,6 +384,7 @@
     },
     {
       "name": "Tariff Pricing Engine",
+      "ai_use": "external_service",
       "description": "Calculates tariff prices from wholesale costs, network charges and policy costs.",
       "capability": "Tariff Design & Pricing",
       "kind": "application",
@@ -969,6 +972,39 @@
       "criticality": "high",
       "quote": "Meridian Energy Supply demo architecture (fictional organisation, illustrative)",
       "confidence": 0.9
+    },
+    {
+      "name": "Customer Chat Agent",
+      "kind": "application",
+      "lifecycle": "active",
+      "criticality": "medium",
+      "disposition": "invest",
+      "domain": "it",
+      "hosting_model": "public_cloud",
+      "capability": "Customer Service & Contact",
+      "business_owner": "Chief Customer Officer",
+      "technical_owner": "Digital Team",
+      "ai_autonomy": "acts_with_approval",
+      "introduced": "2026-03-01",
+      "description": "AI agent that answers customer questions about bills and tariffs in the app and on the website, and hands over to a person for anything it cannot settle.",
+      "quote": "Meridian Energy Supply demo architecture (fictional organisation, illustrative)",
+      "confidence": 0.9
+    },
+    {
+      "name": "Collections Nudge Agent",
+      "kind": "application",
+      "lifecycle": "active",
+      "criticality": "medium",
+      "disposition": "invest",
+      "domain": "it",
+      "hosting_model": "public_cloud",
+      "capability": "Debt Management & Collections",
+      "business_owner": "Finance Director",
+      "ai_autonomy": "acts_alone",
+      "introduced": "2026-03-01",
+      "description": "AI agent that sends payment reminders and offers payment plans to customers in arrears without anyone checking first. Demo example of an agent that acts alone with no technical owner.",
+      "quote": "Meridian Energy Supply demo architecture (fictional organisation, illustrative)",
+      "confidence": 0.9
     }
   ],
   "relationships": [
@@ -1408,6 +1444,52 @@
       "type": "uses",
       "to": "Meridian Web & App",
       "description": "raises incidents for",
+      "quote": "Meridian Energy Supply demo architecture (fictional organisation, illustrative)",
+      "confidence": 0.85
+    },
+    {
+      "from": "Customer Chat Agent",
+      "type": "uses",
+      "to": "Kraken Billing · Account & Contract Management",
+      "description": "reads account and bill details from",
+      "quote": "Meridian Energy Supply demo architecture (fictional organisation, illustrative)",
+      "confidence": 0.85
+    },
+    {
+      "from": "Customer Chat Agent",
+      "type": "flows_to",
+      "to": "Salesforce · Service Cloud",
+      "description": "hands unresolved chats to",
+      "data_classification": "official_sensitive",
+      "protocol_in": "rest_api",
+      "protocol_out": "rest_api",
+      "quote": "Meridian Energy Supply demo architecture (fictional organisation, illustrative)",
+      "confidence": 0.85
+    },
+    {
+      "from": "Customer Chat Agent",
+      "type": "uses",
+      "to": "Meridian Web & App",
+      "description": "answers customers inside",
+      "quote": "Meridian Energy Supply demo architecture (fictional organisation, illustrative)",
+      "confidence": 0.85
+    },
+    {
+      "from": "Collections Nudge Agent",
+      "type": "uses",
+      "to": "Kraken Billing · Debt & Collections",
+      "description": "reads arrears and payment plans from",
+      "quote": "Meridian Energy Supply demo architecture (fictional organisation, illustrative)",
+      "confidence": 0.85
+    },
+    {
+      "from": "Collections Nudge Agent",
+      "type": "flows_to",
+      "to": "Meridian Web & App",
+      "description": "sends payment reminders through",
+      "data_classification": "official_sensitive",
+      "protocol_in": "rest_api",
+      "protocol_out": "rest_api",
       "quote": "Meridian Energy Supply demo architecture (fictional organisation, illustrative)",
       "confidence": 0.85
     }

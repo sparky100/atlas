@@ -32,3 +32,7 @@ Both files carry `introduced`, `planned_end` and `support_ends_at` (ISO `YYYY-MM
 ## Network planning, connections and OT (Northbridge)
 
 Northbridge also carries network planning and design tools (PowerFactory, scenario forecasting, investment planning), customer connections tools (quotation engine, public capacity map, generation connections register) and an OT layer (protection settings, substation automation, operational telecoms, historian, OT security monitoring). Re-import the file into the same model to add them; existing systems are matched by name and left as they are apart from their dates.
+
+## AI agents and AI use
+
+Both files show the AI features (importer fields `ai_autonomy` and `ai_use`, an owner-approved importer exception). Northbridge has three agents (Fault Triage Assistant: suggests only; Outage Comms Agent: acts with approval; Vegetation Cut Scheduler: acts alone), Meridian two (Customer Chat Agent: acts with approval; Collections Nudge Agent: acts alone), each linked to the systems it uses with ordinary relationships. Each demo also marks existing systems with Uses AI (forecasting and pricing engines, Salesforce, condition monitoring). The two agents that act alone have no technical owner on purpose, so Where to focus has something to flag. Re-import into the same model to add them.
