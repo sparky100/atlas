@@ -133,7 +133,7 @@ export function ModelSettingsView({ model, role, orgId, orgSlug, onChanged }: Mo
             }}
           />
           {canEdit && (
-            <Button variant="primary" type="submit" disabled={status === 'saving'}>
+            <Button variant="secondary" type="submit" disabled={status === 'saving'}>
               {status === 'saving' ? 'Saving…' : 'Save'}
             </Button>
           )}
@@ -172,7 +172,7 @@ export function ModelSettingsView({ model, role, orgId, orgSlug, onChanged }: Mo
                 setCopyName(e.target.value);
               }}
             />
-            <Button variant="primary" type="submit" disabled={copying.status === 'copying'}>
+            <Button variant="secondary" type="submit" disabled={copying.status === 'copying'}>
               {copying.status === 'copying' ? 'Copying…' : 'Copy model'}
             </Button>
           </form>
@@ -214,7 +214,7 @@ export function ModelSettingsView({ model, role, orgId, orgSlug, onChanged }: Mo
                 setSampleSlug(e.target.value);
               }}
             />
-            <Button variant="primary" type="submit" disabled={publishing.status === 'publishing'}>
+            <Button variant="secondary" type="submit" disabled={publishing.status === 'publishing'}>
               {publishing.status === 'publishing' ? 'Publishing…' : 'Publish sample'}
             </Button>
           </form>
@@ -353,7 +353,7 @@ export function ModelSettingsView({ model, role, orgId, orgSlug, onChanged }: Mo
                 </option>
               ))}
             </select>
-            <Button variant="primary" type="submit" disabled={targetOrgSlug.trim().length === 0}>
+            <Button variant="secondary" type="submit" disabled={targetOrgSlug.trim().length === 0}>
               Share
             </Button>
           </form>
