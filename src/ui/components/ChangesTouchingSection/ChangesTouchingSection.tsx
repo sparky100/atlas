@@ -1,5 +1,6 @@
 import { Link } from 'react-router';
 import type { BranchRow } from '../../../db/types';
+import { branchStatusTone } from '../../changes/branchStatus';
 import { Chip } from '../Chip/Chip';
 import { Text } from '../Text/Text';
 import styles from './ChangesTouchingSection.module.css';
@@ -39,7 +40,7 @@ export function ChangesTouchingSection({ inFlightBranches, projectTitles, orgSlu
               </Text>
             )}
           </div>
-          <Chip tone="info">{branch.status}</Chip>
+          <Chip tone={branchStatusTone(branch.status)}>{branch.status}</Chip>
         </li>
       ))}
     </ul>

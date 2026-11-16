@@ -244,7 +244,7 @@ export function AttributeDefinitionsPanel({ orgId, userId }: AttributeDefinition
                 <Chip tone="neutral">{definition.key}</Chip>
                 <Chip tone="neutral">{definition.kind}</Chip>
                 {definition.applies_to.map((type) => (
-                  <Chip key={type} tone="info">
+                  <Chip key={type} tone="neutral">
                     {type}
                   </Chip>
                 ))}

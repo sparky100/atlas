@@ -376,8 +376,8 @@ function RelationshipDirectionGroup({
               {fitForPurpose !== null && <Chip tone={fitForPurposeToneFor(fitForPurpose)}>{fitForPurpose}</Chip>}
               {fitNotRated && <Chip tone="neutral">fit not rated</Chip>}
               {ownsRole !== null && <Chip tone="neutral">{ownsRole} owner</Chip>}
-              {typeof dataClassification === 'string' && dataClassification.length > 0 && <Chip tone="info">{dataClassification}</Chip>}
-              {justAdded && <Chip tone="info">just added</Chip>}
+              {typeof dataClassification === 'string' && dataClassification.length > 0 && <Chip tone="neutral">{dataClassification}</Chip>}
+              {justAdded && <Chip tone="neutral">just added</Chip>}
               {existsFact && <FactBadge label={`relationship with ${otherDisplayName}`} fact={existsFact} source={sources.get(existsFact.source_id)} />}
               {removeRelationship && (
                 <RelationshipRemove
