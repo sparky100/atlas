@@ -11,6 +11,8 @@ import { lifecycleToneFor } from '../../elements/lifecycleTone';
 import { moduleDisplayName } from '../../elements/moduleDisplayName';
 import { aiMarkOf } from '../../../engine/elementRead/aiAgent';
 import { AiMarkChip } from '../AiTag/AiTag';
+import { LifecycleTag } from '../LifecycleTag/LifecycleTag';
+import { lifecycleTagFor } from '../LifecycleTag/lifecycleTagFor';
 import { Chip } from '../Chip/Chip';
 import { ElementTypeGlyph } from '../ElementTypeGlyph/ElementTypeGlyph';
 import { Text } from '../Text/Text';
@@ -114,6 +116,7 @@ function ElementBrowseCard({
   const customValue = selectedCustomDefinition ? formatCustomAttributeValue(attributesRecord(row.element.attributes)[selectedCustomDefinition.key]) : '';
   const decisionAction = decisionRowAction?.(row);
   const mark = aiMarkOf(row.element);
+  const lifecycleTag = lifecycleTagFor(row.element, row.parent);
 
   return (
     <li className={styles.card}>
@@ -122,6 +125,7 @@ function ElementBrowseCard({
         <Text as="span" className={styles.cardName}>
           {moduleDisplayName(row.element, row.parent)}
         </Text>
+        {lifecycleTag && <LifecycleTag {...lifecycleTag} />}
         {row.lifecycleStatus && <Chip tone={lifecycleTone ?? 'neutral'}>{row.lifecycleStatus}</Chip>}
         {row.criticality && <Chip tone={criticalityTone ?? 'neutral'}>{row.criticality}</Chip>}
         {row.disposition && <Chip tone={dispositionTone(row.disposition)}>{dispositionLabel(row.disposition)}</Chip>}

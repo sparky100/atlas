@@ -9,6 +9,7 @@ import { useEffect, useState } from 'react';
 import type { UUID } from '../../contracts/delta';
 import type { ElementsHeadRow } from '../../contracts/rows';
 import { listActorsForLandscape, listContainersForLandscape, listLandscapeEdges, listSystemsForLandscape } from '../../db/landscape';
+import { edgesInForce } from '../../engine/elementRead/fitAndExposure';
 import { refParamOf, resolveRef, type Ref } from '../../db/ref';
 import { reportError } from '../errors/errorBannerStore';
 import { supabase } from '../supabaseClient';
@@ -17,6 +18,8 @@ import { buildIntegrationRows, type IntegrationRow } from './integrationRows';
 export interface IntegrationsData {
   commitId: UUID;
   rows: IntegrationRow[];
+  /** Links left out because an end is planned or retired. */
+  notLiveCount: number;
 }
 
 export type IntegrationsState = { status: 'loading' } | { status: 'error'; message: string } | { status: 'refNotFound' } | { status: 'ready'; data: IntegrationsData };
@@ -39,8 +42,11 @@ export function useIntegrations(modelId: UUID, ref: Ref, mainCommitIdHint: UUID 
       const [systems, containers, actors] = await Promise.all([listSystemsForLandscape(supabase, commitId), listContainersForLandscape(supabase, commitId), listActorsForLandscape(supabase, commitId)]);
       const elements: ElementsHeadRow[] = [...systems, ...containers, ...actors];
       const links = await listLandscapeEdges(supabase, commitId, [...systems, ...containers].map((e) => e.element_id), actors.map((a) => a.element_id));
-      const rows = buildIntegrationRows(links, new Map(elements.map((e) => [e.element_id, e])));
-      if (!cancelled) setState({ status: 'ready', data: { commitId, rows } });
+      const elementsById = new Map(elements.map((e) => [e.element_id, e]));
+      // Today's integrations are the live ones: a link needs both ends active. A change branch shows its plan as it is.
+      const shown = ref.kind === 'branch' ? links : edgesInForce(links, elementsById);
+      const rows = buildIntegrationRows(shown, elementsById);
+      if (!cancelled) setState({ status: 'ready', data: { commitId, rows, notLiveCount: links.length - shown.length } });
     }
 
     load().catch((e: unknown) => {

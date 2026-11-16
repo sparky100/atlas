@@ -33,7 +33,8 @@ import { hintedModelId, useMainBranch } from '../branches/useMainBranch';
 import { useSelectedRef } from '../branches/useSelectedRef';
 import { isViewingMode } from '../branches/viewingMode';
 import { AsAtControl } from '../landscape/AsAtControl';
-import { AS_AT_COMPARE_PARAM, AS_AT_PARAM, parseAsAtParam, todayIsoDate } from '../landscape/asAt';
+import { NotLiveNote } from '../landscape/NotLiveNote';
+import { AS_AT_COMPARE_PARAM, AS_AT_PARAM, addMonthsIso, parseAsAtParam, todayIsoDate } from '../landscape/asAt';
 import { FutureSummary } from '../landscape/FutureSummary';
 import { CapabilityLandscapeList } from '../landscape/CapabilityLandscapeList';
 import { Inspector } from '../components/Inspector/Inspector';
@@ -662,6 +663,15 @@ export function LandscapePage() {
         )}
         {asAt !== null && state.status === 'ready' && state.data.future !== null && <FutureSummary future={state.data.future} asAt={asAt} orgSlug={orgSlug ?? ''} modelSlug={model.slug} />}
         {asAt !== null && highlightChanges && state.status === 'ready' && <DiffLegend />}
+        {asAt === null && ref.kind !== 'branch' && state.status === 'ready' && (
+          <NotLiveNote
+            planned={state.data.hiddenByDate.planned}
+            retired={state.data.hiddenByDate.retired}
+            plannedHref={`/o/${orgSlug ?? ''}/m/${model.slug}/landscape?${AS_AT_PARAM}=${addMonthsIso(todayIso, 24)}`}
+            retiredHref={`/o/${orgSlug ?? ''}/m/${model.slug}/elements`}
+            noun={['system or module', 'systems and modules']}
+          />
+        )}
         {ref.kind === 'branch' && (
           <BranchViewModeControl
             mode={mode}

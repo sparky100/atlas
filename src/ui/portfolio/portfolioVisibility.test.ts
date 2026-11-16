@@ -35,3 +35,11 @@ describe('visiblePortfolioRows', () => {
     expect(sysWithoutContainers?.signals).toEqual([overlapSignal]);
   });
 });
+
+describe('visiblePortfolioRows: current portfolio by default', () => {
+  const rows = [fakeRow({ name: 'live' }), fakeRow({ name: 'planned', lifecycleState: 'planned' }), fakeRow({ name: 'retired', lifecycleState: 'retired' })];
+  it('leaves out planned and retired rows unless asked', () => {
+    expect(visiblePortfolioRows(rows, false).map((r) => r.name)).toEqual(['live']);
+    expect(visiblePortfolioRows(rows, false, true).map((r) => r.name)).toEqual(['live', 'planned', 'retired']);
+  });
+});

@@ -13,7 +13,7 @@ import type { ElementsHeadRow, RelationshipsHeadRow } from '../../contracts/rows
 import { attributesRecord } from '../elementRead/attributesRecord';
 import { CRITICALITY_ORDER } from '../elementRead/criticality';
 import { dispositionOf } from '../elementRead/disposition';
-import { fitForPurposeOf, hasLifecycleExposureData, supportsEdgesInForce, systemsExposedByLifecycle, worstFitForPurposeOfSupporter } from '../elementRead/fitAndExposure';
+import { fitForPurposeOf, hasLifecycleExposureData, lifecycleStateOf, supportsEdgesInForce, systemsExposedByLifecycle, worstFitForPurposeOfSupporter, type LifecycleState } from '../elementRead/fitAndExposure';
 import { moduleDisplayNameFromMap } from '../elementRead/moduleDisplayName';
 import { ownersByRole } from '../elementRead/ownersByRole';
 import { annualRunCostOf, highCostOverlapsFromBands, topLevelSupporterBandsByCapability, topLevelSystemIdOf } from './portfolioOverlap';
@@ -49,6 +49,8 @@ export interface PortfolioRow {
   /** F11: this row's own disposition — a module's own, never its platform's. */
   disposition: Disposition | null;
   lifecycleStatus: string | null;
+  /** Planned (not live yet), active, or retired, by this row's own dates (`lifecycleStateOf`). */
+  lifecycleState: LifecycleState;
   /** `null` when this row's own family has no recorded `plannedEnd` at all — unknown, never "not exposed" (decision 4). */
   lifecycleExposed: boolean | null;
   capabilities: PortfolioCapabilityLink[];
@@ -149,6 +151,7 @@ export function buildPortfolioRows({ systems, containers, capabilities, actors, 
     const fit = worstFitForPurposeOfSupporter(element.element_id, support);
     const criticality = criticalityOf(element, parent);
     const lifecycleStatus = lifecycleStatusOf(element, parent);
+    const lifecycleState = lifecycleStateOf(element, elementsById, now);
     const lifecycleExposed = hasLifecycleExposureData([element]) ? systemsExposedByLifecycle([element], now, replacedIds) : null;
 
     const capabilityLinks: PortfolioCapabilityLink[] = support
@@ -184,6 +187,7 @@ export function buildPortfolioRows({ systems, containers, capabilities, actors, 
       criticality,
       disposition,
       lifecycleStatus,
+      lifecycleState,
       lifecycleExposed,
       capabilities: capabilityLinks,
       businessOwner,

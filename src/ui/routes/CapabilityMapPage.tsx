@@ -43,6 +43,8 @@ import { useInspectorCollapsedPreference } from '../components/Inspector/useInsp
 import { useHomeMode } from '../home/useHomeMode';
 import { downloadImportPrompt } from '../import/downloadImportPrompt';
 import { useRouteTiming } from '../perf/useRouteTiming';
+import { NotLiveNote } from '../landscape/NotLiveNote';
+import { addMonthsIso, todayIsoDate } from '../landscape/asAt';
 import { supabase } from '../supabaseClient';
 import styles from './CapabilityMapPage.module.css';
 
@@ -285,6 +287,15 @@ export function CapabilityMapPage() {
             Capability map
           </Text>
           <MakeStartPageButton page="capability-map" />
+          {state.status === 'ready' && (
+            <NotLiveNote
+              planned={state.data.hiddenByDate.planned}
+              retired={state.data.hiddenByDate.retired}
+              plannedHref={`/o/${orgSlug ?? ''}/m/${model.slug}/landscape?asat=${addMonthsIso(todayIsoDate(), 24)}`}
+              retiredHref={`/o/${orgSlug ?? ''}/m/${model.slug}/elements`}
+              noun={['system or module', 'systems and modules']}
+            />
+          )}
           {/* F13 step 1: a stamped picture of the map as shown — open to every member, unlike the editing actions beside it. */}
           {state.status === 'ready' && state.data.tree.l1.length > 0 && (
             <div className={styles.actions}>

@@ -18,6 +18,7 @@ import { ConvertToModuleAction } from '../components/ConvertToModuleAction/Conve
 import { DocumentsSection } from '../components/DocumentsSection/DocumentsSection';
 import { ElementDecisionsSection } from '../components/ElementDecisionsSection/ElementDecisionsSection';
 import { ElementHeader } from '../components/ElementHeader/ElementHeader';
+import { lifecycleTagFor } from '../components/LifecycleTag/lifecycleTagFor';
 import { ElementSearchAdd } from '../components/ElementSearchAdd/ElementSearchAdd';
 import { HistoryTimeline } from '../components/HistoryTimeline/HistoryTimeline';
 import { MergeIntoAction } from '../components/MergeIntoAction/MergeIntoAction';
@@ -371,6 +372,7 @@ export function ElementPage() {
               confirming={attestation.confirmingId === state.data.element.element_id}
               onProposeChange={canPropose ? () => { setProposingChange(true); } : undefined}
               readOnlyReason={underReview ? 'Read-only: under review' : undefined}
+              lifecycleTag={lifecycleTagFor(state.data.element, state.data.parent)}
               interfacePlatform={
                 state.data.parent && isIntegrationInterface(state.data.element, state.data.parent)
                   ? {

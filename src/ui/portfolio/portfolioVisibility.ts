@@ -9,6 +9,11 @@
  */
 import type { PortfolioRow } from './usePortfolio';
 
-export function visiblePortfolioRows(rows: readonly PortfolioRow[], includeContainers: boolean): PortfolioRow[] {
-  return includeContainers ? [...rows] : rows.filter((row) => row.element.element_type !== 'container');
+/**
+ * `includeNotLive` (the "Include planned and retired" switch) is off by
+ * default: the portfolio is the current portfolio, so a planned system (not
+ * live yet) and a retired one are left out until asked for.
+ */
+export function visiblePortfolioRows(rows: readonly PortfolioRow[], includeContainers: boolean, includeNotLive = false): PortfolioRow[] {
+  return rows.filter((row) => (includeContainers || row.element.element_type !== 'container') && (includeNotLive || row.lifecycleState === 'active'));
 }

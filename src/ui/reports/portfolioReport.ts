@@ -5,6 +5,7 @@
  * rank lowest, unset owners sort first), names compare by lower-cased code
  * units rather than the host locale.
  */
+import { INCLUDE_NOT_LIVE_FILTER, LIFECYCLE_STATE_FIELD } from '../../engine/reportQuery';
 import { aiAutonomyOf, aiAutonomyRank, aiRankOf, aiUseReportValueOf } from '../../engine/elementRead/aiAgent';
 import type { AnnualRunCost, Criticality, Disposition } from '../../contracts/delta';
 import { REPORT_SPEC_VERSION, type ReportFilter, type ReportRow, type ReportSort, type ReportSpec } from '../../contracts/reportSpec';
@@ -17,6 +18,8 @@ import type { PortfolioRow } from '../portfolio/usePortfolio';
 /** The Portfolio page's saveable state. */
 export interface PortfolioReportState {
   includeContainers: boolean;
+  /** "Include planned and retired" — off means the current portfolio (a report counts only live rows unless it says otherwise, `reportQuery.ts`). */
+  includeNotLive: boolean;
   filters: PortfolioFilters;
   sortKey: PortfolioSortKey;
   sortDirection: 'asc' | 'desc';
@@ -24,6 +27,7 @@ export interface PortfolioReportState {
 
 export const DEFAULT_PORTFOLIO_REPORT_STATE: PortfolioReportState = {
   includeContainers: false,
+  includeNotLive: false,
   filters: DEFAULT_PORTFOLIO_FILTERS,
   sortKey: DEFAULT_PORTFOLIO_SORT_KEY,
   sortDirection: DEFAULT_PORTFOLIO_SORT_DIRECTION,
@@ -32,7 +36,7 @@ export const DEFAULT_PORTFOLIO_REPORT_STATE: PortfolioReportState = {
 export const PORTFOLIO_REPORT_FIELDS = ['name', 'kind', 'cost', 'fit', 'criticality', 'disposition', 'lifecycle', 'capabilities', 'owner', 'signals'] as const;
 export const PORTFOLIO_REPORT_HELPER_FIELDS = ['id', 'elementType', 'signalKeys', 'costRank', 'fitRank', 'criticalityRank', 'dispositionRank', 'lifecycleRank', 'ownerSort', 'aiAutonomyRank', 'aiRank', 'lifecycleExposed'] as const;
 /** Usable in a report but not a default column (blank for most systems): `aiAutonomy` is how freely an AI agent acts (empty for a non-agent); `aiUse` is how AI is used at all (`agent`, `built_in` or `external_service`, empty for none recorded). */
-export const PORTFOLIO_REPORT_OPTIONAL_FIELDS = ['aiAutonomy', 'aiUse'] as const;
+export const PORTFOLIO_REPORT_OPTIONAL_FIELDS = ['aiAutonomy', 'aiUse', 'lifecycleState'] as const;
 
 /** Signal keys wrapped in bars, so a `contains` filter on one key can never match part of another. */
 function signalKeyList(row: PortfolioRow): string {
@@ -51,6 +55,7 @@ export function portfolioReportRow(row: PortfolioRow): ReportRow {
     criticality: row.criticality,
     disposition: row.disposition,
     lifecycle: row.lifecycleStatus,
+    lifecycleState: row.lifecycleState,
     lifecycleExposed: row.lifecycleExposed,
     capabilities: row.capabilities.length,
     owner: ownerName,
@@ -90,6 +95,7 @@ export function portfolioStateToSpec(state: PortfolioReportState): PortfolioSpec
   const f = state.filters;
   const filters: ReportFilter[] = [];
   if (!state.includeContainers) filters.push({ field: 'elementType', operator: 'neq', value: 'container' });
+  if (state.includeNotLive) filters.push(INCLUDE_NOT_LIVE_FILTER);
   if (f.kind !== 'all') filters.push({ field: 'kind', operator: 'eq', value: f.kind });
   if (f.signal !== 'all') filters.push({ field: 'signalKeys', operator: 'contains', value: `|${f.signal}|` });
   if (f.cost !== 'all') filters.push({ field: 'cost', operator: 'eq', value: f.cost });
@@ -116,6 +122,7 @@ export function specToPortfolioState(spec: ReportSpec): PortfolioStateResult {
   if (spec.groupBy !== undefined || spec.presentation.kind !== 'table' || spec.presentation.limit !== undefined) return { ok: false, reason: NOT_SHOWABLE };
 
   let includeContainers = true;
+  let includeNotLive = false;
   const filters: { -readonly [K in keyof PortfolioFilters]: PortfolioFilters[K] } = { ...DEFAULT_PORTFOLIO_FILTERS };
   const seen = new Set<string>();
   for (const filter of spec.filters) {
@@ -125,6 +132,8 @@ export function specToPortfolioState(spec: ReportSpec): PortfolioStateResult {
     const value = filter.value;
     if (filter.field === 'elementType' && filter.operator === 'neq' && value === 'container') {
       includeContainers = false;
+    } else if (filter.field === LIFECYCLE_STATE_FIELD && filter.operator === 'in' && JSON.stringify(filter.value) === JSON.stringify(INCLUDE_NOT_LIVE_FILTER.value)) {
+      includeNotLive = true;
     } else if (filter.field === 'kind' && filter.operator === 'eq' && typeof value === 'string') {
       filters.kind = value as PortfolioRowKind;
     } else if (filter.field === 'signalKeys' && filter.operator === 'contains' && typeof value === 'string') {
@@ -155,5 +164,5 @@ export function specToPortfolioState(spec: ReportSpec): PortfolioStateResult {
     sortKey = known;
     sortDirection = first.direction;
   }
-  return { ok: true, state: { includeContainers, filters, sortKey, sortDirection } };
+  return { ok: true, state: { includeContainers, includeNotLive, filters, sortKey, sortDirection } };
 }

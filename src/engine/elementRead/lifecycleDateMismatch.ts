@@ -16,6 +16,7 @@
 import type { LifecycleStatus, UUID } from '../../contracts/delta';
 import type { ElementsHeadRow } from '../../contracts/rows';
 import { attributesRecord } from './attributesRecord';
+import { lifecycleStateFromDates } from './fitAndExposure';
 
 export type LifecycleMismatchKind = 'active-not-yet-introduced' | 'planned-already-introduced' | 'active-past-end';
 
@@ -48,20 +49,23 @@ export function formatPlainDate(iso: string): string {
 }
 
 /** The disagreement for one element, or `null` when its status and dates agree. `inheritedStatus` is the platform's status, read only when the element has none of its own. */
-export function lifecycleMismatchOf(element: ElementsHeadRow, inheritedStatus: unknown, now: Date): LifecycleMismatch | null {
+export function lifecycleMismatchOf(element: ElementsHeadRow, inheritedStatus: unknown, now: Date, parent?: ElementsHeadRow | null): LifecycleMismatch | null {
   if (element.element_type !== 'system' && element.element_type !== 'container') return null;
   const attrs = attributesRecord(element.attributes);
   const status = typeof attrs.lifecycleStatus === 'string' ? attrs.lifecycleStatus : inheritedStatus;
   if (status !== 'active' && status !== 'planned') return null;
-  const today = isoDay(now);
-  const introduced = dateOf(attrs.introduced);
-  const plannedEnd = dateOf(attrs.plannedEnd);
+  // The dates are read by the one shared rule (`lifecycleStateFromDates`), so this check and every view agree on what a date means.
+  const byId = new Map<UUID, ElementsHeadRow>(parent ? [[parent.element_id, parent]] : []);
+  const impliedByDates = lifecycleStateFromDates(element, byId, now);
+  const introduced = dateOf(attrs.introduced) ?? (parent ? dateOf(attributesRecord(parent.attributes).introduced) : null);
+  const plannedEnd = dateOf(attrs.plannedEnd) ?? (parent ? dateOf(attributesRecord(parent.attributes).plannedEnd) : null);
   if (status === 'active') {
-    if (introduced !== null && introduced > today) return { element, kind: 'active-not-yet-introduced', suggested: 'planned', current: status, date: introduced };
-    if (plannedEnd !== null && plannedEnd <= today) return { element, kind: 'active-past-end', suggested: 'retired', current: status, date: plannedEnd };
+    if (impliedByDates === 'planned' && introduced !== null) return { element, kind: 'active-not-yet-introduced', suggested: 'planned', current: status, date: introduced };
+    if (impliedByDates === 'retired' && plannedEnd !== null) return { element, kind: 'active-past-end', suggested: 'retired', current: status, date: plannedEnd };
     return null;
   }
-  if (introduced !== null && introduced <= today) return { element, kind: 'planned-already-introduced', suggested: 'active', current: status, date: introduced };
+  // Marked planned, but nothing in its dates says it is still to come: the introduced date has come (or none stops it being live).
+  if (impliedByDates === 'active' && introduced !== null) return { element, kind: 'planned-already-introduced', suggested: 'active', current: status, date: introduced };
   return null;
 }
 
@@ -71,7 +75,7 @@ export function findLifecycleDateMismatches(elements: readonly ElementsHeadRow[]
   const found: LifecycleMismatch[] = [];
   for (const element of elements) {
     const parent = element.parent_id !== null ? byId.get(element.parent_id) : undefined;
-    const mismatch = lifecycleMismatchOf(element, parent ? attributesRecord(parent.attributes).lifecycleStatus : undefined, now);
+    const mismatch = lifecycleMismatchOf(element, parent ? attributesRecord(parent.attributes).lifecycleStatus : undefined, now, parent);
     if (mismatch) found.push(mismatch);
   }
   return found;

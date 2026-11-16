@@ -19,6 +19,9 @@ export interface PortfolioToolbarProps {
   onFiltersChange: (filters: PortfolioFilters) => void;
   includeContainers: boolean;
   onIncludeContainersChange: (include: boolean) => void;
+  /** "Include planned and retired": off by default, so the portfolio is the current one. */
+  includeNotLive: boolean;
+  onIncludeNotLiveChange: (include: boolean) => void;
   /** Table or chart: the same filters apply to both. */
   view: PortfolioViewMode;
   onViewChange: (view: PortfolioViewMode) => void;
@@ -41,10 +44,10 @@ const CRITICALITY_OPTIONS = Object.keys(CRITICALITY_ORDER) as Criticality[];
 const KIND_OPTIONS: PortfolioRowKind[] = ['system', 'platform', 'module'];
 
 /** The Portfolio's own toolbar: sort (any column, click-to-toggle direction via the already-sorted select), the four filters (task item 6), and the containers-inclusion toggle (item 2) — one row of plain controls, the same `<select>`/`<input type="checkbox">` shape `ElementBrowseTable.tsx`'s own toolbar already uses, not a bespoke filter-bar component. */
-export function PortfolioToolbar({ sortKey, sortDirection, onSortChange, filters, onFiltersChange, includeContainers, onIncludeContainersChange, view, onViewChange, fitPick, onFitPickChange, shownCount, totalCount }: PortfolioToolbarProps) {
+export function PortfolioToolbar({ sortKey, sortDirection, onSortChange, filters, onFiltersChange, includeContainers, onIncludeContainersChange, includeNotLive, onIncludeNotLiveChange, view, onViewChange, fitPick, onFitPickChange, shownCount, totalCount }: PortfolioToolbarProps) {
   const [moreOpen, setMoreOpen] = useState(false);
   // A hidden filter that is doing something must never stay out of sight.
-  const moreActive = filters.signal !== 'all' || filters.cost !== 'all' || includeContainers;
+  const moreActive = filters.signal !== 'all' || filters.cost !== 'all' || includeContainers || includeNotLive;
   const showMore = moreOpen || moreActive;
   const chips: { label: string; clear: () => void }[] = [];
   if (filters.kind !== 'all') chips.push({ label: `Kind: ${PORTFOLIO_ROW_KIND_LABEL[filters.kind]}`, clear: () => { onFiltersChange({ ...filters, kind: 'all' }); } });
@@ -212,6 +215,16 @@ export function PortfolioToolbar({ sortKey, sortDirection, onSortChange, filters
             }}
           />
           <span>Include containers (modules)</span>
+        </label>
+        <label>
+          <input
+            type="checkbox"
+            checked={includeNotLive}
+            onChange={(e) => {
+              onIncludeNotLiveChange(e.target.checked);
+            }}
+          />
+          <span>Include planned and retired</span>
         </label>
       </div>
     )}

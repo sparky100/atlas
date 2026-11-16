@@ -24,9 +24,11 @@
 import type { Disposition, ElementType } from '../../contracts/delta';
 import type { Json } from '../../contracts/rows';
 import { REPORT_SPEC_VERSION, type ReportFilter, type ReportRow, type ReportSort, type ReportSpec, type ReportValue } from '../../contracts/reportSpec';
+import { INCLUDE_NOT_LIVE_FILTER, LIFECYCLE_STATE_FIELD } from '../reportQuery';
 import type { BrowseRow } from '../../db/elementBrowse';
 import { aiAutonomyOf, aiAutonomyRank, aiRankOf, aiUseReportValueOf } from './aiAgent';
 import { attributesRecord } from './attributesRecord';
+import { lifecycleStateOf } from './fitAndExposure';
 import { CRITICALITY_ORDER } from './criticality';
 import { DISPOSITION_ORDER } from './disposition';
 import { moduleDisplayName } from './moduleDisplayName';
@@ -59,7 +61,7 @@ export const ELEMENT_REPORT_FIELDS = ['name', 'type', 'owner', 'lifecycle', 'cri
 /** Fields that exist only so the page's ordering and search can be reproduced; never offered as columns. */
 export const ELEMENT_REPORT_HELPER_FIELDS = ['id', 'search', 'ownerSort', 'lifecycleSort', 'criticalityRank', 'dispositionRank', 'aiAutonomyRank', 'aiRank'] as const;
 /** Fields a report may use but that are not default columns (a column that is blank for most systems): `aiAutonomy` is how freely an AI agent acts (empty for a system that is not one); `aiUse` is how AI is used at all (`agent`, `built_in` or `external_service`, empty for no AI recorded). */
-export const ELEMENT_REPORT_OPTIONAL_FIELDS = ['aiAutonomy', 'aiUse'] as const;
+export const ELEMENT_REPORT_OPTIONAL_FIELDS = ['aiAutonomy', 'aiUse', 'lifecycleState'] as const;
 
 const FIXED_FIELDS: ReadonlySet<string> = new Set<string>([...ELEMENT_REPORT_FIELDS, ...ELEMENT_REPORT_OPTIONAL_FIELDS, ...ELEMENT_REPORT_HELPER_FIELDS]);
 
@@ -95,6 +97,8 @@ export function elementReportRow(row: BrowseRow): ReportRow {
     type: row.element.element_type,
     owner: ownerName,
     lifecycle: row.lifecycleStatus,
+    // planned / active / retired by the element's own dates (a report counts only active rows unless it says otherwise — `reportQuery.ts`).
+    lifecycleState: lifecycleStateOf(row.element, new Map(row.parent ? [[row.parent.element_id, row.parent]] : [])),
     criticality: row.criticality,
     disposition: row.disposition,
     aiAutonomy: aiAutonomyOf(row.element),
@@ -170,7 +174,8 @@ export function elementsStateToSpec(state: ElementsReportState, findingFilter: s
   if (state.custom !== null && FIXED_FIELDS.has(state.custom.key)) {
     return { ok: false, reason: 'This attribute has the same key as a built-in column, so a report cannot tell them apart.' };
   }
-  const filters: ReportFilter[] = [];
+  // The Elements page shows every element, planned and retired ones tagged, so what it saves says so (a report otherwise counts live rows only).
+  const filters: ReportFilter[] = [INCLUDE_NOT_LIVE_FILTER];
   if (state.typeFilter !== 'all') filters.push({ field: 'type', operator: 'eq', value: state.typeFilter });
   if (state.dispositionFilter === 'not_assessed') {
     filters.push({ field: 'type', operator: 'in', value: ['system', 'container'] });
@@ -206,7 +211,9 @@ export function specToElementsState(spec: ReportSpec): ElementsStateResult {
   const state: ElementsReportState = { ...DEFAULT_ELEMENTS_REPORT_STATE };
   let typeIn = false;
   for (const filter of spec.filters) {
-    if (filter.field === 'type' && filter.operator === 'eq' && typeof filter.value === 'string' && state.typeFilter === 'all') {
+    if (filter.field === LIFECYCLE_STATE_FIELD && filter.operator === 'in' && JSON.stringify(filter.value) === JSON.stringify(INCLUDE_NOT_LIVE_FILTER.value)) {
+      continue;
+    } else if (filter.field === 'type' && filter.operator === 'eq' && typeof filter.value === 'string' && state.typeFilter === 'all') {
       state.typeFilter = filter.value as ElementType;
     } else if (filter.field === 'type' && filter.operator === 'in' && !typeIn && Array.isArray(filter.value) && filter.value.length === 2 && filter.value[0] === 'system' && filter.value[1] === 'container') {
       typeIn = true;

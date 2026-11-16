@@ -24,6 +24,7 @@ export function fakeRow(overrides: Partial<PortfolioRow> = {}): PortfolioRow {
     criticality: null,
     disposition: null,
     lifecycleStatus: null,
+    lifecycleState: 'active',
     lifecycleExposed: null,
     capabilities: [],
     businessOwner: null,

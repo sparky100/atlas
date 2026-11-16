@@ -49,6 +49,7 @@ const MOBILE_BREAKPOINT_PX = 768;
  */
 export function PortfolioView({ data, elementHref, exportStamp, savedReports }: PortfolioViewProps) {
   const [includeContainers, setIncludeContainers] = useState(false);
+  const [includeNotLive, setIncludeNotLive] = useState(false);
   const [sortKey, setSortKey] = useState<PortfolioSortKey>(DEFAULT_PORTFOLIO_SORT_KEY);
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>(DEFAULT_PORTFOLIO_SORT_DIRECTION);
   const [filters, setFilters] = useState<PortfolioFilters>(DEFAULT_PORTFOLIO_FILTERS);
@@ -58,7 +59,7 @@ export function PortfolioView({ data, elementHref, exportStamp, savedReports }: 
   const [fitPick, setFitPick] = useState<ChartFit | null>(null);
   const narrow = useIsNarrowViewport(MOBILE_BREAKPOINT_PX);
 
-  const visibleRows = useMemo(() => visiblePortfolioRows(data.rows, includeContainers), [data.rows, includeContainers]);
+  const visibleRows = useMemo(() => visiblePortfolioRows(data.rows, includeContainers, includeNotLive), [data.rows, includeContainers, includeNotLive]);
   const notEntered = useMemo(() => countAnnualRunCosts(visibleRows.map((row) => row.cost)).notEntered, [visibleRows]);
   const filteredRows = useMemo(() => filterPortfolioRows(visibleRows, filters), [visibleRows, filters]);
   const rows = useMemo(() => sortPortfolioRows(fitPick ? filteredRows.filter((row) => (row.fit ?? 'unrated') === fitPick) : filteredRows, sortKey, sortDirection), [filteredRows, fitPick, sortKey, sortDirection]);
@@ -93,11 +94,12 @@ export function PortfolioView({ data, elementHref, exportStamp, savedReports }: 
         <SavedReportBar
           source="portfolio"
           {...savedReports}
-          current={portfolioStateToSpec({ includeContainers, filters, sortKey, sortDirection })}
+          current={portfolioStateToSpec({ includeContainers, includeNotLive, filters, sortKey, sortDirection })}
           onOpen={(spec) => {
             const restored = specToPortfolioState(spec);
             if (!restored.ok) return restored.reason;
             setIncludeContainers(restored.state.includeContainers);
+            setIncludeNotLive(restored.state.includeNotLive);
             setFilters(restored.state.filters);
             setSortKey(restored.state.sortKey);
             setSortDirection(restored.state.sortDirection);
@@ -113,6 +115,8 @@ export function PortfolioView({ data, elementHref, exportStamp, savedReports }: 
         onFiltersChange={setFilters}
         includeContainers={includeContainers}
         onIncludeContainersChange={setIncludeContainers}
+        includeNotLive={includeNotLive}
+        onIncludeNotLiveChange={setIncludeNotLive}
         view={view}
         onViewChange={setView}
         fitPick={fitPick}

@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import type { UUID } from '../../contracts/delta';
 import { getMainBranch } from '../../db/branches';
 import { findBoundaryCrossings, listAllUsesAndFlowsToEdges, listUsesAndFlowsToEndpointElements, type BoundaryCrossing } from '../../db/healthFindings';
+import { edgesInForce } from '../../engine/elementRead/fitAndExposure';
 import { reportError } from '../errors/errorBannerStore';
 import { supabase } from '../supabaseClient';
 
@@ -32,7 +33,8 @@ export function useBoundaryCrossings(modelId: UUID): BoundaryCrossingsState {
       }
       const [edges, elements] = await Promise.all([listAllUsesAndFlowsToEdges(supabase, main.head_commit_id), listUsesAndFlowsToEndpointElements(supabase, main.head_commit_id)]);
       const elementsById = new Map(elements.map((e) => [e.element_id, e]));
-      if (!cancelled) setState({ status: 'ready', crossings: findBoundaryCrossings(edges, elementsById) });
+      // A link to or from a system that isn't live yet, or is retired, isn't a crossing today.
+      if (!cancelled) setState({ status: 'ready', crossings: findBoundaryCrossings(edgesInForce(edges, elementsById), elementsById) });
     }
 
     load().catch((e: unknown) => {
