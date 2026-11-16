@@ -129,6 +129,22 @@ export function projectFutureHead(today: Head, changes: readonly PlannedChange[]
   return { head, applied: due.map((c) => c.id), overlaps };
 }
 
+export interface FutureWithBaseline extends FutureProjection {
+  /** Today's live picture: what a future view is compared with. */
+  baseline: Head;
+}
+
+/**
+ * The future picture and the baseline to compare it with. The picture is
+ * projected from the whole model — a planned system has to be in it to be
+ * able to arrive by its date — while the baseline is today's live picture
+ * (`liveHead`). Projecting from the live baseline instead would drop every
+ * planned system before it could arrive.
+ */
+export function projectFutureWithBaseline(fullToday: Head, changes: readonly PlannedChange[], asAt: string, todayIso: string): FutureWithBaseline {
+  return { ...projectFutureHead(fullToday, changes, asAt, todayIso), baseline: liveHead(fullToday, todayIso) };
+}
+
 /** Capabilities some system supports today that no system supports in the future picture — the "no system by then" problem. */
 export function capabilitiesLeftWithoutSystem(today: Head, future: Head): UUID[] {
   const supported = (head: Head): Set<UUID> => {

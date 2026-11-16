@@ -1,6 +1,6 @@
 import type { UUID } from '../contracts/delta';
 import type { Head } from '../engine/deltas';
-import { capabilitiesLeftWithoutSystem, liveHead, projectFutureHead, type PlannedChange } from '../engine/plannedFuture';
+import { capabilitiesLeftWithoutSystem, projectFutureWithBaseline, type PlannedChange } from '../engine/plannedFuture';
 import type { Client } from './client';
 import { listChangeBranches, OPEN_CHANGE_STATUSES } from './branches';
 import type { BranchRow } from './types';
@@ -46,7 +46,8 @@ export async function loadPlannedFuture(
   const undated = planned.filter((b) => b.target_date === null);
   const due = planned.filter((b): b is BranchRow & { target_date: string } => b.target_date !== null && b.target_date <= asAt);
 
-  const today = liveHead(await loadHead(mainHeadCommitId), todayIso);
+  // The projection starts from the whole model (a planned system must be there to arrive by its date); only the baseline it is compared with is today's live picture.
+  const fullToday = await loadHead(mainHeadCommitId);
   // Only fold the changes that fall on or before the date; with none, there is nothing to fold.
   const changes: PlannedChange[] =
     asAt <= todayIso
@@ -58,7 +59,8 @@ export async function loadPlannedFuture(
           }),
         );
 
-  const projection = projectFutureHead(today, changes, asAt, todayIso);
+  const projection = projectFutureWithBaseline(fullToday, changes, asAt, todayIso);
+  const today = projection.baseline;
   const byId = new Map(planned.map((b) => [b.id, b]));
   const nameOf = (id: UUID) => projection.head.elements.get(id)?.name ?? today.elements.get(id)?.name ?? 'Unnamed';
 

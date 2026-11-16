@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { emptyHead, type ElementRow, type Head, type RelationshipRow } from './deltas';
-import { capabilitiesLeftWithoutSystem, liveHead, projectFutureHead, type PlannedChange } from './plannedFuture';
+import { capabilitiesLeftWithoutSystem, liveHead, projectFutureHead, projectFutureWithBaseline, type PlannedChange } from './plannedFuture';
 
 const TODAY = '2026-11-09';
 
@@ -125,5 +125,25 @@ describe('the live baseline for a future view', () => {
     expect(removed('2027-05-16')).toEqual(['ending']);
     expect(added('2027-11-16')).toEqual(['soon']);
     expect(removed('2027-11-16')).toEqual(['ending']);
+  });
+});
+
+describe('projectFutureWithBaseline', () => {
+  const NOW = '2026-11-16';
+  const full = () => headOf({ cap: capability('Mapping'), esri: system('Esri'), un: container('Utility Network', 'esri'), live: system('Live') }, { r: supports('live', 'cap') });
+  const withDate = (asAt: string) => {
+    const head = full();
+    head.elements.set('un', { ...container('Utility Network', 'esri'), attributes: { introduced: '2027-08-28', lifecycleStatus: 'planned' } });
+    return projectFutureWithBaseline(head, [], asAt, NOW);
+  };
+  it('a planned module arrives by its date: in the future picture, not in the baseline', () => {
+    const result = withDate('2027-11-16');
+    expect(result.head.elements.has('un')).toBe(true);
+    expect(result.baseline.elements.has('un')).toBe(false);
+  });
+  it('before its date it is in neither', () => {
+    const result = withDate('2027-05-16');
+    expect(result.head.elements.has('un')).toBe(false);
+    expect(result.baseline.elements.has('un')).toBe(false);
   });
 });
