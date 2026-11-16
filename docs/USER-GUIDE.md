@@ -1,25 +1,22 @@
 # Atlas User Guide
 
-**Status:** reviewed against the app on 2026-11-15 (after the guided change forms, the redesigned change page, project managers, sample models, "Export everything", and the removal of confidence dots). Whenever a change alters what people see, this guide changes in the same pull request. Written for the in-app AI help chat to ground its answers in — if something here doesn't match what you see, the app is right and this guide needs correcting.
+**Status:** restructured and reviewed against the app on 2026-11-16. Whenever a change alters what people see, this guide changes in the same pull request. Written for the in-app AI help chat to ground its answers in — if something here doesn't match what you see, the app is right and this guide needs correcting.
 
 This is the guide the in-app **Help** assistant reads to answer your questions. It isn't reference documentation for developers (that's `docs/ADR-000-foundations.md` and `docs/SPEC-data-model.md`); it's written for the people who use Atlas: architects who maintain the model, and the senior people who read it.
 
+**Words used throughout.** A role is Viewer, Contributor, Architect or Owner (what you may do). An element's owner is someone recorded as owning it (business, technical or service owner). The **live model** is the current agreed model; a **change** is a separate set of edits reviewed before it reaches the live model; a **version** is a named snapshot of the live model.
+
+**What is where.**
+
+1. Start here: what Atlas is, your first 10 minutes, signing in and roles.
+2. The model: the building blocks and how things connect.
+3. Finding your way around, then looking at the model: Home, Views, Element pages, Elements.
+4. Changing the model: Import, Changes, Decisions, Projects.
+5. Reporting and AI: Reports, Ask Atlas, Connect Claude Desktop.
+6. Keeping it trustworthy: Planned action, Still accurate, Comments, History.
+7. Settings and help.
+
 ---
-
-## Your first 10 minutes
-
-**Where do I start?** It depends on your role.
-
-- **Viewer:** you land on the capability map. Click a capability to see the systems that support it, then open a system to see its details. Use the search box at the top to find anything by name.
-- **Contributor:** look around the capability map and landscape first. To change something, start a change from **Work → Changes**; it is reviewed before it reaches the live model.
-- **Architect:** open Home and read **Where to focus**. Each row is a problem and links straight to it, with **Start a decision** or **Start a project** on the same row.
-- **Owner:** as an architect, plus **Invite a colleague** in organisation settings.
-
-**A new, empty model.** If your organisation has no models yet, you are offered **Look around first**, above **New model**: a made-up organisation to look around in. **Add this sample** opens its capability map and puts a separate copy in your organisation, and nothing you change in it affects anyone else. Home shows a **Get started** checklist: open the capability map (it offers a ready-made map for your sector, or you can add your own or import a spreadsheet), add a system, link it to the capability it supports, and (owners only) invite a colleague.
-
-**A model that already has data.** Home shows a **Welcome** card with a few places to start, worded for your role. **Dismiss** hides it in that browser.
-
-**Stuck?** Click the **Help** button at the top and ask. You can also choose a different start page for yourself.
 
 ## What Atlas is
 
@@ -35,6 +32,21 @@ The core ideas:
 - **Every fact shows why you should believe it.** Each value carries where it came from (a spreadsheet, an interview, someone's manual entry), how confident that source is, and how old it is.
 - **Every diagram is a live view of the model, never something hand-drawn.** There's no canvas that stores its own boxes and arrows; what you see is always the model, laid out automatically.
 - **Nothing is overwritten.** Every edit is recorded in the element's history, so you can always see what it said before and who changed it.
+
+## Your first 10 minutes
+
+**Where do I start?** It depends on your role.
+
+- **Viewer:** you land on the capability map. Click a capability to see the systems that support it, then open a system to see its details. Use the search box at the top to find anything by name.
+- **Contributor:** look around the capability map and landscape first. To change something, start a change from **Work → Changes**; it is reviewed before it reaches the live model.
+- **Architect:** open Home and read **Where to focus**. Each row is a problem and links straight to it, with **Start a decision** or **Start a project** on the same row.
+- **Owner:** as an architect, plus **Invite a colleague** in organisation settings.
+
+**A new, empty model.** If your organisation has no models yet, you are offered **Look around first**, above **New model**: a made-up organisation to look around in. **Add this sample** opens its capability map and puts a separate copy in your organisation, and nothing you change in it affects anyone else. Home shows a **Get started** checklist: open the capability map (it offers a ready-made map for your sector, or you can add your own or import a spreadsheet), add a system, link it to the capability it supports, and (owners only) invite a colleague.
+
+**A model that already has data.** Home shows a **Welcome** card with a few places to start, worded for your role. **Dismiss** hides it in that browser.
+
+**Stuck?** Click the **Help** button at the top and ask. You can also choose a different start page for yourself.
 
 ## Signing in, organisations and roles
 
@@ -67,15 +79,29 @@ Atlas models these kinds of thing:
 
 Anything can be marked **external** (owned by someone else) rather than being a different type of element.
 
-Elements connect through **relationships**, which you record yourself:
+Systems carry attributes such as lifecycle (planned, active, retiring, retired), criticality, run cost, planned action, hosting model and provider, IT/OT domain, **AI agent: how it acts** (suggests only, acts with approval, or acts alone; leave it blank if the system is not an AI agent), **Uses AI** (built-in AI features, or uses an AI model or service — for a system that uses AI but is not an agent), and a system counts as using AI if either is filled in, so you never fill in both for an agent. Either one shows a small **AI** tag on the system's page, the landscape, context diagrams and the integrations list, vendor, version, introduced, planned end and vendor support end. Owners can add **custom attributes** for their organisation (Organisation settings).
+
+How these things connect to each other is the next section.
+
+## How things connect
+
+Elements connect through **relationships**, which you record yourself. Each one reads as a short phrase from one element to another, and every relationship page and diagram uses the same wording. There are six types.
+
+**The two that are easiest to mix up: uses and flows to.**
+
+- **uses** means one thing *depends on or is used by* another. A system uses a platform it runs on or calls; a team or an outside organisation uses a system. It says nothing about data moving. Read it as "A relies on B". From the other side it reads **used by**. It can run between systems, between modules, and from a person, team or organisation to a system or module.
+- **flows to** means *data moves* from one system to another. Read it as "A sends data to B". From the other side it reads **receives from**. It runs between systems or between modules, never from a person or team. A flow can go **via** an integration platform, or via one of its interfaces, and then records the protocol on each side: **protocol in** (source → platform) and **protocol out** (platform → target), for example a file over SFTP in and a REST API out.
+- **Which one?** If the question is "does A need B?", record **uses**. If it is "does data travel from A to B?", record **flows to**. When both are true, record both: they are separate links, and the same pair can have one of each.
+- Both can carry a short **verb** that says what it is for ("reads customer records from") and a **data classification**. Atlas asks for the verb when you add either, and Home's health findings flag any that are missing one, or a classification when the link crosses the IT/OT or enterprise boundary. On the landscape, context diagrams, the Integrations list and Reports, both appear as connections between systems, and a link that crosses the IT/OT boundary is marked.
+
+**The other four.**
 
 - **supports** — a system or module supports a capability. One of a system's supports links can be **primary** (it decides which lane the system sits in on the landscape). A supports link carries a **fit** rating: excellent, good, adequate or poor.
-- **owns** — an actor owns a capability, system or module, as its **business**, **technical** or **service** owner.
-- **uses** and **flows to** — between systems and modules (and actors using systems), optionally with a verb and a data classification. A flow can go **via** an integration platform, or via one of its interfaces, and then records the protocol on each side — **protocol in** (source → platform) and **protocol out** (platform → target), e.g. file over SFTP in, REST API out. Several flows via the same interface is how reuse and combining show: the interface's page lists every flow via it, and the platform's context diagram groups its flows by interface. Health findings flag an integration platform, or an interface, that nothing flows via.
+- **owns** — a person, team or organisation owns a capability, system or module, as its **business**, **technical** or **service** owner. This is a recorded fact about the element and has nothing to do with someone's organisation role (Owner, Architect and so on).
 - **replaces** — one system or module replaces another (recorded when you retire something with a replacement). Retiring with a replacement **copies** the old one's capability links to the replacement and keeps the old ones. The old system still shows as supporting those capabilities until its planned end date, then stops showing; before then, nothing flags a capability as at risk because of a system that has a replacement. Integrations and other connections are not copied: they stay on the old system for you to review.
 - **enables** — a capability enables a value-stream stage.
 
-Systems carry attributes such as lifecycle (planned, active, retiring, retired), criticality, run cost, planned action, hosting model and provider, IT/OT domain, **AI agent: how it acts** (suggests only, acts with approval, or acts alone; leave it blank if the system is not an AI agent), **Uses AI** (built-in AI features, or uses an AI model or service — for a system that uses AI but is not an agent), and a system counts as using AI if either is filled in, so you never fill in both for an agent. Either one shows a small **AI** tag on the system's page, the landscape, context diagrams and the integrations list, vendor, version, introduced, planned end and vendor support end. Owners can add **custom attributes** for their organisation (Organisation settings).
+Several flows via the same interface is how reuse and combining show: the interface's page lists every flow via it, and the platform's context diagram groups its flows by interface. Health findings flag an integration platform, or an interface, that nothing flows via.
 
 ## Finding your way around
 
@@ -112,6 +138,20 @@ Home has two views; switch with **Overview** / **My work** at the top. They do d
 **Get started.** A model with no capabilities, no systems or no system-to-capability links shows a **Get started** checklist on Home (for people who can add to the model). Owners also get an **Invite a colleague** step, which ticks once an invite has been sent. A model that already has data shows a **Welcome** card instead. Each step ticks itself from the model's real contents and links to the screen that does it (the capabilities step opens the capability map, with Import as a second link); **Dismiss** hides it in that browser.
 
 Health findings include: AI agents that act alone with no technical owner, systems not linked to a capability, capabilities with no owner, stale values, critical systems with no business owner or nearing end of life, critical systems near the end of vendor support, relationships missing a verb or a data classification across the IT/OT or enterprise boundary, and systems planned to move or switch off that nothing is retiring.
+
+## Views: capability map, landscape and more
+
+- **Capability map** — every capability, in its hierarchy. **Colour by** coverage, oldest lifecycle stage, lifecycle exposure, criticality, OT share, fit, disposition or **AI share** (how many of the systems supporting it use AI — for example "2/3 use AI" — and, once an agent is among them, the freest way any of them acts; each of the others is the worst among the systems supporting it). If the model is empty, you can **start from a capability map** — a ready-made set for your sector. Owners can also **Export as starter map** (in the map's ⋯ actions), saving this model's capabilities as a draft starter map for seeding other models.
+- **Landscape** — systems in lanes by the capability they mainly support, with OT systems in their own zone. Colour by criticality, hosting model or IT/OT domain. Zoom into a system for its **context**, and into a platform for its **modules**. **Find on this landscape** (above the diagram) takes part of a name: choosing a match focuses that tile, with its connections, and centres it — on a phone it opens the group and highlights the row. In a change's **Diff** view, a **context** diagram marks what the change adds (+), removes (−, dashed) and changes (~) on its connections and tiles, with a legend; everything unchanged is dimmed. A platform's own **context** draws each flow as source → platform → target, numbered on both sides so a line leaving the platform can be matched to the one that entered it; hover a source or target to pick out its flows. The change's list of edits names a module as "Platform · Module", like everywhere else. Opened from a capability (its supporting-system count on the capability map), it lists just the systems supporting that capability, with **Export CSV** and **Export XLSX**.
+- **Value streams** — how the organisation delivers its outcomes, stage by stage, and which capabilities enable each stage (weak supporting systems show up the stream). Keep stages short, one line each; Atlas suggests splitting a stream once it has more than 6 stages. Value-stream structure is edited on main, or in a **Correct** change.
+- **Roadmap** — systems' lifecycles over time (introduced, planned end, support end) and changes' target dates, **by capability**, **by value stream** or **by project**, in months, quarters or years, with filters, **Export table** (CSV) and **Export PNG**.
+- **Portfolio** — every system and module with run cost against fit, criticality, disposition, lifecycle and capabilities served, sortable and filterable, with **signals** where the combination matters (for example *Costly, poor fit*, *Costly overlap*, *Invest, poor fit*, *Justified*) and a note when a row is missing the inputs to judge it.
+
+Diagrams redraw to fit whenever you resize the window.
+
+**IT/OT crossings.** On the landscape and context diagrams, a link that crosses the IT/OT boundary is drawn as a heavier grey line with an **IT/OT** tag, and the key explains it. Orange is used only for lifecycle (retiring or retired).
+
+**Export PNG** and **Export PDF** on the capability map and the landscape download a picture of the view as you see it, with the current colour-by. Portfolio is a table, so it offers **Export Excel** (a spreadsheet of the rows with Portfolio's filters and sort applied, plus an About sheet with the stamp) and **Export PDF** instead of a PNG. Every picture is stamped with the model, which state you are looking at (main, a version, or a change by name) and the date. Any member can export. The landscape picture shows systems in their lanes but not the connections between them, and says so. A picture is a copy, not part of the model: it doesn't update when the model changes.
 
 ## Element pages
 
@@ -198,20 +238,6 @@ A **project** holds one piece of architecture work — "Housing CRM replacement"
 - **Project pack.** **Project pack (Markdown)** and **Project pack (PDF)** download the project as one document to hand over: its purpose, scope (and any gap with what the changes touch), the decision log — each decision written up as an ADR, the same as **Copy as ADR markdown** on the decision's page — the target state each change sets out (what it creates, changes and retires, and the capabilities it affects), and the evidence links. Any member can download it. It's a copy as of the moment you download it. The PDF uses a standard font; characters it can't show (for example non-Latin scripts) appear as "?" there, while the Markdown keeps them as written.
 
 A project is part of how your team works, not part of the model itself: it never appears on the capability map or landscape, and it isn't in a version.
-
-## Views
-
-- **Capability map** — every capability, in its hierarchy. **Colour by** coverage, oldest lifecycle stage, lifecycle exposure, criticality, OT share, fit, disposition or **AI share** (how many of the systems supporting it use AI — for example "2/3 use AI" — and, once an agent is among them, the freest way any of them acts; each of the others is the worst among the systems supporting it). If the model is empty, you can **start from a capability map** — a ready-made set for your sector. Owners can also **Export as starter map** (in the map's ⋯ actions), saving this model's capabilities as a draft starter map for seeding other models.
-- **Landscape** — systems in lanes by the capability they mainly support, with OT systems in their own zone. Colour by criticality, hosting model or IT/OT domain. Zoom into a system for its **context**, and into a platform for its **modules**. **Find on this landscape** (above the diagram) takes part of a name: choosing a match focuses that tile, with its connections, and centres it — on a phone it opens the group and highlights the row. In a change's **Diff** view, a **context** diagram marks what the change adds (+), removes (−, dashed) and changes (~) on its connections and tiles, with a legend; everything unchanged is dimmed. A platform's own **context** draws each flow as source → platform → target, numbered on both sides so a line leaving the platform can be matched to the one that entered it; hover a source or target to pick out its flows. The change's list of edits names a module as "Platform · Module", like everywhere else. Opened from a capability (its supporting-system count on the capability map), it lists just the systems supporting that capability, with **Export CSV** and **Export XLSX**.
-- **Value streams** — how the organisation delivers its outcomes, stage by stage, and which capabilities enable each stage (weak supporting systems show up the stream). Keep stages short, one line each; Atlas suggests splitting a stream once it has more than 6 stages. Value-stream structure is edited on main, or in a **Correct** change.
-- **Roadmap** — systems' lifecycles over time (introduced, planned end, support end) and changes' target dates, **by capability**, **by value stream** or **by project**, in months, quarters or years, with filters, **Export table** (CSV) and **Export PNG**.
-- **Portfolio** — every system and module with run cost against fit, criticality, disposition, lifecycle and capabilities served, sortable and filterable, with **signals** where the combination matters (for example *Costly, poor fit*, *Costly overlap*, *Invest, poor fit*, *Justified*) and a note when a row is missing the inputs to judge it.
-
-Diagrams redraw to fit whenever you resize the window.
-
-**IT/OT crossings.** On the landscape and context diagrams, a link that crosses the IT/OT boundary is drawn as a heavier grey line with an **IT/OT** tag, and the key explains it. Orange is used only for lifecycle (retiring or retired).
-
-**Export PNG** and **Export PDF** on the capability map and the landscape download a picture of the view as you see it, with the current colour-by. Portfolio is a table, so it offers **Export Excel** (a spreadsheet of the rows with Portfolio's filters and sort applied, plus an About sheet with the stamp) and **Export PDF** instead of a PNG. Every picture is stamped with the model, which state you are looking at (main, a version, or a change by name) and the date. Any member can export. The landscape picture shows systems in their lanes but not the connections between them, and says so. A picture is a copy, not part of the model: it doesn't update when the model changes.
 
 ## Reports and gaps
 

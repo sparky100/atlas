@@ -31,6 +31,12 @@ import styles from './RelationshipsSection.module.css';
 // recorded, though, it's an ordinary fact like any other: remove and edit
 // (its one optional `description` field) both work the same generic way
 // every other relationship type's row does.
+/** One-line plain-English hint shown under the "uses" and "flows to" headings, so the two are never confused (docs/USER-GUIDE.md "How things connect"). Outbound direction only: the inbound headings ("used by", "receives from") read the same relationship from the other side. */
+const RELATIONSHIP_HINT: Partial<Record<RelationshipType, string>> = {
+  uses: 'Relies on or is used by — no data moves. Use "flows to" for data.',
+  flows_to: 'Sends data to another system. Use "uses" for a dependency.',
+};
+
 const DISPLAY_ORDER: RelationshipType[] = ['supports', 'owns', 'uses', 'flows_to', 'enables', 'replaces'];
 
 const DIRECTION_LABEL: Record<RelationshipType, { outbound: string; inbound: string }> = {
@@ -205,6 +211,7 @@ export function RelationshipsSection({
         const outboundGroup = (
             <RelationshipDirectionGroup
               label={DIRECTION_LABEL[type].outbound}
+              hint={RELATIONSHIP_HINT[type]}
               rows={outboundRows}
               direction="outbound"
               slot={outboundSlot}
@@ -261,6 +268,7 @@ export function RelationshipsSection({
 
 function RelationshipDirectionGroup({
   label,
+  hint,
   rows,
   direction,
   slot,
@@ -279,6 +287,7 @@ function RelationshipDirectionGroup({
   justAddedElementId,
 }: {
   label: string;
+  hint?: string | undefined;
   rows: RelationshipsHeadRow[];
   direction: 'outbound' | 'inbound';
   slot: RelationshipGroupSlot | undefined;
@@ -312,6 +321,11 @@ function RelationshipDirectionGroup({
       <Text as="h3" size="md" className={styles.groupLabel}>
         {label} <Text as="span" tone="muted">({rows.length})</Text>
       </Text>
+      {hint && (
+        <Text as="p" size="xs" tone="muted">
+          {hint}
+        </Text>
+      )}
       {rows.map((rel) => {
         const otherId = direction === 'outbound' ? rel.to_element_id : rel.from_element_id;
         const other = endpoints.get(otherId);
