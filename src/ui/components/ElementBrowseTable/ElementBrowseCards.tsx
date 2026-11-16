@@ -126,7 +126,7 @@ function ElementBrowseCard({
           {moduleDisplayName(row.element, row.parent)}
         </Text>
         {lifecycleTag && <LifecycleTag {...lifecycleTag} />}
-        {row.lifecycleStatus && <Chip tone={lifecycleTone ?? 'neutral'}>{row.lifecycleStatus}</Chip>}
+        {row.lifecycleStatus && row.lifecycleStatus !== lifecycleTag?.state && <Chip tone={lifecycleTone ?? 'neutral'}>{row.lifecycleStatus}</Chip>}
         {row.criticality && <Chip tone={criticalityTone ?? 'neutral'}>{row.criticality}</Chip>}
         {row.disposition && <Chip tone={dispositionTone(row.disposition)}>{dispositionLabel(row.disposition)}</Chip>}
         {mark !== null && <AiMarkChip mark={mark} />}

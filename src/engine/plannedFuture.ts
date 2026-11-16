@@ -12,7 +12,9 @@
  * change planned some time ago still applies after main has moved on.
  */
 import type { UUID } from '../contracts/delta';
+import type { ElementsHeadRow } from '../contracts/rows';
 import { cloneHead, type Head } from './deltas';
+import { lifecycleStateOf } from './elementRead/fitAndExposure';
 import { computeVersionDiff } from './versionDiff';
 
 export interface PlannedChange {
@@ -38,9 +40,35 @@ export interface FutureProjection {
   overlaps: FutureOverlap[];
 }
 
-function stringAttribute(attributes: Record<string, unknown>, key: string): string | undefined {
-  const value = attributes[key];
-  return typeof value === 'string' && value.length > 0 ? value : undefined;
+/**
+ * Systems and modules not live on `onIso` — planned (introduced after it) or
+ * retired (ended by it, or marked retired with no end date), a module going
+ * with its platform. Read through the one shared rule (`lifecycleStateOf`) so
+ * this and every current-state view agree.
+ */
+function notLiveIds(head: Head, onIso: string): Set<UUID> {
+  const now = new Date(`${onIso}T00:00:00Z`);
+  const rows = new Map<UUID, ElementsHeadRow>();
+  for (const [id, e] of head.elements) {
+    if (e.elementType === 'system' || e.elementType === 'container') rows.set(id, { element_id: id, element_type: e.elementType, name: e.name, parent_id: e.parentId, attributes: e.attributes, exists_delta_id: e.existsDeltaId });
+  }
+  const gone = new Set<UUID>();
+  for (const [id, row] of rows) if (lifecycleStateOf(row, rows, now) !== 'active') gone.add(id);
+  return gone;
+}
+
+/**
+ * Today's picture as it really is: the head without the systems and modules
+ * that are not live today (planned ones not yet introduced, retired ones past
+ * their end) and without the links that touch them. This is the baseline a
+ * future view is compared with, so a planned system that arrives by the date
+ * reads as added, and one that is not live today or by then is not "removed".
+ */
+export function liveHead(head: Head, todayIso: string): Head {
+  const live = cloneHead(head);
+  for (const id of notLiveIds(head, todayIso)) live.elements.delete(id);
+  dropDanglingRelationships(live);
+  return live;
 }
 
 /** Drops every relationship with an end that is no longer in the head. */
@@ -94,17 +122,7 @@ export function projectFutureHead(today: Head, changes: readonly PlannedChange[]
     .sort((a, b) => a.elementId.localeCompare(b.elementId));
 
   // A system's own dates: gone once its planned end has passed, not there yet before it is introduced.
-  const gone = new Set<UUID>();
-  for (const [id, element] of head.elements) {
-    if (element.elementType !== 'system' && element.elementType !== 'container') continue;
-    const plannedEnd = stringAttribute(element.attributes, 'plannedEnd');
-    const introduced = stringAttribute(element.attributes, 'introduced');
-    if ((plannedEnd !== undefined && plannedEnd <= asAt) || (introduced !== undefined && introduced > asAt)) gone.add(id);
-  }
-  // A module goes with its platform.
-  for (const [id, element] of head.elements) {
-    if (element.elementType === 'container' && element.parentId !== null && gone.has(element.parentId)) gone.add(id);
-  }
+  const gone = notLiveIds(head, asAt);
   for (const id of gone) head.elements.delete(id);
 
   dropDanglingRelationships(head);

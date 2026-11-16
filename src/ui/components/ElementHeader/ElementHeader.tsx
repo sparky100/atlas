@@ -276,7 +276,8 @@ export function ElementHeader({ element, existsFact, existsSource, onEdit, onCon
           </Text>
         )}
         {lifecycleTag && <LifecycleTag {...lifecycleTag} />}
-        {lifecycleStatus !== null && lifecycleTone !== undefined && <Chip tone={lifecycleTone}>{lifecycleStatus}</Chip>}
+        {/* The tag already says planned or retired; the chip would repeat it. */}
+        {lifecycleStatus !== null && lifecycleTone !== undefined && lifecycleStatus !== lifecycleTag?.state && <Chip tone={lifecycleTone}>{lifecycleStatus}</Chip>}
         {/* Plain text, not a Chip: version is free text in whatever scheme
             the estate actually uses ("3.4.1", "2026-Q1") — a Chip implies
             a fixed vocabulary the way lifecycle/external status actually

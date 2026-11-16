@@ -1,12 +1,12 @@
 import type { UUID } from '../contracts/delta';
 import type { Head } from '../engine/deltas';
-import { capabilitiesLeftWithoutSystem, projectFutureHead, type PlannedChange } from '../engine/plannedFuture';
+import { capabilitiesLeftWithoutSystem, liveHead, projectFutureHead, type PlannedChange } from '../engine/plannedFuture';
 import type { Client } from './client';
 import { listChangeBranches, OPEN_CHANGE_STATUSES } from './branches';
 import type { BranchRow } from './types';
 
 export interface PlannedFuture {
-  /** Today's head — the "unchanged" side of any comparison. */
+  /** Today's live picture (planned and retired systems left out) — the "unchanged" side of any comparison. */
   today: Head;
   /** The picture as at the chosen date. */
   head: Head;
@@ -46,7 +46,7 @@ export async function loadPlannedFuture(
   const undated = planned.filter((b) => b.target_date === null);
   const due = planned.filter((b): b is BranchRow & { target_date: string } => b.target_date !== null && b.target_date <= asAt);
 
-  const today = await loadHead(mainHeadCommitId);
+  const today = liveHead(await loadHead(mainHeadCommitId), todayIso);
   // Only fold the changes that fall on or before the date; with none, there is nothing to fold.
   const changes: PlannedChange[] =
     asAt <= todayIso

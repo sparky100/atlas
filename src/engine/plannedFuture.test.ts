@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { emptyHead, type ElementRow, type Head, type RelationshipRow } from './deltas';
-import { capabilitiesLeftWithoutSystem, projectFutureHead, type PlannedChange } from './plannedFuture';
+import { capabilitiesLeftWithoutSystem, liveHead, projectFutureHead, type PlannedChange } from './plannedFuture';
 
 const TODAY = '2026-11-09';
 
@@ -96,5 +96,34 @@ describe('capabilitiesLeftWithoutSystem', () => {
   it('does not list a capability that had no system today', () => {
     const t = headOf({ cap: capability('Billing') });
     expect(capabilitiesLeftWithoutSystem(t, t)).toEqual([]);
+  });
+});
+
+describe('the live baseline for a future view', () => {
+  const NOW = '2026-11-16';
+  const head = () => headOf({
+    cap: capability('Billing'),
+    live: system('Live', { introduced: '2020-01-01' }),
+    soon: system('Soon', { introduced: '2027-08-28' }),
+    later: system('Later', { introduced: '2028-03-01' }),
+    gone: system('Gone', { introduced: '2010-04-01', plannedEnd: '2025-04-28' }),
+    ending: system('Ending', { plannedEnd: '2027-03-28' }),
+  }, { a: supports('live', 'cap'), b: supports('soon', 'cap'), c: supports('gone', 'cap') });
+
+  it('leaves out planned and already-retired systems and their links', () => {
+    const live = liveHead(head(), NOW);
+    expect([...live.elements.keys()].sort()).toEqual(['cap', 'ending', 'live']);
+    expect([...live.relationships.keys()]).toEqual(['a']);
+  });
+
+  it('a planned system that starts by the date reads as added, one that does not is simply absent, one that ends reads as removed', () => {
+    const baseline = liveHead(head(), NOW);
+    const at = (asAt: string) => projectFutureHead(head(), [], asAt, NOW).head;
+    const added = (asAt: string) => [...at(asAt).elements.keys()].filter((id) => !baseline.elements.has(id)).sort();
+    const removed = (asAt: string) => [...baseline.elements.keys()].filter((id) => !at(asAt).elements.has(id)).sort();
+    expect(added('2027-05-16')).toEqual([]);
+    expect(removed('2027-05-16')).toEqual(['ending']);
+    expect(added('2027-11-16')).toEqual(['soon']);
+    expect(removed('2027-11-16')).toEqual(['ending']);
   });
 });
