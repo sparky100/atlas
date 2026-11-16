@@ -40,7 +40,7 @@ export type ThemePreference = (typeof THEME_PREFERENCES)[number];
  * already establish for this table's other columns — a UI-layer file
  * shouldn't be what a storage contract depends on.
  */
-export const CAPABILITY_MAP_COLOUR_BY_MODES = ['none', 'metric:supportingSystemCount', 'metric:oldestLifecycleStage', 'metric:lifecycleExposure', 'metric:criticality', 'metric:otShare', 'metric:fitForPurpose', 'metric:disposition'] as const;
+export const CAPABILITY_MAP_COLOUR_BY_MODES = ['none', 'metric:supportingSystemCount', 'metric:oldestLifecycleStage', 'metric:lifecycleExposure', 'metric:criticality', 'metric:otShare', 'metric:fitForPurpose', 'metric:disposition', 'metric:aiAgentShare'] as const;
 export type CapabilityMapColourByMode = (typeof CAPABILITY_MAP_COLOUR_BY_MODES)[number];
 
 /**

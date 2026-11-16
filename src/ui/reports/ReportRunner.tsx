@@ -12,9 +12,9 @@ import { useAuth } from '../auth/useAuth';
 import { useAttributeDefinitions } from '../orgs/useAttributeDefinitions';
 import { usePortfolio } from '../portfolio/usePortfolio';
 import { supabase } from '../supabaseClient';
-import { ELEMENT_REPORT_FIELDS, ELEMENT_REPORT_HELPER_FIELDS } from './elementsReport';
+import { ELEMENT_REPORT_FIELDS, ELEMENT_REPORT_HELPER_FIELDS, ELEMENT_REPORT_OPTIONAL_FIELDS } from './elementsReport';
 import { loadElementReportRows } from './loadElementReportRows';
-import { PORTFOLIO_REPORT_FIELDS, PORTFOLIO_REPORT_HELPER_FIELDS, portfolioReportRow } from './portfolioReport';
+import { PORTFOLIO_REPORT_FIELDS, PORTFOLIO_REPORT_HELPER_FIELDS, PORTFOLIO_REPORT_OPTIONAL_FIELDS, portfolioReportRow } from './portfolioReport';
 import { ReportLoadError } from './ReportLoadError';
 import { FINDING_REPORT_FIELDS, loadFindingReportRows, loadRelationshipReportRows, RELATIONSHIP_REPORT_FIELDS } from './relationshipAndFindingReports';
 import { withReportLinks, type LiveReportRow } from './reportRowLinks';
@@ -61,7 +61,7 @@ function ElementsRunner({ orgId, commitId, children, retry }: RunnerProps) {
       cancelled = true;
     };
   }, [commitId]);
-  const known = useMemo(() => [...ELEMENT_REPORT_FIELDS, ...ELEMENT_REPORT_HELPER_FIELDS, ...definitions.filter((d) => d.deprecated_at === null).map((d) => d.key)], [definitions]);
+  const known = useMemo(() => [...ELEMENT_REPORT_FIELDS, ...ELEMENT_REPORT_OPTIONAL_FIELDS, ...ELEMENT_REPORT_HELPER_FIELDS, ...definitions.filter((d) => d.deprecated_at === null).map((d) => d.key)], [definitions]);
   if (state.status === 'error' || definitionsError !== null) return <ReportLoadError message="Couldn't load element report data." retry={retry} />;
   if (state.status === 'loading' || definitionsLoading) return <div role="status"><Text tone="muted">Loading element report data…</Text></div>;
   return <>{children(state.rows, known)}</>;
@@ -73,7 +73,7 @@ function PortfolioRunner({ modelId, commitId, children, retry }: RunnerProps) {
     name: { elementId: row.element.element_id },
     ...(row.businessOwner === null ? {} : { owner: { elementId: row.businessOwner.element_id } }),
   })) : []), [state]);
-  const known = useMemo(() => [...PORTFOLIO_REPORT_FIELDS, ...PORTFOLIO_REPORT_HELPER_FIELDS], []);
+  const known = useMemo(() => [...PORTFOLIO_REPORT_FIELDS, ...PORTFOLIO_REPORT_OPTIONAL_FIELDS, ...PORTFOLIO_REPORT_HELPER_FIELDS], []);
   if (state.status === 'loading') return <div role="status"><Text tone="muted">Loading portfolio report data…</Text></div>;
   if (state.status !== 'ready') return <ReportLoadError message="Couldn't load portfolio report data." retry={retry} />;
   return <>{children(rows, known)}</>;

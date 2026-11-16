@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { Link, useNavigate } from 'react-router';
-import type { ElementType, UUID } from '../../contracts/delta';
+import { AI_AUTONOMY_HELP, AI_AUTONOMY_LABELS, AI_AUTONOMY_OPTIONS } from '../../contracts/attributeSchema';
+import type { AiAutonomy, ElementType, UUID } from '../../contracts/delta';
 import type { Json } from '../../contracts/rows';
 import { refParamOf, type Ref } from '../../db/ref';
 import type { BranchRow, MemberRole } from '../../db/types';
@@ -101,6 +102,8 @@ export function HomeSearch({ modelId, orgId, userId, role, searchCommitId, activ
   }, [addApplicationRequest]);
   const [description, setDescription] = useState('');
   const [capability, setCapability] = useState<{ id: UUID; name: string } | null>(null);
+  // Blank means "not an AI agent" (the attribute is simply left off, never stored as an empty value).
+  const [aiAutonomy, setAiAutonomy] = useState<AiAutonomy | ''>('');
   const [platform, setPlatform] = useState<{ id: UUID; name: string } | null>(null);
   const [proposedBranch, setProposedBranch] = useState<BranchRow | null>(null);
   // Bug fix: this used to hardcode `?ref=main` — a result found by search
@@ -124,6 +127,7 @@ export function HomeSearch({ modelId, orgId, userId, role, searchCommitId, activ
     setSheetOpen(false);
     setDescription('');
     setCapability(null);
+    setAiAutonomy('');
     setPlatform(null);
   };
 
@@ -163,6 +167,7 @@ export function HomeSearch({ modelId, orgId, userId, role, searchCommitId, activ
 
   const submitCreate = () => {
     const attributes: Record<string, Json> = showDescriptionSheet && description.trim().length > 0 ? { description: description.trim() } : {};
+    if (showDescriptionSheet && aiAutonomy !== '') attributes.aiAutonomy = aiAutonomy;
     void create(search.query, { attributes, ...(capability ? { supportsCapabilityId: capability.id, supportsCapabilityName: capability.name } : {}) });
   };
 
@@ -338,6 +343,27 @@ export function HomeSearch({ modelId, orgId, userId, role, searchCommitId, activ
               setCapability({ id, name });
             }}
           />
+          <Text as="label" size="sm">
+            Is it an AI agent?
+          </Text>
+          <select
+            className={styles.select}
+            aria-label="AI agent: how it acts"
+            value={aiAutonomy}
+            onChange={(e) => {
+              setAiAutonomy(e.target.value as AiAutonomy | '');
+            }}
+          >
+            <option value="">Not an AI agent</option>
+            {AI_AUTONOMY_OPTIONS.map((option) => (
+              <option key={option} value={option}>
+                {AI_AUTONOMY_LABELS[option] ?? option}
+              </option>
+            ))}
+          </select>
+          <Text as="p" tone="faint" size="xs">
+            {AI_AUTONOMY_HELP}
+          </Text>
           <Text as="p" tone="faint" size="xs">
             Written as manual · {userId ? 'you' : 'signed-in user'} · confidence 1.00. Lifecycle and External default —
             {writeBranch?.kind === 'main' ? ' defaulted on create · active on main.' : ' defaulted on create · planned on a change.'}

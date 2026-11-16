@@ -1,5 +1,7 @@
 import { Link } from 'react-router';
 import type { UUID } from '../../contracts/delta';
+import { AiAgentTag } from '../components/AiAgentTag/AiAgentTag';
+import { aiAutonomyOf } from '../../engine/elementRead/aiAgent';
 import { Chip } from '../components/Chip/Chip';
 import { CommentMarkerButton } from '../components/CommentMarkerButton/CommentMarkerButton';
 import { commentMarkerFor } from '../components/CommentMarkerButton/commentMarkerFor';
@@ -97,6 +99,7 @@ function Row({
   const external = attrs.isExternal === true;
   const lifecycleStatus = typeof attrs.lifecycleStatus === 'string' ? attrs.lifecycleStatus : null;
   const lifecycleTone = lifecycleStatus !== null ? lifecycleToneFor(lifecycleStatus) : undefined;
+  const autonomy = system.element_type === 'system' ? aiAutonomyOf(system) : null;
   // See `elementHref`/`contextHref`'s own prop comments.
   const isModule = system.element_type === 'container';
   // "(only when non-zero)" — item 2's own words: the whole "uses N · used
@@ -111,6 +114,7 @@ function Row({
         <Text as="span" className={styles.rowName}>
           {system.name}
         </Text>
+        {autonomy !== null && <AiAgentTag autonomy={autonomy} />}
         {lifecycleTone !== undefined && lifecycleStatus !== null && <span className={styles.lifecycleDot} data-tone={lifecycleTone} role="img" aria-label={lifecycleStatus} title={lifecycleStatus} />}
         <Chip tone={role === 'primary' ? 'info' : 'neutral'}>{supportsRoleLabel(role)}</Chip>
         {/* "Child capabilities' systems included with the child named" — only ever set when this row's own edge targets a descendant of the root, never the root itself (`capabilityLandscapeRows.ts`'s own `viaCapability` doc comment). */}

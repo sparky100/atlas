@@ -42,7 +42,9 @@ export type SynonymOnlyColumnRole =
   | 'essentialFunction'
   // ADR-026: an interface's own two attributes, on the module sheet.
   | 'interfaceType'
-  | 'transformation';
+  | 'transformation'
+  // Agents in EA, step 1: what this product's own export writes for a system's `aiAutonomy` — the one synonym an owner-approved importer exception adds, so the field round-trips.
+  | 'aiAutonomy';
 
 /** Every role a column can end up with: prompt A's own, plus the synonym-only ones. */
 export type ColumnRole = PromptAColumnRole | SynonymOnlyColumnRole;
@@ -89,6 +91,7 @@ const COLUMN_SYNONYMS_RAW: Readonly<Record<ColumnRole, readonly string[]>> = {
   essentialFunction: ['Essential function (NIS/CAF)'],
   interfaceType: ['Interface type'],
   transformation: ['Transformation'],
+  aiAutonomy: ['AI agent: how it acts'],
 };
 
 const COLUMN_SYNONYMS: ReadonlyMap<string, ColumnRole> = new Map(

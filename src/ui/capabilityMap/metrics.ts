@@ -48,6 +48,11 @@
  *   unordered set (on-prem/private-cloud/public-cloud/SaaS/hybrid) with no
  *   "worst" value to aggregate to, so it's landscape-only
  *   (`src/ui/landscape/landscapeColour.ts`).
+ * - **Agent share** (`agentShareOf`): how many of a capability's
+ *   supporting systems are AI agents (a system with `aiAutonomy` set), and
+ *   the freest way any of them acts. Derived from the supports links, never
+ *   stored; silent when none is an agent. An L1 group sums across its
+ *   descendants, like OT share.
  * - **OT share** (`otShareOf`), Prompt 7k item 3: fraction of a
  *   capability's supporting systems whose domain resolves to `'ot'`
  *   (`systemDomain.ts`'s `domainOf`) — a fraction, not worst-of, the same
@@ -75,7 +80,7 @@
  * alongside two metrics that need no such judgment call.
  */
 import type { ElementsHeadRow, RelationshipsHeadRow } from '../../contracts/rows';
-import type { Criticality, Disposition, FitForPurpose, LifecycleStatus, UUID } from '../../contracts/delta';
+import type { AiAutonomy, Criticality, Disposition, FitForPurpose, LifecycleStatus, UUID } from '../../contracts/delta';
 import type { HomeMode } from '../../contracts/userPreferences';
 import type { ChipTone } from '../components/Chip/Chip';
 import { attributesRecord } from '../elements/attributesRecord';
@@ -83,7 +88,9 @@ import { CRITICALITY_ORDER, CRITICALITY_TONE } from '../elements/criticalityTone
 import { FIT_FOR_PURPOSE_ORDER, FIT_FOR_PURPOSE_TONE } from '../elements/fitForPurposeTone';
 import { LIFECYCLE_ORDER, LIFECYCLE_TONE } from '../elements/lifecycleTone';
 import { dispositionLabel, dispositionOf, dispositionTone, worstDisposition } from '../elements/disposition';
+import { AI_AUTONOMY_TONE } from '../elements/aiAutonomyTone';
 import { domainOf } from '../elements/systemDomain';
+import { aiAutonomyOf, aiAutonomyRank } from '../../engine/elementRead/aiAgent';
 import { fitForPurposeOf, hasLifecycleExposureData, replacedElementIds, systemsExposedByLifecycle, worstFitForPurposeOfSupporter } from '../../engine/elementRead/fitAndExposure';
 
 export { fitForPurposeOf, hasLifecycleExposureData, replacedElementIds, systemsExposedByLifecycle, worstFitForPurposeOfSupporter };
@@ -103,6 +110,7 @@ export const COLOUR_BY_OPTIONS: { value: ColourByMode; label: string }[] = [
   { value: 'metric:otShare', label: 'OT share' },
   { value: 'metric:fitForPurpose', label: 'Fit' },
   { value: 'metric:disposition', label: 'Planned action' },
+  { value: 'metric:aiAgentShare', label: 'Agent share' },
 ];
 
 export interface TileColour {
@@ -267,6 +275,32 @@ export function otShareOf(capabilityId: UUID, supportsEdges: readonly Relationsh
   return { ot, total: ids.length };
 }
 
+/**
+ * How many of a capability's supporting systems are AI agents, out of the total, and the freest way any of them acts
+ * (`worst`: acts alone beats acts with approval beats suggests only). Worked out from the supports links, never stored.
+ */
+export function agentShareOf(capabilityId: UUID, supportsEdges: readonly RelationshipsHeadRow[], systemsById: ReadonlyMap<UUID, ElementsHeadRow>): { agents: number; total: number; worst: AiAutonomy | null } {
+  const ids = supportingSystemIds(capabilityId, supportsEdges);
+  let agents = 0;
+  let worst: AiAutonomy | null = null;
+  for (const id of ids) {
+    const system = systemsById.get(id);
+    const autonomy = system ? aiAutonomyOf(system) : null;
+    if (autonomy === null) continue;
+    agents += 1;
+    if (aiAutonomyRank(autonomy) > aiAutonomyRank(worst)) worst = autonomy;
+  }
+  return { agents, total: ids.length, worst };
+}
+
+const AGENT_SHARE_WORDS: Record<AiAutonomy, string> = { acts_alone: 'acts alone', acts_with_approval: 'with approval', suggests: 'suggests' };
+
+/** Silent when no supporting system is an AI agent (zero is the ordinary case); otherwise the fraction, with the freest way any acts, in the same risk tone Criticality uses. */
+function agentShareColour(share: { agents: number; total: number; worst: AiAutonomy | null }): TileColour {
+  if (share.agents === 0 || share.worst === null) return { tone: undefined, label: undefined };
+  return { tone: AI_AUTONOMY_TONE[share.worst], label: `${String(share.agents)}/${String(share.total)} AI · ${AGENT_SHARE_WORDS[share.worst]}` };
+}
+
 export function lifecycleExposure(capabilityId: UUID, supportsEdges: readonly RelationshipsHeadRow[], systemsById: ReadonlyMap<UUID, ElementsHeadRow>, now: Date = new Date(), replacedIds?: ReadonlySet<UUID>): boolean {
   const systems: ElementsHeadRow[] = [];
   for (const systemId of supportingSystemIds(capabilityId, supportsEdges)) {
@@ -313,6 +347,8 @@ export function tileColourFor(mode: ColourByMode, capabilityId: UUID, supportsEd
     }
     case 'metric:disposition':
       return dispositionColour(worstDispositionOf(capabilityId, supportsEdges, systemsById));
+    case 'metric:aiAgentShare':
+      return agentShareColour(agentShareOf(capabilityId, supportsEdges, systemsById));
   }
 }
 
@@ -396,6 +432,18 @@ export function aggregateTileColourFor(mode: ColourByMode, descendantCapabilityI
     }
     case 'metric:disposition':
       return dispositionColour(worstDisposition(descendantCapabilityIds.map((id) => worstDispositionOf(id, supportsEdges, systemsById))));
+    case 'metric:aiAgentShare': {
+      let agents = 0;
+      let total = 0;
+      let worst: AiAutonomy | null = null;
+      for (const id of descendantCapabilityIds) {
+        const share = agentShareOf(id, supportsEdges, systemsById);
+        agents += share.agents;
+        total += share.total;
+        if (aiAutonomyRank(share.worst) > aiAutonomyRank(worst)) worst = share.worst;
+      }
+      return agentShareColour({ agents, total, worst });
+    }
   }
 }
 

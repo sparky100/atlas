@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  agentShareOf,
   aggregateTileColourFor,
   fitAssessmentSupportsEdges,
   lifecycleExposure,
@@ -458,5 +459,36 @@ describe('disposition colour-by (F11)', () => {
     ]);
     const edges = [supports('sys-1', 'cap-l2'), supports('sys-2', 'cap-l3')];
     expect(aggregateTileColourFor('metric:disposition', ['cap-l2', 'cap-l3'], edges, systemsById)).toEqual({ tone: 'info', label: 'Switch off' });
+  });
+});
+
+describe('Agent share colour-by', () => {
+  const agent = (id: string, aiAutonomy: string): ElementsHeadRow => ({ ...system(id), attributes: { isExternal: false, aiAutonomy } });
+
+  it('counts supporting systems that are AI agents, with the freest way any of them acts', () => {
+    const systemsById = new Map([
+      ['a', agent('a', 'suggests')],
+      ['b', agent('b', 'acts_with_approval')],
+      ['c', system('c')],
+    ]);
+    const edges = [supports('a', 'cap-1'), supports('b', 'cap-1'), supports('c', 'cap-1')];
+    expect(agentShareOf('cap-1', edges, systemsById)).toEqual({ agents: 2, total: 3, worst: 'acts_with_approval' });
+    expect(tileColourFor('metric:aiAgentShare', 'cap-1', edges, systemsById)).toEqual({ tone: 'warn', label: '2/3 AI · with approval' });
+  });
+
+  it('uses the strongest risk tone, with the words, for an agent that acts alone', () => {
+    const systemsById = new Map([['a', agent('a', 'acts_alone')]]);
+    expect(tileColourFor('metric:aiAgentShare', 'cap-1', [supports('a', 'cap-1')], systemsById)).toEqual({ tone: 'danger', label: '1/1 AI · acts alone' });
+  });
+
+  it('is silent when no supporting system is an AI agent, and for an unknown value', () => {
+    const systemsById = new Map([['a', system('a')], ['b', agent('b', 'nonsense')]]);
+    expect(tileColourFor('metric:aiAgentShare', 'cap-1', [supports('a', 'cap-1'), supports('b', 'cap-1')], systemsById)).toEqual({ tone: undefined, label: undefined });
+  });
+
+  it('sums across a group and takes the freest way any acts', () => {
+    const systemsById = new Map([['a', agent('a', 'suggests')], ['b', agent('b', 'acts_alone')], ['c', system('c')]]);
+    const edges = [supports('a', 'cap-1'), supports('c', 'cap-1'), supports('b', 'cap-2')];
+    expect(aggregateTileColourFor('metric:aiAgentShare', ['cap-1', 'cap-2'], edges, systemsById)).toEqual({ tone: 'danger', label: '2/3 AI · acts alone' });
   });
 });

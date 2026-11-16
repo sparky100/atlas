@@ -4,7 +4,7 @@
  * alone, so a saved copy exports exactly the stored rows (never the live
  * model) through the same code a live report uses.
  */
-import { ANNUAL_RUN_COST_LABELS, DISPOSITION_LABELS } from '../../contracts/attributeSchema';
+import { AI_AUTONOMY_LABELS, ANNUAL_RUN_COST_LABELS, DISPOSITION_LABELS } from '../../contracts/attributeSchema';
 import type { ReportValue } from '../../contracts/reportSpec';
 import type { ValueScale } from '../charts/chartData';
 import { PORTFOLIO_ROW_KIND_LABEL } from '../portfolio/portfolioRowKind';
@@ -18,6 +18,7 @@ const FIELD_LABELS: Readonly<Record<string, string>> = {
   lifecycle: 'Lifecycle',
   criticality: 'Criticality',
   disposition: 'Planned action',
+  aiAutonomy: 'How it acts',
   cost: 'Run cost',
   fit: 'Fit',
   capabilities: 'Capabilities served',
@@ -37,6 +38,7 @@ export function reportFieldLabel(field: string): string {
 const VALUE_LABELS: Readonly<Record<string, Readonly<Record<string, string>>>> = {
   cost: ANNUAL_RUN_COST_LABELS,
   disposition: DISPOSITION_LABELS,
+  aiAutonomy: AI_AUTONOMY_LABELS,
   kind: PORTFOLIO_ROW_KIND_LABEL,
 };
 const SENTENCE_CASE_FIELDS: ReadonlySet<string> = new Set(['type', 'lifecycle', 'criticality', 'fit']);
@@ -57,6 +59,7 @@ const ORDERED_VALUES: Readonly<Record<string, readonly ReportValue[]>> = {
   criticality: ['critical', 'high', 'medium', 'low'],
   cost: Object.keys(ANNUAL_RUN_COST_LABELS),
   fit: ['excellent', 'good', 'adequate', 'poor'],
+  aiAutonomy: ['suggests', 'acts_with_approval', 'acts_alone'],
   kind: ['platform', 'system', 'module'],
 };
 
