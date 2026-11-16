@@ -44,7 +44,7 @@ export function OrganisationSettingsView({ organisation, role, userId, onChanged
   const canManage = canManageOrgSettings(role);
   const { status, error, update, remove, updateReviewPeriod, updateStaleThreshold } = useOrganisationSettings(organisation.id, onChanged);
   const { members, loading: membersLoading, error: membersError, changeRole, remove: removeMemberRow } = useMembers(organisation.id);
-  const { invites, loading: invitesLoading, error: invitesError, create: createInviteRow, revoke: revokeInviteRow, resend: resendInviteRow } = useInvites(organisation.id, userId);
+  const { invites, error: invitesError, create: createInviteRow, revoke: revokeInviteRow, resend: resendInviteRow } = useInvites(organisation.id, userId);
   const { events: memberEvents, profilesById: memberEventProfiles, loading: memberEventsLoading, error: memberEventsError } = useMemberEvents(canManage ? organisation.id : null);
   const [name, setName] = useState(organisation.name);
   const [slug, setSlug] = useState(organisation.slug);
@@ -396,7 +396,6 @@ export function OrganisationSettingsView({ organisation, role, userId, onChanged
           {inviteResult === 'already_pending' && <Text as="p">There's already a pending invite for that email at this organisation.</Text>}
           {inviteResult === 'created_email_failed' && <Text as="p">The invite was created, but the email couldn't be sent{inviteEmailError ? `: ${inviteEmailError}` : '.'} You can resend it below.</Text>}
           {invitesError !== null && <Text as="p">{invitesError}</Text>}
-          {!invitesLoading && invites.length === 0 && <EmptyState>No invites yet.</EmptyState>}
           {invites.length > 0 && (
             <ul className={styles.memberList}>
               {invites.map((invite) => {
@@ -462,34 +461,33 @@ export function OrganisationSettingsView({ organisation, role, userId, onChanged
         </Panel>
       )}
 
-      {canManage && (
-        <Panel>
-          <Text as="h2" size="lg">
-            Membership audit
-          </Text>
-          {memberEventsError !== null && <Text as="p">{memberEventsError}</Text>}
-          {!memberEventsLoading && memberEvents.length === 0 && <EmptyState>No membership activity yet.</EmptyState>}
-          {memberEvents.length > 0 && (
-            <ul className={styles.memberList}>
-              {memberEvents.map((event) => {
-                const nameFor = (userId: UUID | null) => {
-                  if (userId === null) return 'Someone';
-                  const profile = memberEventProfiles.get(userId);
-                  if (!profile) return 'Unknown member';
-                  return profile.display_name ?? `@${profile.handle}`;
-                };
-                return (
-                  <li key={event.id} className={styles.memberRow}>
-                    <Text as="span">{memberEventSentence(event, nameFor)}</Text>
-                    <Text as="span" tone="muted" size="sm">
-                      {formatDate(event.created_at)}
-                    </Text>
-                  </li>
-                );
-              })}
-            </ul>
-          )}
-        </Panel>
+      {canManage && (memberEventsLoading || memberEvents.length > 0 || memberEventsError !== null) && (
+          <Panel>
+            <Text as="h2" size="lg">
+              Membership audit
+            </Text>
+            {memberEventsError !== null && <Text as="p">{memberEventsError}</Text>}
+            {memberEvents.length > 0 && (
+              <ul className={styles.memberList}>
+                {memberEvents.map((event) => {
+                  const nameFor = (userId: UUID | null) => {
+                    if (userId === null) return 'Someone';
+                    const profile = memberEventProfiles.get(userId);
+                    if (!profile) return 'Unknown member';
+                    return profile.display_name ?? `@${profile.handle}`;
+                  };
+                  return (
+                    <li key={event.id} className={styles.memberRow}>
+                      <Text as="span">{memberEventSentence(event, nameFor)}</Text>
+                      <Text as="span" tone="muted" size="sm">
+                        {formatDate(event.created_at)}
+                      </Text>
+                    </li>
+                  );
+                })}
+              </ul>
+            )}
+          </Panel>
       )}
 
       {canManage && (

@@ -6,7 +6,6 @@ import { branchStatusTone } from '../../changes/branchStatus';
 import type { ElementPageDecisionEntry } from '../../elements/useElementPage';
 import { decisionStatusLabel, decisionStatusTone } from '../../decisions/decisionStatus';
 import { Chip } from '../Chip/Chip';
-import { EmptyState } from '../EmptyState/EmptyState';
 import { Text } from '../Text/Text';
 import styles from './ElementDecisionsSection.module.css';
 
@@ -29,7 +28,7 @@ export interface ElementDecisionsSectionProps {
  */
 export function ElementDecisionsSection({ entries, orgSlug, modelSlug }: ElementDecisionsSectionProps) {
   if (entries.length === 0) {
-    return <EmptyState>No decisions recorded about this element yet.</EmptyState>;
+    return null;
   }
   return (
     <ul className={styles.list}>

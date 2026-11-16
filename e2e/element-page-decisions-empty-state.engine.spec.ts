@@ -23,7 +23,7 @@ import { createModel } from '../src/db/models';
 import { createOrganisation } from '../src/db/organisations';
 import { loadEnv } from '../src/db/env';
 
-test('element page: the Decisions section reads "No decisions recorded", never a Sprint reference', async ({ page }) => {
+test('element page: with no decisions the Decisions section is hidden, and nothing mentions a Sprint', async ({ page }) => {
   const env = loadEnv();
 
   const email = `decisions-empty-${randomUUID()}@example.test`;
@@ -71,8 +71,9 @@ test('element page: the Decisions section reads "No decisions recorded", never a
   await page.goto(`/o/${orgSlug}/m/${modelSlug}/e/${systemId}?ref=main`);
   await expect(page.getByRole('heading', { name: 'Billing Service' })).toBeVisible();
 
-  const decisionsSection = page.locator('section', { has: page.getByRole('button', { name: 'Decisions' }) });
-  await expect(decisionsSection.getByText('No decisions recorded')).toBeVisible();
+  // Nothing to show, so no empty box either.
+  await expect(page.getByRole('button', { name: 'Decisions' })).toHaveCount(0);
+  await expect(page.getByText('No decisions recorded')).toHaveCount(0);
   await expect(page.getByText('Sprint', { exact: false })).toHaveCount(0);
   await expect(page.getByText("aren't built", { exact: false })).toHaveCount(0);
 });

@@ -13,7 +13,6 @@ import { profileLabel } from '../comments/profileLabel';
 import { Button } from '../components/Button/Button';
 import { Chip } from '../components/Chip/Chip';
 import { CommentsSection } from '../components/CommentsSection/CommentsSection';
-import { EmptyState } from '../components/EmptyState/EmptyState';
 import { Panel } from '../components/Panel/Panel';
 import { Text } from '../components/Text/Text';
 import { ProjectManagerField } from './ProjectManagerField';
@@ -109,165 +108,169 @@ export function ProjectView({ data, modelName, orgId, modelId, orgSlug, modelSlu
         </Panel>
       )}
 
-      <Panel>
-        <Text as="h2" size="lg">
-          Declared scope
-        </Text>
-        <Text as="p" tone="muted" size="sm">
-          The capabilities and systems this project is about.
-        </Text>
-        {scopeIds.length === 0 && <EmptyState>No scope declared yet.</EmptyState>}
-        {scopeIds.length > 0 && (
-          <ul className={styles.list}>
-            {scopeIds.map((id) => (
-              <li key={id} className={styles.row}>
-                <Link to={`${base}/e/${id}`}>{elementName(id)}</Link>
-                {canEdit && (
-                  <Button
-                    variant="ghost"
-                    aria-label={`Remove ${elementName(id)} from scope`}
-                    onClick={() => {
-                      void removeProjectLink(supabase, project.id, 'element', id).then(reload, (e: unknown) => {
-                        reportError('Could not remove this from the scope.', e);
-                      });
-                    }}
-                  >
-                    Remove
-                  </Button>
-                )}
-              </li>
-            ))}
-          </ul>
-        )}
-        {canEdit && main?.head_commit_id && (
-          <DecisionLinkPicker
-            commitId={main.head_commit_id}
-            modelId={modelId}
-            selected={[]}
-            placeholder="Add a capability or system to the scope…"
-            onAdd={(elementId) => {
-              if (!userId || scopeIds.includes(elementId)) return;
-              void addProjectLink(supabase, { projectId: project.id, linkedType: 'element', linkedId: elementId, createdBy: userId }).then(reload, (e: unknown) => {
-                reportError('Could not add this to the scope.', e);
-              });
-            }}
-            onRemove={() => undefined}
-          />
-        )}
-        {(difference.touchedNotDeclared.length > 0 || difference.declaredNotTouched.length > 0) && (
-          <div className={styles.scopeDiff}>
-            {difference.touchedNotDeclared.length > 0 && (
-              <div>
-                <Text as="h3" size="md">
-                  Touched by this project&apos;s changes, not in scope
-                </Text>
-                <ul className={styles.inlineList}>
-                  {difference.touchedNotDeclared.map((id) => (
-                    <li key={id}>
-                      <Link to={`${base}/e/${id}`}>{elementName(id)}</Link>
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            )}
-            {difference.declaredNotTouched.length > 0 && changes.length > 0 && (
-              <div>
-                <Text as="h3" size="md">
-                  In scope, not touched or affected by any change yet
-                </Text>
-                <ul className={styles.inlineList}>
-                  {difference.declaredNotTouched.map((id) => (
-                    <li key={id}>
-                      <Link to={`${base}/e/${id}`}>{elementName(id)}</Link>
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            )}
-          </div>
-        )}
-      </Panel>
-
-      <Panel>
-        <Text as="h2" size="lg">
-          Decision log
-        </Text>
-        {decisions.length === 0 && <EmptyState>No decisions in this project yet.</EmptyState>}
-        {decisions.length > 0 && (
-          <ul className={styles.list}>
-            {decisions.map((d) => (
-              <DecisionLine key={d.id} decision={d} href={`${base}/decisions/${d.id}`} overdue={isDecisionOverdue(d, today)} first={firstDecision?.id === d.id && decisions.length > 1} />
-            ))}
-          </ul>
-        )}
-        {isOpen && canStartDecision(role) && userId !== null && <NewDecisionForm project={project} userId={userId} base={base} />}
-        {constrainingDecisions.length > 0 && (
-          <>
-            <Text as="h3" size="md">
-              Constraining decisions
-            </Text>
-            <Text as="p" tone="muted" size="sm">
-              Decisions made elsewhere that this project must follow.
-            </Text>
+      {(scopeIds.length > 0 || canEdit) && (
+        <Panel>
+          <Text as="h2" size="lg">
+            Declared scope
+          </Text>
+          <Text as="p" tone="muted" size="sm">
+            The capabilities and systems this project is about.
+          </Text>
+          {scopeIds.length > 0 && (
             <ul className={styles.list}>
-              {constrainingDecisions.map((d) => (
-                <DecisionLine key={d.id} decision={d} href={`${base}/decisions/${d.id}`} overdue={false} first={false} />
-              ))}
-            </ul>
-          </>
-        )}
-      </Panel>
-
-      <Panel>
-        <Text as="h2" size="lg">
-          Changes
-        </Text>
-        {changes.length === 0 && <EmptyState>No changes in this project yet.</EmptyState>}
-        {groupChangesByStage(changes).map((group) => (
-          <section key={group.stage} aria-label={projectChangeStageLabel(group.stage)}>
-            <Text as="h3" size="md">
-              {projectChangeStageLabel(group.stage)} ({group.changes.length})
-            </Text>
-            <ul className={styles.list}>
-              {group.changes.map((c) => (
-                <ChangeLine key={c.id} change={c} href={`${base}/changes/${c.id}`} />
-              ))}
-            </ul>
-          </section>
-        ))}
-        {isOpen && canCreateChangeBranch(role) && userId !== null && main?.head_commit_id && <NewChangeForm project={project} userId={userId} mainHeadCommitId={main.head_commit_id} base={base} />}
-      </Panel>
-
-      <Panel>
-        <Text as="h2" size="lg">
-          Evidence
-        </Text>
-        <Text as="p" tone="muted" size="sm">
-          Business cases, vendor documents and links behind this project.
-        </Text>
-        {evidence.length === 0 && <EmptyState>No evidence attached yet.</EmptyState>}
-        {evidence.length > 0 && (
-          <ul className={styles.list}>
-            {evidence.map((e) => (
-              <li key={e.id} className={styles.row}>
-                <div>
-                  {e.kind === 'link' && /^https?:\/\//i.test(e.pointer) ? (
-                    <a href={e.pointer} target="_blank" rel="noreferrer noopener">
-                      {e.description ?? e.pointer}
-                    </a>
-                  ) : (
-                    <Text as="span">{e.description ?? e.pointer}</Text>
+              {scopeIds.map((id) => (
+                <li key={id} className={styles.row}>
+                  <Link to={`${base}/e/${id}`}>{elementName(id)}</Link>
+                  {canEdit && (
+                    <Button
+                      variant="ghost"
+                      aria-label={`Remove ${elementName(id)} from scope`}
+                      onClick={() => {
+                        void removeProjectLink(supabase, project.id, 'element', id).then(reload, (e: unknown) => {
+                          reportError('Could not remove this from the scope.', e);
+                        });
+                      }}
+                    >
+                      Remove
+                    </Button>
                   )}
-                  <Text as="p" tone="faint" size="xs">
-                    {e.kind === 'link' ? 'Link' : 'Document'} · {e.pointer} · added by {nameOfUser(e.added_by)}
+                </li>
+              ))}
+            </ul>
+          )}
+          {canEdit && main?.head_commit_id && (
+            <DecisionLinkPicker
+              commitId={main.head_commit_id}
+              modelId={modelId}
+              selected={[]}
+              placeholder="Add a capability or system to the scope…"
+              onAdd={(elementId) => {
+                if (!userId || scopeIds.includes(elementId)) return;
+                void addProjectLink(supabase, { projectId: project.id, linkedType: 'element', linkedId: elementId, createdBy: userId }).then(reload, (e: unknown) => {
+                  reportError('Could not add this to the scope.', e);
+                });
+              }}
+              onRemove={() => undefined}
+            />
+          )}
+          {(difference.touchedNotDeclared.length > 0 || difference.declaredNotTouched.length > 0) && (
+            <div className={styles.scopeDiff}>
+              {difference.touchedNotDeclared.length > 0 && (
+                <div>
+                  <Text as="h3" size="md">
+                    Touched by this project&apos;s changes, not in scope
                   </Text>
+                  <ul className={styles.inlineList}>
+                    {difference.touchedNotDeclared.map((id) => (
+                      <li key={id}>
+                        <Link to={`${base}/e/${id}`}>{elementName(id)}</Link>
+                      </li>
+                    ))}
+                  </ul>
                 </div>
-              </li>
-            ))}
-          </ul>
-        )}
-        {canEdit && userId !== null && <EvidenceForm project={project} userId={userId} onAdded={reload} />}
-      </Panel>
+              )}
+              {difference.declaredNotTouched.length > 0 && changes.length > 0 && (
+                <div>
+                  <Text as="h3" size="md">
+                    In scope, not touched or affected by any change yet
+                  </Text>
+                  <ul className={styles.inlineList}>
+                    {difference.declaredNotTouched.map((id) => (
+                      <li key={id}>
+                        <Link to={`${base}/e/${id}`}>{elementName(id)}</Link>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+            </div>
+          )}
+        </Panel>
+      )}
+
+      {(decisions.length > 0 || constrainingDecisions.length > 0 || (isOpen && canStartDecision(role) && userId !== null)) && (
+        <Panel>
+          <Text as="h2" size="lg">
+            Decision log
+          </Text>
+          {decisions.length > 0 && (
+            <ul className={styles.list}>
+              {decisions.map((d) => (
+                <DecisionLine key={d.id} decision={d} href={`${base}/decisions/${d.id}`} overdue={isDecisionOverdue(d, today)} first={firstDecision?.id === d.id && decisions.length > 1} />
+              ))}
+            </ul>
+          )}
+          {isOpen && canStartDecision(role) && userId !== null && <NewDecisionForm project={project} userId={userId} base={base} />}
+          {constrainingDecisions.length > 0 && (
+            <>
+              <Text as="h3" size="md">
+                Constraining decisions
+              </Text>
+              <Text as="p" tone="muted" size="sm">
+                Decisions made elsewhere that this project must follow.
+              </Text>
+              <ul className={styles.list}>
+                {constrainingDecisions.map((d) => (
+                  <DecisionLine key={d.id} decision={d} href={`${base}/decisions/${d.id}`} overdue={false} first={false} />
+                ))}
+              </ul>
+            </>
+          )}
+        </Panel>
+      )}
+
+      {(changes.length > 0 || (isOpen && canCreateChangeBranch(role) && userId !== null && Boolean(main?.head_commit_id))) && (
+        <Panel>
+          <Text as="h2" size="lg">
+            Changes
+          </Text>
+          {groupChangesByStage(changes).map((group) => (
+            <section key={group.stage} aria-label={projectChangeStageLabel(group.stage)}>
+              <Text as="h3" size="md">
+                {projectChangeStageLabel(group.stage)} ({group.changes.length})
+              </Text>
+              <ul className={styles.list}>
+                {group.changes.map((c) => (
+                  <ChangeLine key={c.id} change={c} href={`${base}/changes/${c.id}`} />
+                ))}
+              </ul>
+            </section>
+          ))}
+          {isOpen && canCreateChangeBranch(role) && userId !== null && main?.head_commit_id && <NewChangeForm project={project} userId={userId} mainHeadCommitId={main.head_commit_id} base={base} />}
+        </Panel>
+      )}
+
+      {(evidence.length > 0 || (canEdit && userId !== null)) && (
+        <Panel>
+          <Text as="h2" size="lg">
+            Evidence
+          </Text>
+          <Text as="p" tone="muted" size="sm">
+            Business cases, vendor documents and links behind this project.
+          </Text>
+          {evidence.length > 0 && (
+            <ul className={styles.list}>
+              {evidence.map((e) => (
+                <li key={e.id} className={styles.row}>
+                  <div>
+                    {e.kind === 'link' && /^https?:\/\//i.test(e.pointer) ? (
+                      <a href={e.pointer} target="_blank" rel="noreferrer noopener">
+                        {e.description ?? e.pointer}
+                      </a>
+                    ) : (
+                      <Text as="span">{e.description ?? e.pointer}</Text>
+                    )}
+                    <Text as="p" tone="faint" size="xs">
+                      {e.kind === 'link' ? 'Link' : 'Document'} · {e.pointer} · added by {nameOfUser(e.added_by)}
+                    </Text>
+                  </div>
+                </li>
+              ))}
+            </ul>
+          )}
+          {canEdit && userId !== null && <EvidenceForm project={project} userId={userId} onAdded={reload} />}
+        </Panel>
+      )}
 
       <Panel>
         <Text as="h2" size="lg">

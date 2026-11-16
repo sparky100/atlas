@@ -1,7 +1,6 @@
 import { Link } from 'react-router';
 import type { BranchRow } from '../../../db/types';
 import { Chip } from '../Chip/Chip';
-import { EmptyState } from '../EmptyState/EmptyState';
 import { Text } from '../Text/Text';
 import styles from './ChangesTouchingSection.module.css';
 
@@ -22,7 +21,7 @@ export interface ChangesTouchingSectionProps {
  */
 export function ChangesTouchingSection({ inFlightBranches, projectTitles, orgSlug, modelSlug }: ChangesTouchingSectionProps) {
   if (inFlightBranches.length === 0) {
-    return <EmptyState>No in-flight changes touch this element.</EmptyState>;
+    return null;
   }
 
   return (

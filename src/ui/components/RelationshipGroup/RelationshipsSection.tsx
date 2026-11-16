@@ -13,7 +13,6 @@ import { AttributeRow } from '../AttributeRow/AttributeRow';
 import { Button } from '../Button/Button';
 import { Chip } from '../Chip/Chip';
 import { ElementTypeGlyph } from '../ElementTypeGlyph/ElementTypeGlyph';
-import { EmptyState } from '../EmptyState/EmptyState';
 import { FactBadge } from '../FactBadge/FactBadge';
 import { fitNotRatedRelationshipIds } from './fitNotRatedEdges';
 import { endpointDisplayName } from './relationshipEndpointLabel';
@@ -197,7 +196,7 @@ export function RelationshipsSection({
   }).filter((group) => group.showOutbound || group.showInbound);
 
   if (groups.length === 0) {
-    return <EmptyState>No relationships recorded for this element yet.</EmptyState>;
+    return null;
   }
 
   return (

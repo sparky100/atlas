@@ -18,7 +18,7 @@ test('edit a proposed decision: title, context, needed-by date and a concern; cl
   await page.getByRole('button', { name: 'Start decision' }).click();
   await expect(page.getByRole('heading', { name: 'What to replce BW with' })).toBeVisible();
   await expect(page.getByText('No context recorded.')).toBeVisible();
-  await expect(page.getByText('No capabilities or systems linked yet.')).toBeVisible();
+  await expect(page.getByPlaceholder('Add a capability or system this decision concerns…')).toBeVisible();
 
   // Fix the title, add context and a needed-by date.
   await page.getByRole('button', { name: '✎ Edit decision' }).click();
@@ -35,7 +35,6 @@ test('edit a proposed decision: title, context, needed-by date and a concern; cl
   await page.getByPlaceholder('Add a capability or system this decision concerns…').fill('Data Gov');
   await page.getByRole('button', { name: 'Data Governance' }).click();
   await expect(page.getByRole('link', { name: 'Data Governance' })).toBeVisible();
-  await expect(page.getByText('No capabilities or systems linked yet.')).toHaveCount(0);
 
   // Once cancelled, nothing on it can be edited.
   await page.getByRole('button', { name: 'Cancel decision…' }).click();

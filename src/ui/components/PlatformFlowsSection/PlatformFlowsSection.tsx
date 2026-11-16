@@ -4,7 +4,6 @@ import type { UUID } from '../../../contracts/delta';
 import type { ElementsHeadRow, RelationshipsHeadRow } from '../../../contracts/rows';
 import { Chip } from '../Chip/Chip';
 import { ElementTypeGlyph } from '../ElementTypeGlyph/ElementTypeGlyph';
-import { EmptyState } from '../EmptyState/EmptyState';
 import { Text } from '../Text/Text';
 import { attributesRecord } from '../../elements/attributesRecord';
 import { moduleDisplayNameFromMap } from '../../elements/moduleDisplayName';
@@ -36,7 +35,7 @@ export interface PlatformFlowsSectionProps {
  */
 export function PlatformFlowsSection({ orgSlug, modelSlug, flows, endpoints, interfaces }: PlatformFlowsSectionProps) {
   if (flows.length === 0) {
-    return <EmptyState>Nothing flows via this yet.</EmptyState>;
+    return null;
   }
 
   return (
