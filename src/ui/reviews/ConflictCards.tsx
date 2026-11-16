@@ -82,7 +82,7 @@ export function RetractionConflictCard({ data, canResolve, choice, onChoose, com
         </Text>
       </div>
       <Text as="p" size="sm">
-        Retracted on {retractedSide === 'ours' ? 'this change' : 'main'}, modified on {keepingSide === 'ours' ? 'this change' : 'main'}.
+        Retracted on {retractedSide === 'ours' ? 'this change' : 'the live model'}, modified on {keepingSide === 'ours' ? 'this change' : 'the live model'}.
       </Text>
       {consequences.length > 0 && (
         <Text as="p" tone="muted" size="sm">
@@ -261,7 +261,7 @@ export function FieldConflictCard({ finding, threeWay, canResolve, choice, onCho
       <div className={styles.columns}>
         <FactColumn label="Base" fact={field?.base} />
         <FactColumn label="This change" fact={field?.ours} />
-        <FactColumn label="Main now" fact={field?.theirs} />
+        <FactColumn label="Live model now" fact={field?.theirs} />
       </div>
       {canResolve ? (
         <>
@@ -315,7 +315,7 @@ export function FieldConflictCard({ finding, threeWay, canResolve, choice, onCho
           </div>
           {choice && (
             <Text as="p" tone="muted" size="sm">
-              Staged: {choice.action === 'keep-ours' ? 'keep this change' : choice.action === 'keep-theirs' ? 'keep main' : `use "${formatFactValue(choice.value)}"`} — applies on the next refresh.
+              Staged: {choice.action === 'keep-ours' ? 'keep this change' : choice.action === 'keep-theirs' ? 'keep the live model' : `use "${formatFactValue(choice.value)}"`} — applies on the next refresh.
             </Text>
           )}
         </>

@@ -102,7 +102,7 @@ test('propose a change from an element page, leave and re-enter it, submit; revi
   // (the active ref is model-level session state, not parsed from the
   // URL — `ChangePage.tsx`'s own module comment); "Edit in this change" is
   // the explicit action that does.
-  await proposerPage.getByRole('button', { name: 'Back to main' }).click();
+  await proposerPage.getByRole('button', { name: 'Back to the live model' }).click();
   await expect(proposerPage.getByText(`Editing in change: ${changeName}`)).toHaveCount(0);
   await proposerPage.getByRole('link', { name: 'Changes' }).click();
   await proposerPage.locator('li', { hasText: changeName }).getByRole('link', { name: 'Open →' }).click();

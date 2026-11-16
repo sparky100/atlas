@@ -474,7 +474,7 @@ export function DecisionView({ modelId, decisionId, orgId, orgSlug, modelSlug, r
                                 {o.label}
                                 {o.branchId !== null && comparison.mainDriftedByBranchId.has(o.branchId) && (
                                   <Text as="p" size="sm" tone="muted">
-                                    Main has moved since this option branched
+                                    The live model has moved since this option was started
                                   </Text>
                                 )}
                               </th>

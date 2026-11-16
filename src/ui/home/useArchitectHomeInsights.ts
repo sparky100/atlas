@@ -137,7 +137,7 @@ export function useArchitectHomeInsights(modelId: UUID, userId: UUID | null): Ar
     async function load(): Promise<void> {
       const main = await getMainBranch(supabase, modelId);
       if (!main) {
-        if (!cancelled) setState({ status: 'error', message: 'This model has no main yet.' });
+        if (!cancelled) setState({ status: 'error', message: 'This model has nothing in it yet.' });
         return;
       }
 

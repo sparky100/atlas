@@ -18,7 +18,7 @@ export interface ValueStreamGateNoticeProps {
 export function ValueStreamGateNotice({ orgSlug, modelSlug }: ValueStreamGateNoticeProps) {
   return (
     <Text as="p" tone="muted" size="sm">
-      Value streams change on main or in a correction. Open a correct-intent{' '}
+      Value streams change in the live model or in a correction. Open a correct-intent{' '}
       <Link to={`/o/${orgSlug}/m/${modelSlug}/changes`}>change</Link> to edit this.
     </Text>
   );

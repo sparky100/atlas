@@ -346,7 +346,7 @@ export function ModelSettingsView({ model, role, orgId, orgSlug, onChanged }: Mo
                 setTargetTagId(e.target.value);
               }}
             >
-              <option value="">Current main</option>
+              <option value="">Live model</option>
               {sharing.tags.map((tag) => (
                 <option key={tag.id} value={tag.id}>
                   {tag.name}
@@ -366,7 +366,7 @@ export function ModelSettingsView({ model, role, orgId, orgSlug, onChanged }: Mo
               {sharing.shares.map((share) => (
                 <li key={share.id} className={styles.shareRow}>
                   <Text as="span">{sharing.orgNames.get(share.shared_with_org_id) ?? share.shared_with_org_id}</Text>
-                  <Chip tone="neutral">{share.tag_id ? (sharing.tags.find((t) => t.id === share.tag_id)?.name ?? 'tagged version') : 'current main'}</Chip>
+                  <Chip tone="neutral">{share.tag_id ? (sharing.tags.find((t) => t.id === share.tag_id)?.name ?? 'tagged version') : 'live model'}</Chip>
                   <Button
                     variant="destructive"
                     onClick={() => {

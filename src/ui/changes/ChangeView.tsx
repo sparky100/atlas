@@ -153,7 +153,7 @@ export function ChangeView({ orgId, modelId, branchId, orgSlug, modelSlug, role,
     try {
       const main = await getMainBranch(supabase, modelId);
       if (!main) {
-        setDuplicateError('This model has no main to fork from.');
+        setDuplicateError('This model has nothing in it yet, so there is nothing to base a change on.');
         return;
       }
       const newBranch = await createChangeBranch(supabase, {
