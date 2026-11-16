@@ -3,7 +3,8 @@ import type { UUID } from '../../contracts/delta';
 import { Text } from '../components/Text/Text';
 import { countAnnualRunCosts } from '../elements/annualRunCost';
 import { useIsNarrowViewport } from '../landscape/useIsNarrowViewport';
-import type { AnnualRunCost, FitForPurpose } from '../../contracts/delta';
+import type { AnnualRunCost } from '../../contracts/delta';
+import type { ChartFit } from './portfolioChart';
 import { PortfolioCards } from './PortfolioCards';
 import { PortfolioChart } from './PortfolioChart';
 import { ExportViewButtons } from '../components/ExportViewButtons/ExportViewButtons';
@@ -52,15 +53,15 @@ export function PortfolioView({ data, elementHref, exportStamp, savedReports }: 
   const [expandedRowId, setExpandedRowId] = useState<UUID | null>(null);
   const [view, setView] = useState<PortfolioViewMode>('table');
   // Picked by clicking a chart box. View-only: the saved report keeps only the filters above it.
-  const [fitPick, setFitPick] = useState<FitForPurpose | null>(null);
+  const [fitPick, setFitPick] = useState<ChartFit | null>(null);
   const narrow = useIsNarrowViewport(MOBILE_BREAKPOINT_PX);
 
   const visibleRows = useMemo(() => visiblePortfolioRows(data.rows, includeContainers), [data.rows, includeContainers]);
   const notEntered = useMemo(() => countAnnualRunCosts(visibleRows.map((row) => row.cost)).notEntered, [visibleRows]);
   const filteredRows = useMemo(() => filterPortfolioRows(visibleRows, filters), [visibleRows, filters]);
-  const rows = useMemo(() => sortPortfolioRows(fitPick ? filteredRows.filter((row) => row.fit === fitPick) : filteredRows, sortKey, sortDirection), [filteredRows, fitPick, sortKey, sortDirection]);
+  const rows = useMemo(() => sortPortfolioRows(fitPick ? filteredRows.filter((row) => (row.fit ?? 'unrated') === fitPick) : filteredRows, sortKey, sortDirection), [filteredRows, fitPick, sortKey, sortDirection]);
 
-  function handlePickCell(cost: AnnualRunCost, fit: FitForPurpose): void {
+  function handlePickCell(cost: AnnualRunCost, fit: ChartFit): void {
     setFilters((current) => ({ ...current, cost }));
     setFitPick(fit);
     setView('table');

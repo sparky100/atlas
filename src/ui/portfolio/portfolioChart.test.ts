@@ -18,10 +18,18 @@ describe('buildCostFitGrid', () => {
     expect(grid.notPlotted).toEqual([]);
   });
 
-  it('never plots a row missing cost or fit as low; it is counted as not plotted', () => {
-    const grid = buildCostFitGrid([fakeRow({ name: 'nocost', cost: null, fit: 'poor' }), fakeRow({ name: 'nofit', cost: '1m_5m', fit: null })]);
-    expect(grid.notPlotted.map((r) => r.name)).toEqual(['nocost', 'nofit']);
+  it('puts a row with a cost but no fit in the Fit not rated row, never as poor or good', () => {
+    const grid = buildCostFitGrid([fakeRow({ name: 'nofit', cost: '1m_5m', fit: null })]);
+    expect(cellAt(grid, 'unrated', '1m_5m').rows.map((r) => r.name)).toEqual(['nofit']);
+    expect(cellAt(grid, 'poor', '1m_5m').rows).toEqual([]);
+    expect(grid.notPlotted).toEqual([]);
+  });
+
+  it('does not plot a row with no run cost, or with cost none / included', () => {
+    const grid = buildCostFitGrid([fakeRow({ name: 'nocost', cost: null, fit: 'poor' }), fakeRow({ name: 'included', cost: 'none_included', fit: 'good' })]);
+    expect(grid.notPlotted.map((r) => r.name)).toEqual(['nocost', 'included']);
     expect(grid.cells.flat().every((c) => c.rows.length === 0)).toBe(true);
+    expect(CHART_COST_COLUMNS.map((c) => c.key)).not.toContain('none_included');
   });
 
   it('flags a box only when a row in it has the costly, poor fit signal', () => {
@@ -31,7 +39,7 @@ describe('buildCostFitGrid', () => {
     expect(cellAt(grid, 'poor', 'under_50k').flagged).toBe(false);
   });
 
-  it('orders fit rows worst first', () => {
-    expect(CHART_FIT_ROWS.map((f) => f.key)).toEqual(['poor', 'adequate', 'good', 'excellent']);
+  it('orders fit rows worst first, with not rated last', () => {
+    expect(CHART_FIT_ROWS.map((f) => f.key)).toEqual(['poor', 'adequate', 'good', 'excellent', 'unrated']);
   });
 });

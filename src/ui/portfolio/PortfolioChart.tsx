@@ -1,16 +1,16 @@
 import { useMemo } from 'react';
-import type { AnnualRunCost, Disposition, FitForPurpose } from '../../contracts/delta';
+import type { AnnualRunCost, Disposition } from '../../contracts/delta';
 import { dispositionLabel, dispositionTone } from '../elements/disposition';
 import { Text } from '../components/Text/Text';
 import { EmptyState } from '../components/EmptyState/EmptyState';
-import { buildCostFitGrid, CHART_COST_COLUMNS, CHART_FIT_ROWS } from './portfolioChart';
+import { buildCostFitGrid, type ChartFit, CHART_COST_COLUMNS, CHART_FIT_ROWS } from './portfolioChart';
 import type { PortfolioRow } from './usePortfolio';
 import styles from './PortfolioChart.module.css';
 
 export interface PortfolioChartProps {
   rows: readonly PortfolioRow[];
   /** Open the table narrowed to one box. */
-  onPickCell: (cost: AnnualRunCost, fit: FitForPurpose) => void;
+  onPickCell: (cost: AnnualRunCost, fit: ChartFit) => void;
   /** Show the table (so the "not plotted" applications can be read). */
   onShowTable: () => void;
 }
@@ -40,7 +40,7 @@ export function PortfolioChart({ rows, onPickCell, onShowTable }: PortfolioChart
   return (
     <section aria-label="Cost against fit">
       <Text as="p" size="sm" tone="muted" className={styles.hint}>
-        Cost against fit. Pick a box to see just those applications.
+        Cost against fit. Pick a box to see just those applications. "Fit not rated" means no fit has been recorded on any of the application's capability links; it is not a poor or good rating.
       </Text>
       <div className={styles.grid}>
         <div />
@@ -84,9 +84,11 @@ export function PortfolioChart({ rows, onPickCell, onShowTable }: PortfolioChart
         })}
       </div>
       <ul className={styles.key} aria-label="Key">
-        <li>
-          <span className={styles.swatch} aria-hidden="true" /> Shaded: costly and poor fit
-        </li>
+        {grid.cells.flat().some((cell) => cell.flagged) && (
+          <li>
+            <span className={styles.swatch} aria-hidden="true" /> Shaded: costly and poor fit
+          </li>
+        )}
         {DOT_KEY.map((k) => (
           <li key={k.label}>
             <span className={[styles.dot, dotClass(k.disposition)].join(' ')} aria-hidden="true" /> {k.label}
@@ -95,7 +97,7 @@ export function PortfolioChart({ rows, onPickCell, onShowTable }: PortfolioChart
       </ul>
       {grid.notPlotted.length > 0 && (
         <Text as="p" size="sm" tone="muted" className={styles.notPlotted}>
-          Not shown: {grid.notPlotted.length} {grid.notPlotted.length === 1 ? 'application has' : 'applications have'} no run cost or no fit recorded, so {grid.notPlotted.length === 1 ? 'it is' : 'they are'} not placed as low.{' '}
+          Not shown: {grid.notPlotted.length} {grid.notPlotted.length === 1 ? 'application has' : 'applications have'} no run cost to plot (none entered, or cost included elsewhere).{' '}
           <button type="button" className={styles.linkButton} onClick={onShowTable}>
             See them in the table
           </button>
