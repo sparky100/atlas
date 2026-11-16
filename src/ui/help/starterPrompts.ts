@@ -1,7 +1,8 @@
 /** Static default starter prompts shown before the first message — mirrors Des-Studio's own `SUGGESTED_QUESTIONS` idea, simplified: Atlas has no per-tab editor granularity to key off, so this is one general-purpose set drawn from `docs/USER-GUIDE.md`'s own sections. */
 export const DEFAULT_STARTER_PROMPTS: readonly string[] = [
   "What's the difference between a Capability, System, and Container?",
-  'How do I bring in data with an AI-assisted capture?',
-  'How do I make a change and get it merged?',
+  'How do I import my systems, and is there a blank spreadsheet to start from?',
+  'How do I make a change and get it into the live model?',
   'What are Versions, and how do I create one?',
+  'How do I record that a system is an AI agent or uses AI?',
 ];

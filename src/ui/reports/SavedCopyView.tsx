@@ -61,7 +61,7 @@ export function SavedCopyView({ copy, modelName, userId, role, basePath }: Saved
         <ReportDownloadButtons
           table={table}
           fileBase={`${modelName}-${copy.name}-${copy.generated_at.slice(0, 10)}`}
-          about={{ report: copy.name, model: modelName, state: `main · ${label}`, extra: [['Commit', copy.commit_id]] }}
+          about={{ report: copy.name, model: modelName, state: `live model · ${label}`, extra: [['Commit', copy.commit_id]] }}
           picture={() => {
             const stamp = { modelName, viewLabel: copy.name, refLabel: `Saved copy, ${label}`, date: copy.generated_at.slice(0, 10) };
             return { plan: reportExportPlan(copy.name, parsed.spec, result, stamp), stamp };

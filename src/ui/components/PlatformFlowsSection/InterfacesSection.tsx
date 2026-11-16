@@ -4,7 +4,6 @@ import type { ElementsHeadRow, RelationshipsHeadRow } from '../../../contracts/r
 import { INTERFACE_TYPE_LABELS } from '../../../contracts/attributeSchema';
 import { attributesRecord } from '../../elements/attributesRecord';
 import { ElementTypeGlyph } from '../ElementTypeGlyph/ElementTypeGlyph';
-import { EmptyState } from '../EmptyState/EmptyState';
 import { Text } from '../Text/Text';
 import styles from './PlatformFlowsSection.module.css';
 
@@ -25,7 +24,7 @@ export interface InterfacesSectionProps {
  */
 export function InterfacesSection({ orgSlug, modelSlug, interfaces, flows }: InterfacesSectionProps) {
   if (interfaces.length === 0) {
-    return <EmptyState>No interfaces recorded yet — the APIs, files, topics or jobs this platform exposes or consumes.</EmptyState>;
+    return null;
   }
   const countByInterface = new Map<UUID, number>();
   for (const flow of flows) {

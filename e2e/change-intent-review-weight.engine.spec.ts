@@ -112,7 +112,7 @@ test('a record change merges in one click from its own page and never appears in
   await expect(approveAndMergeButton).toBeVisible();
   await approveAndMergeButton.click();
   await expect(page.getByTestId('stepper-merged')).toHaveAttribute('data-step-state', 'current', { timeout: 15_000 });
-  await expect(page.getByText('Merged into main.')).toBeVisible();
+  await expect(page.getByText('Merged into the live model.')).toBeVisible();
 
   // 2. Propose: today's ordinary flow, completely unaffected — the queue
   // still lists it, and its own page offers "Open review →" only, never

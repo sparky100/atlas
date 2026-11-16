@@ -10,6 +10,7 @@ import { Inspector } from '../components/Inspector/Inspector';
 import { useInspectorCollapsedPreference } from '../components/Inspector/useInspectorCollapsedPreference';
 import { ModelNav } from '../components/ModelNav/ModelNav';
 import navStyles from '../components/ModelNav/ModelNav.module.css';
+import { PageIntro } from '../components/PageIntro/PageIntro';
 import { Text } from '../components/Text/Text';
 import { ElementSearchAdd } from '../components/ElementSearchAdd/ElementSearchAdd';
 import { ValueStreamGateNotice } from '../components/ValueStreamGateNotice/ValueStreamGateNotice';
@@ -141,6 +142,7 @@ export function ValueStreamsPage() {
             )}
             {state.status === 'ready' && !canEditValueStream && canCreateChangeBranch(role) && <ValueStreamGateNotice orgSlug={organisation?.slug ?? ''} modelSlug={model.slug} />}
           </div>
+          <PageIntro>The steps your organisation follows to deliver an outcome, and the capabilities behind each step.</PageIntro>
 
           {state.status === 'loading' && <Loading />}
           {state.status === 'error' && <Text as="p">{state.message}</Text>}

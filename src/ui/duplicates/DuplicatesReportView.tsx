@@ -163,7 +163,7 @@ export function DuplicatesReportView({ modelId, orgSlug, modelSlug, searchCommit
                   <Link to={elementHref(candidate.element_a_id)}>{nameA}</Link> ↔ <Link to={elementHref(candidate.element_b_id)}>{nameB}</Link>
                 </Text>
                 <div className={styles.rowMeta}>
-                  <Chip tone="info">{Math.round(candidate.score * 100)}% match</Chip>
+                  <Chip tone="neutral">{Math.round(candidate.score * 100)}% match</Chip>
                   <Chip tone="neutral">{candidate.element_type}</Chip>
                   {badges.map((badge) => (
                     <Chip key={badge} tone="neutral">

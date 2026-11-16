@@ -4,6 +4,7 @@ import { AppHeader } from '../components/AppHeader/AppHeader';
 import { Breadcrumb } from '../components/Breadcrumb/Breadcrumb';
 import { ModelNav } from '../components/ModelNav/ModelNav';
 import navStyles from '../components/ModelNav/ModelNav.module.css';
+import { PageIntro } from '../components/PageIntro/PageIntro';
 import { Text } from '../components/Text/Text';
 import { CaptureJobListView } from '../capture/CaptureJobListView';
 import { useAuth } from '../auth/useAuth';
@@ -62,6 +63,7 @@ export function CaptureJobListPage() {
               Import
             </Text>
           </div>
+          <PageIntro>Bring in systems and connections from a file or a connected tool, then check them before they go in.</PageIntro>
           <CaptureJobListView modelId={model.id} orgId={organisation?.id ?? ''} orgSlug={orgSlug ?? ''} modelSlug={model.slug} canCreate={canCreate} />
         </main>
       </div>

@@ -13,7 +13,6 @@ import { AttributeRow } from '../AttributeRow/AttributeRow';
 import { Button } from '../Button/Button';
 import { Chip } from '../Chip/Chip';
 import { ElementTypeGlyph } from '../ElementTypeGlyph/ElementTypeGlyph';
-import { EmptyState } from '../EmptyState/EmptyState';
 import { FactBadge } from '../FactBadge/FactBadge';
 import { fitNotRatedRelationshipIds } from './fitNotRatedEdges';
 import { endpointDisplayName } from './relationshipEndpointLabel';
@@ -197,7 +196,7 @@ export function RelationshipsSection({
   }).filter((group) => group.showOutbound || group.showInbound);
 
   if (groups.length === 0) {
-    return <EmptyState>No relationships recorded for this element yet.</EmptyState>;
+    return null;
   }
 
   return (
@@ -377,8 +376,8 @@ function RelationshipDirectionGroup({
               {fitForPurpose !== null && <Chip tone={fitForPurposeToneFor(fitForPurpose)}>{fitForPurpose}</Chip>}
               {fitNotRated && <Chip tone="neutral">fit not rated</Chip>}
               {ownsRole !== null && <Chip tone="neutral">{ownsRole} owner</Chip>}
-              {typeof dataClassification === 'string' && dataClassification.length > 0 && <Chip tone="info">{dataClassification}</Chip>}
-              {justAdded && <Chip tone="info">just added</Chip>}
+              {typeof dataClassification === 'string' && dataClassification.length > 0 && <Chip tone="neutral">{dataClassification}</Chip>}
+              {justAdded && <Chip tone="neutral">just added</Chip>}
               {existsFact && <FactBadge label={`relationship with ${otherDisplayName}`} fact={existsFact} source={sources.get(existsFact.source_id)} />}
               {removeRelationship && (
                 <RelationshipRemove

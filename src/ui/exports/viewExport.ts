@@ -168,7 +168,7 @@ export async function downloadPlanAsPdf(plan: ExportPlan, stamp: ExportStamp): P
 
 /** The stamp's "which state" line: "Main", "Version v2026-Q1", "Change: Housing CRM", or a commit. */
 export function stampRefLabel(ref: { kind: 'main' } | { kind: 'tag'; name: string } | { kind: 'branch'; branchId: string } | { kind: 'commit'; commitId: string }, branchLabel?: string): string {
-  if (ref.kind === 'main') return 'Main';
+  if (ref.kind === 'main') return 'Live model';
   if (ref.kind === 'tag') return `Version ${ref.name}`;
   if (ref.kind === 'commit') return branchLabel ?? `Commit ${ref.commitId.slice(0, 8)}`;
   return `Change: ${branchLabel ?? ref.branchId.slice(0, 8)}`;

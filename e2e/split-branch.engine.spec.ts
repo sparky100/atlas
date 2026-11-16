@@ -68,7 +68,7 @@ test('review queue split: accept one of two independent systems, preview, split,
   await expect(page).toHaveURL(new RegExp(`/o/${orgSlug}/m/${modelSlug}/review/`));
 
   // 3. The split panel: two clean changes to choose between.
-  const splitPanel = page.locator('section, div').filter({ hasText: 'Split — deliver part of this change now' }).last();
+  const splitPanel = page.locator('section, div').filter({ hasText: 'Deliver part of this change now' }).last();
   await expect(splitPanel.getByText('created — Accepted System')).toBeVisible();
   await expect(splitPanel.getByText('created — Remainder System')).toBeVisible();
 
@@ -77,7 +77,7 @@ test('review queue split: accept one of two independent systems, preview, split,
   await expect(splitPanel.getByText('pulled in', { exact: false })).toHaveCount(0);
   await expect(splitPanel.getByText('Blocked:')).toHaveCount(0);
 
-  await splitPanel.getByRole('button', { name: /Split 1 item & merge now/ }).click();
+  await splitPanel.getByRole('button', { name: /Deliver 1 item now/ }).click();
   await expect(splitPanel.getByText('created — Accepted System')).not.toBeVisible({ timeout: 15_000 });
 
   // 4. Accepted System is on main; Remainder System is not.

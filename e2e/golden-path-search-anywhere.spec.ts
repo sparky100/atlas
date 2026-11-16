@@ -34,7 +34,7 @@ test('search anywhere: find a system, a change and a decision from any page, by 
   await page.getByPlaceholder('Title (e.g. Retire the legacy CRM)').fill('Retire the meter hub');
   await page.getByRole('button', { name: 'Create change' }).click();
   await expect(page.getByRole('heading', { name: 'Retire the meter hub' })).toBeVisible();
-  await page.getByRole('button', { name: 'Back to main' }).click();
+  await page.getByRole('button', { name: 'Back to the live model' }).click();
 
   // A decision.
   await clickNavItem(page, 'Decisions');

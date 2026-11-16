@@ -1,6 +1,7 @@
 import { Loading } from '../components/Loading/Loading';
 import { useParams } from 'react-router';
 import { AppHeader } from '../components/AppHeader/AppHeader';
+import { PageIntro } from '../components/PageIntro/PageIntro';
 import { Text } from '../components/Text/Text';
 import { useAuth } from '../auth/useAuth';
 import { OrganisationSettingsView } from '../orgs/OrganisationSettingsView';
@@ -49,6 +50,7 @@ export function OrganisationSettingsPage() {
         <Text as="h1" size="2xl">
           Organisation settings
         </Text>
+        <PageIntro>People, sign-in, connectors and rules for the whole organisation.</PageIntro>
         <OrganisationSettingsView
           organisation={organisation}
           role={role}

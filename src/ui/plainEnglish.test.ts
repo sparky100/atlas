@@ -27,3 +27,43 @@ describe('plain-English UI text', () => {
     expect(offences).toEqual([]);
   });
 });
+
+/** Pages that open with something other than a one-line summary: detail pages (they open with the thing itself), canvas pages (the picture needs the room), sign-in pages, and pages that already carry their own intro text. Every other page that has a title must say in one plain sentence what it shows. */
+const NO_INTRO_NEEDED = new Set([
+  'AskAtlasPage.tsx',
+  'CapabilityMapPage.tsx',
+  'CaptureReviewPage.tsx',
+  'ContainerPage.tsx',
+  'ContextPage.tsx',
+  'DashboardPage.tsx',
+  'DecisionOptionLandscapePage.tsx',
+  'DecisionPage.tsx',
+  'GapsPage.tsx',
+  'Home.tsx',
+  'LandscapePage.tsx',
+  'ModelHome.tsx',
+  'ModelRouteGate.tsx',
+  'OrgHome.tsx',
+  'PlatformAdminPage.tsx',
+  'ProfilePage.tsx',
+  'ProjectPage.tsx',
+  'ReportsPage.tsx',
+  'ResetPasswordPage.tsx',
+  'ReviewRequestPage.tsx',
+  'SavedReportPage.tsx',
+  'SignIn.tsx',
+  'VersionDiffPage.tsx',
+]);
+
+describe('page summaries', () => {
+  it('gives every list and settings page a one-line summary under its title', () => {
+    const routesDir = join(__dirname, 'routes');
+    const missing = readdirSync(routesDir)
+      .filter((name) => name.endsWith('.tsx') && !NO_INTRO_NEEDED.has(name))
+      .filter((name) => {
+        const source = readFileSync(join(routesDir, name), 'utf8');
+        return source.includes('as="h1"') && !source.includes('<PageIntro>');
+      });
+    expect(missing).toEqual([]);
+  });
+});
