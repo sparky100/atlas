@@ -7,7 +7,7 @@ export function plainDate(iso: string): string {
   const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(iso);
   if (!match) return iso;
   const month = MONTHS[Number(match[2]) - 1];
-  return month === undefined ? iso : `${String(Number(match[3]))} ${month} ${match[1]}`;
+  return month === undefined ? iso : `${String(Number(match[3]))} ${month} ${String(match[1])}`;
 }
 
 /** The words on the tag: "Planned · from 28 Aug 2027" or "Retired · to 31 Dec 2026"; the date part is left off when none is recorded. */

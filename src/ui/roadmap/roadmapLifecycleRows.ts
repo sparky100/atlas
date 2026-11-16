@@ -28,6 +28,8 @@ import type { UUID } from '../../contracts/delta';
 import type { ElementsHeadRow, RelationshipsHeadRow } from '../../contracts/rows';
 import { attributesRecord } from '../elements/attributesRecord';
 import { l1AncestorOf } from '../elements/capabilityDepth';
+import type { LifecycleTagProps } from '../components/LifecycleTag/LifecycleTag';
+import { lifecycleTagFor } from '../components/LifecycleTag/lifecycleTagFor';
 
 /** A value no real element id can ever equal (UUIDs never start with `$`) — the same sentinel shape `layout.ts`'s own `UNASSIGNED_LANE_KEY` uses, rather than a type-level union with `UUID` (itself a plain `string` alias, so TS can't distinguish a literal from it anyway). */
 export const UNASSIGNED_GROUP_KEY = '$unassigned';
@@ -49,6 +51,8 @@ export interface RoadmapLifecycleBar {
   capabilityKey?: UUID;
   /** Every capability this system supports through any `supports` edge (main or also), plus each one's ancestors — so filtering by a sub-capability, or by a capability the system only also supports, still finds it. */
   supportedCapabilityIds?: UUID[];
+  /** Set when the system is planned (not live yet) or retired today: the Roadmap always shows it, marked with the shared tag. */
+  lifecycleTag?: LifecycleTagProps;
 }
 
 export interface RoadmapGroup {
@@ -115,6 +119,10 @@ function supportedCapabilityIdsOf(systemId: UUID, supportsEdges: readonly Relati
   return [...ids];
 }
 
+function optionalTag(tag: LifecycleTagProps | undefined): { lifecycleTag?: LifecycleTagProps } {
+  return tag ? { lifecycleTag: tag } : {};
+}
+
 function lifecycleBarOf(system: ElementsHeadRow, ownsEdges: readonly RelationshipsHeadRow[], supportsEdges: readonly RelationshipsHeadRow[], capabilitiesById: ReadonlyMap<UUID, ElementsHeadRow>): RoadmapLifecycleBar | null {
   const attrs = attributesRecord(system.attributes);
   const introduced = typeof attrs.introduced === 'string' ? attrs.introduced : undefined;
@@ -131,6 +139,7 @@ function lifecycleBarOf(system: ElementsHeadRow, ownsEdges: readonly Relationshi
     lifecycleStatus: typeof attrs.lifecycleStatus === 'string' ? attrs.lifecycleStatus : undefined,
     ownerActorIds: ownerActorIdsOf(system.element_id, ownsEdges),
     supportedCapabilityIds: supportedCapabilityIdsOf(system.element_id, supportsEdges, capabilitiesById),
+    ...optionalTag(lifecycleTagFor(system, null)),
   };
 }
 

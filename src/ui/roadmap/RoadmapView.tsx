@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router';
 import { LandscapeFind, type LandscapeFindOption } from '../landscape/LandscapeFind';
 import { EmptyState } from '../components/EmptyState/EmptyState';
+import { LifecycleTag } from '../components/LifecycleTag/LifecycleTag';
 import { Text } from '../components/Text/Text';
 import { useCanvasWidth } from '../landscape/useCanvasWidth';
 import type { RoadmapBranchEvents } from '../../db/roadmapChangeEvents';
@@ -70,6 +71,7 @@ function RoadmapRow({ bar, events, range, todayPct, orgSlug, modelSlug, found }:
         <Text as="span" size="xs" tone="muted" className={styles.rowCaption}>
           {roadmapBarCaption(bar)}
         </Text>
+        {bar.lifecycleTag && <LifecycleTag {...bar.lifecycleTag} />}
       </Link>
       <div className={styles.track}>
         <div className={styles.lifecycleBar} data-tone={bar.lifecycleStatus === 'retiring' || bar.lifecycleStatus === 'retired' ? 'warn' : 'neutral'} style={{ left: `${String(left)}%`, width: `${String(Math.max(width, 0.5))}%` }} />

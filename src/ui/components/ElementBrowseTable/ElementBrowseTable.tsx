@@ -6,6 +6,8 @@ import { attributeDefinitionToFieldSchema } from '../../../contracts/attributeSc
 import type { ElementType, UUID } from '../../../contracts/delta';
 import { aiMarkOf, usesAi } from '../../../engine/elementRead/aiAgent';
 import { AiMarkChip } from '../AiTag/AiTag';
+import { LifecycleTag } from '../LifecycleTag/LifecycleTag';
+import { lifecycleTagFor } from '../LifecycleTag/lifecycleTagFor';
 import { ELEMENT_TYPE_FILTER_OPTIONS, FINDING_FILTER_OPTIONS, type BrowseRow } from '../../../db/elementBrowse';
 import type { AttributeDefinitionRow, BranchRow } from '../../../db/types';
 import type { ThreadCount } from '../../comments/useThreadCounts';
@@ -675,6 +677,7 @@ export function ElementBrowseTable({ state, orgSlug, modelSlug, modelId, filenam
                       <Link to={elementHref(row.element.element_id)} className={styles.nameCell}>
                         <ElementTypeGlyph type={row.element.element_type} />
                         <Text as="span">{moduleDisplayName(row.element, row.parent)}</Text>
+                        {(() => { const tag = lifecycleTagFor(row.element, row.parent); return tag ? <LifecycleTag {...tag} /> : null; })()}
                       </Link>
                     </td>
                     <td headers={`${headerIdBase}-type`}>
