@@ -42,7 +42,7 @@ The core ideas:
 - **Architect:** open Home and read **Where to focus**. Each row is a problem and links straight to it, with **Start a decision** or **Start a project** on the same row.
 - **Owner:** as an architect, plus **Invite a colleague** in organisation settings.
 
-**A new, empty model.** If your organisation has no models yet, you are offered **Look around first**, above **New model**: a made-up organisation to look around in. **Add this sample** opens its capability map and puts a separate copy in your organisation, and nothing you change in it affects anyone else. Home shows a **Get started** checklist: import your capabilities, add a system, link it to the capability it supports, and (owners only) invite a colleague.
+**A new, empty model.** If your organisation has no models yet, you are offered **Look around first**, above **New model**: a made-up organisation to look around in. **Add this sample** opens its capability map and puts a separate copy in your organisation, and nothing you change in it affects anyone else. Home shows a **Get started** checklist: open the capability map (it offers a ready-made map for your sector, or you can add your own or import a spreadsheet), add a system, link it to the capability it supports, and (owners only) invite a colleague.
 
 **A model that already has data.** Home shows a **Welcome** card with a few places to start, worded for your role. **Dismiss** hides it in that browser.
 
@@ -135,7 +135,7 @@ Home has two views; switch with **Overview** / **My work** at the top. They do d
 
 **Your start page.** Opening a model from the model list takes you to your start page: the capability map for viewers and contributors, Home for owners and architects. Pick another (Home, Capability map or Landscape) under **Profile → Start page**, or press **Make this my start page** on any of those three pages. The choice follows you across organisations. On a phone, the **Search** button in the header searches elements, changes, decisions and projects from any page.
 
-**Get started.** A model with no capabilities, no systems or no system-to-capability links shows a **Get started** checklist on Home (for people who can add to the model). Owners also get an **Invite a colleague** step, which ticks once an invite has been sent. A model that already has data shows a **Welcome** card instead. Each step ticks itself from the model's real contents and links to the screen that does it; **Dismiss** hides it in that browser.
+**Get started.** A model with no capabilities, no systems or no system-to-capability links shows a **Get started** checklist on Home (for people who can add to the model). Owners also get an **Invite a colleague** step, which ticks once an invite has been sent. A model that already has data shows a **Welcome** card instead. Each step ticks itself from the model's real contents and links to the screen that does it (the capabilities step opens the capability map, with Import as a second link); **Dismiss** hides it in that browser.
 
 Health findings include: AI agents that act alone with no technical owner, systems not linked to a capability, capabilities with no owner, stale values, critical systems with no business owner or nearing end of life, critical systems near the end of vendor support, relationships missing a verb or a data classification across the IT/OT or enterprise boundary, and systems planned to move or switch off that nothing is retiring.
 
