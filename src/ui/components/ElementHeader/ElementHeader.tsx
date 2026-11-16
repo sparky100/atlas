@@ -7,8 +7,8 @@ import type { UseElementRenameResult } from '../../elements/useElementRename';
 import { Button } from '../Button/Button';
 import { Link } from 'react-router';
 import { LinkButton } from '../Button/LinkButton';
-import { aiAutonomyOf } from '../../../engine/elementRead/aiAgent';
-import { AiAgentTag, AiAutonomyChip } from '../AiAgentTag/AiAgentTag';
+import { aiMarkOf } from '../../../engine/elementRead/aiAgent';
+import { AiMarkChip, AiTag } from '../AiTag/AiTag';
 import { Chip } from '../Chip/Chip';
 import { ElementTypeGlyph } from '../ElementTypeGlyph/ElementTypeGlyph';
 import { FactBadge } from '../FactBadge/FactBadge';
@@ -213,7 +213,7 @@ export function ElementHeader({ element, existsFact, existsSource, onEdit, onCon
   // way `lifecycleStatus` above only ever renders for the types that carry
   // it despite no explicit `element_type` check here either.
   const version = typeof attrs.version === 'string' ? attrs.version : null;
-  const autonomy = element.element_type === 'system' ? aiAutonomyOf(element) : null;
+  const mark = element.element_type === 'system' ? aiMarkOf(element) : null;
   const isExternal = attrs.isExternal === true;
   const externalOrganisation = typeof attrs.externalOrganisation === 'string' ? attrs.externalOrganisation : null;
 
@@ -284,10 +284,10 @@ export function ElementHeader({ element, existsFact, existsSource, onEdit, onCon
             {version}
           </Text>
         )}
-        {autonomy !== null && (
+        {mark !== null && (
           <>
-            <AiAgentTag autonomy={autonomy} />
-            <AiAutonomyChip autonomy={autonomy} />
+            <AiTag mark={mark} />
+            <AiMarkChip mark={mark} />
           </>
         )}
         {interfacePlatform && <Chip tone="neutral">{interfacePlatform.typeLabel ? `Interface · ${interfacePlatform.typeLabel}` : 'Interface'}</Chip>}

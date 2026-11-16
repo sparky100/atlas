@@ -1,8 +1,8 @@
 import { Link } from 'react-router';
 import type { UUID } from '../../contracts/delta';
 import type { ElementVersionDiff, VersionDiff } from '../../engine/versionDiff';
-import { AiAgentTag } from '../components/AiAgentTag/AiAgentTag';
-import { aiAutonomyOf } from '../../engine/elementRead/aiAgent';
+import { AiTag } from '../components/AiTag/AiTag';
+import { aiMarkOf } from '../../engine/elementRead/aiAgent';
 import { Chip } from '../components/Chip/Chip';
 import { LinkButton } from '../components/Button/LinkButton';
 import { DiffBadge } from '../components/DiffBadge/DiffBadge';
@@ -73,7 +73,7 @@ export function ContextView({ group, orgSlug, modelSlug, refParam, diff = null, 
   const neighbourContextHref = (elementId: UUID) => `/o/${orgSlug}/m/${modelSlug}/context/${elementId}?${refParam}`;
   const containersHref = `/o/${orgSlug}/m/${modelSlug}/container/${group.hub.element_id}?${refParam}`;
   const hubExternal = attributesRecord(group.hub.attributes).isExternal === true;
-  const hubAutonomy = group.hub.element_type === 'system' ? aiAutonomyOf(group.hub) : null;
+  const hubMark = group.hub.element_type === 'system' ? aiMarkOf(group.hub) : null;
   const diffById = new Map<UUID, ElementVersionDiff>(diff?.elements.map((e) => [e.elementId, e]) ?? []);
   const hubDiff = diffById.get(group.hub.element_id);
 
@@ -87,7 +87,7 @@ export function ContextView({ group, orgSlug, modelSlug, refParam, diff = null, 
               {group.hubDisplayName}
             </Text>
           </Link>
-          {hubAutonomy !== null && <AiAgentTag autonomy={hubAutonomy} />}
+          {hubMark !== null && <AiTag mark={hubMark} />}
           {hubExternal && <Chip tone="neutral">external</Chip>}
           {diff && hubDiff && <DiffBadge state={hubDiff.state} changedCount={hubDiff.state === 'changed' ? hubDiff.changedAttributes.length : undefined} />}
         </div>

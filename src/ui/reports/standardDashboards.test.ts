@@ -63,21 +63,24 @@ describe('standard dashboards', () => {
     expect(count('Run cost over £1m')).toBe(1);
   });
 
-  it('the AI agents dashboard counts only systems marked as agents and lists the ones that act alone first', () => {
+  it('the AI in use dashboard counts agents and other AI use, and lists the freest agents first', () => {
     const rows = [
       fakeRow({ element: fakeElement('plain'), name: 'Plain system' }),
       fakeRow({ element: fakeElement('a', 'system', { aiAutonomy: 'suggests' }), name: 'Drafting agent' }),
       fakeRow({ element: fakeElement('b', 'system', { aiAutonomy: 'acts_alone' }), name: 'Meter bot' }),
       fakeRow({ element: fakeElement('c', 'system', { aiAutonomy: 'acts_alone' }), name: 'Claims bot', businessOwner: fakeElement('o', 'system') }),
+      fakeRow({ element: fakeElement('d', 'system', { aiUse: 'built_in' }), name: 'CRM with copilot' }),
+      fakeRow({ element: fakeElement('e', 'system', { aiUse: 'external_service' }), name: 'Billing engine' }),
     ].map(portfolioReportRow);
     const tile = (name: string) => {
       const t = tiles.find((x) => x.name === name);
       if (t === undefined) throw new Error(name);
       return runReport(rows, t.spec);
     };
+    expect(tile('Systems using AI').rowCount).toBe(5);
     expect(tile('AI agents').rowCount).toBe(3);
     expect(tile('AI agents that act alone').rowCount).toBe(2);
-    expect(tile('AI agents with no business owner').rowCount).toBe(2);
-    expect(tile('AI agent inventory').rows.map((r) => r[0])).toEqual(['Claims bot', 'Meter bot', 'Drafting agent']);
+    expect(tile('Using AI with no business owner').rowCount).toBe(4);
+    expect(tile('AI inventory').rows.map((r) => r[0])).toEqual(['Claims bot', 'Meter bot', 'Drafting agent', 'Billing engine', 'CRM with copilot']);
   });
 });

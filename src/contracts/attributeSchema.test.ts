@@ -87,11 +87,11 @@ describe('ATTRIBUTE_SCHEMA_BY_TYPE', () => {
     }
   });
 
-  it('only annualRunCost, importance, disposition and aiAutonomy declare an emptyLabel, and only annualRunCost, disposition, isExternal and aiAutonomy declare help text — every other field keeps §4.3\'s bare "—" and a silent row', () => {
+  it('only annualRunCost, importance, disposition, aiAutonomy and aiUse declare an emptyLabel, and only annualRunCost, disposition, isExternal, aiAutonomy and aiUse declare help text — every other field keeps §4.3\'s bare "—" and a silent row', () => {
     for (const type of ELEMENT_TYPES) {
       for (const field of ATTRIBUTE_SCHEMA_BY_TYPE[type]) {
-        if (field.key !== 'annualRunCost' && field.key !== 'disposition' && field.key !== 'isExternal' && field.key !== 'aiAutonomy') expect(field.help, `${type}.${field.key}`).toBeUndefined();
-        if (field.key !== 'annualRunCost' && field.key !== 'importance' && field.key !== 'disposition' && field.key !== 'aiAutonomy') expect(field.emptyLabel, `${type}.${field.key}`).toBeUndefined();
+        if (field.key !== 'annualRunCost' && field.key !== 'disposition' && field.key !== 'isExternal' && field.key !== 'aiAutonomy' && field.key !== 'aiUse') expect(field.help, `${type}.${field.key}`).toBeUndefined();
+        if (field.key !== 'annualRunCost' && field.key !== 'importance' && field.key !== 'disposition' && field.key !== 'aiAutonomy' && field.key !== 'aiUse') expect(field.emptyLabel, `${type}.${field.key}`).toBeUndefined();
       }
     }
   });
@@ -103,6 +103,15 @@ describe('System AI autonomy (agents in EA, step 1)', () => {
     expect(field).toMatchObject({ required: false, kind: 'enum', options: ['suggests', 'acts_with_approval', 'acts_alone'], emptyLabel: 'Not an AI agent' });
     expect(field?.optionLabels).toEqual({ suggests: 'Suggests only', acts_with_approval: 'Acts with approval', acts_alone: 'Acts alone' });
     expect(ATTRIBUTE_SCHEMA_BY_TYPE.container.some((f) => f.key === 'aiAutonomy')).toBe(false);
+  });
+});
+
+describe('System "Uses AI"', () => {
+  it('is an optional enum on a system only, with plain-English labels, separate from how an agent acts', () => {
+    const field = ATTRIBUTE_SCHEMA_BY_TYPE.system.find((f) => f.key === 'aiUse');
+    expect(field).toMatchObject({ label: 'Uses AI', required: false, kind: 'enum', options: ['built_in', 'external_service'], emptyLabel: 'No AI recorded' });
+    expect(field?.optionLabels).toEqual({ built_in: 'Built-in AI features', external_service: 'Uses an AI model or service' });
+    expect(ATTRIBUTE_SCHEMA_BY_TYPE.container.some((f) => f.key === 'aiUse')).toBe(false);
   });
 });
 

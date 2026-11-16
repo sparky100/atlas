@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { Link, useNavigate } from 'react-router';
-import { AI_AUTONOMY_HELP, AI_AUTONOMY_LABELS, AI_AUTONOMY_OPTIONS } from '../../contracts/attributeSchema';
-import type { AiAutonomy, ElementType, UUID } from '../../contracts/delta';
+import { AI_AUTONOMY_HELP, AI_AUTONOMY_LABELS, AI_AUTONOMY_OPTIONS, AI_USE_HELP, AI_USE_LABELS, AI_USE_OPTIONS } from '../../contracts/attributeSchema';
+import type { AiAutonomy, AiUse, ElementType, UUID } from '../../contracts/delta';
 import type { Json } from '../../contracts/rows';
 import { refParamOf, type Ref } from '../../db/ref';
 import type { BranchRow, MemberRole } from '../../db/types';
@@ -104,6 +104,7 @@ export function HomeSearch({ modelId, orgId, userId, role, searchCommitId, activ
   const [capability, setCapability] = useState<{ id: UUID; name: string } | null>(null);
   // Blank means "not an AI agent" (the attribute is simply left off, never stored as an empty value).
   const [aiAutonomy, setAiAutonomy] = useState<AiAutonomy | ''>('');
+  const [aiUse, setAiUse] = useState<AiUse | ''>('');
   const [platform, setPlatform] = useState<{ id: UUID; name: string } | null>(null);
   const [proposedBranch, setProposedBranch] = useState<BranchRow | null>(null);
   // Bug fix: this used to hardcode `?ref=main` — a result found by search
@@ -128,6 +129,7 @@ export function HomeSearch({ modelId, orgId, userId, role, searchCommitId, activ
     setDescription('');
     setCapability(null);
     setAiAutonomy('');
+    setAiUse('');
     setPlatform(null);
   };
 
@@ -168,6 +170,7 @@ export function HomeSearch({ modelId, orgId, userId, role, searchCommitId, activ
   const submitCreate = () => {
     const attributes: Record<string, Json> = showDescriptionSheet && description.trim().length > 0 ? { description: description.trim() } : {};
     if (showDescriptionSheet && aiAutonomy !== '') attributes.aiAutonomy = aiAutonomy;
+    if (showDescriptionSheet && aiUse !== '') attributes.aiUse = aiUse;
     void create(search.query, { attributes, ...(capability ? { supportsCapabilityId: capability.id, supportsCapabilityName: capability.name } : {}) });
   };
 
@@ -363,6 +366,27 @@ export function HomeSearch({ modelId, orgId, userId, role, searchCommitId, activ
           </select>
           <Text as="p" tone="faint" size="xs">
             {AI_AUTONOMY_HELP}
+          </Text>
+          <Text as="label" size="sm">
+            Does it use AI?
+          </Text>
+          <select
+            className={styles.select}
+            aria-label="Uses AI"
+            value={aiUse}
+            onChange={(e) => {
+              setAiUse(e.target.value as AiUse | '');
+            }}
+          >
+            <option value="">No AI recorded</option>
+            {AI_USE_OPTIONS.map((option) => (
+              <option key={option} value={option}>
+                {AI_USE_LABELS[option] ?? option}
+              </option>
+            ))}
+          </select>
+          <Text as="p" tone="faint" size="xs">
+            {AI_USE_HELP}
           </Text>
           <Text as="p" tone="faint" size="xs">
             Written as manual · {userId ? 'you' : 'signed-in user'} · confidence 1.00. Lifecycle and External default —

@@ -12,7 +12,7 @@ import { LIFECYCLE_TONE } from '../elements/lifecycleTone';
 import { ownersByRole } from '../elements/ownersByRole';
 import { capabilityMapInspectorSupportingSystems } from './capabilityMapInspectorSelection';
 import { LandscapeZoomLink } from './CapabilityMapView';
-import { agentShareOf, COLOUR_BY_OPTIONS, oldestLifecycleStage, otShareOf, worstCriticality, worstFitForPurpose, type ColourByMode } from './metrics';
+import { aiShareOf, COLOUR_BY_OPTIONS, oldestLifecycleStage, otShareOf, worstCriticality, worstFitForPurpose, type ColourByMode } from './metrics';
 import { AI_AUTONOMY_TONE } from '../elements/aiAutonomyTone';
 import { aiAutonomyLabel } from '../../engine/elementRead/aiAgent';
 import styles from './CapabilityMapInspectorContent.module.css';
@@ -94,7 +94,7 @@ export function CapabilityMapInspectorContent({
   const oldest = selectedCapability ? oldestLifecycleStage(selectedCapability.element_id, supportsEdges, systemsById) : null;
   const criticality = selectedCapability ? worstCriticality(selectedCapability.element_id, supportsEdges, systemsById) : null;
   const fit = selectedCapability ? worstFitForPurpose(selectedCapability.element_id, supportsEdges) : null;
-  const agents = selectedCapability ? agentShareOf(selectedCapability.element_id, supportsEdges, systemsById) : { agents: 0, total: 0, worst: null };
+  const aiShare = selectedCapability ? aiShareOf(selectedCapability.element_id, supportsEdges, systemsById) : { using: 0, agents: 0, total: 0, worst: null };
   const ot = selectedCapability ? otShareOf(selectedCapability.element_id, supportsEdges, systemsById) : { ot: 0, total: 0 };
 
   return (
@@ -137,13 +137,13 @@ export function CapabilityMapInspectorContent({
                 <Chip tone={fitForPurposeToneFor(fit)}>{fit}</Chip>
               </div>
             )}
-            {agents.agents > 0 && agents.worst !== null && (
+            {aiShare.using > 0 && (
               <div className={styles.attributeRow}>
                 <Text as="span" size="sm" tone="muted">
-                  Agent share
+                  AI share
                 </Text>
-                <Chip tone={AI_AUTONOMY_TONE[agents.worst]}>
-                  {agents.agents}/{agents.total} AI agents · {aiAutonomyLabel(agents.worst).toLowerCase()}
+                <Chip tone={aiShare.worst !== null ? AI_AUTONOMY_TONE[aiShare.worst] : 'neutral'}>
+                  {aiShare.using}/{aiShare.total} use AI{aiShare.worst !== null ? ` · ${aiAutonomyLabel(aiShare.worst).toLowerCase()}` : ''}
                 </Chip>
               </div>
             )}

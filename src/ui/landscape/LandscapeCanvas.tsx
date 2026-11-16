@@ -10,7 +10,7 @@ import { elementTypeGlyph } from '../components/ElementTypeGlyph/glyph';
 import { attributesRecord } from '../elements/attributesRecord';
 import { isIntegrationPlatform } from '../elements/systemKind';
 import { BOUNDARY_MARGIN, computeLandscapeChannels, laneAt, laneLabelLeftInset, NODE_HEIGHT, NODE_WIDTH, REFERENCE_CHIP_HEIGHT, REFERENCE_CHIP_WIDTH, routeLandscapeEdge, viaPositionFor, type LandscapeLayout, type LandscapeNodePosition } from './layout';
-import { isAiAgent } from '../../engine/elementRead/aiAgent';
+import { usesAi } from '../../engine/elementRead/aiAgent';
 import { landscapeTileColourFor } from './landscapeColour';
 import { quantizeScale, wheelZoomFactor } from './zoom';
 import { DIFF_MARKER, diffBorderColour, polylineMidpoint } from '../components/DiffBadge/diffCanvas';
@@ -863,7 +863,7 @@ export function LandscapeCanvas({
         const totalCount = threadCountsForNode?.total ?? 0;
         if (showLabels) {
           const glyph = elementType === 'actor' ? elementTypeGlyph('actor', attributesRecord(element.attributes).subtype as ActorSubtype | undefined) : elementTypeGlyph('system');
-          nodeLabels.push({ glyph, name: element.name, worldX: x, worldY: y, truncateToNarrow: totalCount > 0, aiAgent: elementType === 'system' && isAiAgent(element) });
+          nodeLabels.push({ glyph, name: element.name, worldX: x, worldY: y, truncateToNarrow: totalCount > 0, aiAgent: elementType === 'system' && usesAi(element) });
         }
         if (diff && elementType === 'system' && DIFF_MARKER[nodeState] !== '') {
           const label = nodeState === 'changed' ? `${DIFF_MARKER[nodeState]}${String(nodeDiff?.changedAttributes.length ?? 0)}` : DIFF_MARKER[nodeState];

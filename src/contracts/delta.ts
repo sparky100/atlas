@@ -133,6 +133,14 @@ export type SystemDomain = 'it' | 'ot' | 'hybrid';
  * capability lane (`SystemKind`'s own comment) and an agent must stay in one.
  */
 export type AiAutonomy = 'suggests' | 'acts_with_approval' | 'acts_alone';
+/**
+ * How a system that is *not* an agent uses AI: a product that ships with AI
+ * features, or a system that calls an AI model or service. Absent means no AI
+ * recorded. A separate field from `AiAutonomy` because how freely something
+ * acts is a different question from whether it uses AI at all; a system
+ * with `aiAutonomy` set counts as using AI without also filling this in.
+ */
+export type AiUse = 'built_in' | 'external_service';
 export type SystemKind = 'application' | 'integration_platform' | 'data_platform' | 'infrastructure' | 'platform';
 /** S1 item 11a: adds `'organisation'` — a third-party entity (a regulator, a supplier) rather than an internal person or team; almost always paired with `isExternal: true`, though not enforced (an organisation subtype merely names the *kind* of actor, `isExternal` is the separate fact about whether it's outside the enterprise). */
 export type ActorSubtype = 'person' | 'team' | 'organisation';
@@ -307,6 +315,8 @@ export interface SystemAttributes {
   kind?: SystemKind;
   /** Set only on an AI agent: how freely it acts — suggests, acts with a person's approval, or acts alone. Absent = not an AI agent. */
   aiAutonomy?: AiAutonomy;
+  /** Set on a system that uses AI but is not an agent: built-in AI features, or an AI model or service it calls. Absent = no AI recorded. An agent (`aiAutonomy` set) counts as using AI without this. */
+  aiUse?: AiUse;
   /**
    * Prompt 7k item 5: vendor support end (e.g. an OS/platform's end-of-
    * support date) — distinct from `plannedEnd`, which is *this estate's*

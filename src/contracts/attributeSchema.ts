@@ -172,6 +172,9 @@ const DOMAIN_OPTIONS = ['it', 'ot', 'hybrid'] as const;
 export const AI_AUTONOMY_OPTIONS = ['suggests', 'acts_with_approval', 'acts_alone'] as const;
 export const AI_AUTONOMY_LABELS: Readonly<Record<string, string>> = { suggests: 'Suggests only', acts_with_approval: 'Acts with approval', acts_alone: 'Acts alone' };
 export const AI_AUTONOMY_HELP = 'Set this only if the system is an AI agent. Suggests only: a person does the work. Acts with approval: it acts once a person says yes. Acts alone: it acts without anyone checking first. Leave blank if it is not an AI agent.';
+export const AI_USE_OPTIONS = ['built_in', 'external_service'] as const;
+export const AI_USE_LABELS: Readonly<Record<string, string>> = { built_in: 'Built-in AI features', external_service: 'Uses an AI model or service' };
+export const AI_USE_HELP = 'Set this if the system uses AI but is not an AI agent. Built-in AI features: the product ships with AI. Uses an AI model or service: it calls an AI model or service. An AI agent does not need this: filling in "AI agent: how it acts" already counts it as using AI.';
 const KIND_OPTIONS = ['application', 'integration_platform', 'data_platform', 'infrastructure', 'platform'] as const;
 /** Display labels for the three plain-key enums above, so a page shows "On premises" / "IT" / "Integration platform" rather than the stored key. */
 const HOSTING_MODEL_LABELS: Readonly<Record<string, string>> = { on_premises: 'On premises', private_cloud: 'Private cloud', public_cloud: 'Public cloud', saas: 'SaaS', hybrid: 'Hybrid' };
@@ -250,6 +253,7 @@ const SYSTEM_META: Record<keyof SystemAttributes, AttributeFieldMeta> = {
   hostingProvider: { label: 'Hosting provider', required: false, kind: 'text' },
   domain: { label: 'Domain', required: false, kind: 'enum', options: DOMAIN_OPTIONS, optionLabels: DOMAIN_LABELS },
   kind: { label: 'Kind', required: false, kind: 'enum', options: KIND_OPTIONS, optionLabels: KIND_LABELS },
+  aiUse: { label: 'Uses AI', required: false, kind: 'enum', options: AI_USE_OPTIONS, optionLabels: AI_USE_LABELS, help: AI_USE_HELP, emptyLabel: 'No AI recorded' },
   aiAutonomy: { label: 'AI agent: how it acts', required: false, kind: 'enum', options: AI_AUTONOMY_OPTIONS, optionLabels: AI_AUTONOMY_LABELS, help: AI_AUTONOMY_HELP, emptyLabel: 'Not an AI agent' },
   // Prompt 7k item 5 — see `SystemAttributes.supportEndsAt`'s own doc
   // comment (delta.ts) for why this is distinct from `plannedEnd`.
@@ -272,6 +276,7 @@ const SYSTEM_ORDER: (keyof SystemAttributes)[] = [
   'hostingProvider',
   'kind',
   'aiAutonomy',
+  'aiUse',
   'domain',
 ];
 

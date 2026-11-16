@@ -48,9 +48,11 @@
  *   unordered set (on-prem/private-cloud/public-cloud/SaaS/hybrid) with no
  *   "worst" value to aggregate to, so it's landscape-only
  *   (`src/ui/landscape/landscapeColour.ts`).
- * - **Agent share** (`agentShareOf`): how many of a capability's
- *   supporting systems are AI agents (a system with `aiAutonomy` set), and
- *   the freest way any of them acts. Derived from the supports links, never
+ * - **AI share** (`aiShareOf`): how many of a capability's supporting
+ *   systems use AI (an agent, or a system with `aiUse` set), and the freest
+ *   way any agent among them acts. The saved mode key stays
+ *   `metric:aiAgentShare`, so renaming it from "Agent share" needed no
+ *   database change. Derived from the supports links, never
  *   stored; silent when none is an agent. An L1 group sums across its
  *   descendants, like OT share.
  * - **OT share** (`otShareOf`), Prompt 7k item 3: fraction of a
@@ -90,7 +92,7 @@ import { LIFECYCLE_ORDER, LIFECYCLE_TONE } from '../elements/lifecycleTone';
 import { dispositionLabel, dispositionOf, dispositionTone, worstDisposition } from '../elements/disposition';
 import { AI_AUTONOMY_TONE } from '../elements/aiAutonomyTone';
 import { domainOf } from '../elements/systemDomain';
-import { aiAutonomyOf, aiAutonomyRank } from '../../engine/elementRead/aiAgent';
+import { aiAutonomyOf, aiAutonomyRank, usesAi } from '../../engine/elementRead/aiAgent';
 import { fitForPurposeOf, hasLifecycleExposureData, replacedElementIds, systemsExposedByLifecycle, worstFitForPurposeOfSupporter } from '../../engine/elementRead/fitAndExposure';
 
 export { fitForPurposeOf, hasLifecycleExposureData, replacedElementIds, systemsExposedByLifecycle, worstFitForPurposeOfSupporter };
@@ -110,7 +112,7 @@ export const COLOUR_BY_OPTIONS: { value: ColourByMode; label: string }[] = [
   { value: 'metric:otShare', label: 'OT share' },
   { value: 'metric:fitForPurpose', label: 'Fit' },
   { value: 'metric:disposition', label: 'Planned action' },
-  { value: 'metric:aiAgentShare', label: 'Agent share' },
+  { value: 'metric:aiAgentShare', label: 'AI share' },
 ];
 
 export interface TileColour {
@@ -276,29 +278,34 @@ export function otShareOf(capabilityId: UUID, supportsEdges: readonly Relationsh
 }
 
 /**
- * How many of a capability's supporting systems are AI agents, out of the total, and the freest way any of them acts
- * (`worst`: acts alone beats acts with approval beats suggests only). Worked out from the supports links, never stored.
+ * How many of a capability's supporting systems use AI (an agent, built-in AI features, or an AI model or service),
+ * out of the total, how many of those are agents, and the freest way any agent acts (`worst`: acts alone beats acts
+ * with approval beats suggests only). Worked out from the supports links, never stored.
  */
-export function agentShareOf(capabilityId: UUID, supportsEdges: readonly RelationshipsHeadRow[], systemsById: ReadonlyMap<UUID, ElementsHeadRow>): { agents: number; total: number; worst: AiAutonomy | null } {
+export function aiShareOf(capabilityId: UUID, supportsEdges: readonly RelationshipsHeadRow[], systemsById: ReadonlyMap<UUID, ElementsHeadRow>): { using: number; agents: number; total: number; worst: AiAutonomy | null } {
   const ids = supportingSystemIds(capabilityId, supportsEdges);
+  let using = 0;
   let agents = 0;
   let worst: AiAutonomy | null = null;
   for (const id of ids) {
     const system = systemsById.get(id);
-    const autonomy = system ? aiAutonomyOf(system) : null;
+    if (!system || !usesAi(system)) continue;
+    using += 1;
+    const autonomy = aiAutonomyOf(system);
     if (autonomy === null) continue;
     agents += 1;
     if (aiAutonomyRank(autonomy) > aiAutonomyRank(worst)) worst = autonomy;
   }
-  return { agents, total: ids.length, worst };
+  return { using, agents, total: ids.length, worst };
 }
 
-const AGENT_SHARE_WORDS: Record<AiAutonomy, string> = { acts_alone: 'acts alone', acts_with_approval: 'with approval', suggests: 'suggests' };
+const AI_SHARE_WORDS: Record<AiAutonomy, string> = { acts_alone: 'acts alone', acts_with_approval: 'with approval', suggests: 'suggests' };
 
-/** Silent when no supporting system is an AI agent (zero is the ordinary case); otherwise the fraction, with the freest way any acts, in the same risk tone Criticality uses. */
-function agentShareColour(share: { agents: number; total: number; worst: AiAutonomy | null }): TileColour {
-  if (share.agents === 0 || share.worst === null) return { tone: undefined, label: undefined };
-  return { tone: AI_AUTONOMY_TONE[share.worst], label: `${String(share.agents)}/${String(share.total)} AI · ${AGENT_SHARE_WORDS[share.worst]}` };
+/** Silent when no supporting system uses AI (zero is the ordinary case). Neutral "n/m use AI" when none is an agent; once an agent is among them, the same risk tone Criticality uses, with the words for the freest way any acts. */
+function aiShareColour(share: { using: number; total: number; worst: AiAutonomy | null }): TileColour {
+  if (share.using === 0) return { tone: undefined, label: undefined };
+  if (share.worst === null) return { tone: 'neutral', label: `${String(share.using)}/${String(share.total)} use AI` };
+  return { tone: AI_AUTONOMY_TONE[share.worst], label: `${String(share.using)}/${String(share.total)} AI · ${AI_SHARE_WORDS[share.worst]}` };
 }
 
 export function lifecycleExposure(capabilityId: UUID, supportsEdges: readonly RelationshipsHeadRow[], systemsById: ReadonlyMap<UUID, ElementsHeadRow>, now: Date = new Date(), replacedIds?: ReadonlySet<UUID>): boolean {
@@ -348,7 +355,7 @@ export function tileColourFor(mode: ColourByMode, capabilityId: UUID, supportsEd
     case 'metric:disposition':
       return dispositionColour(worstDispositionOf(capabilityId, supportsEdges, systemsById));
     case 'metric:aiAgentShare':
-      return agentShareColour(agentShareOf(capabilityId, supportsEdges, systemsById));
+      return aiShareColour(aiShareOf(capabilityId, supportsEdges, systemsById));
   }
 }
 
@@ -433,16 +440,16 @@ export function aggregateTileColourFor(mode: ColourByMode, descendantCapabilityI
     case 'metric:disposition':
       return dispositionColour(worstDisposition(descendantCapabilityIds.map((id) => worstDispositionOf(id, supportsEdges, systemsById))));
     case 'metric:aiAgentShare': {
-      let agents = 0;
+      let using = 0;
       let total = 0;
       let worst: AiAutonomy | null = null;
       for (const id of descendantCapabilityIds) {
-        const share = agentShareOf(id, supportsEdges, systemsById);
-        agents += share.agents;
+        const share = aiShareOf(id, supportsEdges, systemsById);
+        using += share.using;
         total += share.total;
         if (aiAutonomyRank(share.worst) > aiAutonomyRank(worst)) worst = share.worst;
       }
-      return agentShareColour({ agents, total, worst });
+      return aiShareColour({ using, total, worst });
     }
   }
 }

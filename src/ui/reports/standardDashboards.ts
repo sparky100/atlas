@@ -53,7 +53,9 @@ function portfolio(filters: ReportFilter[], over: Partial<ReportSpec> = {}): Rep
 
 const OVERVIEW = 'Application portfolio overview';
 const TIME = 'Rationalisation (TIME)';
-const AI_AGENTS = 'AI agents';
+const AI_IN_USE = 'AI in use';
+/** Any system that uses AI: an agent, built-in AI features, or an AI model or service. */
+const USES_AI: ReportFilter = { field: 'aiUse', operator: 'isNotEmpty', value: null };
 /** Only systems marked as an AI agent. */
 const AGENTS_ONLY: ReportFilter = { field: 'aiAutonomy', operator: 'isNotEmpty', value: null };
 
@@ -87,18 +89,20 @@ export const STANDARD_DASHBOARDS: readonly StandardDashboard[] = [
     ],
   },
   {
-    key: 'ai-agents',
-    name: AI_AGENTS,
-    summary: 'Every AI agent in the model: how many there are, how freely they act, who owns them and what they support. An AI agent is a system with “AI agent: how it acts” filled in.',
+    key: 'ai-in-use',
+    name: AI_IN_USE,
+    summary: 'Every system that uses AI: how many, how they use it, which are AI agents and how freely those act, who owns them and what they support. A system counts when “Uses AI” or “AI agent: how it acts” is filled in.',
     tiles: [
-      { name: 'AI agents', description: `Every system marked as an AI agent. Part of “${AI_AGENTS}”.`, spec: portfolio([AGENTS_ONLY], { presentation: { kind: 'count' } }), kind: 'kpi', size: 'one' },
-      { name: 'AI agents that act alone', description: `Agents that act without anyone checking first. Part of “${AI_AGENTS}”.`, spec: portfolio([{ field: 'aiAutonomy', operator: 'eq', value: 'acts_alone' }], { presentation: { kind: 'count' } }), kind: 'kpi', size: 'one' },
-      { name: 'AI agents with no business owner', description: `Agents with no business owner recorded. Part of “${AI_AGENTS}”.`, spec: portfolio([AGENTS_ONLY, { field: 'owner', operator: 'isEmpty', value: null }], { presentation: { kind: 'count' } }), kind: 'kpi', size: 'one' },
-      { name: 'How AI agents act', description: `Suggests only, acts with approval, or acts alone. Part of “${AI_AGENTS}”.`, spec: portfolio([AGENTS_ONLY], { groupBy: 'aiAutonomy', presentation: { kind: 'donut' } }), kind: 'donut', size: 'one' },
+      { name: 'Systems using AI', description: `Every system that uses AI: agents, built-in AI features, or an AI model or service. Part of “${AI_IN_USE}”.`, spec: portfolio([USES_AI], { presentation: { kind: 'count' } }), kind: 'kpi', size: 'one' },
+      { name: 'AI agents', description: `Every system marked as an AI agent. Part of “${AI_IN_USE}”.`, spec: portfolio([AGENTS_ONLY], { presentation: { kind: 'count' } }), kind: 'kpi', size: 'one' },
+      { name: 'AI agents that act alone', description: `Agents that act without anyone checking first. Part of “${AI_IN_USE}”.`, spec: portfolio([{ field: 'aiAutonomy', operator: 'eq', value: 'acts_alone' }], { presentation: { kind: 'count' } }), kind: 'kpi', size: 'one' },
+      { name: 'Using AI with no business owner', description: `Systems that use AI and have no business owner recorded. Part of “${AI_IN_USE}”.`, spec: portfolio([USES_AI, { field: 'owner', operator: 'isEmpty', value: null }], { presentation: { kind: 'count' } }), kind: 'kpi', size: 'one' },
+      { name: 'How AI is used', description: `AI agent, built-in AI features, or an AI model or service. Part of “${AI_IN_USE}”.`, spec: portfolio([USES_AI], { groupBy: 'aiUse', presentation: { kind: 'donut' } }), kind: 'donut', size: 'one' },
+      { name: 'How AI agents act', description: `Suggests only, acts with approval, or acts alone. Part of “${AI_IN_USE}”.`, spec: portfolio([AGENTS_ONLY], { groupBy: 'aiAutonomy', presentation: { kind: 'donut' } }), kind: 'donut', size: 'one' },
       {
-        name: 'AI agent inventory',
-        description: `Every AI agent, the ones that act alone first. Part of “${AI_AGENTS}”.`,
-        spec: portfolio([AGENTS_ONLY], { columns: ['name', 'aiAutonomy', 'owner', 'capabilities', 'lifecycle', 'criticality'], sort: [{ field: 'aiAutonomyRank', direction: 'desc' }, { field: 'name', direction: 'asc' }] }),
+        name: 'AI inventory',
+        description: `Every system that uses AI, agents that act alone first. Part of “${AI_IN_USE}”.`,
+        spec: portfolio([USES_AI], { columns: ['name', 'aiUse', 'aiAutonomy', 'owner', 'capabilities', 'lifecycle', 'criticality'], sort: [{ field: 'aiRank', direction: 'desc' }, { field: 'name', direction: 'asc' }] }),
         kind: 'table',
         size: 'two',
       },
