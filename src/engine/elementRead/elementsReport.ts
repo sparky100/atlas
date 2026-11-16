@@ -25,7 +25,7 @@ import type { Disposition, ElementType } from '../../contracts/delta';
 import type { Json } from '../../contracts/rows';
 import { REPORT_SPEC_VERSION, type ReportFilter, type ReportRow, type ReportSort, type ReportSpec, type ReportValue } from '../../contracts/reportSpec';
 import type { BrowseRow } from '../../db/elementBrowse';
-import { aiAutonomyOf, aiAutonomyRank } from './aiAgent';
+import { aiAutonomyOf, aiAutonomyRank, aiRankOf, aiUseReportValueOf } from './aiAgent';
 import { attributesRecord } from './attributesRecord';
 import { CRITICALITY_ORDER } from './criticality';
 import { DISPOSITION_ORDER } from './disposition';
@@ -57,9 +57,9 @@ export const DEFAULT_ELEMENTS_REPORT_STATE: ElementsReportState = {
 /** Fields every elements row carries that a person reads (and may pick as a column). */
 export const ELEMENT_REPORT_FIELDS = ['name', 'type', 'owner', 'lifecycle', 'criticality', 'disposition'] as const;
 /** Fields that exist only so the page's ordering and search can be reproduced; never offered as columns. */
-export const ELEMENT_REPORT_HELPER_FIELDS = ['id', 'search', 'ownerSort', 'lifecycleSort', 'criticalityRank', 'dispositionRank', 'aiAutonomyRank'] as const;
-/** Fields a report may use but that are not default columns (a column that is blank for most systems): how freely an AI agent acts, empty for a system that is not one. */
-export const ELEMENT_REPORT_OPTIONAL_FIELDS = ['aiAutonomy'] as const;
+export const ELEMENT_REPORT_HELPER_FIELDS = ['id', 'search', 'ownerSort', 'lifecycleSort', 'criticalityRank', 'dispositionRank', 'aiAutonomyRank', 'aiRank'] as const;
+/** Fields a report may use but that are not default columns (a column that is blank for most systems): `aiAutonomy` is how freely an AI agent acts (empty for a system that is not one); `aiUse` is how AI is used at all (`agent`, `built_in` or `external_service`, empty for no AI recorded). */
+export const ELEMENT_REPORT_OPTIONAL_FIELDS = ['aiAutonomy', 'aiUse'] as const;
 
 const FIXED_FIELDS: ReadonlySet<string> = new Set<string>([...ELEMENT_REPORT_FIELDS, ...ELEMENT_REPORT_OPTIONAL_FIELDS, ...ELEMENT_REPORT_HELPER_FIELDS]);
 
@@ -98,12 +98,14 @@ export function elementReportRow(row: BrowseRow): ReportRow {
     criticality: row.criticality,
     disposition: row.disposition,
     aiAutonomy: aiAutonomyOf(row.element),
+    aiUse: aiUseReportValueOf(row.element),
     search: `${name}\n${ownerName ?? ''}`,
     ownerSort: ownerName ?? '',
     lifecycleSort: row.lifecycleStatus ?? '',
     criticalityRank: criticalityRank(row.criticality),
     dispositionRank: dispositionRank(row.disposition),
     aiAutonomyRank: aiAutonomyRank(aiAutonomyOf(row.element)),
+    aiRank: aiRankOf(row.element),
   };
 }
 
@@ -124,7 +126,7 @@ function sortFieldOf(key: ElementBrowseSortKey): string {
     case 'disposition':
       return 'dispositionRank';
     case 'aiAutonomy':
-      return 'aiAutonomyRank';
+      return 'aiRank';
   }
 }
 
@@ -136,6 +138,7 @@ const FIELD_TO_SORT_KEY: Record<string, ElementBrowseSortKey> = {
   criticalityRank: 'criticality',
   dispositionRank: 'disposition',
   aiAutonomyRank: 'aiAutonomy',
+  aiRank: 'aiAutonomy',
 };
 
 export type ElementsSpecResult = { ok: true; spec: ReportSpec } | { ok: false; reason: string };
@@ -157,7 +160,8 @@ function columnsFor(state: ElementsReportState): string[] {
  */
 export function elementsStateToSpec(state: ElementsReportState, findingFilter: string | null = null): ElementsSpecResult {
   const agentsOnly = findingFilter === 'ai-agents';
-  if (findingFilter !== null && findingFilter !== '' && !agentsOnly) {
+  const usesAiOnly = findingFilter === 'uses-ai';
+  if (findingFilter !== null && findingFilter !== '' && !agentsOnly && !usesAiOnly) {
     return { ok: false, reason: 'A health-finding filter cannot be saved as a report yet. Clear the finding filter, or save from the Health findings page instead.' };
   }
   if (state.custom !== null && !isScalar(state.custom.value)) {
@@ -175,6 +179,7 @@ export function elementsStateToSpec(state: ElementsReportState, findingFilter: s
     filters.push({ field: 'disposition', operator: 'eq', value: state.dispositionFilter });
   }
   if (agentsOnly) filters.push({ field: 'aiAutonomy', operator: 'isNotEmpty', value: null });
+  if (usesAiOnly) filters.push({ field: 'aiUse', operator: 'isNotEmpty', value: null });
   const query = state.query.trim();
   if (query !== '') filters.push({ field: 'search', operator: 'contains', value: query });
   if (state.custom !== null && isScalar(state.custom.value)) filters.push({ field: state.custom.key, operator: 'eq', value: state.custom.value });

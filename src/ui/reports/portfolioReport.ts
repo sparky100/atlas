@@ -5,7 +5,7 @@
  * rank lowest, unset owners sort first), names compare by lower-cased code
  * units rather than the host locale.
  */
-import { aiAutonomyOf, aiAutonomyRank } from '../../engine/elementRead/aiAgent';
+import { aiAutonomyOf, aiAutonomyRank, aiRankOf, aiUseReportValueOf } from '../../engine/elementRead/aiAgent';
 import type { AnnualRunCost, Criticality, Disposition } from '../../contracts/delta';
 import { REPORT_SPEC_VERSION, type ReportFilter, type ReportRow, type ReportSort, type ReportSpec } from '../../contracts/reportSpec';
 import { DEFAULT_PORTFOLIO_FILTERS, type PortfolioFilters } from '../portfolio/portfolioFilter';
@@ -30,9 +30,9 @@ export const DEFAULT_PORTFOLIO_REPORT_STATE: PortfolioReportState = {
 };
 
 export const PORTFOLIO_REPORT_FIELDS = ['name', 'kind', 'cost', 'fit', 'criticality', 'disposition', 'lifecycle', 'capabilities', 'owner', 'signals'] as const;
-export const PORTFOLIO_REPORT_HELPER_FIELDS = ['id', 'elementType', 'signalKeys', 'costRank', 'fitRank', 'criticalityRank', 'dispositionRank', 'lifecycleRank', 'ownerSort', 'aiAutonomyRank'] as const;
-/** Usable in a report but not a default column (blank for most systems): how freely an AI agent acts, empty for a system that is not one. */
-export const PORTFOLIO_REPORT_OPTIONAL_FIELDS = ['aiAutonomy'] as const;
+export const PORTFOLIO_REPORT_HELPER_FIELDS = ['id', 'elementType', 'signalKeys', 'costRank', 'fitRank', 'criticalityRank', 'dispositionRank', 'lifecycleRank', 'ownerSort', 'aiAutonomyRank', 'aiRank'] as const;
+/** Usable in a report but not a default column (blank for most systems): `aiAutonomy` is how freely an AI agent acts (empty for a non-agent); `aiUse` is how AI is used at all (`agent`, `built_in` or `external_service`, empty for none recorded). */
+export const PORTFOLIO_REPORT_OPTIONAL_FIELDS = ['aiAutonomy', 'aiUse'] as const;
 
 /** Signal keys wrapped in bars, so a `contains` filter on one key can never match part of another. */
 function signalKeyList(row: PortfolioRow): string {
@@ -55,7 +55,9 @@ export function portfolioReportRow(row: PortfolioRow): ReportRow {
     owner: ownerName,
     signals: row.signals.length,
     aiAutonomy: aiAutonomyOf(row.element),
+    aiUse: aiUseReportValueOf(row.element),
     aiAutonomyRank: aiAutonomyRank(aiAutonomyOf(row.element)),
+    aiRank: aiRankOf(row.element),
     signalKeys: signalKeyList(row),
     costRank: costRank(row.cost),
     fitRank: fitRank(row.fit),

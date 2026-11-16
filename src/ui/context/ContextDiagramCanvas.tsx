@@ -4,7 +4,7 @@ import type { ActorSubtype, UUID } from '../../contracts/delta';
 import type { ElementsHeadRow } from '../../contracts/rows';
 import type { ElementVersionDiff, RelationshipVersionDiff, VersionDiff } from '../../engine/versionDiff';
 import { DIFF_MARKER, diffBorderColour, edgeDiffState, polylineMidpoint } from '../components/DiffBadge/diffCanvas';
-import { isAiAgent } from '../../engine/elementRead/aiAgent';
+import { usesAi } from '../../engine/elementRead/aiAgent';
 import { elementTypeGlyph } from '../components/ElementTypeGlyph/glyph';
 import { attributesRecord } from '../elements/attributesRecord';
 import { lifecycleToneFor } from '../elements/lifecycleTone';
@@ -419,7 +419,7 @@ export function ContextDiagramCanvas({ group, layoutWidthHint, neighbourContextH
 
         if (showLabels) {
           const glyph = element.element_type === 'actor' ? elementTypeGlyph('actor', attributesRecord(element.attributes).subtype as ActorSubtype | undefined) : elementTypeGlyph(element.element_type);
-          nodeLabels.push({ glyph, name: displayName, worldX: tile.x, worldY: tile.y + tile.h / 2, maxWidth: tile.w - 30, tileHeight: tile.h, aiAgent: element.element_type === 'system' && isAiAgent(element) });
+          nodeLabels.push({ glyph, name: displayName, worldX: tile.x, worldY: tile.y + tile.h / 2, maxWidth: tile.w - 30, tileHeight: tile.h, aiAgent: element.element_type === 'system' && usesAi(element) });
         }
       };
 

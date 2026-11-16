@@ -9,8 +9,8 @@ import { criticalityToneFor } from '../../elements/criticalityTone';
 import { dispositionLabel, dispositionTone } from '../../elements/disposition';
 import { lifecycleToneFor } from '../../elements/lifecycleTone';
 import { moduleDisplayName } from '../../elements/moduleDisplayName';
-import { aiAutonomyOf } from '../../../engine/elementRead/aiAgent';
-import { AiAutonomyChip } from '../AiAgentTag/AiAgentTag';
+import { aiMarkOf } from '../../../engine/elementRead/aiAgent';
+import { AiMarkChip } from '../AiTag/AiTag';
 import { Chip } from '../Chip/Chip';
 import { ElementTypeGlyph } from '../ElementTypeGlyph/ElementTypeGlyph';
 import { Text } from '../Text/Text';
@@ -113,7 +113,7 @@ function ElementBrowseCard({
   const metaParts = [row.element.element_type, row.owner?.name].filter((part): part is string => part !== undefined);
   const customValue = selectedCustomDefinition ? formatCustomAttributeValue(attributesRecord(row.element.attributes)[selectedCustomDefinition.key]) : '';
   const decisionAction = decisionRowAction?.(row);
-  const autonomy = aiAutonomyOf(row.element);
+  const mark = aiMarkOf(row.element);
 
   return (
     <li className={styles.card}>
@@ -125,7 +125,7 @@ function ElementBrowseCard({
         {row.lifecycleStatus && <Chip tone={lifecycleTone ?? 'neutral'}>{row.lifecycleStatus}</Chip>}
         {row.criticality && <Chip tone={criticalityTone ?? 'neutral'}>{row.criticality}</Chip>}
         {row.disposition && <Chip tone={dispositionTone(row.disposition)}>{dispositionLabel(row.disposition)}</Chip>}
-        {autonomy !== null && <AiAutonomyChip autonomy={autonomy} />}
+        {mark !== null && <AiMarkChip mark={mark} />}
       </Link>
       <div className={styles.cardSecondary}>
         <Text as="span" size="sm" tone="muted">

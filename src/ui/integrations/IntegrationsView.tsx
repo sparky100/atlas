@@ -2,8 +2,8 @@ import { Plug } from 'lucide-react';
 import { Fragment, useMemo, useState } from 'react';
 import { Link } from 'react-router';
 import type { UUID } from '../../contracts/delta';
-import { AiAgentTag } from '../components/AiAgentTag/AiAgentTag';
-import { aiAutonomyOf } from '../../engine/elementRead/aiAgent';
+import { AiTag } from '../components/AiTag/AiTag';
+import { aiMarkOf } from '../../engine/elementRead/aiAgent';
 import { Chip } from '../components/Chip/Chip';
 import { EmptyState } from '../components/EmptyState/EmptyState';
 import { Text } from '../components/Text/Text';
@@ -268,6 +268,6 @@ function RowDetail({ row, elementHref }: { row: IntegrationRow; elementHref: (id
 
 /** The plain "AI" tag after an endpoint that is an AI agent; nothing for any other element. */
 function AgentTagFor({ element }: { element: IntegrationRow['source'] }) {
-  const autonomy = element.element_type === 'system' ? aiAutonomyOf(element) : null;
-  return autonomy === null ? null : <AiAgentTag autonomy={autonomy} />;
+  const mark = element.element_type === 'system' ? aiMarkOf(element) : null;
+  return mark === null ? null : <AiTag mark={mark} />;
 }

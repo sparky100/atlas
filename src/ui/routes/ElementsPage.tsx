@@ -48,6 +48,7 @@ const VALID_FILTERS: readonly ElementBrowseFilter[] = [
   'no-technical-owner',
   'ai-agent-no-technical-owner',
   'ai-agents',
+  'uses-ai',
   'critical-no-business-owner',
   'critical-exposed',
   'unused-integration-platform',

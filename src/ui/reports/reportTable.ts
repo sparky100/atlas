@@ -5,6 +5,7 @@
  * model) through the same code a live report uses.
  */
 import { AI_AUTONOMY_LABELS, ANNUAL_RUN_COST_LABELS, DISPOSITION_LABELS } from '../../contracts/attributeSchema';
+import { AI_USE_REPORT_LABELS } from '../../engine/elementRead/aiAgent';
 import type { ReportValue } from '../../contracts/reportSpec';
 import type { ValueScale } from '../charts/chartData';
 import { PORTFOLIO_ROW_KIND_LABEL } from '../portfolio/portfolioRowKind';
@@ -19,6 +20,7 @@ const FIELD_LABELS: Readonly<Record<string, string>> = {
   criticality: 'Criticality',
   disposition: 'Planned action',
   aiAutonomy: 'How it acts',
+  aiUse: 'How AI is used',
   cost: 'Run cost',
   fit: 'Fit',
   capabilities: 'Capabilities served',
@@ -39,6 +41,7 @@ const VALUE_LABELS: Readonly<Record<string, Readonly<Record<string, string>>>> =
   cost: ANNUAL_RUN_COST_LABELS,
   disposition: DISPOSITION_LABELS,
   aiAutonomy: AI_AUTONOMY_LABELS,
+  aiUse: AI_USE_REPORT_LABELS,
   kind: PORTFOLIO_ROW_KIND_LABEL,
 };
 const SENTENCE_CASE_FIELDS: ReadonlySet<string> = new Set(['type', 'lifecycle', 'criticality', 'fit']);
@@ -60,6 +63,7 @@ const ORDERED_VALUES: Readonly<Record<string, readonly ReportValue[]>> = {
   cost: Object.keys(ANNUAL_RUN_COST_LABELS),
   fit: ['excellent', 'good', 'adequate', 'poor'],
   aiAutonomy: ['suggests', 'acts_with_approval', 'acts_alone'],
+  aiUse: ['agent', 'external_service', 'built_in'],
   kind: ['platform', 'system', 'module'],
 };
 

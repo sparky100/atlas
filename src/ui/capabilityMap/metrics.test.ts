@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
-  agentShareOf,
+  aiShareOf,
   aggregateTileColourFor,
   fitAssessmentSupportsEdges,
   lifecycleExposure,
@@ -462,18 +462,25 @@ describe('disposition colour-by (F11)', () => {
   });
 });
 
-describe('Agent share colour-by', () => {
+describe('AI share colour-by', () => {
   const agent = (id: string, aiAutonomy: string): ElementsHeadRow => ({ ...system(id), attributes: { isExternal: false, aiAutonomy } });
+  const usesAi = (id: string, aiUse: string): ElementsHeadRow => ({ ...system(id), attributes: { isExternal: false, aiUse } });
 
-  it('counts supporting systems that are AI agents, with the freest way any of them acts', () => {
+  it('counts supporting systems that use AI, how many are agents, and the freest way any agent acts', () => {
     const systemsById = new Map([
       ['a', agent('a', 'suggests')],
       ['b', agent('b', 'acts_with_approval')],
       ['c', system('c')],
+      ['d', usesAi('d', 'built_in')],
     ]);
-    const edges = [supports('a', 'cap-1'), supports('b', 'cap-1'), supports('c', 'cap-1')];
-    expect(agentShareOf('cap-1', edges, systemsById)).toEqual({ agents: 2, total: 3, worst: 'acts_with_approval' });
-    expect(tileColourFor('metric:aiAgentShare', 'cap-1', edges, systemsById)).toEqual({ tone: 'warn', label: '2/3 AI · with approval' });
+    const edges = [supports('a', 'cap-1'), supports('b', 'cap-1'), supports('c', 'cap-1'), supports('d', 'cap-1')];
+    expect(aiShareOf('cap-1', edges, systemsById)).toEqual({ using: 3, agents: 2, total: 4, worst: 'acts_with_approval' });
+    expect(tileColourFor('metric:aiAgentShare', 'cap-1', edges, systemsById)).toEqual({ tone: 'warn', label: '3/4 AI · with approval' });
+  });
+
+  it('is a quiet neutral "n/m use AI" when AI is used but nothing is an agent', () => {
+    const systemsById = new Map([['d', usesAi('d', 'external_service')], ['c', system('c')]]);
+    expect(tileColourFor('metric:aiAgentShare', 'cap-1', [supports('d', 'cap-1'), supports('c', 'cap-1')], systemsById)).toEqual({ tone: 'neutral', label: '1/2 use AI' });
   });
 
   it('uses the strongest risk tone, with the words, for an agent that acts alone', () => {
@@ -481,14 +488,14 @@ describe('Agent share colour-by', () => {
     expect(tileColourFor('metric:aiAgentShare', 'cap-1', [supports('a', 'cap-1')], systemsById)).toEqual({ tone: 'danger', label: '1/1 AI · acts alone' });
   });
 
-  it('is silent when no supporting system is an AI agent, and for an unknown value', () => {
-    const systemsById = new Map([['a', system('a')], ['b', agent('b', 'nonsense')]]);
-    expect(tileColourFor('metric:aiAgentShare', 'cap-1', [supports('a', 'cap-1'), supports('b', 'cap-1')], systemsById)).toEqual({ tone: undefined, label: undefined });
+  it('is silent when no supporting system uses AI, and for an unknown value', () => {
+    const systemsById = new Map([['a', system('a')], ['b', agent('b', 'nonsense')], ['c', usesAi('c', 'nonsense')]]);
+    expect(tileColourFor('metric:aiAgentShare', 'cap-1', [supports('a', 'cap-1'), supports('b', 'cap-1'), supports('c', 'cap-1')], systemsById)).toEqual({ tone: undefined, label: undefined });
   });
 
-  it('sums across a group and takes the freest way any acts', () => {
-    const systemsById = new Map([['a', agent('a', 'suggests')], ['b', agent('b', 'acts_alone')], ['c', system('c')]]);
-    const edges = [supports('a', 'cap-1'), supports('c', 'cap-1'), supports('b', 'cap-2')];
-    expect(aggregateTileColourFor('metric:aiAgentShare', ['cap-1', 'cap-2'], edges, systemsById)).toEqual({ tone: 'danger', label: '2/3 AI · acts alone' });
+  it('sums across a group and takes the freest way any agent acts', () => {
+    const systemsById = new Map([['a', agent('a', 'suggests')], ['b', agent('b', 'acts_alone')], ['c', system('c')], ['d', usesAi('d', 'built_in')]]);
+    const edges = [supports('a', 'cap-1'), supports('c', 'cap-1'), supports('b', 'cap-2'), supports('d', 'cap-2')];
+    expect(aggregateTileColourFor('metric:aiAgentShare', ['cap-1', 'cap-2'], edges, systemsById)).toEqual({ tone: 'danger', label: '3/4 AI · acts alone' });
   });
 });

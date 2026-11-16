@@ -4,8 +4,8 @@ import { Link } from 'react-router';
 import type { AttributeDefinitionKind } from '../../../contracts/attributeSchema';
 import { attributeDefinitionToFieldSchema } from '../../../contracts/attributeSchema';
 import type { ElementType, UUID } from '../../../contracts/delta';
-import { aiAutonomyOf, isAiAgent } from '../../../engine/elementRead/aiAgent';
-import { AiAutonomyChip } from '../AiAgentTag/AiAgentTag';
+import { aiMarkOf, usesAi } from '../../../engine/elementRead/aiAgent';
+import { AiMarkChip } from '../AiTag/AiTag';
 import { ELEMENT_TYPE_FILTER_OPTIONS, FINDING_FILTER_OPTIONS, type BrowseRow } from '../../../db/elementBrowse';
 import type { AttributeDefinitionRow, BranchRow } from '../../../db/types';
 import type { ThreadCount } from '../../comments/useThreadCounts';
@@ -121,8 +121,8 @@ const COLUMNS: { key: 'name' | 'type' | 'owner' | 'lifecycle' | 'criticality' | 
   { key: 'lifecycle', label: 'Lifecycle' },
   { key: 'criticality', label: 'Criticality' },
   { key: 'disposition', label: 'Planned action' },
-  // Shown only while at least one listed element is an AI agent (see `showAgentColumn`).
-  { key: 'aiAutonomy', label: 'How it acts' },
+  // Shown only while at least one listed element uses AI (see `showAgentColumn`).
+  { key: 'aiAutonomy', label: 'AI' },
 ];
 
 /** The edit bar's hint mentions the custom column too, when one is shown. */
@@ -244,7 +244,7 @@ export function ElementBrowseTable({ state, orgSlug, modelSlug, modelId, filenam
   const exportState = useElementExport({ modelId, commitId: state.status === 'ready' ? state.commitId : null, definitions: attributeDefinitions, rows: state.status === 'ready' ? state.rows : [], filenameBase });
   const page = useResultPage(state.status === 'ready' ? state.rows : undefined);
   // The "How it acts" column appears only when something listed is an AI agent: a column that is blank on every row is clutter.
-  const showAgentColumn = state.status === 'ready' && state.rows.some((row) => isAiAgent(row.element));
+  const showAgentColumn = state.status === 'ready' && state.rows.some((row) => usesAi(row.element));
   const columns = COLUMNS.filter((column) => column.key !== 'aiAutonomy' || showAgentColumn);
 
   // Below the breakpoint, `ElementBrowseCards` replaces the two-table
@@ -471,6 +471,14 @@ export function ElementBrowseTable({ state, orgSlug, modelSlug, modelId, filenam
         <label className={styles.agentsOnly}>
           <input
             type="checkbox"
+            checked={findingFilter === 'uses-ai'}
+            onChange={(e) => { onFindingFilterChange(e.target.checked ? 'uses-ai' : ''); }}
+          />
+          <Text as="span" size="sm">Uses AI</Text>
+        </label>
+        <label className={styles.agentsOnly}>
+          <input
+            type="checkbox"
             checked={findingFilter === 'ai-agents'}
             onChange={(e) => { onFindingFilterChange(e.target.checked ? 'ai-agents' : ''); }}
           />
@@ -487,8 +495,9 @@ export function ElementBrowseTable({ state, orgSlug, modelSlug, modelId, filenam
               {option.label}
             </option>
           ))}
-          {/* "AI agents only" is the checkbox beside this list, not a finding; this entry only keeps the list in step when it is on. */}
+          {/* "Uses AI" and "AI agents only" are the checkboxes beside this list, not a finding; this entry only keeps the list in step when it is on. */}
           {findingFilter === 'ai-agents' && <option value="ai-agents">AI agents only</option>}
+          {findingFilter === 'uses-ai' && <option value="uses-ai">Uses AI</option>}
         </select>
         <CustomAttributePicker definitions={applicableCustomDefinitions} selection={customAttr} onChange={onCustomAttrChange} />
         {narrow && (
@@ -657,7 +666,7 @@ export function ElementBrowseTable({ state, orgSlug, modelSlug, modelId, filenam
               <tbody ref={tbodyRef}>
                 {page.rows.map((row) => {
                   const unresolvedCount = unresolvedCounts?.get(row.element.element_id)?.open ?? 0;
-                  const autonomy = aiAutonomyOf(row.element);
+                  const mark = aiMarkOf(row.element);
                   return (
                   <tr key={row.element.element_id}>
                     <td headers={`${headerIdBase}-name`}>
@@ -715,8 +724,8 @@ export function ElementBrowseTable({ state, orgSlug, modelSlug, modelId, filenam
                     </td>
                     {showAgentColumn && (
                       <td headers={`${headerIdBase}-aiAutonomy`}>
-                        {autonomy !== null ? (
-                          <AiAutonomyChip autonomy={autonomy} />
+                        {mark !== null ? (
+                          <AiMarkChip mark={mark} />
                         ) : (
                           <Text as="span" tone="faint" size="sm">
                             —
