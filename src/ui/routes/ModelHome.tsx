@@ -214,7 +214,7 @@ export function ModelHome() {
           )}
         </Panel>
 
-        {canShowSearch && <GetStarted modelId={model.id} commitId={searchCommitId} orgId={organisation?.id ?? ''} isOwner={role === 'owner'} orgSlug={organisation?.slug ?? ''} modelSlug={model.slug} onAddApplication={() => { setAddApplicationRequest((n) => n + 1); }} />}
+        {canShowSearch && <GetStarted modelId={model.id} commitId={searchCommitId} orgId={organisation?.id ?? ''} isOwner={role === 'owner' && organisation?.is_personal !== true} orgSlug={organisation?.slug ?? ''} modelSlug={model.slug} onAddApplication={() => { setAddApplicationRequest((n) => n + 1); }} />}
         <FirstVisit modelId={model.id} commitId={searchCommitId} orgId={organisation?.id ?? ''} role={role} orgSlug={organisation?.slug ?? ''} modelSlug={model.slug} />
 
         <div className={styles.doorLinks}>

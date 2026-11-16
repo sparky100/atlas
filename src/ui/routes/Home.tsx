@@ -1,6 +1,6 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import type { SubmitEvent } from 'react';
-import { Link } from 'react-router';
+import { Link, useNavigate } from 'react-router';
 import { useAuth } from '../auth/useAuth';
 import { useOwnProfile } from '../auth/useOwnProfile';
 import { AppHeader } from '../components/AppHeader/AppHeader';
@@ -23,7 +23,7 @@ function slugify(name: string): string {
 /**
  * The signed-in landing page: every organisation the user belongs to, plus
  * creating a new one. Which organisation/model to open next is the user's
- * own click — no auto-redirect invented for the one-org case.
+ * own click, except right after creating one, which opens it.
  *
  * Prompt 7h bug fix: "first sign-in prompts for a display name." A
  * brand-new user has no `atlas.profiles` row at all until their first
@@ -48,6 +48,15 @@ export function Home() {
   // "my organisation" (a named org with an invite step). `null` = no choice
   // made yet.
   const [orgChoice, setOrgChoice] = useState<'justMe' | 'organisation' | null>(null);
+  const navigate = useNavigate();
+  // A just-created organisation opens by itself, so a new person never has to
+  // find and click it. Held until the profile has a name: the display-name
+  // prompt above must still get its moment first.
+  const [openSlug, setOpenSlug] = useState<string | null>(null);
+  const nameKnown = !profileLoading && profile !== null && profile.display_name !== null;
+  useEffect(() => {
+    if (openSlug !== null && nameKnown) void navigate(`/o/${openSlug}`);
+  }, [openSlug, nameKnown, navigate]);
 
   if (!profileLoading && profile?.display_name === null && userId) {
     return <DisplayNamePrompt userId={userId} onDone={refreshProfile} />;
@@ -59,7 +68,7 @@ export function Home() {
     setSubmitting(true);
     setCreateError(null);
     try {
-      await createOrganisation(name.trim(), slugify(name), userId);
+      const created = await createOrganisation(name.trim(), slugify(name), userId);
       setName('');
       setCreating(false);
       setOrgChoice(null);
@@ -69,6 +78,7 @@ export function Home() {
       // the display-name gate above picks up the freshly created profile
       // instead of the still-`null` one this page loaded with.
       refreshProfile();
+      setOpenSlug(created.slug);
     } catch (e) {
       setCreateError(e instanceof Error ? e.message : 'Failed to create organisation');
     } finally {
@@ -85,9 +95,10 @@ export function Home() {
     try {
       const personalName = profile?.display_name ?? profile?.handle ?? 'Personal';
       const personalSlug = slugify(personalName) || 'personal';
-      await createOrganisation(personalName, personalSlug, userId, true);
+      const created = await createOrganisation(personalName, personalSlug, userId, true);
       setOrgChoice(null);
       refreshProfile();
+      setOpenSlug(created.slug);
     } catch (e) {
       setCreateError(e instanceof Error ? e.message : 'Failed to create organisation');
     } finally {

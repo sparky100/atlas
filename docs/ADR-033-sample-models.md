@@ -4,7 +4,7 @@ Status: accepted (Simon, 2026-11-15: "Offer a copy on join — let's do this"; o
 
 ## Decision
 
-A person who joins and has an empty model list is offered **"Start with a sample model"**: Northbridge DNO (electricity network) and Meridian retail. Adding one creates a separate, independent model in **their own organisation**, as one ordinary `manual` commit titled "Copied from the <name> sample". They can edit or delete it. Nothing is seeded automatically and no organisation can see another's data.
+A person who joins and has an empty model list is offered **"Look around first"** (above New model): Northbridge DNO (electricity network) and Meridian retail. Adding one creates a separate, independent model in **their own organisation**, as one ordinary `manual` commit titled "Copied from the <name> sample". They can edit or delete it. Nothing is seeded automatically and no organisation can see another's data.
 
 The offer shows only to someone who can create a model (owner or architect) and only while the organisation has no active model. It is not offered later from the model list.
 
