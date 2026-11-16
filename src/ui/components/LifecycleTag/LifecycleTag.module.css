@@ -1,0 +1,26 @@
+/* "Planned" and "Retired" carry no colour of their own, so they never compete
+   with the status colours (one meaning per colour). The border style adds a
+   second cue: dashed = not live yet, dotted = gone. The words always appear. */
+.tag {
+  display: inline-flex;
+  align-items: center;
+  height: 18px;
+  padding: 0 var(--space-1);
+  border: var(--border-width) dashed var(--border-strong);
+  border-radius: var(--radius-sm);
+  color: var(--text-muted);
+  background: transparent;
+  font-size: var(--text-xs-size);
+  line-height: 1;
+  font-weight: 600;
+  white-space: nowrap;
+  flex: none;
+}
+
+.planned {
+  border-style: dashed;
+}
+
+.retired {
+  border-style: dotted;
+}

@@ -17,6 +17,7 @@ import { getOrCreateModelView } from '../../db/views';
 import type { ViewMode } from '../../db/viewMode';
 import { loadPlannedFuture, type PlannedFuture } from '../../db/plannedFuture';
 import { cloneHead } from '../../engine/deltas';
+import { lifecycleStateOf } from '../../engine/elementRead/fitAndExposure';
 import { serializeHeadProjection, type HeadProjection } from '../../engine/projection';
 import { computeVersionDiff, type VersionDiff } from '../../engine/versionDiff';
 import type { ViewRow } from '../../db/types';
@@ -56,6 +57,8 @@ export interface LandscapeData {
   diff: VersionDiff | null;
   /** Populated only for a view "as at" a future date (`asAt`): what was laid on, what was left out, and what the date leaves without a system. `null` for today. */
   future: PlannedFuture | null;
+  /** How many systems and modules today's picture leaves out because they are not live yet (planned) or are past their end (retired). Always zero for a change branch or a future date, which show them on purpose. */
+  hiddenByDate: { planned: number; retired: number };
 }
 
 export type LandscapeState = { status: 'loading' } | { status: 'error'; message: string } | { status: 'refNotFound' } | { status: 'ready'; data: LandscapeData };
@@ -287,6 +290,21 @@ export function useLandscape(
         [allSystems, allActors, allContainers] = await loadCommitScope(commitId);
       }
 
+      // Today's picture (main or a tag) shows what is live today: a planned system doesn't exist until its Introduced date, and a retired one is gone — and so are the links to either (`engine/elementRead/fitAndExposure.ts`). A change branch and a future date show them on purpose.
+      const hiddenByDate = { planned: 0, retired: 0 };
+      if (ref.kind !== 'branch' && futureAsAt === null) {
+        const now = new Date();
+        const datedById = new Map([...allSystems, ...allContainers].map((e) => [e.element_id, e]));
+        const live = (e: ElementsHeadRow): boolean => {
+          const state = lifecycleStateOf(e, datedById, now);
+          if (state === 'active') return true;
+          hiddenByDate[state] += 1;
+          return false;
+        };
+        allSystems = allSystems.filter(live);
+        allContainers = allContainers.filter(live);
+      }
+
       // "Platforms and modules": a platform's own module (Container)
       // children get their own landscape tile, placed by their own
       // `supports` edge — folded into `allSystems` right here so every
@@ -343,7 +361,7 @@ export function useLandscape(
 
       const systemsById = new Map(allSystems.map((s) => [s.element_id, s]));
       const actorsById = new Map(allActors.map((a) => [a.element_id, a]));
-      if (!cancelled) setState({ status: 'ready', data: { commitId, view, systemsById, platformIdByInterfaceId, actorsById, edges, supportsEdges, ownsEdges, l1AncestorByCapabilityId, diff, future } });
+      if (!cancelled) setState({ status: 'ready', data: { commitId, view, systemsById, platformIdByInterfaceId, actorsById, edges, supportsEdges, ownsEdges, l1AncestorByCapabilityId, diff, future, hiddenByDate } });
     }
 
     load().catch((e: unknown) => {
