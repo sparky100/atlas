@@ -924,7 +924,7 @@ function buildJsonElementCandidates(rows: readonly ImportRow[], startSeq: number
     if (soleCapabilityName !== undefined) {
       const capabilityText = row.capabilityNames.length === 1 ? soleCapabilityName : row.capabilityNames.join('|');
       const description = attributes.description;
-      capabilityRows.push({ seq: elSeq, systemName: row.name, ...(typeof description === 'string' ? { description } : {}), capabilityText, sourceRef: jsonSourceRef(index) });
+      capabilityRows.push({ seq: elSeq, systemName: row.name, ...(typeof description === 'string' ? { description } : {}), capabilityText, ...(row.fit !== undefined ? { fit: row.fit } : {}), sourceRef: jsonSourceRef(index) });
     }
 
     for (const [owner, role] of [

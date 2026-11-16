@@ -35,7 +35,7 @@
  */
 import { attributeFieldSchema, validateAttributeValue } from '../contracts/attributeSchema';
 import type { CandidateEvidence, CandidateProposal, CaptureAliasType, ElementProposal, EvidenceWarning, RelationshipProposal } from '../contracts/capture';
-import type { ActorSubtype, ElementType, OwnsRole, UUID } from '../contracts/delta';
+import type { ActorSubtype, ElementType, FitForPurpose, OwnsRole, UUID } from '../contracts/delta';
 import type { SourceRef } from '../contracts/sourceRef';
 import { DEFAULTED_ATTRIBUTE_CONFIDENCE, parseFactorFor, rowFactorFor, sheetAttrConf } from './confidence';
 import type { ColumnRoleAssignment } from './columnSynonyms';
@@ -84,6 +84,8 @@ export interface CapabilityColumnRow {
   systemName: string;
   description?: string;
   capabilityText: string;
+  /** JSON import only (owner-approved exception): the fit rating to put on every `supports` link this row creates. */
+  fit?: FitForPurpose;
   sourceRef: SourceRef;
 }
 

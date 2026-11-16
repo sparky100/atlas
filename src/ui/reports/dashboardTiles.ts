@@ -15,9 +15,13 @@ export const TILE_KIND_LABEL: Record<DashboardTileKind, string> = {
   stackedBar: 'Stacked bar chart',
   donut: 'Donut',
   table: 'Table',
+  quadrant: 'Quadrant (fit against technical health)',
 };
 
 export const DEFAULT_TABLE_TILE_ROWS = 5;
+
+/** The fields a quadrant tile reads from each Portfolio row, in this order (`DashboardTileCard.tsx` and the dashboard export read the result by it). */
+export const QUADRANT_REPORT_COLUMNS = ['id', 'name', 'fit', 'lifecycle', 'lifecycleExposed', 'cost', 'disposition'] as const;
 
 /** Which tile kinds can show this report. A bar or donut needs a grouping; a stacked bar needs a second grouping too. */
 export function tileKindsFor(spec: ReportSpec): DashboardTileKind[] {
@@ -25,6 +29,8 @@ export function tileKindsFor(spec: ReportSpec): DashboardTileKind[] {
   if (spec.groupBy !== undefined) kinds.push('bar', 'donut');
   if (spec.groupBy !== undefined && spec.splitBy !== undefined) kinds.push('stackedBar');
   kinds.push('table');
+  // The quadrant reads application rows, so only a Portfolio report can show it.
+  if (spec.source === 'portfolio') kinds.push('quadrant');
   return kinds;
 }
 
@@ -51,6 +57,12 @@ export function specForTile(spec: ReportSpec, kind: DashboardTileKind, rowLimit:
       return { ...spec, presentation: { kind: 'barByField' } };
     case 'table':
       return { ...withoutSplit, presentation: { kind: 'table', limit: rowLimit ?? DEFAULT_TABLE_TILE_ROWS } };
+    case 'quadrant': {
+      // Every matching row, with just the columns the quadrant reads; the report's own filters still apply.
+      const quadrant: ReportSpec = { ...withoutSplit, columns: [...QUADRANT_REPORT_COLUMNS], presentation: { kind: 'table' } };
+      delete quadrant.groupBy;
+      return quadrant;
+    }
   }
 }
 

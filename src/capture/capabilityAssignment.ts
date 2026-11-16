@@ -278,13 +278,13 @@ export async function assignCapabilities(input: AssignCapabilitiesInput): Promis
         relationshipType: 'supports',
         from: { kind: 'candidate', seq: row.seq },
         to: { kind: 'existing', elementId: target.elementId },
-        attributes: { role },
+        attributes: row.fit !== undefined ? { role, fitForPurpose: row.fit } : { role },
       };
       const evidence: CandidateEvidence = {
         sourceRef: row.sourceRef,
         passage: `${row.systemName} | ${row.capabilityText}`,
         extractor: EXTRACTOR_BY_SOURCE[target.source],
-        attributeConfidence: { role: target.confidence },
+        attributeConfidence: row.fit !== undefined ? { role: target.confidence, fitForPurpose: target.confidence } : { role: target.confidence },
         warnings: [],
       };
       candidates.push({ seq: nextSeq++, proposal, evidence, aliasProposals: [], ...(eligibleForPrimary ? { primaryEligible: true } : {}) });

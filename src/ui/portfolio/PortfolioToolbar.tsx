@@ -29,7 +29,13 @@ export interface PortfolioToolbarProps {
   totalCount: number;
 }
 
-export type PortfolioViewMode = 'table' | 'chart';
+export type PortfolioViewMode = 'table' | 'grid' | 'quadrant';
+
+const VIEW_MODES: { mode: PortfolioViewMode; label: string }[] = [
+  { mode: 'table', label: 'Table' },
+  { mode: 'grid', label: 'Cost grid' },
+  { mode: 'quadrant', label: 'Quadrant' },
+];
 
 const CRITICALITY_OPTIONS = Object.keys(CRITICALITY_ORDER) as Criticality[];
 const KIND_OPTIONS: PortfolioRowKind[] = ['system', 'platform', 'module'];
@@ -51,9 +57,17 @@ export function PortfolioToolbar({ sortKey, sortDirection, onSortChange, filters
     <>
     <div className={styles.toolbar}>
       <div className={styles.switch} role="group" aria-label="Show as">
-        {(['table', 'chart'] as const).map((mode) => (
-          <button key={mode} type="button" className={[styles.switchButton, view === mode ? styles.switchOn : ''].filter(Boolean).join(' ')} aria-pressed={view === mode} onClick={() => { onViewChange(mode); }}>
-            {mode === 'table' ? 'Table' : 'Chart'}
+        {VIEW_MODES.map(({ mode, label }) => (
+          <button
+            key={mode}
+            type="button"
+            className={[styles.switchButton, view === mode ? styles.switchOn : ''].filter(Boolean).join(' ')}
+            aria-pressed={view === mode}
+            onClick={() => {
+              onViewChange(mode);
+            }}
+          >
+            {label}
           </button>
         ))}
       </div>
