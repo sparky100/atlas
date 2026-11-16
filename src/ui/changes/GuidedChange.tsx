@@ -4,7 +4,7 @@ import { Button } from '../components/Button/Button';
 import { ElementTypeGlyph } from '../components/ElementTypeGlyph/ElementTypeGlyph';
 import { Text } from '../components/Text/Text';
 import { moduleDisplayName } from '../elements/moduleDisplayName';
-import { useRelationshipTargetSearch } from '../elements/useRelationshipTargetSearch';
+import { SYSTEM_OR_MODULE_TYPES, useRelationshipTargetSearch } from '../elements/useRelationshipTargetSearch';
 import draftStyles from './DraftWithAi.module.css';
 
 export type GuidedChangeKind = 'add' | 'retire' | 'details';
@@ -36,7 +36,7 @@ const PICKER_TITLE: Record<Exclude<GuidedChangeKind, 'add'>, string> = {
  */
 export function GuidedChange({ modelId, commitId, busy, onStart }: GuidedChangeProps) {
   const [picking, setPicking] = useState<Exclude<GuidedChangeKind, 'add'> | null>(null);
-  const search = useRelationshipTargetSearch(commitId, modelId, ['system'], '00000000-0000-0000-0000-000000000000', picking !== null);
+  const search = useRelationshipTargetSearch(commitId, modelId, SYSTEM_OR_MODULE_TYPES, '00000000-0000-0000-0000-000000000000', picking !== null);
 
   if (picking !== null) {
     return (
@@ -48,8 +48,8 @@ export function GuidedChange({ modelId, commitId, busy, onStart }: GuidedChangeP
           // eslint-disable-next-line jsx-a11y/no-autofocus -- choosing this change is itself the request to search.
           autoFocus
           type="text"
-          placeholder="Search systems…"
-          aria-label="Search systems"
+          placeholder="Search systems and modules…"
+          aria-label="Search systems and modules"
           value={search.query}
           disabled={busy}
           onChange={(event) => {

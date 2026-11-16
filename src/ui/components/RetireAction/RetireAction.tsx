@@ -6,7 +6,7 @@ import { attributesRecord } from '../../elements/attributesRecord';
 import { buildReplaceWithNewElementDeltas } from '../../elements/buildReplaceWithNewElementDeltas';
 import { moduleDisplayName } from '../../elements/moduleDisplayName';
 import { useElementRetire, type RetireReplacement } from '../../elements/useElementRetire';
-import { useRelationshipTargetSearch } from '../../elements/useRelationshipTargetSearch';
+import { SYSTEM_OR_MODULE_TYPES, useRelationshipTargetSearch } from '../../elements/useRelationshipTargetSearch';
 import { useReplaceWithNewElement } from '../../elements/useReplaceWithNewElement';
 import { Button } from '../Button/Button';
 import { ElementTypeGlyph } from '../ElementTypeGlyph/ElementTypeGlyph';
@@ -75,8 +75,11 @@ export function RetireAction({
   // branch, as SAP BW's own replacement) is otherwise invisible to a
   // main-only search — `useRelationshipTargetSearch`'s own `branchCommitId`
   // doc comment.
-  const search = useRelationshipTargetSearch(searchCommitId, modelId, [element.element_type], element.element_id, mode === 'searching', branch.kind === 'change' ? branch.head_commit_id : null);
-  const searchPlaceholder = element.element_type === 'container' ? 'Search modules…' : 'Search systems…';
+  // Systems and modules both: a replacement can be a module inside a platform
+  // (shown as "Module (in Platform)"). `replaces` and `supports` both allow
+  // system and container ends (`relationshipTypeRules.ts`).
+  const search = useRelationshipTargetSearch(searchCommitId, modelId, SYSTEM_OR_MODULE_TYPES, element.element_id, mode === 'searching', branch.kind === 'change' ? branch.head_commit_id : null);
+  const searchPlaceholder = 'Search systems and modules…';
   const { status, error, retire } = useElementRetire({
     modelId,
     orgId,
