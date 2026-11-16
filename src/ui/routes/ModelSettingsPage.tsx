@@ -5,6 +5,7 @@ import { Breadcrumb } from '../components/Breadcrumb/Breadcrumb';
 import { EditingBranchBanner } from '../branches/EditingBranchBanner/EditingBranchBanner';
 import { ModelNav } from '../components/ModelNav/ModelNav';
 import navStyles from '../components/ModelNav/ModelNav.module.css';
+import { PageIntro } from '../components/PageIntro/PageIntro';
 import { Text } from '../components/Text/Text';
 import { useAuth } from '../auth/useAuth';
 import { useSelectedRef } from '../branches/useSelectedRef';
@@ -53,6 +54,7 @@ export function ModelSettingsPage() {
           <Text as="h1" size="2xl">
             Model settings
           </Text>
+          <PageIntro>Name, sharing and version options for this model.</PageIntro>
           <ModelSettingsView
             model={model}
             role={role}

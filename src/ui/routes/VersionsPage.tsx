@@ -5,6 +5,7 @@ import { Breadcrumb } from '../components/Breadcrumb/Breadcrumb';
 import { EditingBranchBanner } from '../branches/EditingBranchBanner/EditingBranchBanner';
 import { ModelNav } from '../components/ModelNav/ModelNav';
 import navStyles from '../components/ModelNav/ModelNav.module.css';
+import { PageIntro } from '../components/PageIntro/PageIntro';
 import { Text } from '../components/Text/Text';
 import { useAuth } from '../auth/useAuth';
 import { useSelectedRef } from '../branches/useSelectedRef';
@@ -60,6 +61,7 @@ export function VersionsPage() {
               History
             </Text>
           </div>
+          <PageIntro>Tagged versions of the model that you can look back at or compare.</PageIntro>
           <VersionsView modelId={model.id} orgId={organisation?.id ?? ''} userId={userId} orgSlug={orgSlug ?? ''} modelSlug={model.slug} canTag={canTag} />
         </main>
       </div>

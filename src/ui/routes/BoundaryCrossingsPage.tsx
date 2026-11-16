@@ -5,6 +5,7 @@ import { Breadcrumb } from '../components/Breadcrumb/Breadcrumb';
 import { EditingBranchBanner } from '../branches/EditingBranchBanner/EditingBranchBanner';
 import { ModelNav } from '../components/ModelNav/ModelNav';
 import navStyles from '../components/ModelNav/ModelNav.module.css';
+import { PageIntro } from '../components/PageIntro/PageIntro';
 import { Text } from '../components/Text/Text';
 import { BoundaryCrossingsView } from '../boundaryCrossings/BoundaryCrossingsView';
 import { useSelectedRef } from '../branches/useSelectedRef';
@@ -48,6 +49,7 @@ export function BoundaryCrossingsPage() {
               Boundary crossings
             </Text>
           </div>
+          <PageIntro>Connections that cross the IT/OT boundary.</PageIntro>
           <BoundaryCrossingsView modelId={model.id} orgSlug={orgSlug ?? ''} modelSlug={model.slug} />
         </main>
       </div>
