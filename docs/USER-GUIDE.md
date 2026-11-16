@@ -15,7 +15,7 @@ This is the guide the in-app **Help** assistant reads to answer your questions. 
 - **Architect:** open Home and read **Where to focus**. Each row is a problem and links straight to it, with **Start a decision** or **Start a project** on the same row.
 - **Owner:** as an architect, plus **Invite a colleague** in organisation settings.
 
-**A new, empty model.** If your organisation has no models yet, you may be offered **Start with a sample model**: a made-up organisation to look around in. **Add this sample** puts a separate copy in your organisation, and nothing you change in it affects anyone else. Home shows a **Get started** checklist: import your capabilities, add a system, link it to the capability it supports, and (owners only) invite a colleague.
+**A new, empty model.** If your organisation has no models yet, you are offered **Look around first**, above **New model**: a made-up organisation to look around in. **Add this sample** opens its capability map and puts a separate copy in your organisation, and nothing you change in it affects anyone else. Home shows a **Get started** checklist: import your capabilities, add a system, link it to the capability it supports, and (owners only) invite a colleague.
 
 **A model that already has data.** Home shows a **Welcome** card with a few places to start, worded for your role. **Dismiss** hides it in that browser.
 

@@ -54,7 +54,7 @@ export function ModelList({ orgSlug, models, loading, canCreate, onCreate }: Mod
       {models.length === 0 && !creating && (
         <Panel>
           <Text as="p" tone="muted">
-            {canCreate ? 'No models yet. A model is one landscape — create the first one to get started.' : 'No models yet in this organisation.'}
+            {canCreate ? 'Or start with an empty model. A model is one landscape of your applications, and you can import a spreadsheet into it.' : 'No models yet. Ask an architect in this organisation to add one.'}
           </Text>
         </Panel>
       )}
