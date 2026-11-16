@@ -78,8 +78,31 @@ export function introducedOf(element: ElementsHeadRow): Date | null {
   return Number.isNaN(date.getTime()) ? null : date;
 }
 
+/**
+ * `true` while `element`'s own `introduced` date, or its parent platform's, is
+ * still ahead. No recorded or readable date reads `false` — never "not yet".
+ */
+export function hasNotYetBeenIntroduced(element: ElementsHeadRow, elementsById: ReadonlyMap<UUID, ElementsHeadRow>, now: Date = new Date()): boolean {
+  const own = introducedOf(element);
+  if (own !== null && own.getTime() > now.getTime()) return true;
+  const parent = element.parent_id !== null ? elementsById.get(element.parent_id) : undefined;
+  const parentStart = parent ? introducedOf(parent) : null;
+  return parentStart !== null && parentStart.getTime() > now.getTime();
+}
+
 /** Where an element sits in time: not live yet, live, or gone. */
 export type LifecycleState = 'planned' | 'active' | 'retired';
+
+/**
+ * What an element's dates alone say (`introduced`, `plannedEnd`, a module
+ * following its platform), ignoring any recorded status. The lifecycle
+ * status/date mismatch check compares this with the status someone typed, so
+ * the two can never read the dates differently.
+ */
+export function lifecycleStateFromDates(element: ElementsHeadRow, elementsById: ReadonlyMap<UUID, ElementsHeadRow>, now: Date = new Date()): LifecycleState {
+  if (hasNotYetBeenIntroduced(element, elementsById, now)) return 'planned';
+  return hasReachedPlannedEnd(element, elementsById, now) ? 'retired' : 'active';
+}
 
 /**
  * The one start/end rule for systems, platforms and modules. An element is
@@ -92,15 +115,10 @@ export type LifecycleState = 'planned' | 'active' | 'retired';
  * date wins. Pure: `now` is always the caller's.
  */
 export function lifecycleStateOf(element: ElementsHeadRow, elementsById: ReadonlyMap<UUID, ElementsHeadRow>, now: Date = new Date()): LifecycleState {
+  const byDates = lifecycleStateFromDates(element, elementsById, now);
+  if (byDates !== 'active') return byDates;
   const parent = element.parent_id !== null ? elementsById.get(element.parent_id) : undefined;
-  const chain = parent ? [element, parent] : [element];
-  const t = now.getTime();
-  for (const e of chain) {
-    const start = introducedOf(e);
-    if (start !== null && start.getTime() > t) return 'planned';
-  }
-  if (hasReachedPlannedEnd(element, elementsById, now)) return 'retired';
-  for (const e of chain) {
+  for (const e of parent ? [element, parent] : [element]) {
     if (attributesRecord(e.attributes).lifecycleStatus === 'retired' && plannedEndOf(e) === null) return 'retired';
   }
   return 'active';

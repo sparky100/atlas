@@ -1,3 +1,4 @@
+import { describeLifecycleMismatch, lifecycleMismatchOf } from '../../engine/elementRead/lifecycleDateMismatch';
 import { Loading } from '../components/Loading/Loading';
 import { useEffect, useRef, useState } from 'react';
 import { Link, useLocation, useNavigate, useParams, useSearchParams } from 'react-router';
@@ -994,6 +995,13 @@ function isCollapsibleWhenEmpty(field: AttributeFieldSchema, fact: FactsRow | un
   return true;
 }
 
+function lifecycleHintFor(element: ElementsHeadRow, values: Record<string, DraftValue>): string | null {
+  const draft = (key: string) => (typeof values[key] === 'string' ? values[key] : '');
+  const attributes = { lifecycleStatus: draft('lifecycleStatus'), introduced: draft('introduced'), plannedEnd: draft('plannedEnd') };
+  const mismatch = lifecycleMismatchOf({ ...element, attributes }, undefined, new Date());
+  return mismatch ? `${describeLifecycleMismatch(mismatch)}. ${mismatch.suggested.charAt(0).toUpperCase()}${mismatch.suggested.slice(1)} would fit better.` : null;
+}
+
 function AttributesEditor({
   element,
   editor,
@@ -1009,6 +1017,8 @@ function AttributesEditor({
   customFields: AttributeFieldSchema[];
 }) {
   const schema = ATTRIBUTE_SCHEMA_BY_TYPE[element.element_type].filter((field) => field.editable !== false);
+  // A gentle nudge, never a block: shown while the draft's status and dates disagree.
+  const lifecycleHint = lifecycleHintFor(element, editor.values);
   return (
     <div>
       {[...schema, ...customFields].map((field) => (
@@ -1022,6 +1032,13 @@ function AttributesEditor({
           error={editor.fieldErrors[field.key]}
         />
       ))}
+      {lifecycleHint !== null && (
+        <div role="status">
+          <Text as="p" size="sm">
+            {lifecycleHint}
+          </Text>
+        </div>
+      )}
       {/* Not editable here (this hook only ever writes attributes.*, never
           the separate aliases table) — still shown, read-only, so an
           alias doesn't visibly disappear the moment someone clicks Edit. */}

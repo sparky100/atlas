@@ -46,6 +46,7 @@ import { listActorsForLandscape, listSystemsForLandscape } from '../../db/landsc
 import { listAllSupportsEdges, listDeltasForCommits, listRecentCommits } from '../../db/modelHome';
 import { listProfilesByIds } from '../../db/profiles';
 import { edgesInForce, lifecycleStateOf, replacedElementIds, supportsEdgesInForce } from '../../engine/elementRead/fitAndExposure';
+import { findLifecycleDateMismatches, type LifecycleMismatch } from '../../engine/elementRead/lifecycleDateMismatch';
 import type { ProfileRow } from '../../db/types';
 import { envelopeSubjects } from '../../engine/describeEnvelope';
 import { reportError } from '../errors/errorBannerStore';
@@ -76,6 +77,8 @@ export interface ArchitectHomeInsightsData {
   flowsToPlatformInsteadOfModule: PlatformFlowEndpoint[];
   capabilitiesWithoutOwner: ElementsHeadRow[];
   staleAttributes: StaleAttributesFinding;
+  /** Systems and modules whose lifecycle status and own dates disagree (`findLifecycleDateMismatches`). */
+  lifecycleDateMismatches: LifecycleMismatch[];
   /** The organisation's stale threshold the finding above was computed with — the Home row words itself with it. */
   staleAfterMonths: number;
   /** Sprint U4-1 B5's fifth finding: `uses`/`flows_to` relationships with no verb-phrase label. */
@@ -239,6 +242,7 @@ export function useArchitectHomeInsights(modelId: UUID, userId: UUID | null): Ar
             flowsToPlatformInsteadOfModule: findFlowsToPlatformInsteadOfModule(liveUsesAndFlowsTo, usesAndFlowsToEndpointsById),
             capabilitiesWithoutOwner: findCapabilitiesWithoutOwner(capabilities, liveSupports, ownsEdges),
             staleAttributes: computeStaleAttributesFinding(facts, allElements, new Date(), staleAfterMonths),
+            lifecycleDateMismatches: findLifecycleDateMismatches([...systems, ...containers], today),
             staleAfterMonths,
             unlabeledVerbRelationships: findUnlabeledVerbRelationships(liveUsesAndFlowsTo, usesAndFlowsToEndpointsById),
             // Owner-related findings check systems and their own modules

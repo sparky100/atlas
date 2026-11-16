@@ -9,6 +9,8 @@ import { ElementBrowseTable } from '../components/ElementBrowseTable/ElementBrow
 import { ModelNav } from '../components/ModelNav/ModelNav';
 import navStyles from '../components/ModelNav/ModelNav.module.css';
 import { Button } from '../components/Button/Button';
+import { describeLifecycleMismatch, lifecycleFixLabel, lifecycleMismatchOf } from '../../engine/elementRead/lifecycleDateMismatch';
+import { useLifecycleFix } from '../elements/useLifecycleFix';
 import { Panel } from '../components/Panel/Panel';
 import { PageIntro } from '../components/PageIntro/PageIntro';
 import { Text } from '../components/Text/Text';
@@ -62,6 +64,7 @@ const VALID_FILTERS: readonly ElementBrowseFilter[] = [
   'critical-support-end',
   'capability-no-supporters',
   'outgoing-no-retiring-change',
+  'lifecycle-date-mismatch',
 ];
 
 function parseFilterParam(value: string | null): ElementBrowseFilter {
@@ -200,6 +203,7 @@ export function ElementsPage() {
     [attributeDefinitions],
   );
   const bulkEdit = useBulkEdit({ modelId: model?.id ?? '', orgId: organisation?.id ?? '', userId, branch: bulkEditBranch, customFields: bulkEditCustomFields, onSaved: onLinked });
+  const lifecycleFix = useLifecycleFix({ modelId: model?.id ?? '', orgId: organisation?.id ?? '', userId, branch: bulkEditBranch, onFixed: onLinked });
   const canBulkEdit = bulkEditBranch !== null && canEditBranch(role, bulkEditBranch);
   const attestation = useAttestation({ modelId: model?.id ?? '', orgId: organisation?.id ?? '', userId, branch: bulkEditBranch, onConfirmed: onLinked });
   const threadCountsState = useThreadCounts(model?.id ?? null, state.status === 'ready' ? state.rows.map((r) => r.element.element_id) : []);
@@ -244,6 +248,31 @@ export function ElementsPage() {
             </span>
           );
         }
+      : filter === 'lifecycle-date-mismatch'
+        ? (row: BrowseRow) => {
+            // Each row says what disagrees and, for someone who can edit, offers the one status the dates point to.
+            const mismatch = lifecycleMismatchOf(row.element, row.lifecycleStatus, new Date());
+            if (!mismatch) return null;
+            return (
+              <span className={styles.rowActions}>
+                <Text as="span" size="sm">
+                  {describeLifecycleMismatch(mismatch)}
+                </Text>
+                {canBulkEdit && (
+                  <Button
+                    variant="secondary"
+                    disabled={lifecycleFix.fixingId !== null}
+                    aria-label={`${lifecycleFixLabel(mismatch.suggested)}: ${row.element.name}`}
+                    onClick={() => {
+                      void lifecycleFix.fix(row.element, mismatch.suggested);
+                    }}
+                  >
+                    {lifecycleFix.fixingId === row.element.element_id ? 'Saving…' : lifecycleFixLabel(mismatch.suggested)}
+                  </Button>
+                )}
+              </span>
+            );
+          }
       : canStartProject(role) && filter === 'outgoing-no-retiring-change'
         ? (row: BrowseRow) => {
             // F11: the work an outgoing disposition implies is a project, not a decision — the decision was the disposition itself.
@@ -387,6 +416,7 @@ export function ElementsPage() {
                 : undefined
             }
             decisionRowAction={decisionRowAction}
+            rowActionHeader={filter === 'lifecycle-date-mismatch' ? 'What disagrees' : undefined}
             onImportClick={canEdit ? () => { void navigate(`/o/${orgSlug ?? ''}/m/${model.slug}/capture`); } : undefined}
             bulkEdit={canBulkEdit ? bulkEdit : undefined}
             attest={
@@ -400,6 +430,13 @@ export function ElementsPage() {
                 : undefined
             }
           />
+          {lifecycleFix.error !== null && (
+            <div role="alert">
+              <Text as="p" size="sm">
+                {lifecycleFix.error}
+              </Text>
+            </div>
+          )}
           {attestation.error !== null && (
             <div role="alert">
               <Text as="p" size="sm">
