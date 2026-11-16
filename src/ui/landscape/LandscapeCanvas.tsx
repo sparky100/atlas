@@ -10,6 +10,7 @@ import { elementTypeGlyph } from '../components/ElementTypeGlyph/glyph';
 import { attributesRecord } from '../elements/attributesRecord';
 import { isIntegrationPlatform } from '../elements/systemKind';
 import { BOUNDARY_MARGIN, computeLandscapeChannels, laneAt, laneLabelLeftInset, NODE_HEIGHT, NODE_WIDTH, REFERENCE_CHIP_HEIGHT, REFERENCE_CHIP_WIDTH, routeLandscapeEdge, viaPositionFor, type LandscapeLayout, type LandscapeNodePosition } from './layout';
+import { isAiAgent } from '../../engine/elementRead/aiAgent';
 import { landscapeTileColourFor } from './landscapeColour';
 import { quantizeScale, wheelZoomFactor } from './zoom';
 import { DIFF_MARKER, diffBorderColour, polylineMidpoint } from '../components/DiffBadge/diffCanvas';
@@ -765,7 +766,7 @@ export function LandscapeCanvas({
         }
       }
 
-      const nodeLabels: { glyph: string; name: string; worldX: number; worldY: number; truncateToNarrow: boolean }[] = [];
+      const nodeLabels: { glyph: string; name: string; worldX: number; worldY: number; truncateToNarrow: boolean; aiAgent: boolean }[] = [];
       const diffMarkers: { text: string; worldX: number; worldY: number; colour: string }[] = [];
       // B4's "no primary -> most recently added decides, with a '+N' chip
       // listing the rest" — top-right corner (diff markers already own
@@ -862,7 +863,7 @@ export function LandscapeCanvas({
         const totalCount = threadCountsForNode?.total ?? 0;
         if (showLabels) {
           const glyph = elementType === 'actor' ? elementTypeGlyph('actor', attributesRecord(element.attributes).subtype as ActorSubtype | undefined) : elementTypeGlyph('system');
-          nodeLabels.push({ glyph, name: element.name, worldX: x, worldY: y, truncateToNarrow: totalCount > 0 });
+          nodeLabels.push({ glyph, name: element.name, worldX: x, worldY: y, truncateToNarrow: totalCount > 0, aiAgent: elementType === 'system' && isAiAgent(element) });
         }
         if (diff && elementType === 'system' && DIFF_MARKER[nodeState] !== '') {
           const label = nodeState === 'changed' ? `${DIFF_MARKER[nodeState]}${String(nodeDiff?.changedAttributes.length ?? 0)}` : DIFF_MARKER[nodeState];
@@ -964,6 +965,24 @@ export function LandscapeCanvas({
           const maxWidth = (label.truncateToNarrow ? NODE_WIDTH - 34 - 26 : NODE_WIDTH - 34) * transform.scale;
           const truncated = truncate(ctx, label.name, maxWidth);
           ctx.fillText(truncated, x + 30 * transform.scale, y + screenNodeHeight / 2);
+          if (label.aiAgent) {
+            // A plain outlined "AI" tag, bottom-left under the glyph: no fill colour of its own, so it never competes with colour-by or diff tints, and clear of the top-corner badges and bottom-right comment marker.
+            const tagW = 20 * transform.scale;
+            const tagH = 13 * transform.scale;
+            const tagX = x + 6 * transform.scale;
+            const tagY = y + screenNodeHeight - 4 * transform.scale - tagH;
+            roundRectPath(ctx, tagX, tagY, tagW, tagH, 3 * transform.scale);
+            ctx.fillStyle = tokens.surfaceRaised;
+            ctx.fill();
+            ctx.strokeStyle = tokens.borderStrong;
+            ctx.lineWidth = 1;
+            ctx.stroke();
+            ctx.fillStyle = tokens.textMuted;
+            ctx.font = `600 ${(9 * textScale).toFixed(2)}px sans-serif`;
+            ctx.textAlign = 'center';
+            ctx.fillText('AI', tagX + tagW / 2, tagY + tagH / 2 + 0.5);
+            ctx.textAlign = 'left';
+          }
         }
 
         // S1 item 11a: an actor's own `uses` edge verb phrase, centred on

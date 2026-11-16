@@ -2,6 +2,8 @@ import { Plug } from 'lucide-react';
 import { Fragment, useMemo, useState } from 'react';
 import { Link } from 'react-router';
 import type { UUID } from '../../contracts/delta';
+import { AiAgentTag } from '../components/AiAgentTag/AiAgentTag';
+import { aiAutonomyOf } from '../../engine/elementRead/aiAgent';
 import { Chip } from '../components/Chip/Chip';
 import { EmptyState } from '../components/EmptyState/EmptyState';
 import { Text } from '../components/Text/Text';
@@ -183,8 +185,8 @@ export function IntegrationsView({ data, elementHref }: IntegrationsViewProps) {
                         <tr>
                           <td><PlatformCell row={row} elementHref={elementHref} /></td>
                           <td>{row.integrationInterface ? <Link to={elementHref(row.integrationInterface.element_id)}>{row.integrationInterface.name}</Link> : row.platform ? <Text as="span" tone="faint" size="sm">No interface named</Text> : <Text as="span" tone="faint" size="sm">—</Text>}</td>
-                          <td><Link to={elementHref(row.source.element_id)}>{row.sourceName}</Link></td>
-                          <td><Link to={elementHref(row.target.element_id)}>{row.targetName}</Link></td>
+                          <td><Link to={elementHref(row.source.element_id)}>{row.sourceName}</Link> <AgentTagFor element={row.source} /></td>
+                          <td><Link to={elementHref(row.target.element_id)}>{row.targetName}</Link> <AgentTagFor element={row.target} /></td>
                           <td><Text as="span" size="sm" tone="muted">{row.linkType === 'uses' ? 'uses' : 'flows to'}</Text></td>
                           <td>{row.protocol ? <Text as="span" size="sm">{row.protocol}</Text> : <Text as="span" tone="faint" size="sm">Not recorded</Text>}</td>
                           <td>{row.dataClassification ? <Chip tone="info">{row.dataClassification}</Chip> : <Text as="span" tone="faint" size="sm">—</Text>}</td>
@@ -262,4 +264,10 @@ function RowDetail({ row, elementHref }: { row: IntegrationRow; elementHref: (id
       {!row.description && !row.integrationInterface && row.platform && <Text as="p" size="sm" tone="muted">Goes through the platform; no interface or description recorded.</Text>}
     </div>
   );
+}
+
+/** The plain "AI" tag after an endpoint that is an AI agent; nothing for any other element. */
+function AgentTagFor({ element }: { element: IntegrationRow['source'] }) {
+  const autonomy = element.element_type === 'system' ? aiAutonomyOf(element) : null;
+  return autonomy === null ? null : <AiAgentTag autonomy={autonomy} />;
 }

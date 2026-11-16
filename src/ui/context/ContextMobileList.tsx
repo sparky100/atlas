@@ -2,6 +2,8 @@ import { useId, useState } from 'react';
 import { Link } from 'react-router';
 import type { ActorSubtype, UUID } from '../../contracts/delta';
 import type { RelationshipsHeadRow } from '../../contracts/rows';
+import { AiAgentTag } from '../components/AiAgentTag/AiAgentTag';
+import { aiAutonomyOf } from '../../engine/elementRead/aiAgent';
 import { Chip } from '../components/Chip/Chip';
 import { ElementTypeGlyph } from '../components/ElementTypeGlyph/ElementTypeGlyph';
 import { Text } from '../components/Text/Text';
@@ -133,6 +135,7 @@ function NeighbourRow({
   const actorSubtype = element.element_type === 'actor' && typeof attrs.subtype === 'string' ? (attrs.subtype as ActorSubtype) : undefined;
   const lifecycleStatus = (element.element_type === 'system' || element.element_type === 'container') && typeof attrs.lifecycleStatus === 'string' ? attrs.lifecycleStatus : null;
   const lifecycleTone = lifecycleStatus !== null ? lifecycleToneFor(lifecycleStatus) : undefined;
+  const autonomy = element.element_type === 'system' ? aiAutonomyOf(element) : null;
   // Only an actor neighbour has no Context view of its own (S1 item 11a) —
   // a container gets one just like a system does, per V3.
   const href = element.element_type === 'system' || element.element_type === 'container' ? neighbourContextHref(element.element_id) : elementHref(element.element_id);
@@ -144,6 +147,7 @@ function NeighbourRow({
         <Text as="span" className={styles.rowName}>
           {neighbour.displayName}
         </Text>
+        {autonomy !== null && <AiAgentTag autonomy={autonomy} />}
         {lifecycleTone !== undefined && lifecycleStatus !== null && <span className={styles.lifecycleDot} data-tone={lifecycleTone} role="img" aria-label={lifecycleStatus} title={lifecycleStatus} />}
         {/* V1's mobile list groups by direction, not internal/external (its
             own wording never asks for a second split) — "external" stays a

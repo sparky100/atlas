@@ -7,6 +7,8 @@ import type { UseElementRenameResult } from '../../elements/useElementRename';
 import { Button } from '../Button/Button';
 import { Link } from 'react-router';
 import { LinkButton } from '../Button/LinkButton';
+import { aiAutonomyOf } from '../../../engine/elementRead/aiAgent';
+import { AiAgentTag, AiAutonomyChip } from '../AiAgentTag/AiAgentTag';
 import { Chip } from '../Chip/Chip';
 import { ElementTypeGlyph } from '../ElementTypeGlyph/ElementTypeGlyph';
 import { FactBadge } from '../FactBadge/FactBadge';
@@ -211,6 +213,7 @@ export function ElementHeader({ element, existsFact, existsSource, onEdit, onCon
   // way `lifecycleStatus` above only ever renders for the types that carry
   // it despite no explicit `element_type` check here either.
   const version = typeof attrs.version === 'string' ? attrs.version : null;
+  const autonomy = element.element_type === 'system' ? aiAutonomyOf(element) : null;
   const isExternal = attrs.isExternal === true;
   const externalOrganisation = typeof attrs.externalOrganisation === 'string' ? attrs.externalOrganisation : null;
 
@@ -280,6 +283,12 @@ export function ElementHeader({ element, existsFact, existsSource, onEdit, onCon
           <Text as="span" tone="muted" size="sm">
             {version}
           </Text>
+        )}
+        {autonomy !== null && (
+          <>
+            <AiAgentTag autonomy={autonomy} />
+            <AiAutonomyChip autonomy={autonomy} />
+          </>
         )}
         {interfacePlatform && <Chip tone="neutral">{interfacePlatform.typeLabel ? `Interface · ${interfacePlatform.typeLabel}` : 'Interface'}</Chip>}
         {interfacePlatform && (

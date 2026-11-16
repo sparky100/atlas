@@ -4,6 +4,7 @@ import type { ActorSubtype, UUID } from '../../contracts/delta';
 import type { ElementsHeadRow } from '../../contracts/rows';
 import type { ElementVersionDiff, RelationshipVersionDiff, VersionDiff } from '../../engine/versionDiff';
 import { DIFF_MARKER, diffBorderColour, edgeDiffState, polylineMidpoint } from '../components/DiffBadge/diffCanvas';
+import { isAiAgent } from '../../engine/elementRead/aiAgent';
 import { elementTypeGlyph } from '../components/ElementTypeGlyph/glyph';
 import { attributesRecord } from '../elements/attributesRecord';
 import { lifecycleToneFor } from '../elements/lifecycleTone';
@@ -382,7 +383,7 @@ export function ContextDiagramCanvas({ group, layoutWidthHint, neighbourContextH
       const hoveredEdge = layout.edges.find((e) => e.id === hoveredEdgeId);
       if (hoveredEdge) drawEdge(hoveredEdge, true);
 
-      const nodeLabels: { glyph: string; name: string; worldX: number; worldY: number; maxWidth: number }[] = [];
+      const nodeLabels: { glyph: string; name: string; worldX: number; worldY: number; maxWidth: number; tileHeight: number; aiAgent: boolean }[] = [];
 
       const drawTile = (tile: DiagramTile, isHub: boolean): void => {
         const element = elementsById.get(tile.elementId);
@@ -418,7 +419,7 @@ export function ContextDiagramCanvas({ group, layoutWidthHint, neighbourContextH
 
         if (showLabels) {
           const glyph = element.element_type === 'actor' ? elementTypeGlyph('actor', attributesRecord(element.attributes).subtype as ActorSubtype | undefined) : elementTypeGlyph(element.element_type);
-          nodeLabels.push({ glyph, name: displayName, worldX: tile.x, worldY: tile.y + tile.h / 2, maxWidth: tile.w - 30 });
+          nodeLabels.push({ glyph, name: displayName, worldX: tile.x, worldY: tile.y + tile.h / 2, maxWidth: tile.w - 30, tileHeight: tile.h, aiAgent: element.element_type === 'system' && isAiAgent(element) });
         }
       };
 
@@ -445,6 +446,24 @@ export function ContextDiagramCanvas({ group, layoutWidthHint, neighbourContextH
         lines.forEach((line, i) => {
           ctx.fillText(line, x + 26 * transform.scale, startY + i * lineHeight);
         });
+        if (label.aiAgent) {
+          // A plain outlined "AI" tag under the glyph, left of the name: no fill colour of its own, so it never competes with status or diff tints.
+          const tagW = 18 * transform.scale;
+          const tagH = 13 * transform.scale;
+          const tagX = x + 6 * transform.scale;
+          const tagY = y + (label.tileHeight / 2 - 4) * transform.scale - tagH;
+          roundRectPath(ctx, tagX, tagY, tagW, tagH, 3 * transform.scale);
+          ctx.fillStyle = tokens.surfaceRaised;
+          ctx.fill();
+          ctx.strokeStyle = tokens.borderStrong;
+          ctx.lineWidth = 1;
+          ctx.stroke();
+          ctx.fillStyle = tokens.textMuted;
+          ctx.font = `600 ${(9 * textScale).toFixed(2)}px sans-serif`;
+          ctx.textAlign = 'center';
+          ctx.fillText('AI', tagX + tagW / 2, tagY + tagH / 2 + 0.5);
+          ctx.textAlign = 'left';
+        }
       }
 
       // The state markers (§8.4: never colour alone) — "+" added, "−" removed, "~N" changed — on the changed edge's midpoint or the tile's top-right corner, in the same diff colour.
