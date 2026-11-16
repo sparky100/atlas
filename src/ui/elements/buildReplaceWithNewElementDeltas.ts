@@ -12,7 +12,6 @@ export interface ReplaceWithNewElementInput {
   facts: Map<string, FactsRow>;
   /** A's own live relationships (`ElementPageData.relationships`) — same input `useElementRetire.ts` already takes, no new round trip. */
   relationships: readonly RelationshipsHeadRow[];
-  relationshipFacts: ReadonlyMap<UUID, Map<string, FactsRow>>;
   plannedEnd: string;
   /** The new element's (B's) own name — everything else about B is left blank (`defaultCreateAttributes`'s own required-field defaults only), never copied from A: a replacement is usually a different real product (different vendor/version/hosting), so carrying A's values over could silently mislead. */
   replacementName: string;
@@ -64,7 +63,7 @@ export interface ReplaceWithNewElementResult {
  * for a comparably complex multi-delta operation.
  */
 export function buildReplaceWithNewElementDeltas(input: ReplaceWithNewElementInput): ReplaceWithNewElementResult {
-  const { element, facts, relationships, relationshipFacts, plannedEnd, replacementName, sourceId, onMain } = input;
+  const { element, facts, relationships, plannedEnd, replacementName, sourceId, onMain } = input;
   const deltas: Delta[] = [];
   const newElementId = crypto.randomUUID();
 
@@ -113,22 +112,12 @@ export function buildReplaceWithNewElementDeltas(input: ReplaceWithNewElementInp
     confidence: 1,
   } as Delta);
 
-  const previousDeltaFor = (relationshipId: UUID, existsDeltaId: UUID) => relationshipFacts.get(relationshipId)?.get('$exists')?.delta_id ?? existsDeltaId;
-
   // Supports: A is always the `from` side (system/container → capability,
   // ADR-000's own "platforms and modules" amendment) — same transfer
   // `useElementRetire.ts` already builds.
   for (const edge of relationships) {
     if (edge.relationship_type !== 'supports' || edge.from_element_id !== element.element_id) continue;
-    deltas.push({
-      kind: 'relationship.retract',
-      id: crypto.randomUUID(),
-      relationshipId: edge.relationship_id,
-      relationshipType: 'supports',
-      previousDeltaId: previousDeltaFor(edge.relationship_id, edge.exists_delta_id),
-      sourceId,
-      confidence: 1,
-    });
+    // Copy, never move: A keeps its own link until its planned end passes.
     const description = attributesRecord(edge.attributes).description;
     deltas.push({
       kind: 'relationship.create',
@@ -141,38 +130,6 @@ export function buildReplaceWithNewElementDeltas(input: ReplaceWithNewElementInp
       sourceId,
       confidence: 1,
     });
-  }
-
-  // uses/flows_to: A can be either side of the edge — swap only the side
-  // A was on, leaving the other endpoint (and every other attribute —
-  // description, dataClassification, protocol, via) unchanged. No
-  // primary/secondary role to worry about here (RELATIONSHIP_TYPE_RULES
-  // only ever caps `supports`/`owns`), so this is a plain substitution.
-  for (const edge of relationships) {
-    if (edge.relationship_type !== 'uses' && edge.relationship_type !== 'flows_to') continue;
-    const aIsFrom = edge.from_element_id === element.element_id;
-    const aIsTo = edge.to_element_id === element.element_id;
-    if (!aIsFrom && !aIsTo) continue;
-    deltas.push({
-      kind: 'relationship.retract',
-      id: crypto.randomUUID(),
-      relationshipId: edge.relationship_id,
-      relationshipType: edge.relationship_type,
-      previousDeltaId: previousDeltaFor(edge.relationship_id, edge.exists_delta_id),
-      sourceId,
-      confidence: 1,
-    });
-    deltas.push({
-      kind: 'relationship.create',
-      id: crypto.randomUUID(),
-      relationshipId: crypto.randomUUID(),
-      relationshipType: edge.relationship_type,
-      fromElementId: aIsFrom ? newElementId : edge.from_element_id,
-      toElementId: aIsTo ? newElementId : edge.to_element_id,
-      attributes: edge.attributes,
-      sourceId,
-      confidence: 1,
-    } as Delta);
   }
 
   deltas.push(buildReplacesDelta(newElementId, element.element_id, sourceId));

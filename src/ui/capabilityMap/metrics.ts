@@ -93,9 +93,9 @@ import { dispositionLabel, dispositionOf, dispositionTone, worstDisposition } fr
 import { AI_AUTONOMY_TONE } from '../elements/aiAutonomyTone';
 import { domainOf } from '../elements/systemDomain';
 import { aiAutonomyOf, aiAutonomyRank, usesAi } from '../../engine/elementRead/aiAgent';
-import { fitForPurposeOf, hasLifecycleExposureData, replacedElementIds, systemsExposedByLifecycle, worstFitForPurposeOfSupporter } from '../../engine/elementRead/fitAndExposure';
+import { fitForPurposeOf, hasLifecycleExposureData, replacedElementIds, supportsEdgesInForce, systemsExposedByLifecycle, worstFitForPurposeOfSupporter } from '../../engine/elementRead/fitAndExposure';
 
-export { fitForPurposeOf, hasLifecycleExposureData, replacedElementIds, systemsExposedByLifecycle, worstFitForPurposeOfSupporter };
+export { fitForPurposeOf, hasLifecycleExposureData, replacedElementIds, supportsEdgesInForce, systemsExposedByLifecycle, worstFitForPurposeOfSupporter };
 
 // The mode identifiers themselves are canonical in src/contracts/userPreferences.ts
 // (Sprint U4-1 C4: they're now persisted, `user_preferences.capability_map_colour_by`)

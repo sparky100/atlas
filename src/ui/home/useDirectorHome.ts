@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import type { UUID } from '../../contracts/delta';
 import type { ElementsHeadRow } from '../../contracts/rows';
+import { supportsEdgesInForce } from '../../engine/elementRead/fitAndExposure';
 import { listChangeBranches } from '../../db/branches';
 import { listCapabilitiesForMap } from '../../db/capabilityMap';
 import { listOwnsEdges } from '../../db/elementBrowse';
@@ -130,8 +131,10 @@ export function useDirectorHome(
       // `computeSelfOwnedCapabilityIds`) — the whole model's capabilities,
       // not just level-1, since a business owner can sit anywhere in the
       // tree and still roll up to its level-1 ancestor.
-      const selfOwnedIds = computeSelfOwnedCapabilityIds(capabilities, supportsEdges, ownsEdges);
-      const tiles = buildCapabilityTiles(level1Capabilities, capabilities, supportsEdges, systemsById, plannedReplacements, selfOwnedIds);
+      // A system past its planned end stops counting as supporting a capability (Retire copies links to the replacement and keeps the old ones).
+      const supportsInForce = supportsEdgesInForce(supportsEdges, systemsById);
+      const selfOwnedIds = computeSelfOwnedCapabilityIds(capabilities, supportsInForce, ownsEdges);
+      const tiles = buildCapabilityTiles(level1Capabilities, capabilities, supportsInForce, systemsById, plannedReplacements, selfOwnedIds);
       const exposedCount = tiles.filter((t) => t.tone === 'warn' || t.tone === 'info').length;
       const unrecordedCount = tiles.filter((t) => t.tone === 'neutral').length;
 
