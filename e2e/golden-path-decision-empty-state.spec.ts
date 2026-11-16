@@ -27,10 +27,9 @@ test('two like-for-like options with no commits of their own show the empty-stat
     ['vendor-a', 'Vendor A'],
     ['vendor-b', 'Vendor B'],
   ];
-  for (const [name, title] of optionSpecs) {
+  for (const [, title] of optionSpecs) {
     await page.getByRole('button', { name: '+ Add an option' }).click();
-    await page.getByPlaceholder('Name (e.g. replace-with-workday)').fill(name);
-    await page.getByPlaceholder('Title (e.g. Replace with Workday)').fill(title);
+    await page.getByPlaceholder("What's this option? (e.g. Replace with Workday)").fill(title);
     await page.getByRole('button', { name: 'Add option' }).click();
     await expect(page.getByText(title).first()).toBeVisible();
   }

@@ -25,7 +25,7 @@ function seedSystemDelta(elementId: string, name: string, sourceId: string): Del
 async function createChangeFromChangesPage(page: Page, orgSlug: string, modelSlug: string, name: string, intent: 'record' | 'propose'): Promise<void> {
   await page.goto(`/o/${orgSlug}/m/${modelSlug}/changes`);
   const form = page.locator('form').filter({ has: page.getByRole('button', { name: 'Create change' }) });
-  await form.getByPlaceholder('Name (e.g. retire-legacy-crm)').fill(name);
+  await form.getByPlaceholder("What's this change? (e.g. Retire the legacy CRM)").fill(name);
   await form.getByRole('combobox').first().selectOption(intent);
   await form.getByRole('button', { name: 'Create change' }).click();
 }

@@ -67,8 +67,7 @@ test('an option that removes an IT/OT boundary crossing shows only the scoped-cr
   // — decision-side-completion item 5).
   const optionTitle = 'Remove the crossing';
   await page.getByRole('button', { name: '+ Add an option' }).click();
-  await page.getByPlaceholder('Name (e.g. replace-with-workday)').fill('remove-crossing');
-  await page.getByPlaceholder('Title (e.g. Replace with Workday)').fill(optionTitle);
+  await page.getByPlaceholder("What's this option? (e.g. Replace with Workday)").fill(optionTitle);
   await page.getByRole('button', { name: 'Add option' }).click();
   await expect(page.getByText(optionTitle).first()).toBeVisible();
 

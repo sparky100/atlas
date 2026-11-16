@@ -11,7 +11,7 @@ export interface AddOptionInput {
   orgId: UUID;
   modelId: UUID;
   decisionId: UUID;
-  name: string;
+  /** What the person typed — the short code behind the option is made from it. */
   title: string;
   userId: UUID;
   /** ADR-024 P1: the decision's own project — an option is always created in it (the database refuses a mismatched option link). */
@@ -67,9 +67,9 @@ export function useDecisionOptions(
 
   const addOption = useCallback(
     async (input: AddOptionInput): Promise<boolean> => {
-      const trimmedName = input.name.trim();
-      if (trimmedName.length === 0) {
-        setError('Name cannot be empty.');
+      const trimmedTitle = input.title.trim();
+      if (trimmedTitle.length === 0) {
+        setError('Say what this option is first.');
         return false;
       }
       setError(null);
@@ -84,8 +84,7 @@ export function useDecisionOptions(
           id: crypto.randomUUID(),
           orgId: input.orgId,
           modelId: input.modelId,
-          name: trimmedName,
-          ...(input.title.trim().length > 0 ? { title: input.title.trim() } : {}),
+          title: trimmedTitle,
           createdBy: input.userId,
           mainHeadCommitId: main.head_commit_id,
           intent: 'explore',

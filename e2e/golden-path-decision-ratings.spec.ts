@@ -28,10 +28,9 @@ test('rate decision options on judgement criteria, leave some unrated, choose on
     ['option-a', 'Option 1'],
     ['option-b', 'Option 2'],
   ];
-  for (const [name, title] of optionSpecs) {
+  for (const [, title] of optionSpecs) {
     await page.getByRole('button', { name: '+ Add an option' }).click();
-    await page.getByPlaceholder('Name (e.g. replace-with-workday)').fill(name);
-    await page.getByPlaceholder('Title (e.g. Replace with Workday)').fill(title);
+    await page.getByPlaceholder("What's this option? (e.g. Replace with Workday)").fill(title);
     await page.getByRole('button', { name: 'Add option' }).click();
     await expect(page.getByText(title).first()).toBeVisible();
   }

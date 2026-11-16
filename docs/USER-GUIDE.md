@@ -197,7 +197,7 @@ Every change says **why** it exists:
 - **Correct** — the record was wrong.
 - **Explore** — a candidate future, created as an option inside a decision.
 
-**Working in a change.** Create one from **Changes** (or **Propose a change** on an element page), then use **Edit in this change** in the banner at the top of the page: every edit you make while it shows **Editing in this change** goes into the change, not main. The change page shows what it touches.
+**Working in a change.** Create one from **Changes** (or **Propose a change** on an element page): type what the change is in the one box, "What's this change?" (for example *Retire the legacy CRM*), add an optional description, choose **Why** and, where asked, a date. Atlas makes any short code it needs itself, so there is no name to invent. Then use **Edit in this change** in the banner at the top of the page: every edit you make while it shows **Editing in this change** goes into the change, not main. The change page shows what it touches.
 
 **The change page.** The main action for the change's stage sits in the header (**Submit for review**, **Approve & merge** and so on), so you don't have to hunt for it. The details are on the left (description, what the change does, its parts, comments) and the impact is on the right (affected capabilities and value streams, and other open changes touching the same elements). A section with nothing in it is hidden. The change's page also shows its project and the decisions it belongs to.
 

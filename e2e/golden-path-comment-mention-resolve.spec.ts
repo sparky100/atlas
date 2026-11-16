@@ -41,8 +41,7 @@ test('comment on an element from a change\'s view, mention a member, see it in t
   await page.getByRole('link', { name: /goldenpath8 Model/ }).click();
   await page.getByRole('link', { name: 'Changes' }).click();
   const changeTitle = 'Add a draft-only system';
-  await page.getByPlaceholder('Name (e.g. retire-legacy-crm)').fill('add-draft-system');
-  await page.getByPlaceholder('Title (e.g. Retire the legacy CRM)').fill(changeTitle);
+  await page.getByPlaceholder("What's this change? (e.g. Retire the legacy CRM)").fill(changeTitle);
   await page.getByRole('button', { name: 'Create change' }).click();
   await expect(page.getByRole('heading', { name: changeTitle })).toBeVisible();
 

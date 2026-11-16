@@ -47,8 +47,7 @@ test('cancel a decision: it stays in the log as cancelled with its reason, its d
   await page.getByRole('button', { name: 'Start decision' }).click();
   await expect(page.getByRole('heading', { name: DECISION })).toBeVisible();
   await page.getByRole('button', { name: '+ Add an option' }).click();
-  await page.getByPlaceholder('Name (e.g. replace-with-workday)').fill('datasphere');
-  await page.getByPlaceholder('Title (e.g. Replace with Workday)').fill('Move to Datasphere');
+  await page.getByPlaceholder("What's this option? (e.g. Replace with Workday)").fill('Move to Datasphere');
   await page.getByRole('button', { name: 'Add option' }).click();
   await expect(page.getByText('Move to Datasphere').first()).toBeVisible();
 

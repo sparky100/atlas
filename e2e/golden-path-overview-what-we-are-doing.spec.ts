@@ -50,7 +50,7 @@ test("Overview's \"What we're doing\" shows a project and a decision outside any
   const changeName = `fix-typo-${randomUUID().slice(0, 8)}`;
   await clickNavItem(page, 'Changes');
   const form = page.locator('form').filter({ has: page.getByRole('button', { name: 'Create change' }) });
-  await form.getByPlaceholder('Name (e.g. retire-legacy-crm)').fill(changeName);
+  await form.getByPlaceholder("What's this change? (e.g. Retire the legacy CRM)").fill(changeName);
   await form.getByRole('combobox').first().selectOption('correct');
   await form.getByRole('button', { name: 'Create change' }).click();
   await expect(page.getByRole('heading', { name: /Correction/ })).toBeVisible();

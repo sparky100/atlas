@@ -8,7 +8,7 @@ import { supabase } from '../supabaseClient';
 export type ChangesStatus = 'loading' | 'idle' | 'creating';
 
 export interface CreateChangeInput {
-  name: string;
+  /** What the person typed ("Retire the legacy CRM") — the short code behind the change is made from it (`changeNameFromTitle`). */
   title: string;
   description: string;
   /** ISO `date` string (`YYYY-MM-DD`), or `''` for no target date. */
@@ -82,9 +82,9 @@ export function useChanges(modelId: UUID, orgId: UUID, userId: UUID | null): Use
         setError('You must be signed in to create a change.');
         return null;
       }
-      const trimmedName = input.name.trim();
-      if (trimmedName.length === 0) {
-        setError('Name cannot be empty.');
+      const trimmedTitle = input.title.trim();
+      if (trimmedTitle.length === 0) {
+        setError('Say what this change is first.');
         return null;
       }
       if (!mainHeadCommitId) {
@@ -99,8 +99,7 @@ export function useChanges(modelId: UUID, orgId: UUID, userId: UUID | null): Use
           id: crypto.randomUUID(),
           orgId,
           modelId,
-          name: trimmedName,
-          ...(input.title.trim().length > 0 ? { title: input.title.trim() } : {}),
+          title: trimmedTitle,
           ...(input.description.trim().length > 0 ? { description: input.description.trim() } : {}),
           ...(input.targetDate.trim().length > 0 ? { targetDate: input.targetDate.trim() } : {}),
           createdBy: userId,

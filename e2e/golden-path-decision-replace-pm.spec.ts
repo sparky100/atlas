@@ -33,8 +33,7 @@ test('retiring PM on an option, with a real replacement picked, shows the Outcom
   // One option, selected as the session's editing ref.
   const optionTitle = 'Replace PM with Hana';
   await page.getByRole('button', { name: '+ Add an option' }).click();
-  await page.getByPlaceholder('Name (e.g. replace-with-workday)').fill('replace-pm-with-hana');
-  await page.getByPlaceholder('Title (e.g. Replace with Workday)').fill(optionTitle);
+  await page.getByPlaceholder("What's this option? (e.g. Replace with Workday)").fill(optionTitle);
   await page.getByRole('button', { name: 'Add option' }).click();
   await expect(page.getByText(optionTitle).first()).toBeVisible();
 

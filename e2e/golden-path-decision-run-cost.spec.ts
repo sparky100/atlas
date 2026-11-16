@@ -40,8 +40,7 @@ test('replacing a costed system with a costed alternative on an option shows the
 
   const optionTitle = 'Replace PM with Hana';
   await page.getByRole('button', { name: '+ Add an option' }).click();
-  await page.getByPlaceholder('Name (e.g. replace-with-workday)').fill('replace-pm-with-hana');
-  await page.getByPlaceholder('Title (e.g. Replace with Workday)').fill(optionTitle);
+  await page.getByPlaceholder("What's this option? (e.g. Replace with Workday)").fill(optionTitle);
   await page.getByRole('button', { name: 'Add option' }).click();
   await expect(page.getByText(optionTitle).first()).toBeVisible();
 

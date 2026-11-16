@@ -26,7 +26,7 @@ test('submitting for review from the banner on an element page (not the change p
   // own `setRef` on create), same as clicking "Edit in this change" would.
   await page.goto(`/o/${orgSlug}/m/${modelSlug}/changes`);
   const changeName = `retire-ledger-banner-${randomUUID().slice(0, 8)}`;
-  await page.getByPlaceholder('Name (e.g. retire-legacy-crm)').fill(changeName);
+  await page.getByPlaceholder("What's this change? (e.g. Retire the legacy CRM)").fill(changeName);
   await page.getByRole('button', { name: 'Create change' }).click();
   await expect(page).toHaveURL(new RegExp(`/o/${orgSlug}/m/${modelSlug}/changes/`));
   await expect(page.getByText(`Editing in change: ${changeName}`)).toBeVisible();

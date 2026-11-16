@@ -67,10 +67,9 @@ test('two like-for-like options with no commits of their own show the empty-stat
 
   // 2. Add two options — neither one gets a single extra commit.
   const optionNames = ['option-a', 'option-b'].map((n) => `${n}-${randomUUID().slice(0, 8)}`);
-  for (const [i, name] of optionNames.entries()) {
+  for (const [i] of optionNames.entries()) {
     await page.getByRole('button', { name: '+ Add an option' }).click();
-    await page.getByPlaceholder('Name (e.g. replace-with-workday)').fill(name);
-    await page.getByPlaceholder('Title (e.g. Replace with Workday)').fill(`Option ${String(i + 1)}`);
+    await page.getByPlaceholder("What's this option? (e.g. Replace with Workday)").fill(`Option ${String(i + 1)}`);
     await page.getByRole('button', { name: 'Add option' }).click();
     await expect(page.getByText('Option ' + String(i + 1))).toBeVisible();
   }

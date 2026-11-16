@@ -30,8 +30,7 @@ test('search anywhere: find a system, a change and a decision from any page, by 
   // A change, left straight away so the session stays on main.
   await goToModelHome(page);
   await clickNavItem(page, 'Changes');
-  await page.getByPlaceholder('Name (e.g. retire-legacy-crm)').fill('retire-meter-hub');
-  await page.getByPlaceholder('Title (e.g. Retire the legacy CRM)').fill('Retire the meter hub');
+  await page.getByPlaceholder("What's this change? (e.g. Retire the legacy CRM)").fill('Retire the meter hub');
   await page.getByRole('button', { name: 'Create change' }).click();
   await expect(page.getByRole('heading', { name: 'Retire the meter hub' })).toBeVisible();
   await page.getByRole('button', { name: 'Back to the live model' }).click();

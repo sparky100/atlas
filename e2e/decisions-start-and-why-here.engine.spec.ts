@@ -66,8 +66,7 @@ test('start a decision from a critical-support-end health finding, choose the on
   // only enough to get an accepted decision to look up from the system's
   // own page).
   await page.getByRole('button', { name: '+ Add an option' }).click();
-  await page.getByPlaceholder('Name (e.g. replace-with-workday)').fill(`replacement-${randomUUID().slice(0, 8)}`);
-  await page.getByPlaceholder('Title (e.g. Replace with Workday)').fill('Replace with Workday');
+  await page.getByPlaceholder("What's this option? (e.g. Replace with Workday)").fill('Replace with Workday');
   await page.getByRole('button', { name: 'Add option' }).click();
   await expect(page.getByText('Replace with Workday')).toBeVisible();
 

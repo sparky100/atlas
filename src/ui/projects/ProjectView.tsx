@@ -439,7 +439,6 @@ function NewDecisionForm({ project, userId, base }: { project: ProjectRow; userI
 /** Step 4: "New change" from the project page — created inside the project (`branches.project_id`). */
 function NewChangeForm({ project, userId, mainHeadCommitId, base }: { project: ProjectRow; userId: UUID; mainHeadCommitId: UUID; base: string }) {
   const navigate = useNavigate();
-  const [name, setName] = useState('');
   const [title, setTitle] = useState('');
   const [intent, setIntent] = useState<BranchIntent>('propose');
   const [targetDate, setTargetDate] = useState('');
@@ -452,15 +451,14 @@ function NewChangeForm({ project, userId, mainHeadCommitId, base }: { project: P
       className={styles.inlineForm}
       onSubmit={(e) => {
         e.preventDefault();
-        if (name.trim().length === 0 || dateMissing) return;
+        if (title.trim().length === 0 || dateMissing) return;
         setBusy(true);
         setError(null);
         void createChangeBranch(supabase, {
           id: crypto.randomUUID(),
           orgId: project.org_id,
           modelId: project.model_id,
-          name: name.trim(),
-          ...(title.trim().length > 0 ? { title: title.trim() } : {}),
+          title: title.trim(),
           createdBy: userId,
           mainHeadCommitId,
           intent,
@@ -469,7 +467,7 @@ function NewChangeForm({ project, userId, mainHeadCommitId, base }: { project: P
         })
           .then((b) => navigate(`${base}/changes/${b.id}?ref=branch:${b.id}`))
           .catch((err: unknown) => {
-            setError(err instanceof Error && err.message.startsWith('A change named') ? err.message : 'Could not start this change.');
+            setError('Could not start this change.');
             reportError('Could not start this change.', err);
           })
           .finally(() => {
@@ -480,18 +478,8 @@ function NewChangeForm({ project, userId, mainHeadCommitId, base }: { project: P
       <input
         className={styles.input}
         type="text"
-        aria-label="New change name"
-        placeholder="New change in this project — name (e.g. crm-cutover)"
-        value={name}
-        onChange={(e) => {
-          setName(e.target.value);
-        }}
-      />
-      <input
-        className={styles.input}
-        type="text"
-        aria-label="New change title"
-        placeholder="Title (optional)"
+        aria-label="What's this change?"
+        placeholder="What's this change? (e.g. CRM cutover)"
         value={title}
         onChange={(e) => {
           setTitle(e.target.value);
@@ -522,7 +510,7 @@ function NewChangeForm({ project, userId, mainHeadCommitId, base }: { project: P
           }}
         />
       )}
-      <Button type="submit" disabled={busy || name.trim().length === 0 || dateMissing}>
+      <Button type="submit" disabled={busy || title.trim().length === 0 || dateMissing}>
         {busy ? 'Starting…' : 'Start change'}
       </Button>
       {error !== null && <Text as="p">{error}</Text>}

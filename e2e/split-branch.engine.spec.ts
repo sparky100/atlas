@@ -30,8 +30,7 @@ test('review queue split: accept one of two independent systems, preview, split,
   // 1. Create the change branch through the real "Changes" form.
   await page.goto(`/o/${orgSlug}/m/${modelSlug}/changes`);
   const changeTitle = 'Add two independent systems';
-  await page.getByPlaceholder('Name (e.g. retire-legacy-crm)').fill(`split-review-${randomUUID().slice(0, 8)}`);
-  await page.getByPlaceholder('Title (e.g. Retire the legacy CRM)').fill(changeTitle);
+  await page.getByPlaceholder("What's this change? (e.g. Retire the legacy CRM)").fill(changeTitle);
   await page.getByRole('button', { name: 'Create change' }).click();
   // Sticky ref: a successful create lands inside the new change's own page
   // directly — no separate "find the row, click Open →" step needed.
