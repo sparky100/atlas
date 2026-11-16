@@ -13,7 +13,7 @@ import type { ElementsHeadRow, RelationshipsHeadRow } from '../../contracts/rows
 import { attributesRecord } from '../elementRead/attributesRecord';
 import { CRITICALITY_ORDER } from '../elementRead/criticality';
 import { dispositionOf } from '../elementRead/disposition';
-import { fitForPurposeOf, hasLifecycleExposureData, systemsExposedByLifecycle, worstFitForPurposeOfSupporter } from '../elementRead/fitAndExposure';
+import { fitForPurposeOf, hasLifecycleExposureData, supportsEdgesInForce, systemsExposedByLifecycle, worstFitForPurposeOfSupporter } from '../elementRead/fitAndExposure';
 import { moduleDisplayNameFromMap } from '../elementRead/moduleDisplayName';
 import { ownersByRole } from '../elementRead/ownersByRole';
 import { annualRunCostOf, highCostOverlapsFromBands, topLevelSupporterBandsByCapability, topLevelSystemIdOf } from './portfolioOverlap';
@@ -92,6 +92,8 @@ export interface PortfolioInputs {
   /** `owns` edges into any system or module. */
   ownsEdges: readonly RelationshipsHeadRow[];
   now: Date;
+  /** ADR-001 amendment: every element with a live `replaces` edge pointing at it. A replaced system never reads as lifecycle-exposed, and never counts as an overlapping supporter of the capabilities its replacement now also supports. Optional so a caller that hasn't loaded `replaces` edges keeps the plain reading. */
+  replacedIds?: ReadonlySet<UUID>;
 }
 
 function edgesByEndpoint(edges: readonly RelationshipsHeadRow[], endpoint: 'from_element_id' | 'to_element_id'): Map<UUID, RelationshipsHeadRow[]> {
@@ -104,7 +106,7 @@ function edgesByEndpoint(edges: readonly RelationshipsHeadRow[], endpoint: 'from
   return byId;
 }
 
-export function buildPortfolioRows({ systems, containers, capabilities, actors, supportsEdges, ownsEdges, now }: PortfolioInputs): { rows: PortfolioRow[]; capabilitiesById: Map<UUID, ElementsHeadRow> } {
+export function buildPortfolioRows({ systems, containers, capabilities, actors, supportsEdges, ownsEdges, now, replacedIds }: PortfolioInputs): { rows: PortfolioRow[]; capabilitiesById: Map<UUID, ElementsHeadRow> } {
   // Every system and module container together: a module can carry its own `supports`/`owns` edges independently of its platform.
   const allElements = [...systems, ...containers];
   const elementsById = new Map<UUID, ElementsHeadRow>(allElements.map((e) => [e.element_id, e]));
@@ -112,7 +114,9 @@ export function buildPortfolioRows({ systems, containers, capabilities, actors, 
   const actorsById = new Map<UUID, ElementsHeadRow>(actors.map((a) => [a.element_id, a]));
   const supportsBySource = edgesByEndpoint(supportsEdges, 'from_element_id');
   const ownsByTarget = edgesByEndpoint(ownsEdges, 'to_element_id');
-  const bandsByCapability = topLevelSupporterBandsByCapability(supportsEdges, elementsById);
+  // Overlap and "other supporters" only count links still in force, and never from a system already replaced: a replacement's capability links are copies, so the pair overlapping is the plan, not a finding.
+  const supportsEdgesForOverlap = supportsEdgesInForce(supportsEdges, elementsById, now).filter((edge) => !replacedIds?.has(edge.from_element_id));
+  const bandsByCapability = topLevelSupporterBandsByCapability(supportsEdgesForOverlap, elementsById);
   const overlapsBySystem = new Map<UUID, string[]>();
   for (const [capabilityId, systemsWithOverlap] of highCostOverlapsFromBands(bandsByCapability)) {
     const name = capabilitiesById.get(capabilityId)?.name ?? '(unknown capability)';
@@ -145,7 +149,7 @@ export function buildPortfolioRows({ systems, containers, capabilities, actors, 
     const fit = worstFitForPurposeOfSupporter(element.element_id, support);
     const criticality = criticalityOf(element, parent);
     const lifecycleStatus = lifecycleStatusOf(element, parent);
-    const lifecycleExposed = hasLifecycleExposureData([element]) ? systemsExposedByLifecycle([element], now) : null;
+    const lifecycleExposed = hasLifecycleExposureData([element]) ? systemsExposedByLifecycle([element], now, replacedIds) : null;
 
     const capabilityLinks: PortfolioCapabilityLink[] = support
       .filter((edge) => edge.relationship_type === 'supports')

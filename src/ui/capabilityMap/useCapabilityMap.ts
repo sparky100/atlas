@@ -6,7 +6,7 @@ import { hasAnySystem, listSupportsEdgesForAllCapabilities, listCapabilitiesForM
 import { getElementsByIds } from '../../db/elements';
 import { listOwnsEdges } from '../../db/elementBrowse';
 import { computeSelfOwnedCapabilityIds, listAllReplacesEdges } from '../../db/healthFindings';
-import { replacedElementIds } from '../../engine/elementRead/fitAndExposure';
+import { replacedElementIds, supportsEdgesInForce } from '../../engine/elementRead/fitAndExposure';
 import { listAllEnablesEdges } from '../../db/valueStreams';
 import { refParamOf, resolveBranchRef, resolveRef, type Ref } from '../../db/ref';
 import type { ViewMode } from '../../db/viewMode';
@@ -211,6 +211,8 @@ export function useCapabilityMap(
 
       const view = preloadedView ?? (await getOrCreateModelView(supabase, { id: crypto.randomUUID(), orgId, modelId, kind: 'capability_map', name: 'Capability map', createdBy: currentUserId }));
       const tree = computeCapabilityMapTree(capabilities);
+      // A system past its planned end stops counting as supporting a capability (Retire copies the links to the replacement and keeps the old ones).
+      supportsEdges = supportsEdgesInForce(supportsEdges, systemsById);
       const selfOwnedIds = computeSelfOwnedCapabilityIds(capabilities, supportsEdges, ownsEdges);
 
       if (!cancelled) setState({ status: 'ready', data: { commitId, view, tree, supportsEdges, systemsById, hasSystems, capabilities, selfOwnedIds, ownsEdges, actorsById, enablesEdges, replacedIds } });

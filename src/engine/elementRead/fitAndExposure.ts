@@ -57,6 +57,36 @@ export function replacedElementIds(edges: readonly RelationshipsHeadRow[]): Set<
 }
 
 /**
+ * `true` once `element`'s own `plannedEnd` has been reached (`plannedEnd <= now`),
+ * or its parent platform's has (a module goes with its platform, the same
+ * rule `plannedFuture.ts` applies to a future view). No recorded date, or an
+ * unreadable one, reads `false` — never "ended".
+ */
+export function hasReachedPlannedEnd(element: ElementsHeadRow, elementsById: ReadonlyMap<UUID, ElementsHeadRow>, now: Date = new Date()): boolean {
+  const own = plannedEndOf(element);
+  if (own !== null && own.getTime() <= now.getTime()) return true;
+  const parent = element.parent_id !== null ? elementsById.get(element.parent_id) : undefined;
+  const parentEnd = parent ? plannedEndOf(parent) : null;
+  return parentEnd !== null && parentEnd.getTime() <= now.getTime();
+}
+
+/**
+ * The `supports` edges still "in force" today: those whose supporting system
+ * or module has not yet reached its planned end. Retire with a replacement
+ * copies the capability links to the replacement and keeps the old ones, so
+ * before the end date both systems support the capability (the truth during a
+ * migration), and from the end date the old system stops counting. An edge
+ * whose supporter isn't in `elementsById` is kept — unknown is never "ended".
+ */
+export function supportsEdgesInForce(edges: readonly RelationshipsHeadRow[], elementsById: ReadonlyMap<UUID, ElementsHeadRow>, now: Date = new Date()): RelationshipsHeadRow[] {
+  return edges.filter((edge) => {
+    if (edge.relationship_type !== 'supports') return true;
+    const supporter = elementsById.get(edge.from_element_id);
+    return !supporter || !hasReachedPlannedEnd(supporter, elementsById, now);
+  });
+}
+
+/**
  * `true` when any of `systems` has a `plannedEnd` falling within
  * `STALE_AFTER_MONTHS` of `now` — including one already overdue, which is
  * more exposed still, not less — **and** has no recorded replacement.

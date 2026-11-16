@@ -20,7 +20,6 @@ export interface RetireActionProps {
   element: ElementsHeadRow;
   facts: Map<string, FactsRow>;
   relationships: readonly RelationshipsHeadRow[];
-  relationshipFacts: ReadonlyMap<UUID, Map<string, FactsRow>>;
   /** The "replaced by" picker's own search pool — always main's real head, same reasoning `ElementSearchAdd.tsx`/`RelationshipAdd.tsx` already give. */
   searchCommitId: UUID;
   branch: BranchRow;
@@ -55,7 +54,6 @@ export function RetireAction({
   element,
   facts,
   relationships,
-  relationshipFacts,
   searchCommitId,
   branch,
   expectedHeadCommitId,
@@ -86,7 +84,6 @@ export function RetireAction({
     element,
     facts,
     relationships,
-    relationshipFacts,
     branch,
     expectedHeadCommitId,
     onRetired,
@@ -98,7 +95,6 @@ export function RetireAction({
     element,
     facts,
     relationships,
-    relationshipFacts,
     branch,
     expectedHeadCommitId,
     onReplaced: onReplacedWithNew,
@@ -115,15 +111,13 @@ export function RetireAction({
             element,
             facts,
             relationships,
-            relationshipFacts,
             plannedEnd: plannedEnd.trim() === '' ? '2099-01-01' : plannedEnd,
             replacementName: newReplacementName.trim(),
             sourceId: 'preview',
             onMain: branch.kind === 'main',
           });
           const supportsCount = deltas.filter((d) => d.kind === 'relationship.create' && (d as unknown as { relationshipType: string }).relationshipType === 'supports').length;
-          const otherCount = deltas.filter((d) => d.kind === 'relationship.create').length - supportsCount;
-          return { supportsCount, otherCount };
+          return { supportsCount };
         })()
       : null;
 
@@ -149,7 +143,7 @@ export function RetireAction({
 
       {replacement ? (
         <Text as="p" size="sm">
-          Replaced by <strong>{replacement.name}</strong> — the capabilities it supports transfer to the replacement.{' '}
+          Replaced by <strong>{replacement.name}</strong> — its capability links are copied to the replacement, and stop showing on the old one after its planned end date.{' '}
           <Button
             variant="ghost"
             onClick={() => {
@@ -238,8 +232,7 @@ export function RetireAction({
           {previewCounts && (
             <Text as="p" tone="faint" size="xs">
               This will create <strong>{newReplacementName.trim()}</strong>
-              {previewCounts.supportsCount > 0 ? `, transfer ${String(previewCounts.supportsCount)} supports ${previewCounts.supportsCount === 1 ? 'link' : 'links'}` : ''}
-              {previewCounts.otherCount > 0 ? `, ${String(previewCounts.otherCount)} other ${previewCounts.otherCount === 1 ? 'connection' : 'connections'}` : ''}, and retire &ldquo;{element.name}&rdquo;.
+              {previewCounts.supportsCount > 0 ? `, copy ${String(previewCounts.supportsCount)} capability ${previewCounts.supportsCount === 1 ? 'link' : 'links'} to it` : ''}, and retire &ldquo;{element.name}&rdquo;. Other connections stay on &ldquo;{element.name}&rdquo; for you to review.
             </Text>
           )}
           <div className={styles.actions}>

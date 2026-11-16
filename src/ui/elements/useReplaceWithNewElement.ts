@@ -20,7 +20,6 @@ export interface UseReplaceWithNewElementInput {
   element: ElementsHeadRow;
   facts: Map<string, FactsRow>;
   relationships: readonly RelationshipsHeadRow[];
-  relationshipFacts: ReadonlyMap<UUID, Map<string, FactsRow>>;
   branch: BranchRow;
   expectedHeadCommitId: UUID;
   onReplaced: (newElementId: UUID) => void;
@@ -44,7 +43,7 @@ export interface UseReplaceWithNewElementResult {
  * already does.
  */
 export function useReplaceWithNewElement(input: UseReplaceWithNewElementInput): UseReplaceWithNewElementResult {
-  const { modelId, orgId, userId, element, facts, relationships, relationshipFacts, branch, expectedHeadCommitId, onReplaced } = input;
+  const { modelId, orgId, userId, element, facts, relationships, branch, expectedHeadCommitId, onReplaced } = input;
   const [status, setStatus] = useState<ReplaceWithNewElementStatus>('idle');
   const [error, setError] = useState<string | null>(null);
   const queryClient = useQueryClient();
@@ -78,7 +77,6 @@ export function useReplaceWithNewElement(input: UseReplaceWithNewElementInput): 
           element,
           facts,
           relationships,
-          relationshipFacts,
           plannedEnd: typeof validated.value === 'string' ? validated.value : plannedEnd,
           replacementName: trimmedName,
           sourceId: source.id,
@@ -116,7 +114,7 @@ export function useReplaceWithNewElement(input: UseReplaceWithNewElementInput): 
         setError(e instanceof Error ? e.message : 'Could not replace.');
       }
     },
-    [element, facts, relationships, relationshipFacts, modelId, orgId, userId, branch, expectedHeadCommitId, onReplaced, queryClient],
+    [element, facts, relationships, modelId, orgId, userId, branch, expectedHeadCommitId, onReplaced, queryClient],
   );
 
   return { status, error, replace };

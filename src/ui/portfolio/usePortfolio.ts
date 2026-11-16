@@ -15,9 +15,11 @@
 import { useEffect, useState } from 'react';
 import type { UUID } from '../../contracts/delta';
 import type { ElementsHeadRow } from '../../contracts/rows';
+import { listAllReplacesEdges } from '../../db/healthFindings';
 import { listCapabilitiesForMap } from '../../db/capabilityMap';
 import { listActorsForLandscape, listContainersForLandscape, listOwnsEdgesForSystems, listSupportsEdgesForSystems, listSystemsForLandscape } from '../../db/landscape';
 import { refParamOf, resolveRef, type Ref } from '../../db/ref';
+import { replacedElementIds } from '../../engine/elementRead/fitAndExposure';
 import { buildPortfolioRows, type PortfolioRow } from '../../engine/portfolio/buildPortfolioRows';
 import { reportError } from '../errors/errorBannerStore';
 import { supabase } from '../supabaseClient';
@@ -67,12 +69,13 @@ export function usePortfolio(modelId: UUID, ref: Ref, mainCommitIdHint: UUID | n
       // its platform.
       const allElements = [...systems, ...containers];
       const allIds = allElements.map((e) => e.element_id);
-      const [supportsEdges, ownsEdges] = await Promise.all([
+      const [supportsEdges, ownsEdges, replacesEdges] = await Promise.all([
         listSupportsEdgesForSystems(supabase, commitId, allIds),
         listOwnsEdgesForSystems(supabase, commitId, allIds),
+        listAllReplacesEdges(supabase, commitId),
       ]);
 
-      const { rows, capabilitiesById } = buildPortfolioRows({ systems, containers, capabilities, actors, supportsEdges, ownsEdges, now: new Date() });
+      const { rows, capabilitiesById } = buildPortfolioRows({ systems, containers, capabilities, actors, supportsEdges, ownsEdges, now: new Date(), replacedIds: replacedElementIds(replacesEdges) });
 
       if (!cancelled) setState({ status: 'ready', data: { commitId, rows, capabilitiesById } });
     }
