@@ -199,4 +199,21 @@ describe('validateImportRow', () => {
     const result = validateImportRow({ name: 'PM', platform: 'SAP', support_ends_at: '2027-12-31' }, 2);
     expect(result.ok).toBe(false);
   });
+
+  it('accepts the two AI columns (owner-approved importer exception) and rejects values outside their choices', () => {
+    const ok = validateImportRow({ name: 'Fault Triage Assistant', ai_autonomy: 'suggests', ai_use: 'external_service' }, 2);
+    expect(ok.ok).toBe(true);
+    if (ok.ok) expect(ok.row.attributes).toMatchObject({ aiAutonomy: 'suggests', aiUse: 'external_service' });
+    const bad = validateImportRow({ name: 'X', ai_autonomy: 'sometimes' }, 3);
+    expect(bad.ok).toBe(false);
+    if (!bad.ok) expect(bad.error).toContain('"ai_autonomy"');
+    const badUse = validateImportRow({ name: 'X', ai_use: 'maybe' }, 4);
+    expect(badUse.ok).toBe(false);
+  });
+
+  it('leaves the AI attributes untouched when the columns are blank', () => {
+    const result = validateImportRow({ name: 'SAP', ai_autonomy: '', ai_use: null }, 2);
+    expect(result.ok).toBe(true);
+    if (result.ok) expect(result.row.attributes).toEqual({});
+  });
 });
