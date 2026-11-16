@@ -53,6 +53,9 @@ function portfolio(filters: ReportFilter[], over: Partial<ReportSpec> = {}): Rep
 
 const OVERVIEW = 'Application portfolio overview';
 const TIME = 'Rationalisation (TIME)';
+const AI_AGENTS = 'AI agents';
+/** Only systems marked as an AI agent. */
+const AGENTS_ONLY: ReportFilter = { field: 'aiAutonomy', operator: 'isNotEmpty', value: null };
 
 export const STANDARD_DASHBOARDS: readonly StandardDashboard[] = [
   {
@@ -81,6 +84,24 @@ export const STANDARD_DASHBOARDS: readonly StandardDashboard[] = [
       { name: 'Fit by run cost', description: `Where the money goes, and how well what it buys fits. Part of “${TIME}”.`, spec: portfolio([], { groupBy: 'cost', splitBy: 'fit', presentation: { kind: 'barByField' } }), kind: 'stackedBar', size: 'two' },
       { name: 'Move and switch-off candidates', description: `Most expensive first. Part of “${TIME}”.`, spec: portfolio([{ field: 'disposition', operator: 'in', value: ['eliminate', 'migrate'] }], { sort: BY_COST, columns: ['name', 'disposition', 'cost', 'fit', 'owner'] }), kind: 'table', size: 'two', rowLimit: 10 },
       { name: 'Costly, poor fit: the list', description: `Most expensive first. Part of “${TIME}”.`, spec: portfolio([{ field: 'signalKeys', operator: 'contains', value: '|costly_poor_fit|' }], { sort: BY_COST, columns: ['name', 'cost', 'fit', 'owner'] }), kind: 'table', size: 'one', rowLimit: 10 },
+    ],
+  },
+  {
+    key: 'ai-agents',
+    name: AI_AGENTS,
+    summary: 'Every AI agent in the model: how many there are, how freely they act, who owns them and what they support. An AI agent is a system with “AI agent: how it acts” filled in.',
+    tiles: [
+      { name: 'AI agents', description: `Every system marked as an AI agent. Part of “${AI_AGENTS}”.`, spec: portfolio([AGENTS_ONLY], { presentation: { kind: 'count' } }), kind: 'kpi', size: 'one' },
+      { name: 'AI agents that act alone', description: `Agents that act without anyone checking first. Part of “${AI_AGENTS}”.`, spec: portfolio([{ field: 'aiAutonomy', operator: 'eq', value: 'acts_alone' }], { presentation: { kind: 'count' } }), kind: 'kpi', size: 'one' },
+      { name: 'AI agents with no business owner', description: `Agents with no business owner recorded. Part of “${AI_AGENTS}”.`, spec: portfolio([AGENTS_ONLY, { field: 'owner', operator: 'isEmpty', value: null }], { presentation: { kind: 'count' } }), kind: 'kpi', size: 'one' },
+      { name: 'How AI agents act', description: `Suggests only, acts with approval, or acts alone. Part of “${AI_AGENTS}”.`, spec: portfolio([AGENTS_ONLY], { groupBy: 'aiAutonomy', presentation: { kind: 'donut' } }), kind: 'donut', size: 'one' },
+      {
+        name: 'AI agent inventory',
+        description: `Every AI agent, the ones that act alone first. Part of “${AI_AGENTS}”.`,
+        spec: portfolio([AGENTS_ONLY], { columns: ['name', 'aiAutonomy', 'owner', 'capabilities', 'lifecycle', 'criticality'], sort: [{ field: 'aiAutonomyRank', direction: 'desc' }, { field: 'name', direction: 'asc' }] }),
+        kind: 'table',
+        size: 'two',
+      },
     ],
   },
 ];

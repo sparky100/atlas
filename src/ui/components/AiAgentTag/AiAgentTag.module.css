@@ -1,0 +1,17 @@
+/* A plain outlined tag: "AI" carries no colour meaning, so it never competes
+   with the status colours (one meaning per colour). */
+.tag {
+  display: inline-flex;
+  align-items: center;
+  height: 18px;
+  padding: 0 var(--space-1);
+  border: var(--border-width) solid var(--border-strong);
+  border-radius: var(--radius-sm);
+  color: var(--text-muted);
+  background: transparent;
+  font-size: var(--text-xs-size);
+  line-height: 1;
+  font-weight: 600;
+  white-space: nowrap;
+  flex: none;
+}

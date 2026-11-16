@@ -169,8 +169,8 @@ const HOSTING_MODEL_OPTIONS = ['on_premises', 'private_cloud', 'public_cloud', '
 /** Prompt 7k item 3 — see `SystemDomain`'s own doc comment (`delta.ts`) for why absent reads as `'it'`. */
 const DOMAIN_OPTIONS = ['it', 'ot', 'hybrid'] as const;
 /** Prompt 7k item 4 (plus "platforms and modules"'s own `'platform'` addition) — see `SystemKind`'s own doc comment (`delta.ts`) for why absent reads as `'application'`. */
-const AI_AUTONOMY_OPTIONS = ['suggests', 'acts_with_approval', 'acts_alone'] as const;
-const AI_AUTONOMY_LABELS: Readonly<Record<string, string>> = { suggests: 'Suggests only', acts_with_approval: 'Acts with approval', acts_alone: 'Acts alone' };
+export const AI_AUTONOMY_OPTIONS = ['suggests', 'acts_with_approval', 'acts_alone'] as const;
+export const AI_AUTONOMY_LABELS: Readonly<Record<string, string>> = { suggests: 'Suggests only', acts_with_approval: 'Acts with approval', acts_alone: 'Acts alone' };
 export const AI_AUTONOMY_HELP = 'Set this only if the system is an AI agent. Suggests only: a person does the work. Acts with approval: it acts once a person says yes. Acts alone: it acts without anyone checking first. Leave blank if it is not an AI agent.';
 const KIND_OPTIONS = ['application', 'integration_platform', 'data_platform', 'infrastructure', 'platform'] as const;
 /** Display labels for the three plain-key enums above, so a page shows "On premises" / "IT" / "Integration platform" rather than the stored key. */
