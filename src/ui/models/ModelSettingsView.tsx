@@ -68,7 +68,7 @@ export function ModelSettingsView({ model, role, orgId, orgSlug, onChanged }: Mo
   const tagSelectId = useId();
 
   return (
-    <div>
+    <div className={styles.panels}>
       <Panel>
         <Text as="h2" size="lg">
           Model

@@ -1,3 +1,12 @@
+/* Settings panels flow into as many columns as the width allows (one on a
+   phone or narrow window), so a wide screen is used and a narrow one stacks. */
+.panels {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 440px), 1fr));
+  gap: var(--space-4);
+  align-items: start;
+}
+
 .archivedNotice {
   display: flex;
   align-items: center;
@@ -9,7 +18,7 @@
   display: flex;
   flex-direction: column;
   gap: var(--space-2);
-  max-width: 480px;
+  max-width: 560px;
 }
 
 .input,

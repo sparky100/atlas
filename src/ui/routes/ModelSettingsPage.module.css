@@ -1,5 +1,11 @@
 .main {
   padding: var(--space-8);
-  max-width: 640px;
+  max-width: var(--page-max-medium);
   margin: 0 auto;
+}
+
+/* Same title wrapper the list pages use: the intro line below pulls up by a
+   fixed amount, so a bare heading overlaps it. */
+.header {
+  margin-bottom: var(--space-4);
 }
