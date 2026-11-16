@@ -55,6 +55,8 @@ The first time you sign in, Atlas asks how you want to start:
 - **Just me** — a personal workspace for working alone.
 - **My organisation** — a named organisation you can invite colleagues into.
 
+**Signing in with Microsoft.** The sign-in page has a **Sign in with Microsoft** button for work or school accounts. If your company's owner has recorded its Microsoft tenant ID (Organisation settings, **Microsoft sign-in**), you join that organisation as a **Viewer** the first time you sign in, and the owner can change your role afterwards. If no organisation has set it up yet, Home tells you your company hasn't set up Atlas and to ask your Atlas owner. Personal Microsoft accounts are not supported, and your Microsoft account needs an email address. Nobody is removed automatically: when someone leaves, their Microsoft account stops working, and an owner removes them from Members.
+
 You can belong to more than one organisation; "Your organisations" lists them. Inside an organisation, one or more **models** hold your architecture — most organisations start with one.
 
 Everyone in an organisation has one role:
@@ -64,7 +66,7 @@ Everyone in an organisation has one role:
 | **Viewer** | See everything. Can't change the model, comment, or see the review queue. |
 | **Contributor** | Everything a viewer can, plus comment, start changes and edit inside them, submit them for review, run an import, start decisions and projects, rate decision options and add what a decision concerns, and edit or cancel decisions they started or own. Can't edit the live model directly. |
 | **Architect** | Everything a contributor can, plus edit the live model directly, approve and add changes to it, choose a decision's option, edit or cancel any proposed decision, create and archive models. |
-| **Owner** | Everything an architect can, plus organisation settings, members and invites, custom attributes, restoring or deleting archived models. |
+| **Owner** | Everything an architect can, plus organisation settings, members and invites, custom attributes, Microsoft sign-in for the organisation, restoring or deleting archived models. |
 
 ## The building blocks
 
