@@ -57,6 +57,7 @@ test('set run cost and fit, see the expected signal in Portfolio, sort, filter a
   expect(nameOrderText.indexOf('Cheap App')).toBeLessThan(nameOrderText.indexOf('Ledger System'));
 
   // Filter by signal: only Ledger System remains.
+  await page.getByRole('button', { name: /More filters/ }).click();
   await page.getByRole('combobox', { name: /^Signal/ }).selectOption('costly_poor_fit');
   await expect(page.getByText('Ledger System', { exact: true }).first()).toBeVisible();
   await expect(page.getByText('Cheap App', { exact: true })).toHaveCount(0);
