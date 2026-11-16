@@ -6,7 +6,7 @@ import { hasAnySystem, listSupportsEdgesForAllCapabilities, listCapabilitiesForM
 import { getElementsByIds } from '../../db/elements';
 import { listOwnsEdges } from '../../db/elementBrowse';
 import { computeSelfOwnedCapabilityIds, listAllReplacesEdges } from '../../db/healthFindings';
-import { replacedElementIds, supportsEdgesInForce } from '../../engine/elementRead/fitAndExposure';
+import { lifecycleStateOf, replacedElementIds, supportsEdgesInForce } from '../../engine/elementRead/fitAndExposure';
 import { listAllEnablesEdges } from '../../db/valueStreams';
 import { refParamOf, resolveBranchRef, resolveRef, type Ref } from '../../db/ref';
 import type { ViewMode } from '../../db/viewMode';
@@ -38,6 +38,8 @@ export interface CapabilityMapData {
   enablesEdges: RelationshipsHeadRow[];
   /** ADR-001 amendment: every element with a live `replaces` edge pointing at it (`replacedElementIds`) — `metrics.ts`'s `lifecycleExposure` reads a recorded replacement as "not exposed". */
   replacedIds: ReadonlySet<UUID>;
+  /** Supporting systems and modules left out because they are planned (not live yet) or retired. Zero for a change branch, which shows its plan as it is. */
+  hiddenByDate: { planned: number; retired: number };
 }
 
 export type CapabilityMapState = { status: 'loading' } | { status: 'error'; message: string } | { status: 'refNotFound' } | { status: 'ready'; data: CapabilityMapData };
@@ -212,10 +214,20 @@ export function useCapabilityMap(
       const view = preloadedView ?? (await getOrCreateModelView(supabase, { id: crypto.randomUUID(), orgId, modelId, kind: 'capability_map', name: 'Capability map', createdBy: currentUserId }));
       const tree = computeCapabilityMapTree(capabilities);
       // A system past its planned end stops counting as supporting a capability (Retire copies the links to the replacement and keeps the old ones).
-      supportsEdges = supportsEdgesInForce(supportsEdges, systemsById);
+      // A change branch shows its plan as it is; main and a tag show what is live.
+      const hiddenByDate = { planned: 0, retired: 0 };
+      if (ref.kind !== 'branch') {
+        const now = new Date();
+        for (const id of new Set(supportsEdges.map((edge) => edge.from_element_id))) {
+          const supporter = systemsById.get(id);
+          const state = supporter ? lifecycleStateOf(supporter, systemsById, now) : 'active';
+          if (state !== 'active') hiddenByDate[state] += 1;
+        }
+        supportsEdges = supportsEdgesInForce(supportsEdges, systemsById, now);
+      }
       const selfOwnedIds = computeSelfOwnedCapabilityIds(capabilities, supportsEdges, ownsEdges);
 
-      if (!cancelled) setState({ status: 'ready', data: { commitId, view, tree, supportsEdges, systemsById, hasSystems, capabilities, selfOwnedIds, ownsEdges, actorsById, enablesEdges, replacedIds } });
+      if (!cancelled) setState({ status: 'ready', data: { commitId, view, tree, supportsEdges, systemsById, hasSystems, capabilities, selfOwnedIds, ownsEdges, actorsById, enablesEdges, replacedIds, hiddenByDate } });
     }
 
     load().catch((e: unknown) => {

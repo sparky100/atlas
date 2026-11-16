@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { edgesInForce, isInForce } from '../../engine/elementRead/fitAndExposure';
 import type { UUID } from '../../contracts/delta';
 import type { ElementsHeadRow, RelationshipsHeadRow } from '../../contracts/rows';
 import { projectionChildrenOf, projectionContainersForLandscape, projectionElementById, projectionElementsByIds, projectionFlowsViaElement, projectionRelationshipsForElement, projectionRelationshipsTouchingAny } from '../../db/branchProjection';
@@ -99,6 +100,20 @@ export type ElementContextState =
  * querying `elements_head`/`relationships_head` — same reasoning as
  * useLandscape.ts's own Sprint C1 note.
  */
+/**
+ * Today's context shows the live connections: a link to or from a system that
+ * isn't live yet (planned) or is retired is left out, because an integration
+ * doesn't exist until it is active. Left alone when the view is a change
+ * branch (it shows its plan) or when the element itself isn't live (someone
+ * opened a planned or retired system on purpose, and its own connections are
+ * the point).
+ */
+function liveEdgesFor<T extends RelationshipsHeadRow>(hub: ElementsHeadRow, edges: readonly T[], elementsById: ReadonlyMap<UUID, ElementsHeadRow>, isBranch: boolean): T[] {
+  const byId = new Map([...elementsById, [hub.element_id, hub] as const]);
+  if (isBranch || !isInForce(hub, byId)) return [...edges];
+  return edgesInForce(edges, byId) as T[];
+}
+
 export function useElementContext(modelId: UUID, orgId: UUID, userId: UUID | null, elementId: UUID, ref: Ref, mode: ViewMode): ElementContextState {
   const [state, setState] = useState<ElementContextState>({ status: 'loading' });
   const refParam = refParamOf(ref);
@@ -198,7 +213,8 @@ export function useElementContext(modelId: UUID, orgId: UUID, userId: UUID | nul
           // of some *other* platform, which needs that platform's own row
           // resolved here too (`computePlatformConnections`'s own doc
           // comment on `PlatformConnection.otherName`).
-          const connections = computePlatformConnections(hub, ownEdges, new Map([...otherElementsById, ...connectionParentsById]));
+          const connectionEndpoints = new Map([...otherElementsById, ...connectionParentsById]);
+          const connections = computePlatformConnections(hub, liveEdgesFor(hub, ownEdges, connectionEndpoints, projection !== null), connectionEndpoints);
 
           const view = await viewPromise;
           if (!cancelled) setState({ status: 'ready', data: { kind: 'platform-structure', commitId, view, hub, modules, connections, diff } });
@@ -227,8 +243,8 @@ export function useElementContext(modelId: UUID, orgId: UUID, userId: UUID | nul
         const viaIds = flowViaIdsFor(hub, hubParent, hubChildren);
         const interfaces = new Map(hubChildren.filter((c) => c.element_type === 'container').map((c) => [c.element_id, c]));
         if (hub.element_type === 'container') interfaces.set(hub.element_id, hub);
-        const flows = projection ? projectionFlowsViaElement(projection, viaIds) : await listFlowsViaElement(supabase, commitId, viaIds);
-        const endpointIds = [...new Set(flows.flatMap((f) => [f.from_element_id, f.to_element_id]))];
+        const allFlows = projection ? projectionFlowsViaElement(projection, viaIds) : await listFlowsViaElement(supabase, commitId, viaIds);
+        const endpointIds = [...new Set(allFlows.flatMap((f) => [f.from_element_id, f.to_element_id]))];
         const rawEndpoints = projection ? projectionElementsByIds(projection, endpointIds) : await getElementsByIds(supabase, commitId, endpointIds);
         // "Platform · Module": a source or target routed via this platform
         // can itself be a module of some *other* platform — resolved once,
@@ -239,6 +255,7 @@ export function useElementContext(modelId: UUID, orgId: UUID, userId: UUID | nul
         const endpointParentIds = containerParentIds(rawEndpoints.values());
         const endpointParentsById = projection ? projectionElementsByIds(projection, endpointParentIds) : await getElementsByIds(supabase, commitId, endpointParentIds);
         const endpoints = new Map([...rawEndpoints, ...endpointParentsById]);
+        const flows = liveEdgesFor(hub, allFlows, endpoints, projection !== null);
         const view = await viewPromise;
         if (!cancelled) setState({ status: 'ready', data: { kind: 'integration-platform', commitId, view, hub, flows, endpoints, interfaces } });
         return;
@@ -257,7 +274,8 @@ export function useElementContext(modelId: UUID, orgId: UUID, userId: UUID | nul
       const groupParentIds = containerParentIds([hub, ...neighbourElementsById.values()]).filter((id) => !firstBatch.has(id));
       const fetchedParentsById = projection ? projectionElementsByIds(projection, groupParentIds) : await getElementsByIds(supabase, commitId, groupParentIds);
       const groupParentsById = new Map([...fetchedParentsById, ...(hubParent ? [[hubParent.element_id, hubParent] as const] : [])]);
-      const group = computeContextGroup(hub, hubRelationships, new Map([...neighbourElementsById, ...groupParentsById]));
+      const groupElementsById = new Map([...neighbourElementsById, ...groupParentsById]);
+      const group = computeContextGroup(hub, liveEdgesFor(hub, hubRelationships, groupElementsById, projection !== null), groupElementsById);
 
       const view = await viewPromise;
       if (!cancelled) setState({ status: 'ready', data: { kind: 'group', commitId, view, group, diff } });

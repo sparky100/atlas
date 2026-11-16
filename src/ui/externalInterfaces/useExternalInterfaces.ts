@@ -3,6 +3,7 @@ import type { UUID } from '../../contracts/delta';
 import { getMainBranch } from '../../db/branches';
 import { findExternalInterfacesMissingClassification, findExternalOrganisationAccess, listAllUsesAndFlowsToEdges, listUsesAndFlowsToEndpointElements, type ExternalInterfaceCrossing, type ExternalOrganisationAccess } from '../../db/healthFindings';
 import { listActorsForLandscape } from '../../db/landscape';
+import { edgesInForce } from '../../engine/elementRead/fitAndExposure';
 import { reportError } from '../errors/errorBannerStore';
 import { supabase } from '../supabaseClient';
 
@@ -43,11 +44,13 @@ export function useExternalInterfaces(modelId: UUID): ExternalInterfacesState {
         listActorsForLandscape(supabase, main.head_commit_id),
       ]);
       const elementsById = new Map([...elements, ...actors].map((e) => [e.element_id, e]));
+      // Only links between live systems count: an integration doesn't exist until it is active, and goes with a retired system.
+      const liveEdges = edgesInForce(edges, elementsById);
       if (!cancelled) {
         setState({
           status: 'ready',
-          crossings: findExternalInterfacesMissingClassification(edges, elementsById),
-          organisationAccess: findExternalOrganisationAccess(edges, elementsById),
+          crossings: findExternalInterfacesMissingClassification(liveEdges, elementsById),
+          organisationAccess: findExternalOrganisationAccess(liveEdges, elementsById),
         });
       }
     }

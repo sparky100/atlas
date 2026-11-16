@@ -124,6 +124,12 @@ export function IntegrationsView({ data, elementHref }: IntegrationsViewProps) {
         </label>
       </div>
 
+      {data.notLiveCount > 0 && (
+        <Text as="p" size="sm" tone="muted">
+          {data.notLiveCount === 1 ? '1 link is' : `${String(data.notLiveCount)} links are`} not shown because {data.notLiveCount === 1 ? 'a system it joins is' : 'a system they join is'} planned (not live yet) or retired. A planned integration appears once it is introduced, and the Landscape 1 and 2 year views show it before then.
+        </Text>
+      )}
+
       {data.rows.length === 0 ? (
         <EmptyState>No system-to-system links in this model yet.</EmptyState>
       ) : rows.length === 0 ? (

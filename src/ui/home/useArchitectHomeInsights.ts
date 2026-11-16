@@ -45,7 +45,7 @@ import { listAllElements } from '../../db/elementBrowse';
 import { listActorsForLandscape, listSystemsForLandscape } from '../../db/landscape';
 import { listAllSupportsEdges, listDeltasForCommits, listRecentCommits } from '../../db/modelHome';
 import { listProfilesByIds } from '../../db/profiles';
-import { hasReachedPlannedEnd, replacedElementIds, supportsEdgesInForce } from '../../engine/elementRead/fitAndExposure';
+import { edgesInForce, lifecycleStateOf, replacedElementIds, supportsEdgesInForce } from '../../engine/elementRead/fitAndExposure';
 import type { ProfileRow } from '../../db/types';
 import { envelopeSubjects } from '../../engine/describeEnvelope';
 import { reportError } from '../errors/errorBannerStore';
@@ -186,6 +186,13 @@ export function useArchitectHomeInsights(modelId: UUID, userId: UUID | null): Ar
       // A system past its planned end stops counting as supporting a capability (see `supportsEdgesInForce`).
       const today = new Date();
       const elementsById = new Map<UUID, ElementsHeadRow>([...allElements, ...systems, ...containers].map((e) => [e.element_id, e]));
+      // What is live today. A planned system doesn't exist yet and a retired one is gone, so neither raises a finding, and a link counts only when both ends are live (an integration doesn't exist until it is active). Findings about the end of life itself keep retired systems (an overdue retirement is the problem), but never planned ones.
+      const stateOf = (e: ElementsHeadRow) => lifecycleStateOf(e, elementsById, today);
+      const liveSystems = systems.filter((e) => stateOf(e) === 'active');
+      const liveContainers = containers.filter((e) => stateOf(e) === 'active');
+      const notPlannedSystems = systems.filter((e) => stateOf(e) !== 'planned');
+      const liveSupports = supportsEdgesInForce(supportsEdges, elementsById, today);
+      const liveUsesAndFlowsTo = edgesInForce(usesAndFlowsToEdges, usesAndFlowsToEndpointsById, today);
 
       // Sprint U4-1 B2: author display name and named-subject links for
       // each shown commit, both batched once across every row rather than
@@ -227,36 +234,32 @@ export function useArchitectHomeInsights(modelId: UUID, userId: UUID | null): Ar
           data: {
             recentCommits,
             duplicatesCount: duplicateCandidates.candidates.length,
-            systemsWithoutCapability: findSystemsWithoutCapability(
-              systems.filter((s) => !hasReachedPlannedEnd(s, elementsById, today)),
-              supportsEdgesInForce(supportsEdges, elementsById, today),
-              containers.filter((c) => !hasReachedPlannedEnd(c, elementsById, today)),
-            ),
-            platformSupportsThatShouldMoveToModule: findPlatformSupportsThatShouldMoveToModule(systems, supportsEdges, containers),
-            flowsToPlatformInsteadOfModule: findFlowsToPlatformInsteadOfModule(usesAndFlowsToEdges, usesAndFlowsToEndpointsById),
-            capabilitiesWithoutOwner: findCapabilitiesWithoutOwner(capabilities, supportsEdgesInForce(supportsEdges, elementsById, today), ownsEdges),
+            systemsWithoutCapability: findSystemsWithoutCapability(liveSystems, liveSupports, liveContainers),
+            platformSupportsThatShouldMoveToModule: findPlatformSupportsThatShouldMoveToModule(liveSystems, liveSupports, liveContainers),
+            flowsToPlatformInsteadOfModule: findFlowsToPlatformInsteadOfModule(liveUsesAndFlowsTo, usesAndFlowsToEndpointsById),
+            capabilitiesWithoutOwner: findCapabilitiesWithoutOwner(capabilities, liveSupports, ownsEdges),
             staleAttributes: computeStaleAttributesFinding(facts, allElements, new Date(), staleAfterMonths),
             staleAfterMonths,
-            unlabeledVerbRelationships: findUnlabeledVerbRelationships(usesAndFlowsToEdges, usesAndFlowsToEndpointsById),
+            unlabeledVerbRelationships: findUnlabeledVerbRelationships(liveUsesAndFlowsTo, usesAndFlowsToEndpointsById),
             // Owner-related findings check systems and their own modules
             // together (`findSystemsWithoutTechnicalOwner`'s own doc
             // comment) — a platform's own module can have a distinct
             // owner from the platform itself, so a module missing one is
             // exactly as real a finding as a system missing one.
-            systemsWithoutTechnicalOwner: findSystemsWithoutTechnicalOwner([...systems, ...containers], ownsEdges),
-            aiAgentsWithoutTechnicalOwner: findAiAgentsActingAloneWithoutTechnicalOwner(systems, ownsEdges),
-            criticalSystemsWithoutBusinessOwner: findCriticalSystemsWithoutBusinessOwner([...systems, ...containers], ownsEdges),
-            criticalExposedSystems: findCriticalExposedSystems(systems, new Date(), replacedElementIds(replacesEdges)),
-            boundaryCrossingsMissingVerb: findBoundaryCrossingsMissingVerb(usesAndFlowsToEdges, usesAndFlowsToEndpointsById),
-            unusedIntegrationPlatforms: findUnusedIntegrationPlatforms(systems, usesAndFlowsToEdges, containers),
-            unusedIntegrationInterfaces: findUnusedIntegrationInterfaces(systems, containers, usesAndFlowsToEdges),
-            systemsSupportingEssentialFunctionWithoutTechnicalOwner: findSystemsSupportingEssentialFunctionWithoutTechnicalOwner([...systems, ...containers], capabilities, supportsEdgesInForce(supportsEdges, elementsById, today), ownsEdges),
-            boundaryCrossingsMissingClassification: findBoundaryCrossingsMissingClassification(usesAndFlowsToEdges, usesAndFlowsToEndpointsById),
-            criticalSystemsPastOrNearSupportEnd: findCriticalSystemsPastOrNearSupportEnd(systems),
+            systemsWithoutTechnicalOwner: findSystemsWithoutTechnicalOwner([...liveSystems, ...liveContainers], ownsEdges),
+            aiAgentsWithoutTechnicalOwner: findAiAgentsActingAloneWithoutTechnicalOwner(liveSystems, ownsEdges),
+            criticalSystemsWithoutBusinessOwner: findCriticalSystemsWithoutBusinessOwner([...liveSystems, ...liveContainers], ownsEdges),
+            criticalExposedSystems: findCriticalExposedSystems(notPlannedSystems, new Date(), replacedElementIds(replacesEdges)),
+            boundaryCrossingsMissingVerb: findBoundaryCrossingsMissingVerb(liveUsesAndFlowsTo, usesAndFlowsToEndpointsById),
+            unusedIntegrationPlatforms: findUnusedIntegrationPlatforms(liveSystems, liveUsesAndFlowsTo, liveContainers),
+            unusedIntegrationInterfaces: findUnusedIntegrationInterfaces(liveSystems, liveContainers, liveUsesAndFlowsTo),
+            systemsSupportingEssentialFunctionWithoutTechnicalOwner: findSystemsSupportingEssentialFunctionWithoutTechnicalOwner([...liveSystems, ...liveContainers], capabilities, liveSupports, ownsEdges),
+            boundaryCrossingsMissingClassification: findBoundaryCrossingsMissingClassification(liveUsesAndFlowsTo, usesAndFlowsToEndpointsById),
+            criticalSystemsPastOrNearSupportEnd: findCriticalSystemsPastOrNearSupportEnd(notPlannedSystems),
             outgoingWithoutRetiringChange: findOutgoingWithoutRetiringChange([...systems, ...containers], retiringElementIds, new Map(systems.map((el) => [el.element_id, el]))),
             projectByElementId: new Map(projectScope.map((scope) => [scope.elementId, scope])),
-            externalInterfacesMissingClassification: findExternalInterfacesMissingClassification(usesAndFlowsToEdges, usesAndFlowsToEndpointsById),
-            externalOrganisationAccess: findExternalOrganisationAccess(usesAndFlowsToEdges, usesAndFlowsToEndpointsById),
+            externalInterfacesMissingClassification: findExternalInterfacesMissingClassification(liveUsesAndFlowsTo, usesAndFlowsToEndpointsById),
+            externalOrganisationAccess: findExternalOrganisationAccess(liveUsesAndFlowsTo, usesAndFlowsToEndpointsById),
           },
         });
       }
