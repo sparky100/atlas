@@ -161,3 +161,10 @@
   overflow: hidden;
   text-overflow: ellipsis;
 }
+
+/* "Find on this roadmap": a neutral outline, no status colour, so it never reads as a lifecycle state. Fades with the 4s timer in RoadmapView. */
+.row[data-found='true'] {
+  outline: 2px solid var(--text);
+  outline-offset: 2px;
+  border-radius: var(--radius-md);
+}

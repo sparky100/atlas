@@ -1,4 +1,6 @@
+import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router';
+import { LandscapeFind, type LandscapeFindOption } from '../landscape/LandscapeFind';
 import { EmptyState } from '../components/EmptyState/EmptyState';
 import { Text } from '../components/Text/Text';
 import { useCanvasWidth } from '../landscape/useCanvasWidth';
@@ -52,7 +54,7 @@ function allDatesFor(groups: readonly RoadmapGroup[], branchEvents: readonly Roa
  * capability map redesign's own "fact, not a flag" stance forward: a thin
  * shape and colour, never a filled alarm treatment.
  */
-function RoadmapRow({ bar, events, range, todayPct, orgSlug, modelSlug }: { bar: RoadmapLifecycleBar; events: readonly { event: RoadmapBranchEvents['events'][number]; branch: RoadmapBranchEvents['branch'] }[]; range: RoadmapTimelineRange; todayPct: number | undefined; orgSlug: string; modelSlug: string }) {
+function RoadmapRow({ bar, events, range, todayPct, orgSlug, modelSlug, found }: { found: boolean; bar: RoadmapLifecycleBar; events: readonly { event: RoadmapBranchEvents['events'][number]; branch: RoadmapBranchEvents['branch'] }[]; range: RoadmapTimelineRange; todayPct: number | undefined; orgSlug: string; modelSlug: string }) {
   const startPct = percentAtIso(bar.introduced, range);
   const endPct = percentAtIso(bar.plannedEnd, range);
   const supportEndPct = percentAtIso(bar.supportEndsAt, range);
@@ -60,7 +62,7 @@ function RoadmapRow({ bar, events, range, todayPct, orgSlug, modelSlug }: { bar:
   const width = (endPct ?? 100) - left;
 
   return (
-    <div className={styles.row}>
+    <div className={styles.row} data-system-id={bar.systemId} data-found={found ? 'true' : undefined}>
       <Link to={`/o/${orgSlug}/m/${modelSlug}/e/${bar.systemId}`} className={styles.rowName} title={bar.name}>
         <Text as="span" size="sm">
           {bar.name}
@@ -169,6 +171,22 @@ export function RoadmapView({ groupsLabel = 'Capability domains', groups, branch
   const range = computeRoadmapWindow(horizon, fullRange, now, windowStart);
   const todayPct = todayPercent(range, now);
 
+  // "Find on this roadmap": only systems a row is drawn for, so a pick always lands. A system under several groups is one option.
+  const findOptions = useMemo<LandscapeFindOption[]>(() => {
+    const byId = new Map<string, LandscapeFindOption>();
+    for (const group of filteredGroups) for (const bar of group.bars) if (!byId.has(bar.systemId)) byId.set(bar.systemId, { elementId: bar.systemId, name: bar.name, detail: 'system' });
+    return [...byId.values()];
+  }, [filteredGroups]);
+  const [found, setFound] = useState<{ id: string; n: number } | null>(null);
+  useEffect(() => {
+    if (found === null) return;
+    // First row for this system, in page order; the rest are highlighted but not scrolled to.
+    const row = [...document.querySelectorAll<HTMLElement>('[data-system-id]')].find((el) => el.dataset.systemId === found.id);
+    row?.scrollIntoView({ block: 'center', behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth' });
+    const timer = window.setTimeout(() => { setFound(null); }, 4000);
+    return () => { window.clearTimeout(timer); };
+  }, [found]);
+
   if (filteredGroups.length === 0 && eligibleEvents.length === 0) {
     return <EmptyState>No systems with a recorded lifecycle date (introduced, planned end or support end) yet.</EmptyState>;
   }
@@ -177,6 +195,13 @@ export function RoadmapView({ groupsLabel = 'Capability domains', groups, branch
     <div className={styles.roadmap}>
       {filteredGroups.length > 0 && (
         <>
+          <LandscapeFind
+            options={findOptions}
+            onPick={(id) => { setFound((prev) => ({ id, n: (prev?.n ?? 0) + 1 })); }}
+            label="Find on this roadmap"
+            listLabel="Matches on this roadmap"
+            emptyText="Nothing on this roadmap matches. A filter may be hiding it."
+          />
           <RoadmapAxis range={range} granularity={granularity} />
           <div role="list" aria-label={groupsLabel}>
             {filteredGroups.map((group) => (
@@ -195,7 +220,7 @@ export function RoadmapView({ groupsLabel = 'Capability domains', groups, branch
                 <div role="list" aria-label={`${group.label} systems`}>
                   {group.bars.map((bar) => (
                     <div key={bar.systemId} role="listitem">
-                      <RoadmapRow bar={bar} events={eventsForSystem(bar.systemId, branchEvents, mode)} range={range} todayPct={todayPct} orgSlug={orgSlug} modelSlug={modelSlug} />
+                      <RoadmapRow bar={bar} events={eventsForSystem(bar.systemId, branchEvents, mode)} range={range} todayPct={todayPct} orgSlug={orgSlug} modelSlug={modelSlug} found={found?.id === bar.systemId} />
                     </div>
                   ))}
                 </div>
