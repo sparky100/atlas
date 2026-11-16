@@ -423,6 +423,11 @@ export function CaptureReviewView({ modelId, orgId, jobId, reviewQueueHref }: Ca
           )}
           {canDiscard && <DiscardCaptureButton label="Discard this draft…" confirmText="Discard the whole import? Nothing from it reaches the model; decisions so far stay on record." onConfirm={runDiscard} />}
           {canReview && (
+            <Text as="p" size="sm" tone="muted">
+              Press 1–5 to pick a match, a to accept, r to reject; j moves to the next, k goes back.
+            </Text>
+          )}
+          {canReview && (
             <CollapsibleSection title="Keyboard shortcuts" defaultOpen={false}>
               <Text as="p" tone="faint" size="xs" className={styles.shortcuts}>
                 j/k select · a accept · r reject · u undo · e edit · s split · m merge into… · 1-5/n pick a match · x select (up to date or new, then a/r for several) · t change · ⌘/Ctrl+Enter apply / finish
