@@ -1,0 +1,152 @@
+.hint {
+  margin-bottom: var(--space-2);
+}
+
+/* One column for the row heads, then one per cost band; every track can shrink, so it reflows at any width. */
+.grid,
+.fitRow {
+  display: grid;
+  grid-template-columns: minmax(64px, 96px) repeat(6, minmax(0, 1fr));
+  gap: var(--space-1);
+}
+
+.grid {
+  grid-template-rows: auto;
+}
+
+/* Each fit row spans the whole grid and repeats the same tracks. */
+.fitRow {
+  grid-column: 1 / -1;
+}
+
+.colHead,
+.rowHead {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  font-size: var(--text-xs-size);
+  color: var(--text-muted);
+  overflow-wrap: anywhere;
+}
+
+.rowHead {
+  justify-content: flex-end;
+  text-align: right;
+  padding-right: var(--space-2);
+}
+
+.cell {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--space-1);
+  min-height: 56px;
+  min-width: 0;
+  padding: var(--space-1);
+  border: var(--border-width) solid var(--border-strong);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  color: var(--text);
+  font: inherit;
+  cursor: pointer;
+  text-align: left;
+}
+
+.cell:disabled {
+  cursor: default;
+  color: var(--text-muted);
+  background: var(--bg-subtle);
+}
+
+.cell:not(:disabled):hover,
+.cell:not(:disabled):focus-visible {
+  outline: 2px solid var(--status-info);
+}
+
+.flagged {
+  background: color-mix(in srgb, var(--status-warn) 16%, transparent);
+  border-color: var(--status-warn);
+}
+
+.count {
+  font-size: var(--text-xs-size);
+  color: var(--text-muted);
+}
+
+.dots {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 3px;
+}
+
+.dot {
+  display: inline-block;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  vertical-align: -1px;
+}
+
+.dotOk {
+  background: var(--status-ok);
+}
+
+.dotInfo {
+  background: var(--status-info);
+}
+
+.dotNone {
+  background: var(--text-muted);
+  opacity: 0.5;
+}
+
+.more {
+  font-size: var(--text-xs-size);
+  color: var(--text-muted);
+}
+
+.key {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2) var(--space-4);
+  margin: var(--space-3) 0 0;
+  padding: 0;
+  list-style: none;
+  font-size: var(--text-xs-size);
+  color: var(--text-muted);
+}
+
+.swatch {
+  display: inline-block;
+  width: 14px;
+  height: 12px;
+  border-radius: 3px;
+  border: var(--border-width) solid var(--status-warn);
+  background: color-mix(in srgb, var(--status-warn) 16%, transparent);
+  vertical-align: -1px;
+}
+
+.notPlotted {
+  margin-top: var(--space-3);
+}
+
+.linkButton {
+  border: none;
+  background: none;
+  padding: 0;
+  color: var(--text);
+  text-decoration: underline;
+  cursor: pointer;
+  font: inherit;
+}
+
+@media (max-width: 520px) {
+  .grid,
+  .fitRow {
+    grid-template-columns: 56px repeat(6, minmax(0, 1fr));
+  }
+  .colHead {
+    font-size: 10px;
+  }
+}

@@ -3,7 +3,9 @@ import type { UUID } from '../../contracts/delta';
 import { Text } from '../components/Text/Text';
 import { countAnnualRunCosts } from '../elements/annualRunCost';
 import { useIsNarrowViewport } from '../landscape/useIsNarrowViewport';
+import type { AnnualRunCost, FitForPurpose } from '../../contracts/delta';
 import { PortfolioCards } from './PortfolioCards';
+import { PortfolioChart } from './PortfolioChart';
 import { ExportViewButtons } from '../components/ExportViewButtons/ExportViewButtons';
 import { portfolioExportPlan, portfolioExportTable } from '../exports/portfolioExport';
 import type { ExportStamp } from '../exports/viewExport';
@@ -11,7 +13,7 @@ import { DEFAULT_PORTFOLIO_FILTERS, filterPortfolioRows, type PortfolioFilters }
 import { DEFAULT_PORTFOLIO_SORT_DIRECTION, DEFAULT_PORTFOLIO_SORT_KEY, sortPortfolioRows, type PortfolioSortKey } from './portfolioSort';
 import { visiblePortfolioRows } from './portfolioVisibility';
 import { PortfolioTable } from './PortfolioTable';
-import { PortfolioToolbar } from './PortfolioToolbar';
+import { PortfolioToolbar, type PortfolioViewMode } from './PortfolioToolbar';
 import type { PortfolioData } from './usePortfolio';
 import { SavedReportBar } from '../reports/SavedReportBar';
 import { portfolioStateToSpec, specToPortfolioState } from '../reports/portfolioReport';
@@ -48,11 +50,21 @@ export function PortfolioView({ data, elementHref, exportStamp, savedReports }: 
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>(DEFAULT_PORTFOLIO_SORT_DIRECTION);
   const [filters, setFilters] = useState<PortfolioFilters>(DEFAULT_PORTFOLIO_FILTERS);
   const [expandedRowId, setExpandedRowId] = useState<UUID | null>(null);
+  const [view, setView] = useState<PortfolioViewMode>('table');
+  // Picked by clicking a chart box. View-only: the saved report keeps only the filters above it.
+  const [fitPick, setFitPick] = useState<FitForPurpose | null>(null);
   const narrow = useIsNarrowViewport(MOBILE_BREAKPOINT_PX);
 
   const visibleRows = useMemo(() => visiblePortfolioRows(data.rows, includeContainers), [data.rows, includeContainers]);
   const notEntered = useMemo(() => countAnnualRunCosts(visibleRows.map((row) => row.cost)).notEntered, [visibleRows]);
-  const rows = useMemo(() => sortPortfolioRows(filterPortfolioRows(visibleRows, filters), sortKey, sortDirection), [visibleRows, filters, sortKey, sortDirection]);
+  const filteredRows = useMemo(() => filterPortfolioRows(visibleRows, filters), [visibleRows, filters]);
+  const rows = useMemo(() => sortPortfolioRows(fitPick ? filteredRows.filter((row) => row.fit === fitPick) : filteredRows, sortKey, sortDirection), [filteredRows, fitPick, sortKey, sortDirection]);
+
+  function handlePickCell(cost: AnnualRunCost, fit: FitForPurpose): void {
+    setFilters((current) => ({ ...current, cost }));
+    setFitPick(fit);
+    setView('table');
+  }
 
   function handleSort(key: PortfolioSortKey): void {
     if (key === sortKey) {
@@ -93,6 +105,12 @@ export function PortfolioView({ data, elementHref, exportStamp, savedReports }: 
         onFiltersChange={setFilters}
         includeContainers={includeContainers}
         onIncludeContainersChange={setIncludeContainers}
+        view={view}
+        onViewChange={setView}
+        fitPick={fitPick}
+        onFitPickChange={setFitPick}
+        shownCount={view === 'chart' ? filteredRows.length : rows.length}
+        totalCount={visibleRows.length}
       />
       {exportStamp && (
         <div className={styles.exportActions}>
@@ -115,7 +133,9 @@ export function PortfolioView({ data, elementHref, exportStamp, savedReports }: 
           {notEntered} {notEntered === 1 ? 'row has' : 'rows have'} no run cost entered — excluded from every cost-based signal below, not treated as low.
         </Text>
       )}
-      {narrow ? (
+      {view === 'chart' ? (
+        <PortfolioChart rows={filteredRows} onPickCell={handlePickCell} onShowTable={() => { setView('table'); }} />
+      ) : narrow ? (
         <PortfolioCards rows={rows} expandedRowId={expandedRowId} onToggleExpand={handleToggleExpand} elementHref={elementHref} />
       ) : (
         <PortfolioTable rows={rows} sortKey={sortKey} sortDirection={sortDirection} onSort={handleSort} expandedRowId={expandedRowId} onToggleExpand={handleToggleExpand} elementHref={elementHref} />
