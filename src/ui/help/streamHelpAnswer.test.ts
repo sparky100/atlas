@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { consumeSseChunk, streamHelpAnswer } from './streamHelpAnswer';
+import { consumeSseChunk, createSseParser, streamHelpAnswer } from './streamHelpAnswer';
 
 describe('consumeSseChunk', () => {
   it('extracts text from a content_block_delta event', () => {
@@ -107,5 +107,41 @@ describe('streamHelpAnswer', () => {
 
     expect(onError).not.toHaveBeenCalled();
     expect(onComplete).not.toHaveBeenCalled();
+  });
+});
+
+describe('createSseParser', () => {
+  it('reassembles an event split across reads, at any byte position', () => {
+    const wire = 'data: {"delta":{"text":"one "}}\n\ndata: {"delta":{"text":"two **bold**"}}\n\n';
+    for (let cut = 1; cut < wire.length; cut += 1) {
+      const tokens: string[] = [];
+      const parser = createSseParser((t) => tokens.push(t));
+      parser.push(wire.slice(0, cut));
+      parser.push(wire.slice(cut));
+      parser.flush();
+      expect(tokens.join('')).toBe('one two **bold**');
+    }
+  });
+
+  it('handles CRLF separators and a final event with no trailing blank line', () => {
+    const tokens: string[] = [];
+    const parser = createSseParser((t) => tokens.push(t));
+    parser.push('data: {"delta":{"text":"a"}}\r\n\r\ndata: {"delta":{"text":"b"}}');
+    parser.flush();
+    expect(tokens).toEqual(['a', 'b']);
+  });
+});
+
+describe('streamHelpAnswer with split reads', () => {
+  it('loses no text when an event is split across network reads', async () => {
+    const fetchImpl = vi.fn().mockResolvedValue(
+      new Response(sseStream(['data: {"delta":{"te', 'xt":"Hello"}}\n\ndata: {"delta":{"text":" wor', 'ld"}}\n\n']), { status: 200 }),
+    );
+    const tokens: string[] = [];
+    await streamHelpAnswer(
+      { orgId: 'o', messages: [{ role: 'user', content: 'x' }], fetchImpl: fetchImpl as typeof fetch, getAccessToken: () => Promise.resolve('t'), proxyUrl: 'https://example.test/x' },
+      { onToken: (t) => tokens.push(t), onComplete: () => undefined, onError: () => undefined },
+    );
+    expect(tokens.join('')).toBe('Hello world');
   });
 });

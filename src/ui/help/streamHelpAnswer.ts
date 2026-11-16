@@ -51,6 +51,31 @@ export function consumeSseChunk(chunk: string, onToken: (token: string) => void)
   }
 }
 
+/**
+ * Stateful version of `consumeSseChunk` for a real network stream. A network read does not
+ * respect SSE event boundaries: one event's `data:` line is routinely split across two reads.
+ * Parsing each read on its own drops the half-event on both sides (its JSON fails to parse),
+ * which showed up as garbled Help answers (words spliced together, text missing, broken bold).
+ * This keeps the incomplete tail until the blank line that ends it arrives.
+ */
+export function createSseParser(onToken: (token: string) => void): { push: (text: string) => void; flush: () => void } {
+  let buffer = '';
+  return {
+    push(text) {
+      buffer += text.replace(/\r\n/g, '\n');
+      const boundary = buffer.lastIndexOf('\n\n');
+      if (boundary === -1) return;
+      const complete = buffer.slice(0, boundary + 2);
+      buffer = buffer.slice(boundary + 2);
+      consumeSseChunk(complete, onToken);
+    },
+    flush() {
+      if (buffer.trim()) consumeSseChunk(`${buffer}\n\n`, onToken);
+      buffer = '';
+    },
+  };
+}
+
 export interface StreamHelpAnswerInput {
   orgId: string;
   messages: readonly LlmProxyMessage[];
@@ -108,11 +133,14 @@ export async function streamHelpAnswer(input: StreamHelpAnswerInput, { onToken, 
 
     const reader = response.body.getReader();
     const decoder = new TextDecoder();
+    const parser = createSseParser(onToken);
     for (;;) {
       const { done, value } = await reader.read();
       if (done) break;
-      consumeSseChunk(decoder.decode(value, { stream: true }), onToken);
+      parser.push(decoder.decode(value, { stream: true }));
     }
+    parser.push(decoder.decode());
+    parser.flush();
     onComplete();
   } catch (error) {
     if (error instanceof DOMException && error.name === 'AbortError') return;
