@@ -198,6 +198,23 @@ function groupAndSplitRows(rows: readonly ReportRow[], field: string, splitField
   });
 }
 
+/**
+ * The one scoping rule for reports: a source whose rows carry a
+ * `lifecycleState` (elements, portfolio) counts only live rows, unless the
+ * report itself says something about `lifecycleState` — a planned system
+ * doesn't exist until it is introduced and a retired one is gone. A report
+ * that wants the others adds `INCLUDE_NOT_LIVE_FILTER` ("Include planned and
+ * retired"), or filters on the state it wants. Sources with no such field
+ * (relationships, findings) are untouched.
+ */
+export const LIFECYCLE_STATE_FIELD = 'lifecycleState';
+export const INCLUDE_NOT_LIVE_FILTER: ReportFilter = { field: LIFECYCLE_STATE_FIELD, operator: 'in', value: ['active', 'planned', 'retired'] };
+
+function isInScope(row: ReportRow, spec: ReportSpec): boolean {
+  const state = row[LIFECYCLE_STATE_FIELD];
+  return state === undefined || state === 'active' || spec.filters.some((filter) => filter.field === LIFECYCLE_STATE_FIELD);
+}
+
 /** Runs a report. Never mutates `rows`. */
 export function runReport(rows: readonly ReportRow[], spec: ReportSpec, options: RunReportOptions = {}): ReportResult {
   return runReportWithRows(rows, spec, options).result;
@@ -205,7 +222,7 @@ export function runReport(rows: readonly ReportRow[], spec: ReportSpec, options:
 
 /** Live views can use the original rows in display order for navigation. Only the result is stored or exported. */
 export function runReportWithRows<Row extends ReportRow>(rows: readonly Row[], spec: ReportSpec, options: RunReportOptions = {}): { result: ReportResult; displayedRows: readonly Row[] } {
-  const matched = rows.filter((row) => spec.filters.every((filter) => matches(row, filter)));
+  const matched = rows.filter((row) => isInScope(row, spec) && spec.filters.every((filter) => matches(row, filter)));
   const tiebreak = options.tiebreakField ?? 'id';
   const useTiebreak = matched.some((row) => row[tiebreak] !== undefined);
 

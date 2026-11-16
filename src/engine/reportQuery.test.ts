@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { REPORT_SPEC_VERSION, type ReportFilter, type ReportRow, type ReportSpec, type ReportValue } from '../contracts/reportSpec';
-import { compareReportValues, reportFitsSnapshot, runReport } from './reportQuery';
+import { compareReportValues, INCLUDE_NOT_LIVE_FILTER, reportFitsSnapshot, runReport } from './reportQuery';
 
 const rows: ReportRow[] = [
   { id: 'a', name: 'Billing', lifecycle: 'active', cost: 100, owner: 'Ann', supportEnds: '2027-06-30' },
@@ -244,5 +244,26 @@ describe('reportFitsSnapshot and groups', () => {
   it('refuses a grouping with more groups than the cap', () => {
     const many: ReportRow[] = Array.from({ length: 5001 }, (_, i) => ({ id: `r${String(i)}`, k: `v${String(i)}` }));
     expect(reportFitsSnapshot(runReport(many, spec({ groupBy: 'k', presentation: { kind: 'barByField' } })))).toBe(false);
+  });
+});
+
+describe('live-only scoping (planned and retired rows)', () => {
+  const spec = (filters: ReportSpec['filters'] = []): ReportSpec => ({ specVersion: REPORT_SPEC_VERSION, source: 'portfolio', filters, columns: ['name'], sort: [{ field: 'name', direction: 'asc' }], presentation: { kind: 'table' } });
+  const rows: ReportRow[] = [
+    { id: 'a', name: 'Active', lifecycleState: 'active' },
+    { id: 'p', name: 'Planned', lifecycleState: 'planned' },
+    { id: 'r', name: 'Retired', lifecycleState: 'retired' },
+  ];
+  it('counts only active rows unless the report says otherwise', () => {
+    expect(runReport(rows, spec()).rows).toEqual([['Active']]);
+  });
+  it('INCLUDE_NOT_LIVE_FILTER brings planned and retired rows back', () => {
+    expect(runReport(rows, spec([INCLUDE_NOT_LIVE_FILTER])).rows).toEqual([['Active'], ['Planned'], ['Retired']]);
+  });
+  it('a filter on the state itself picks exactly that state', () => {
+    expect(runReport(rows, spec([{ field: 'lifecycleState', operator: 'eq', value: 'planned' }])).rows).toEqual([['Planned']]);
+  });
+  it('rows with no lifecycleState (relationships, findings) are untouched', () => {
+    expect(runReport([{ id: 'x', name: 'Link' }], spec()).rows).toEqual([['Link']]);
   });
 });
