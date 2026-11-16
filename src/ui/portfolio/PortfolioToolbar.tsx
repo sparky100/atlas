@@ -1,8 +1,8 @@
 import { useState } from 'react';
 import { ANNUAL_RUN_COST_OPTIONS } from '../../contracts/attributeSchema';
-import type { Criticality, FitForPurpose } from '../../contracts/delta';
+import type { Criticality } from '../../contracts/delta';
 import { DISPOSITION_LEVELS } from '../../contracts/attributeSchema';
-import { CHART_FIT_ROWS } from './portfolioChart';
+import { CHART_FIT_ROWS, type ChartFit } from './portfolioChart';
 import { annualRunCostLabel } from '../elements/annualRunCost';
 import { CRITICALITY_ORDER } from '../elements/criticalityTone';
 import { DEFAULT_PORTFOLIO_FILTERS, type PortfolioFilters } from './portfolioFilter';
@@ -23,8 +23,8 @@ export interface PortfolioToolbarProps {
   view: PortfolioViewMode;
   onViewChange: (view: PortfolioViewMode) => void;
   /** A fit picked by clicking a chart box; shown as a removable chip, not a dropdown. */
-  fitPick: FitForPurpose | null;
-  onFitPickChange: (fit: FitForPurpose | null) => void;
+  fitPick: ChartFit | null;
+  onFitPickChange: (fit: ChartFit | null) => void;
   shownCount: number;
   totalCount: number;
 }
