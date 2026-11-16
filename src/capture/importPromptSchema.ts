@@ -46,6 +46,8 @@ Fields (only what's actually known has to be filled in): \`${IMPORT_COLUMNS.join
 - \`interface_type\` is one of: ${INTERFACE_TYPE_OPTIONS.join(', ')} — only for a module of an integration platform (an *interface*: an API, file drop, topic or job the platform exposes or consumes). Leave it out everywhere else.
 - \`transformation\` is free text: what the platform does to the data on this interface (maps, enriches, combines, converts a file to an API…). Only for an interface.
 - \`introduced\`, \`planned_end\` and \`support_ends_at\` are ISO dates (YYYY-MM-DD): when the system went live, when it is planned to be retired, and when vendor support ends (top-level systems only). They put the system on the Roadmap. Leave them out if the source doesn't state them; never guess.
+- \`ai_autonomy\` is one of: suggests, acts_with_approval, acts_alone — set it only if the system is an AI agent (a person does the work, a person approves, or it acts alone). Leave it out otherwise; never guess.
+- \`ai_use\` is one of: built_in (the product ships with AI features), external_service (it calls an AI model or service). For a system that uses AI but is not an agent. Leave it out for an agent and when the source does not say.
 - \`business_owner\`/\`technical_owner\` each name one person, team, or organisation. A plain name ("Jane Doe") creates or matches an ordinary owner. "Name (External: Org)" (e.g. "Ofgem (External: Energy regulator)") creates or matches an external organisation instead.
 
 An entry that matches an existing system or module by name updates it; a name that doesn't match anything creates a new one.

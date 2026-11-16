@@ -29,12 +29,12 @@ import { validateAttributeValue } from '../contracts/attributeSchema';
 import { normalizeName } from '../engine/merge';
 
 /** The exact header names a row must use — order doesn't matter, extra columns are ignored, case-sensitive (matching every other attribute key in this product). Snake_case, this session's own plan's spelling — distinct from the camelCase attribute keys they map onto below. */
-export const IMPORT_COLUMNS = ['name', 'description', 'kind', 'lifecycle', 'criticality', 'annual_run_cost', 'disposition', 'domain', 'hosting_model', 'vendor', 'is_external', 'external_organisation', 'platform', 'capability', 'business_owner', 'technical_owner', 'interface_type', 'transformation', 'introduced', 'planned_end', 'support_ends_at'] as const;
+export const IMPORT_COLUMNS = ['name', 'description', 'kind', 'lifecycle', 'criticality', 'annual_run_cost', 'disposition', 'domain', 'hosting_model', 'vendor', 'is_external', 'external_organisation', 'platform', 'capability', 'business_owner', 'technical_owner', 'interface_type', 'transformation', 'introduced', 'planned_end', 'support_ends_at', 'ai_autonomy', 'ai_use'] as const;
 export type ImportColumn = (typeof IMPORT_COLUMNS)[number];
 
 export type ImportRowElementType = 'system' | 'container';
 
-export type ImportRowAttributeKey = 'description' | 'kind' | 'lifecycleStatus' | 'criticality' | 'annualRunCost' | 'disposition' | 'domain' | 'hostingModel' | 'vendor' | 'externalOrganisation' | 'interfaceType' | 'transformation' | 'introduced' | 'plannedEnd' | 'supportEndsAt';
+export type ImportRowAttributeKey = 'description' | 'kind' | 'lifecycleStatus' | 'criticality' | 'annualRunCost' | 'disposition' | 'domain' | 'hostingModel' | 'vendor' | 'externalOrganisation' | 'interfaceType' | 'transformation' | 'introduced' | 'plannedEnd' | 'supportEndsAt' | 'aiAutonomy' | 'aiUse';
 
 /** An owner column's own cell — either a plain name, or "Name (External: Org)" (import close-out), which creates the owner as an external organisation actor (`subtype: 'organisation'`, `isExternal: true`, `externalOrganisation: Org`) if no existing actor named `name` already resolves it. */
 export interface OwnerReference {
@@ -101,6 +101,9 @@ const ATTRIBUTE_COLUMNS: readonly (readonly [ImportColumn, ImportRowAttributeKey
   ['introduced', 'introduced'],
   ['planned_end', 'plannedEnd'],
   ['support_ends_at', 'supportEndsAt'],
+  // Owner-approved importer exception (Simon, 2026-11-16, "Yes A"): the two AI fields, so a demo or JSON import can record them. Same enum check as every other column; system-only attributes, so a module row setting either fails validation.
+  ['ai_autonomy', 'aiAutonomy'],
+  ['ai_use', 'aiUse'],
 ];
 
 const TRUE_WORDS = new Set(['true', 'yes', 'y', '1']);

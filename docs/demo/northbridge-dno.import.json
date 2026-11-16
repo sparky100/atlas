@@ -594,6 +594,7 @@
       "hosting_model": "hybrid",
       "business_owner": "Head of Asset Management",
       "technical_owner": "Asset Management Systems Team",
+      "ai_use": "built_in",
       "description": "Online monitoring of transformers and switchgear.",
       "quote": "Northbridge Power Distribution demo architecture (fictional organisation, illustrative)",
       "confidence": 0.9,
@@ -1043,6 +1044,7 @@
       "hosting_model": "saas",
       "business_owner": "Head of Network Planning",
       "technical_owner": "Network Planning Systems Team",
+      "ai_use": "external_service",
       "description": "Demand and generation scenario forecasting by primary substation, aligned with the distribution future energy scenarios.",
       "quote": "Northbridge Power Distribution demo architecture (fictional organisation, illustrative)",
       "confidence": 0.9,
@@ -1200,6 +1202,56 @@
       "quote": "Northbridge Power Distribution demo architecture (fictional organisation, illustrative)",
       "confidence": 0.9,
       "introduced": "2015-12-01"
+    },
+    {
+      "name": "Fault Triage Assistant",
+      "kind": "application",
+      "lifecycle": "active",
+      "criticality": "medium",
+      "disposition": "invest",
+      "domain": "hybrid",
+      "hosting_model": "public_cloud",
+      "capability": "Outage & Fault Management",
+      "business_owner": "Head of Control",
+      "technical_owner": "OT Systems Team",
+      "ai_autonomy": "suggests",
+      "introduced": "2026-03-01",
+      "description": "AI agent that reads incoming faults and telemetry and suggests a likely cause and crew priority for the control room to act on.",
+      "quote": "Northbridge Power Distribution demo architecture (fictional organisation, illustrative)",
+      "confidence": 0.9
+    },
+    {
+      "name": "Outage Comms Agent",
+      "kind": "application",
+      "lifecycle": "active",
+      "criticality": "medium",
+      "disposition": "invest",
+      "domain": "it",
+      "hosting_model": "public_cloud",
+      "capability": "Contact Channels",
+      "business_owner": "Customer Operations Director",
+      "technical_owner": "Customer Platforms Team",
+      "ai_autonomy": "acts_with_approval",
+      "introduced": "2026-03-01",
+      "description": "AI agent that drafts and sends outage texts and updates to affected customers once a control room engineer approves each message.",
+      "quote": "Northbridge Power Distribution demo architecture (fictional organisation, illustrative)",
+      "confidence": 0.9
+    },
+    {
+      "name": "Vegetation Cut Scheduler",
+      "kind": "application",
+      "lifecycle": "active",
+      "criticality": "medium",
+      "disposition": "invest",
+      "domain": "it",
+      "hosting_model": "public_cloud",
+      "capability": "Vegetation Management",
+      "business_owner": "Head of Field Operations",
+      "ai_autonomy": "acts_alone",
+      "introduced": "2026-03-01",
+      "description": "AI agent that books tree-cutting visits with contractors from the vegetation plan without anyone checking each booking. Demo example of an agent that acts alone with no technical owner.",
+      "quote": "Northbridge Power Distribution demo architecture (fictional organisation, illustrative)",
+      "confidence": 0.9
     }
   ],
   "relationships": [
@@ -1783,6 +1835,79 @@
       "type": "uses",
       "to": "Operational Telecoms Manager",
       "description": "monitors traffic on",
+      "quote": "Northbridge Power Distribution demo architecture (fictional organisation, illustrative)",
+      "confidence": 0.85
+    },
+    {
+      "from": "Fault Triage Assistant",
+      "type": "uses",
+      "to": "ADMS",
+      "description": "reads fault and outage events from",
+      "quote": "Northbridge Power Distribution demo architecture (fictional organisation, illustrative)",
+      "confidence": 0.85
+    },
+    {
+      "from": "Fault Triage Assistant",
+      "type": "uses",
+      "to": "SCADA Front End",
+      "description": "reads telemetry from",
+      "quote": "Northbridge Power Distribution demo architecture (fictional organisation, illustrative)",
+      "confidence": 0.85
+    },
+    {
+      "from": "Fault Triage Assistant",
+      "type": "flows_to",
+      "to": "Salesforce · Field Service",
+      "description": "suggests crew priorities to",
+      "data_classification": "official",
+      "protocol_in": "rest_api",
+      "protocol_out": "rest_api",
+      "quote": "Northbridge Power Distribution demo architecture (fictional organisation, illustrative)",
+      "confidence": 0.85
+    },
+    {
+      "from": "Outage Comms Agent",
+      "type": "uses",
+      "to": "ADMS",
+      "description": "reads outage status from",
+      "quote": "Northbridge Power Distribution demo architecture (fictional organisation, illustrative)",
+      "confidence": 0.85
+    },
+    {
+      "from": "Outage Comms Agent",
+      "type": "uses",
+      "to": "Salesforce · Priority Services Manager",
+      "description": "reads priority customers from",
+      "quote": "Northbridge Power Distribution demo architecture (fictional organisation, illustrative)",
+      "confidence": 0.85
+    },
+    {
+      "from": "Outage Comms Agent",
+      "type": "flows_to",
+      "to": "Salesforce · Service Cloud",
+      "description": "logs customer messages to",
+      "data_classification": "official_sensitive",
+      "protocol_in": "rest_api",
+      "protocol_out": "rest_api",
+      "quote": "Northbridge Power Distribution demo architecture (fictional organisation, illustrative)",
+      "confidence": 0.85
+    },
+    {
+      "from": "Vegetation Cut Scheduler",
+      "type": "uses",
+      "to": "Vegetation Management Tool",
+      "description": "reads cutting plans from",
+      "quote": "Northbridge Power Distribution demo architecture (fictional organisation, illustrative)",
+      "confidence": 0.85
+    },
+    {
+      "from": "Vegetation Cut Scheduler",
+      "type": "flows_to",
+      "to": "Salesforce · Field Service",
+      "description": "books contractor visits in",
+      "data_classification": "official",
+      "protocol_in": "rest_api",
+      "protocol_out": "rest_api",
       "quote": "Northbridge Power Distribution demo architecture (fictional organisation, illustrative)",
       "confidence": 0.85
     }

@@ -19,7 +19,7 @@ const DEMOS = [
   { file: 'docs/demo/meridian-retail.import.json', map: 'content/capability-maps/retail_energy/1.json' },
 ] as const;
 
-interface RawSystem { name: string; description?: string; platform?: string; capability?: string; quote?: string; confidence?: number }
+interface RawSystem { ai_autonomy?: string; ai_use?: string; technical_owner?: string; name: string; description?: string; platform?: string; capability?: string; quote?: string; confidence?: number }
 interface RawEntry { name?: string; from?: string; to?: string; via?: string; platform?: string; capability?: string; replaced_by?: string; quote?: string; confidence?: number }
 interface RawImport { systems: RawSystem[]; relationships: RawEntry[]; changes: RawEntry[] }
 
@@ -75,6 +75,16 @@ describe.each(DEMOS)('demo import $file', ({ file, map }) => {
   it('never names an external organisation as an owner (an external actor can only own with the service role, C20)', () => {
     const external = raw.systems.flatMap((sys) => Object.entries(sys as unknown as Record<string, unknown>).filter(([k, v]) => k.endsWith('_owner') && typeof v === 'string' && v.includes('(External:')).map(([k]) => `${sys.name}.${k}`));
     expect(external).toEqual([]);
+  });
+
+  it('shows the AI features: agents at every level, AI use, and one agent that acts alone with no technical owner', () => {
+    const agents = raw.systems.filter((s) => s.ai_autonomy);
+    expect(agents.length).toBeGreaterThanOrEqual(2);
+    expect(agents.some((s) => s.ai_autonomy === 'acts_with_approval')).toBe(true);
+    expect(agents.filter((s) => s.ai_autonomy === 'acts_alone' && !s.technical_owner)).toHaveLength(1);
+    expect(raw.systems.filter((s) => s.ai_use).length).toBeGreaterThanOrEqual(2);
+    // Every agent is wired to the systems it uses with ordinary relationships.
+    for (const agent of agents) expect(raw.relationships.some((r) => r.from === agent.name)).toBe(true);
   });
 
   it('carries provenance on every entry', () => {
