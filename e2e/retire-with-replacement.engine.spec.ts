@@ -59,7 +59,7 @@ test('retiring a system with a replacement transfers its supports edges and clea
   await page.getByRole('button', { name: 'Mark as retired…' }).click();
   await page.getByLabel('Planned end', { exact: true }).fill(nearPlannedEnd);
   await page.getByRole('button', { name: '+ Replaced by…' }).click();
-  await page.getByPlaceholder('Search systems…').fill('New Billing Platform');
+  await page.getByPlaceholder('Search systems and modules…').fill('New Billing Platform');
   await page.getByRole('button', { name: /New Billing Platform/ }).click();
   await expect(page.getByText('Replaced by', { exact: false })).toBeVisible();
   // `exact: true` — a plain substring match would also catch the header

@@ -7,6 +7,9 @@ import { loadProjectionAtCommitCached } from '../query/cachedBranchProjection';
 import { reportError } from '../errors/errorBannerStore';
 import { supabase } from '../supabaseClient';
 
+/** "An application" for every picker that asks the user to find one: a system, or a module inside a platform (shown "Platform · Module" via `resultParents`). Use this rather than `['system']`, so no picker quietly misses modules. */
+export const SYSTEM_OR_MODULE_TYPES: readonly ElementType[] = ['system', 'container'];
+
 export type RelationshipTargetSearchStatus = 'loading' | 'ready' | 'error';
 
 export interface UseRelationshipTargetSearchResult {

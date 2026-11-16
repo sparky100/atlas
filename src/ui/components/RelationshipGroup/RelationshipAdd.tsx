@@ -8,7 +8,7 @@ import { attributesRecord } from '../../elements/attributesRecord';
 import { moduleDisplayName } from '../../elements/moduleDisplayName';
 import { isIntegrationInterface, isIntegrationPlatform } from '../../elements/systemKind';
 import { useRelationshipCreate, type RelationshipCreateDemotion } from '../../elements/useRelationshipCreate';
-import { useRelationshipTargetSearch } from '../../elements/useRelationshipTargetSearch';
+import { SYSTEM_OR_MODULE_TYPES, useRelationshipTargetSearch } from '../../elements/useRelationshipTargetSearch';
 import { Button } from '../Button/Button';
 import { ElementTypeGlyph } from '../ElementTypeGlyph/ElementTypeGlyph';
 import { Text } from '../Text/Text';
@@ -195,7 +195,7 @@ export function RelationshipAdd({ slot, direction, elementId, elementName, eleme
   // element page must not also pay for a redundant system-pool query.
   // ADR-026: containers too, so an interface on a platform (a container
   // whose parent is an integration platform) can be the via.
-  const viaSearch = useRelationshipTargetSearch(searchCommitId, modelId, ['system', 'container'], elementId, needsLabel && searchWanted, branchCommitId);
+  const viaSearch = useRelationshipTargetSearch(searchCommitId, modelId, SYSTEM_OR_MODULE_TYPES, elementId, needsLabel && searchWanted, branchCommitId);
   // Set right before each `create()` call so the hook's own success callback
   // (which carries no arguments of its own) can still report which element
   // the new relationship points at (Handoff — Flow: Add a system, step 7).

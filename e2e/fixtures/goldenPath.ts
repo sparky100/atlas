@@ -293,7 +293,7 @@ export async function retireElement(page: Page, plannedEndIsoDate: string, repla
   await page.getByLabel('Planned end', { exact: true }).fill(plannedEndIsoDate);
   if (replacementNameMatch) {
     await page.getByRole('button', { name: '+ Replaced by…' }).click();
-    await page.getByPlaceholder('Search systems…').fill(replacementNameMatch);
+    await page.getByPlaceholder('Search systems and modules…').fill(replacementNameMatch);
     await page.getByRole('button', { name: new RegExp(replacementNameMatch) }).click();
   }
   await page.getByRole('button', { name: 'Retire', exact: true }).click();
