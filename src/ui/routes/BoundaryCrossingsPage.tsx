@@ -2,12 +2,14 @@ import { Loading } from '../components/Loading/Loading';
 import { useParams } from 'react-router';
 import { AppHeader } from '../components/AppHeader/AppHeader';
 import { Breadcrumb } from '../components/Breadcrumb/Breadcrumb';
+import { reportsSection } from '../nav/reportsSection';
 import { EditingBranchBanner } from '../branches/EditingBranchBanner/EditingBranchBanner';
 import { ModelNav } from '../components/ModelNav/ModelNav';
 import navStyles from '../components/ModelNav/ModelNav.module.css';
 import { PageIntro } from '../components/PageIntro/PageIntro';
 import { Text } from '../components/Text/Text';
 import { BoundaryCrossingsView } from '../boundaryCrossings/BoundaryCrossingsView';
+import { refLabelOf } from '../../db/ref';
 import { useSelectedRef } from '../branches/useSelectedRef';
 import { useModels } from '../models/useModels';
 import { useOrganisationBySlug } from '../orgs/useOrganisationBySlug';
@@ -43,7 +45,7 @@ export function BoundaryCrossingsPage() {
         <ModelNav orgSlug={orgSlug ?? ''} modelSlug={modelSlug ?? ''} />
         <main className={styles.main}>
           <EditingBranchBanner activeRef={ref} modelId={model.id} orgSlug={orgSlug ?? ''} modelSlug={model.slug} showModeShortcuts={false} />
-          <Breadcrumb org={{ label: organisation?.name ?? '', href: `/o/${orgSlug ?? ''}` }} model={{ label: model.name, href: `/o/${orgSlug ?? ''}/m/${model.slug}` }} refLabel="Boundary crossings" />
+          <Breadcrumb org={{ label: organisation?.name ?? '', href: `/o/${orgSlug ?? ''}` }} model={{ label: model.name, href: `/o/${orgSlug ?? ''}/m/${model.slug}` }} refLabel={refLabelOf(ref)} section={reportsSection(orgSlug ?? '', modelSlug ?? '')} segments={[{ label: 'Boundary crossings', href: `/o/${orgSlug ?? ''}/m/${model.slug}/boundary-crossings` }]} />
           <div className={styles.header}>
             <Text as="h1" size="2xl">
               Boundary crossings

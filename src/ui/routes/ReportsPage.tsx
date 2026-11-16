@@ -2,11 +2,13 @@ import { Loading } from '../components/Loading/Loading';
 import { useParams } from "react-router";
 import { AppHeader } from "../components/AppHeader/AppHeader";
 import { Breadcrumb } from "../components/Breadcrumb/Breadcrumb";
+import { reportsSection } from "../nav/reportsSection";
 import { EditingBranchBanner } from "../branches/EditingBranchBanner/EditingBranchBanner";
 import { ModelNav } from "../components/ModelNav/ModelNav";
 import navStyles from "../components/ModelNav/ModelNav.module.css";
 import { Text } from "../components/Text/Text";
 import { useMainBranch } from "../branches/useMainBranch";
+import { refLabelOf } from "../../db/ref";
 import { useSelectedRef } from "../branches/useSelectedRef";
 import { useModels } from "../models/useModels";
 import { useOrganisationBySlug } from "../orgs/useOrganisationBySlug";
@@ -75,7 +77,8 @@ export function ReportsPage() {
               label: model.name,
               href: `/o/${orgSlug ?? ""}/m/${model.slug}`,
             }}
-            refLabel="Reports"
+            refLabel={refLabelOf(ref)}
+            section={reportsSection(orgSlug ?? "", modelSlug ?? "")}
           />
           <div className={styles.header}>
             <Text as="h1" size="2xl">

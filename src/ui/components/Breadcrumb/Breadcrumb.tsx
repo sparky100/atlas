@@ -15,6 +15,12 @@ export interface BreadcrumbProps {
   /** `main`, or a tag's own name (`src/db/ref.ts`'s `refLabelOf`). */
   refLabel: string;
   /**
+   * The model section a page belongs to (e.g. Reports), between `[ref]` and
+   * the page's own segments. Pages under a section always show it, however
+   * the user arrived, so there is always a step back to the section's hub.
+   */
+  section?: BreadcrumbSegment;
+  /**
    * Whatever comes after `[ref]` — Capability, System, Container, Component,
    * in whichever prefix of that chain applies to the current page. "No
    * 'you could go deeper' affordance" (§2.2) — a caller passes only the
@@ -32,7 +38,7 @@ export interface BreadcrumbProps {
  * still shows which state you're looking at, which is the part every page
  * that reaches this component already knows.
  */
-export function Breadcrumb({ org, model, refLabel, segments = [] }: BreadcrumbProps) {
+export function Breadcrumb({ org, model, refLabel, section, segments = [] }: BreadcrumbProps) {
   return (
     <nav aria-label="Breadcrumb" className={styles.breadcrumb}>
       <Link to={org.href}>
@@ -48,6 +54,16 @@ export function Breadcrumb({ org, model, refLabel, segments = [] }: BreadcrumbPr
       </Link>
       <Sep />
       <Chip tone="neutral">{refLabel}</Chip>
+      {section && (
+        <span className={styles.segment}>
+          <Sep />
+          <Link to={section.href}>
+            <Text as="span" size="sm">
+              {section.label}
+            </Text>
+          </Link>
+        </span>
+      )}
       {segments.map((segment) => (
         <span key={segment.href} className={styles.segment}>
           <Sep />
