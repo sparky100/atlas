@@ -84,7 +84,6 @@ export function DecisionView({ modelId, decisionId, orgId, orgSlug, modelSlug, r
   const ratingsState = useDecisionRatings(modelId, decisionId);
 
   const [addingOption, setAddingOption] = useState(false);
-  const [optionName, setOptionName] = useState('');
   const [optionTitle, setOptionTitle] = useState('');
   const [choosingBranchId, setChoosingBranchId] = useState<UUID | null>(null);
   const [reasons, setReasons] = useState('');
@@ -367,7 +366,6 @@ export function DecisionView({ modelId, decisionId, orgId, orgSlug, modelSlug, r
               variant="secondary"
               onClick={() => {
                 setAddingOption(true);
-                setOptionName('');
                 setOptionTitle('');
               }}
             >
@@ -379,16 +377,8 @@ export function DecisionView({ modelId, decisionId, orgId, orgSlug, modelSlug, r
               <input
                 className={styles.input}
                 type="text"
-                placeholder="Name (e.g. replace-with-workday)"
-                value={optionName}
-                onChange={(e) => {
-                  setOptionName(e.target.value);
-                }}
-              />
-              <input
-                className={styles.input}
-                type="text"
-                placeholder="Title (e.g. Replace with Workday)"
+                aria-label="What's this option?"
+                placeholder="What's this option? (e.g. Replace with Workday)"
                 value={optionTitle}
                 onChange={(e) => {
                   setOptionTitle(e.target.value);
@@ -396,10 +386,10 @@ export function DecisionView({ modelId, decisionId, orgId, orgSlug, modelSlug, r
               />
               <Button
                 variant="primary"
-                disabled={optionsState.status === 'adding' || optionName.trim().length === 0}
+                disabled={optionsState.status === 'adding' || optionTitle.trim().length === 0}
                 onClick={() => {
                   if (!userId) return;
-                  void optionsState.addOption({ orgId, modelId, decisionId, name: optionName, title: optionTitle, userId, projectId: decision.project_id }).then((added) => {
+                  void optionsState.addOption({ orgId, modelId, decisionId, title: optionTitle, userId, projectId: decision.project_id }).then((added) => {
                     if (added) setAddingOption(false);
                   });
                 }}

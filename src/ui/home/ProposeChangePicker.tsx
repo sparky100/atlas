@@ -86,7 +86,8 @@ export function ProposeChangePicker({ modelId, orgId, userId, onChosen, onCancel
         <input
           type="text"
           className={styles.input}
-          placeholder="Name (e.g. retire-northgate)"
+          aria-label="What's this change?"
+          placeholder="What's this change? (e.g. Retire Northgate)"
           value={newName}
           onChange={(e) => {
             setNewName(e.target.value);
@@ -96,7 +97,7 @@ export function ProposeChangePicker({ modelId, orgId, userId, onChosen, onCancel
           variant="primary"
           disabled={status === 'creating' || newName.trim().length === 0}
           onClick={() => {
-            void createChange({ name: newName, title: '', description: defaultDescription, targetDate: '', intent: defaultIntent }).then((branch) => {
+            void createChange({ title: newName, description: defaultDescription, targetDate: '', intent: defaultIntent }).then((branch) => {
               if (branch) onChosen(branch);
             });
           }}

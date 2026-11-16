@@ -38,10 +38,8 @@ test('create a change, edit it on its own branch, view it, submit, approve, and 
 
   // 1. Create the change branch through the real "Changes" form.
   await page.goto(`/o/${orgSlug}/m/${modelSlug}/changes`);
-  const changeName = `retire-legacy-vendor-${randomUUID().slice(0, 8)}`;
   const changeTitle = 'Point Billing Service at the new vendor';
-  await page.getByPlaceholder('Name (e.g. retire-legacy-crm)').fill(changeName);
-  await page.getByPlaceholder('Title (e.g. Retire the legacy CRM)').fill(changeTitle);
+  await page.getByPlaceholder("What's this change? (e.g. Retire the legacy CRM)").fill(changeTitle);
   await page.getByPlaceholder('Description (optional)').fill('Swap Billing Service onto Acme Corp.');
   await page.getByRole('button', { name: 'Create change' }).click();
 

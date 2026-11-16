@@ -45,13 +45,12 @@ test('project pack: decide and design inside a project, attach evidence, downloa
   await page.getByLabel('New decision title').fill('Which system supports repairs?');
   await page.getByRole('button', { name: 'Start decision' }).click();
   await expect(page.getByRole('heading', { name: 'Which system supports repairs?' })).toBeVisible();
-  for (const [name, title] of [
+  for (const [, title] of [
     ['repairs-hub', 'Build Repairs Hub'],
     ['extend-crm', 'Extend the CRM'],
   ] as const) {
     await page.getByRole('button', { name: '+ Add an option' }).click();
-    await page.getByPlaceholder('Name (e.g. replace-with-workday)').fill(name);
-    await page.getByPlaceholder('Title (e.g. Replace with Workday)').fill(title);
+    await page.getByPlaceholder("What's this option? (e.g. Replace with Workday)").fill(title);
     await page.getByRole('button', { name: 'Add option' }).click();
     await expect(page.getByText(title).first()).toBeVisible();
   }

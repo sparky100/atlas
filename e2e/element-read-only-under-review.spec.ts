@@ -29,8 +29,7 @@ test('a contributor sees "Read-only: under review" on an element of a Proposed c
   // is about the read-only chip, not the create-a-system UI.
   await page.goto(`/o/${orgSlug}/m/${modelSlug}/changes`);
   const changeTitle = `Under review ${randomUUID().slice(0, 8)}`;
-  await page.getByPlaceholder('Name (e.g. retire-legacy-crm)').fill(`under-review-${randomUUID().slice(0, 8)}`);
-  await page.getByPlaceholder('Title (e.g. Retire the legacy CRM)').fill(changeTitle);
+  await page.getByPlaceholder("What's this change? (e.g. Retire the legacy CRM)").fill(changeTitle);
   await page.getByRole('button', { name: 'Create change' }).click();
   await expect(page.getByRole('heading', { name: changeTitle })).toBeVisible();
   const branchIdMatch = /\/changes\/([^/?]+)/.exec(page.url());

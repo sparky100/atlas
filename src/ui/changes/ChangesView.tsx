@@ -56,7 +56,6 @@ export function ChangesView({ modelId, orgId, userId, orgSlug, modelSlug, canCre
   const { status, branches, error, mainHeadCommitId, createChange } = useChanges(modelId, orgId, userId);
   // E8 ("performance") phase 1: this route's own resolve/first-paint/data-complete marks — see useRouteTiming.ts's own module comment. `useChanges`' own status has no 'ready' state; 'idle' is its own "loaded, no create-form submission in flight" — the data-complete signal here.
   useRouteTiming('changes', status === 'idle');
-  const [name, setName] = useState('');
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [targetDate, setTargetDate] = useState('');
@@ -95,8 +94,7 @@ export function ChangesView({ modelId, orgId, userId, orgSlug, modelSlug, canCre
   // open the screen that does the job on it (Retire panel, edit form, or the add box).
   const startGuided = ({ kind, system }: GuidedChangeStart) => {
     const title = kind === 'add' ? 'Add a new system' : kind === 'retire' ? `Retire ${system?.name ?? 'a system'}` : `Change details of ${system?.name ?? 'a system'}`;
-    const slug = title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 60);
-    void createChange({ name: `${slug}-${Date.now().toString(36)}`, title, description: '', targetDate: '', intent: 'propose' }).then((branch) => {
+    void createChange({ title, description: '', targetDate: '', intent: 'propose' }).then((branch) => {
       if (!branch) return;
       setRef({ kind: 'branch', branchId: branch.id });
       const base = `/o/${orgSlug}/m/${modelSlug}`;
@@ -149,9 +147,8 @@ export function ChangesView({ modelId, orgId, userId, orgSlug, modelSlug, canCre
               className={styles.form}
               onSubmit={(e) => {
                 e.preventDefault();
-                void createChange({ name, title, description, targetDate, intent }).then((branch) => {
+                void createChange({ title, description, targetDate, intent }).then((branch) => {
                   if (branch) {
-                    setName('');
                     setTitle('');
                     setDescription('');
                     setTargetDate('');
@@ -169,19 +166,10 @@ export function ChangesView({ modelId, orgId, userId, orgSlug, modelSlug, canCre
               }}
             >
               <input
-                className={styles.input}
+                className={joinClasses(styles.input, styles.full)}
                 type="text"
-                placeholder="Name (e.g. retire-legacy-crm)"
-                value={name}
-                onChange={(e) => {
-                  setName(e.target.value);
-                }}
-                disabled={!mainHeadCommitId}
-              />
-              <input
-                className={styles.input}
-                type="text"
-                placeholder="Title (e.g. Retire the legacy CRM)"
+                aria-label="What's this change?"
+                placeholder="What's this change? (e.g. Retire the legacy CRM)"
                 value={title}
                 onChange={(e) => {
                   setTitle(e.target.value);

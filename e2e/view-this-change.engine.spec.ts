@@ -27,8 +27,7 @@ test('viewing a change read-only leaves the session\'s own editing selection unt
   // selection, superseding A.
   const changeATitle = `Change A ${randomUUID().slice(0, 8)}`;
   await page.goto(`/o/${orgSlug}/m/${modelSlug}/changes`);
-  await page.getByPlaceholder('Name (e.g. retire-legacy-crm)').fill(`change-a-${randomUUID().slice(0, 8)}`);
-  await page.getByPlaceholder('Title (e.g. Retire the legacy CRM)').fill(changeATitle);
+  await page.getByPlaceholder("What's this change? (e.g. Retire the legacy CRM)").fill(changeATitle);
   await page.getByRole('button', { name: 'Create change' }).click();
   await expect(page.getByRole('heading', { name: changeATitle })).toBeVisible();
   const changeAId = /\/changes\/([^/?]+)/.exec(page.url())?.[1];
@@ -36,8 +35,7 @@ test('viewing a change read-only leaves the session\'s own editing selection unt
 
   const changeBTitle = `Change B ${randomUUID().slice(0, 8)}`;
   await page.goto(`/o/${orgSlug}/m/${modelSlug}/changes`);
-  await page.getByPlaceholder('Name (e.g. retire-legacy-crm)').fill(`change-b-${randomUUID().slice(0, 8)}`);
-  await page.getByPlaceholder('Title (e.g. Retire the legacy CRM)').fill(changeBTitle);
+  await page.getByPlaceholder("What's this change? (e.g. Retire the legacy CRM)").fill(changeBTitle);
   await page.getByRole('button', { name: 'Create change' }).click();
   await expect(page.getByRole('heading', { name: changeBTitle })).toBeVisible();
   await expect(page.getByText(`Editing in change: ${changeBTitle}`)).toBeVisible();

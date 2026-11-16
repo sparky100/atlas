@@ -87,10 +87,8 @@ test('an option that removes a boundary crossing shows only that row plus the su
   await expect(page.getByRole('heading', { name: decisionTitle })).toBeVisible();
 
   // 2. Add one option.
-  const optionName = `option-a-${randomUUID().slice(0, 8)}`;
   await page.getByRole('button', { name: '+ Add an option' }).click();
-  await page.getByPlaceholder('Name (e.g. replace-with-workday)').fill(optionName);
-  await page.getByPlaceholder('Title (e.g. Replace with Workday)').fill('Option 1');
+  await page.getByPlaceholder("What's this option? (e.g. Replace with Workday)").fill('Option 1');
   await page.getByRole('button', { name: 'Add option' }).click();
   await expect(page.getByText('Option 1')).toBeVisible();
 

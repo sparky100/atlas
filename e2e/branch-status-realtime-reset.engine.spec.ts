@@ -35,8 +35,7 @@ test('submitting for review on one tab resets the active ref on another open tab
   // 1. Tab 1: create the change through the real form — lands inside it.
   await page.goto(`/o/${orgSlug}/m/${modelSlug}/changes`);
   const changeTitle = `Realtime reset ${randomUUID().slice(0, 8)}`;
-  await page.getByPlaceholder('Name (e.g. retire-legacy-crm)').fill(`realtime-reset-${randomUUID().slice(0, 8)}`);
-  await page.getByPlaceholder('Title (e.g. Retire the legacy CRM)').fill(changeTitle);
+  await page.getByPlaceholder("What's this change? (e.g. Retire the legacy CRM)").fill(changeTitle);
   await page.getByRole('button', { name: 'Create change' }).click();
   await expect(page.getByRole('heading', { name: changeTitle })).toBeVisible();
   const branchIdMatch = /\/changes\/([^/?]+)/.exec(page.url());

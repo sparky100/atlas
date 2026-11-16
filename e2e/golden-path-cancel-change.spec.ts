@@ -12,8 +12,7 @@ test('cancel a change: collapsed section with a reason, active ref reset, duplic
 
   await page.getByRole('link', { name: 'Changes' }).click();
   const changeTitle = 'Cancel Me';
-  await page.getByPlaceholder('Name (e.g. retire-legacy-crm)').fill('cancel-me');
-  await page.getByPlaceholder('Title (e.g. Retire the legacy CRM)').fill(changeTitle);
+  await page.getByPlaceholder("What's this change? (e.g. Retire the legacy CRM)").fill(changeTitle);
   await page.getByRole('button', { name: 'Create change' }).click();
   await expect(page.getByRole('heading', { name: changeTitle })).toBeVisible();
   await expect(page.getByText(`Editing in change: ${changeTitle}`)).toBeVisible();

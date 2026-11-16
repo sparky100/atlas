@@ -120,10 +120,8 @@ test('model-scoped routes: no horizontal scroll at 390px, including a long branc
   // chip shows (`title ?? name`), and the thing that actually bled past
   // the fixed nav's edges before the fix.
   await page.goto(`/o/${orgSlug}/m/${modelSlug}/changes`);
-  const changeName = `long-title-branch-${randomUUID().slice(0, 8)}`;
   const changeTitle = 'A deliberately long change title chosen to exceed 390 pixels of nav chip width';
-  await page.getByPlaceholder('Name (e.g. retire-legacy-crm)').fill(changeName);
-  await page.getByPlaceholder('Title (e.g. Retire the legacy CRM)').fill(changeTitle);
+  await page.getByPlaceholder("What's this change? (e.g. Retire the legacy CRM)").fill(changeTitle);
   await page.getByRole('button', { name: 'Create change' }).click();
   // Sticky ref: a successful create lands inside the new change's own page
   // directly — no separate "find the row, click Open →" step needed.

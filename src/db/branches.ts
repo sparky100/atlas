@@ -23,7 +23,8 @@ export interface CreateChangeBranchInput {
   id: UUID;
   orgId: UUID;
   modelId: UUID;
-  name: string;
+  /** The short code behind the change (`branches.name`, unique per model). Omit it to have one made from `title` and `id` (`changeNameFromTitle`) — the person only ever types a plain title. */
+  name?: string;
   title?: string;
   /** Free-text description of the change (SPEC §3.4) — the "create change" form's second field. */
   description?: string;
@@ -38,12 +39,29 @@ export interface CreateChangeBranchInput {
   projectId?: UUID | null;
 }
 
+/**
+ * The short code behind a change, made from the plain title the person typed
+ * plus the first eight characters of the change's own id — so it is unique
+ * within a model without a clash check and reproducible for the same inputs
+ * (no randomness here; the id is minted by the caller, S-1).
+ */
+export function changeNameFromTitle(title: string, id: UUID): string {
+  const slug = title
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+    .slice(0, 50)
+    .replace(/-+$/g, '');
+  return `${slug.length > 0 ? slug : 'change'}-${id.replace(/-/g, '').slice(0, 8)}`;
+}
+
 export async function createChangeBranch(supabase: Client, input: CreateChangeBranchInput): Promise<BranchRow> {
+  const name = input.name !== undefined && input.name.trim().length > 0 ? input.name : changeNameFromTitle(input.title ?? '', input.id);
   const row = {
     id: input.id,
     org_id: input.orgId,
     model_id: input.modelId,
-    name: input.name,
+    name,
     kind: 'change' as const,
     status: 'draft' as const,
     base_commit_id: input.mainHeadCommitId,
@@ -66,7 +84,7 @@ export async function createChangeBranch(supabase: Client, input: CreateChangeBr
     // constraint violation this insert can realistically hit from normal
     // use, so it's worth naming specifically rather than only ever
     // surfacing `error.message` verbatim.
-    if (error.code === '23505') throw new Error(`A change named "${input.name}" already exists in this model — pick a different name.`);
+    if (error.code === '23505') throw new Error(`A change named "${name}" already exists in this model — pick a different name.`);
     throw new Error(`createChangeBranch: ${error.message}`);
   }
   return data as BranchRow;

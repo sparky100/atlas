@@ -69,10 +69,8 @@ test('comment on a branch-only element, merge the change, see the comment on mai
 
   // 1. Create the change branch through the real "Changes" form.
   await page.goto(`/o/${orgSlug}/m/${modelSlug}/changes`);
-  const changeName = `add-draft-system-${randomUUID().slice(0, 8)}`;
   const changeTitle = 'Add a draft-only system';
-  await page.getByPlaceholder('Name (e.g. retire-legacy-crm)').fill(changeName);
-  await page.getByPlaceholder('Title (e.g. Retire the legacy CRM)').fill(changeTitle);
+  await page.getByPlaceholder("What's this change? (e.g. Retire the legacy CRM)").fill(changeTitle);
   await page.getByRole('button', { name: 'Create change' }).click();
   // Sticky ref: a successful create lands inside the new change's own page
   // directly — no separate "find the row, click Open →" step needed.

@@ -85,7 +85,7 @@ test('propose a change from an element page, leave and re-enter it, submit; revi
   await proposerPage.getByRole('button', { name: 'Propose a plan' }).click();
 
   const changeName = 'retire-ledger-vendor';
-  await proposerPage.getByPlaceholder('Name (e.g. retire-northgate)').fill(changeName);
+  await proposerPage.getByPlaceholder("What's this change? (e.g. Retire the legacy CRM)").fill(changeName);
   await proposerPage.getByRole('button', { name: 'Create & continue' }).click();
   await expect(proposerPage.getByText(`Editing in change: ${changeName}`)).toBeVisible();
 

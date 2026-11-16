@@ -53,8 +53,7 @@ test('a selected change persists through Home, search and create — the new ele
   // 1. Create the change branch through the real "Changes" form.
   await page.goto(`/o/${orgSlug}/m/${modelSlug}/changes`);
   const changeTitle = `Persist ref ${randomUUID().slice(0, 8)}`;
-  await page.getByPlaceholder('Name (e.g. retire-legacy-crm)').fill(`persist-ref-${randomUUID().slice(0, 8)}`);
-  await page.getByPlaceholder('Title (e.g. Retire the legacy CRM)').fill(changeTitle);
+  await page.getByPlaceholder("What's this change? (e.g. Retire the legacy CRM)").fill(changeTitle);
   await page.getByRole('button', { name: 'Create change' }).click();
 
   // 2. Sticky ref: "the create-change flow lands you inside" — creating

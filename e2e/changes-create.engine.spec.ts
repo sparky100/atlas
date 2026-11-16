@@ -24,8 +24,7 @@ test('creates a change from the UI, lands inside it, and lists it', async ({ pag
 
   await page.goto(`/o/${orgSlug}/m/${modelSlug}/changes`);
   const changeTitle = 'Retire the payments gateway';
-  await page.getByPlaceholder('Name (e.g. retire-legacy-crm)').fill('retire-payments-gateway');
-  await page.getByPlaceholder('Title (e.g. Retire the legacy CRM)').fill(changeTitle);
+  await page.getByPlaceholder("What's this change? (e.g. Retire the legacy CRM)").fill(changeTitle);
   await page.getByPlaceholder('Description (optional)').fill('Decommission the old gateway once the new one is live.');
   await page.getByRole('button', { name: 'Create change' }).click();
 
@@ -47,37 +46,22 @@ test('creates a change from the UI, lands inside it, and lists it', async ({ pag
   await expect(page.locator('li', { hasText: changeTitle })).toBeVisible();
 });
 
-test('a failed create surfaces a visible error, not a silent no-op', async ({ page }) => {
+test('two changes with the same title can both be created — Atlas makes the short code unique itself', async ({ page }) => {
   const env = loadEnv();
-  const { orgSlug, modelSlug } = await bootstrapChangeBranchFixture(page, env, 'changescreatefail', 'Order Service');
+  const { orgSlug, modelSlug } = await bootstrapChangeBranchFixture(page, env, 'changescreatesame', 'Order Service');
 
   await page.goto(`/o/${orgSlug}/m/${modelSlug}/changes`);
-  const duplicateName = 'duplicate-change-name';
-  await page.getByPlaceholder('Name (e.g. retire-legacy-crm)').fill(duplicateName);
+  const sameTitle = 'Same title twice';
+  await page.getByPlaceholder("What's this change? (e.g. Retire the legacy CRM)").fill(sameTitle);
   await page.getByRole('button', { name: 'Create change' }).click();
-
-  // The first create succeeds and lands inside — back to the Changes page
-  // to attempt the real point of this test, a second create with the same
-  // name.
   await expect(page).toHaveURL(/ref=branch(:|%3A)/);
+
   await page.goto(`/o/${orgSlug}/m/${modelSlug}/changes`);
-  await expect(page.locator('li', { hasText: duplicateName })).toBeVisible();
-
-  // The second create with the same name trips `branches`' own
-  // `unique (model_id, name)` constraint (20260906071400_history.sql) — a
-  // real, server-rejected create, not a client-side validation guard, so
-  // this exercises `createChange`'s own `catch` (and, through it, both the
-  // inline error text and the global banner `reportError` now wires it to)
-  // rather than one of its early `!mainHeadCommitId`/`!userId`/empty-name
-  // returns.
-  await page.getByPlaceholder('Name (e.g. retire-legacy-crm)').fill(duplicateName);
+  await expect(page.locator('li', { hasText: sameTitle })).toHaveCount(1);
+  await page.getByPlaceholder("What's this change? (e.g. Retire the legacy CRM)").fill(sameTitle);
   await page.getByRole('button', { name: 'Create change' }).click();
+  await expect(page).toHaveURL(/ref=branch(:|%3A)/);
 
-  // Inline (ChangesView's own panel) and the global banner both surface
-  // the same real failure — this is the exact gap Prompt 7g's bug report
-  // named: previously neither did. A failed create must not navigate
-  // anywhere, unlike a successful one.
-  await expect(page.getByRole('alert')).toBeVisible({ timeout: 15_000 });
-  await expect(page).toHaveURL(new RegExp(`/o/${orgSlug}/m/${modelSlug}/changes(\\?|$)`));
-  await expect(page.locator('li', { hasText: duplicateName })).toHaveCount(1);
+  await page.goto(`/o/${orgSlug}/m/${modelSlug}/changes`);
+  await expect(page.locator('li', { hasText: sameTitle })).toHaveCount(2);
 });

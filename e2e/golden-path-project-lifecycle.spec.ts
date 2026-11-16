@@ -45,13 +45,12 @@ test('project lifecycle: start from a finding, decide inside it, deliver the cho
   await expect(page.getByRole('link', { name: PROJECT_TITLE })).toBeVisible();
 
   // 3. Two options, one rating, choose the first.
-  for (const [name, title] of [
+  for (const [, title] of [
     ['repairs-hub', 'Build Repairs Hub'],
     ['extend-crm', 'Extend the CRM'],
   ] as const) {
     await page.getByRole('button', { name: '+ Add an option' }).click();
-    await page.getByPlaceholder('Name (e.g. replace-with-workday)').fill(name);
-    await page.getByPlaceholder('Title (e.g. Replace with Workday)').fill(title);
+    await page.getByPlaceholder("What's this option? (e.g. Replace with Workday)").fill(title);
     await page.getByRole('button', { name: 'Add option' }).click();
     await expect(page.getByText(title).first()).toBeVisible();
   }
