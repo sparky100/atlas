@@ -94,7 +94,7 @@ On a phone, the bar at the bottom shows Home, Capabilities, Landscape and Change
 
 **Zooming in.** Atlas is one continuous zoom through four levels: **capability map** (all your capabilities) → **landscape** (systems grouped by the capability they support) → **system context** (one system and its neighbours) → **containers** (inside one system).
 
-**The breadcrumb** at the top of a page shows where you are: `Org › Model › [ref] › …`. The `[ref]` chip says which state of the model you're looking at — the live model (shown as `main`), a version like `v2026-Q1`, or a change like `Change: Housing CRM replacement`. Click it to switch. **Back to main** (in the banner shown while you look at a version or a change) returns you to the live model.
+**The breadcrumb** at the top of a page shows where you are: `Org › Model › [ref] › …`. The `[ref]` chip says which state of the model you're looking at — the live model (shown as **live model**), a version like `v2026-Q1`, or a change like `Change: Housing CRM replacement`. Click it to switch. **Back to the live model** (in the banner shown while you look at a version or a change) returns you to the live model.
 
 **Every page has a URL.** You can bookmark or share a link to any element, change, decision, project or version, and it opens straight to it.
 
@@ -129,7 +129,7 @@ What you can do depends on your role and on whether you're looking at the live m
 
 **Elements** lists everything in the model. Search by name or owner, filter by type, planned action or a custom attribute, tick **AI agents only** or **Uses AI**, or pick a **Finding** to see just the elements a health finding flagged. Sort by any column (an **AI** column appears when any listed system uses AI: an agent shows how it acts, anything else shows **Built-in AI** or **AI service**), and **Export CSV** or **Export XLSX**. **Export everything (JSON)** downloads the whole model — every element, relationship, value and where it came from — whatever filter is on. The workbook carries each element's **Atlas ID** and its parent (a module's system, a capability's parent capability) and lists every relationship, so it can be brought back in through **Import**: modules keep their platform and systems keep their capability links.
 
-- **Edit in grid** turns the Lifecycle, Criticality and Planned action cells (and a custom attribute's column, when one is shown) into editable controls. **Save N changes** records them all as one edit — on main, or in the change you're working in. While editing, each row also has **✓ Still accurate**.
+- **Edit in grid** turns the Lifecycle, Criticality and Planned action cells (and a custom attribute's column, when one is shown) into editable controls. **Save N changes** records them all as one edit — on the live model, or in the change you're working in. While editing, each row also has **✓ Still accurate**.
 - **Import…** (architects and owners) takes you to Import.
 
 ## Bringing data in: import
@@ -167,7 +167,7 @@ Every change says **why** it exists:
 
 - **Record** and **Correct** changes need one architect or owner: **Approve & merge** on the change page.
 - **Propose** and **Explore** changes go through review: **Submit for review**, pick the reviewers, and they appear in the **Waiting for review** tab of Changes, and in a **Waiting for review** section at the top of the Changes list (drafts stay in the intent groups below it). Reviewers **Approve**, **Request changes** or **Abstain**; once the required reviewers approve, an architect or owner **Merges**.
-- If the live model has moved on since you started, the change page says **The model has changed since you started** and shows what clashes. Resolve each one, then press **Bring up to date**. A change already in review does the same from the review page, with **Pull in main & resubmit**.
+- If the live model has moved on since you started, the change page says **The model has changed since you started** and shows what clashes. Resolve each one, then press **Bring up to date**. A change already in review does the same from the review page, with **Bring up to date and resubmit**.
 - A change in review can be **split**, sending some of its edits on ahead as their own change.
 - A change still in draft or proposed can be **cancelled** (with a reason); **Duplicate into a new draft** starts again from it. The Changes page lists open changes (draft, proposed, in review or approved) grouped by intent — the number on the **Changes** menu item is how many there are. Merged, cancelled, and rejected or archived changes each have their own collapsed section at the bottom.
 
@@ -278,12 +278,12 @@ The **bell** in the top bar holds your notifications: when someone @mentions you
 
 ## History
 
-A **version** is a named, permanent snapshot of the live model at a point in time (e.g. a quarterly baseline) — a tag on that state, not a copy that can drift. On **Versions**, give one a name and an optional note to create it. Open any version read-only with the `[ref]` chip, or **compare two versions** to see what changed between them.
+A **version** is a named, permanent snapshot of the live model at a point in time (e.g. a quarterly baseline) — a tag on that state, not a copy that can drift. On **Versions**, give one a name and an optional note, then press **Tag the live model now** to create it. Open any version read-only with the `[ref]` chip, or **compare two versions** to see what changed between them.
 
 ## Settings
 
 - **Organisation settings** (owners): the organisation's name, **members** and their roles, **invite by email**, the **membership audit** log, **custom attributes**, and deleting the organisation.
-- **Model settings**: name and description; **archive** a model you've finished with (architects and owners), and **restore** or **delete** an archived one (owners); **share with another organisation** — read-only access to main or to one version, never edit access.
+- **Model settings**: name and description; **archive** a model you've finished with (architects and owners), and **restore** or **delete** an archived one (owners); **share with another organisation** — read-only access to the live model or to one version, never edit access.
 - **Your profile** (the **•••** menu at the top right → Profile): your name, **notifications**, and your signed-in **sessions**.
 
 ## Getting help
