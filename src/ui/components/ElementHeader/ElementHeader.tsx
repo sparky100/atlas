@@ -10,6 +10,7 @@ import { LinkButton } from '../Button/LinkButton';
 import { aiMarkOf } from '../../../engine/elementRead/aiAgent';
 import { AiMarkChip, AiTag } from '../AiTag/AiTag';
 import { Chip } from '../Chip/Chip';
+import { LifecycleTag, type LifecycleTagProps } from '../LifecycleTag/LifecycleTag';
 import { ElementTypeGlyph } from '../ElementTypeGlyph/ElementTypeGlyph';
 import { FactBadge } from '../FactBadge/FactBadge';
 import type { FactsRow } from '../../../contracts/rows';
@@ -131,6 +132,8 @@ export interface ElementHeaderProps {
    * ADR-026: set only when the element is an *interface* — names the integration platform that manages it (the interface's own parent) and links to that platform's page, so the header says "Interface · managed by <platform>" instead of leaving that to the "Parent:" line further down. `typeLabel` is the interface's own type ("API", "File"…), `null` when not yet recorded. Omitted for every other element.
    */
   interfacePlatform?: { name: string; href: string; typeLabel: string | null } | undefined;
+  /** Planned (not live yet) or retired, by the element's own dates: draws the shared tag beside the name. Omit for an active element. */
+  lifecycleTag?: LifecycleTagProps | undefined;
   /**
    * "Context →" — a system or container's own context diagram
    * (`/context/:elementId`, `ContextPage.tsx`). Omitted entirely (not
@@ -183,7 +186,7 @@ export interface ElementHeaderProps {
  * and adds "Retire…" (`onRetire`, system only) — both live in this same
  * overflow menu, not a standalone row.
  */
-export function ElementHeader({ element, existsFact, existsSource, onEdit, onConfirmStillAccurate, confirming, onProposeChange, rename, onRetire, onRemoveFromModel, onMerge, onConvertToModule, onDeactivate, onReactivate, readOnlyReason, interfacePlatform, contextHref, roadmapHref, startProjectHref, startDecisionHref }: ElementHeaderProps) {
+export function ElementHeader({ element, existsFact, existsSource, onEdit, onConfirmStillAccurate, confirming, onProposeChange, rename, onRetire, onRemoveFromModel, onMerge, onConvertToModule, onDeactivate, onReactivate, readOnlyReason, interfacePlatform, lifecycleTag, contextHref, roadmapHref, startProjectHref, startDecisionHref }: ElementHeaderProps) {
   const [menuOpen, setMenuOpen] = useState(false);
   const menuId = useId();
   const menuRef = useRef<HTMLDivElement>(null);
@@ -272,6 +275,7 @@ export function ElementHeader({ element, existsFact, existsSource, onEdit, onCon
             )}
           </Text>
         )}
+        {lifecycleTag && <LifecycleTag {...lifecycleTag} />}
         {lifecycleStatus !== null && lifecycleTone !== undefined && <Chip tone={lifecycleTone}>{lifecycleStatus}</Chip>}
         {/* Plain text, not a Chip: version is free text in whatever scheme
             the estate actually uses ("3.4.1", "2026-Q1") — a Chip implies
