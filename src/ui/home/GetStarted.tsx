@@ -48,14 +48,14 @@ export function GetStarted({ modelId, commitId, orgId, isOwner, orgSlug, modelSl
 
   const base = `/o/${orgSlug}/m/${modelSlug}`;
   const links: Record<GettingStartedStep['id'], { to: string; text: string }> = {
-    capabilities: { to: `${base}/capture`, text: 'Import' },
+    capabilities: { to: `${base}/capability-map`, text: 'Open the capability map' },
     system: { to: `${base}/elements`, text: 'See what is already here' },
     link: { to: `${base}/capability-map`, text: 'Open the capability map' },
     assess: { to: `${base}/portfolio`, text: 'See your applications' },
     invite: { to: `/o/${orgSlug}/settings`, text: 'Open organisation settings' },
   };
   const hints: Record<GettingStartedStep['id'], string> = {
-    capabilities: 'Import a spreadsheet or document, or type a name in the search box above.',
+    capabilities: 'Start from a ready-made map for your sector, or add your own.',
     system: 'Use Add application below, or Import inventory if you already have a list.',
     link: 'Open an application and say which capability it supports.',
     assess: 'Open an application and choose its planned action: invest, tolerate, migrate or eliminate.',
@@ -81,6 +81,12 @@ export function GetStarted({ modelId, commitId, orgId, isOwner, orgSlug, modelSl
               {!step.done && (
                 <Text as="p" tone="muted" size="sm">
                   {hints[step.id]} <Link to={links[step.id].to}>{links[step.id].text} →</Link>
+                  {step.id === 'capabilities' && (
+                    <>
+                      {' '}
+                      Or <Link to={`${base}/capture`}>import a spreadsheet or document</Link>.
+                    </>
+                  )}
                 </Text>
               )}
             </div>
