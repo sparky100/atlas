@@ -7,10 +7,10 @@ import { Text } from '../components/Text/Text';
 import { useCanvasWidth } from '../landscape/useCanvasWidth';
 import type { RoadmapBranchEvents } from '../../db/roadmapChangeEvents';
 import type { RoadmapFilters } from './roadmapFilter';
-import { isRoadmapEligibleBranch, type RoadmapMode } from './roadmapEligibility';
+import type { RoadmapMode } from './roadmapEligibility';
 import { roadmapBarCaption, type RoadmapGroup, type RoadmapLifecycleBar } from './roadmapLifecycleRows';
-import { computeRoadmapAxisTicks, computeRoadmapTimelineRange, computeRoadmapWindow, percentAtIso, thinAxisTicksToFit, todayPercent, type RoadmapGranularity, type RoadmapHorizon, type RoadmapTimelineRange } from './roadmapTimelineScale';
-import { changeDescription, computeRoadmapVisibleData, eventsForSystem, recentRoadmapChanges } from './roadmapVisibleData';
+import { computeRoadmapAxisTicks, isWithinRange, percentAtIso, thinAxisTicksToFit, todayPercent, type RoadmapGranularity, type RoadmapHorizon, type RoadmapTimelineRange } from './roadmapTimelineScale';
+import { changeDescription, computeRoadmapVisibleData, eventsForSystem, hiddenNoteFor, recentRoadmapChanges, roadmapRangeFor } from './roadmapVisibleData';
 import styles from './RoadmapView.module.css';
 
 /** A conservative mobile-safe width to thin ticks against before `useCanvasWidth`'s `ResizeObserver` reports a real measurement — the report this fixes was "overlapping right on load, every time," so the very first paint has to already be thinned, not just the settled one. */
@@ -29,22 +29,11 @@ export interface RoadmapViewProps {
   horizon: RoadmapHorizon;
   /** The fixed-horizon window's left edge (month start); `undefined` centers on now. Ignored when `horizon` is `'all'`. */
   windowStart: Date | undefined;
+  /** "Show the past year": starts the timeline a year back and brings recently retired systems and delivered changes into it. */
+  showPast: boolean;
   orgSlug: string;
   modelSlug: string;
   now?: Date;
-}
-
-function allDatesFor(groups: readonly RoadmapGroup[], branchEvents: readonly RoadmapBranchEvents[], mode: RoadmapMode): (string | undefined)[] {
-  const dates: (string | undefined)[] = [];
-  for (const group of groups) {
-    for (const bar of group.bars) {
-      dates.push(bar.introduced, bar.plannedEnd, bar.supportEndsAt);
-    }
-  }
-  for (const { branch } of branchEvents) {
-    if (isRoadmapEligibleBranch(branch, mode)) dates.push(branch.target_date ?? undefined);
-  }
-  return dates;
 }
 
 /**
@@ -55,10 +44,10 @@ function allDatesFor(groups: readonly RoadmapGroup[], branchEvents: readonly Roa
  * capability map redesign's own "fact, not a flag" stance forward: a thin
  * shape and colour, never a filled alarm treatment.
  */
-function RoadmapRow({ bar, events, range, todayPct, orgSlug, modelSlug, found }: { found: boolean; bar: RoadmapLifecycleBar; events: readonly { event: RoadmapBranchEvents['events'][number]; branch: RoadmapBranchEvents['branch'] }[]; range: RoadmapTimelineRange; todayPct: number | undefined; orgSlug: string; modelSlug: string }) {
+function RoadmapRow({ bar, events, range, todayPct, showPast, orgSlug, modelSlug, found }: { found: boolean; showPast: boolean; bar: RoadmapLifecycleBar; events: readonly { event: RoadmapBranchEvents['events'][number]; branch: RoadmapBranchEvents['branch'] }[]; range: RoadmapTimelineRange; todayPct: number | undefined; orgSlug: string; modelSlug: string }) {
   const startPct = percentAtIso(bar.introduced, range);
   const endPct = percentAtIso(bar.plannedEnd, range);
-  const supportEndPct = percentAtIso(bar.supportEndsAt, range);
+  const supportEndPct = isWithinRange(bar.supportEndsAt, range) ? percentAtIso(bar.supportEndsAt, range) : undefined;
   const left = startPct ?? 0;
   const width = (endPct ?? 100) - left;
 
@@ -74,10 +63,13 @@ function RoadmapRow({ bar, events, range, todayPct, orgSlug, modelSlug, found }:
         {bar.lifecycleTag && <LifecycleTag {...bar.lifecycleTag} />}
       </Link>
       <div className={styles.track}>
+        {showPast && todayPct !== undefined && <div className={styles.pastBand} style={{ width: `${String(todayPct)}%` }} aria-hidden="true" />}
         <div className={styles.lifecycleBar} data-tone={bar.lifecycleStatus === 'retiring' || bar.lifecycleStatus === 'retired' ? 'warn' : 'neutral'} style={{ left: `${String(left)}%`, width: `${String(Math.max(width, 0.5))}%` }} />
         {todayPct !== undefined && <div className={styles.todayLine} style={{ left: `${String(todayPct)}%` }} title="Today" aria-hidden="true" />}
         {supportEndPct !== undefined && <div className={styles.supportEndTick} style={{ left: `${String(supportEndPct)}%` }} title={`Support ends ${bar.supportEndsAt ?? ''}`} />}
         {events.map(({ event, branch }, index) => {
+          // A change outside the visible window is left off rather than pinned to an edge.
+          if (!isWithinRange(branch.target_date ?? undefined, range)) return null;
           const pct = percentAtIso(branch.target_date ?? undefined, range);
           if (pct === undefined) return null;
           const key = `${branch.id}-${String(index)}`;
@@ -158,6 +150,17 @@ function RoadmapChangesList({ eligibleEvents }: { eligibleEvents: readonly Roadm
   );
 }
 
+/** Says what the start date left off; nothing when nothing was left off. */
+function HiddenNote({ retired, changes, showPast }: { retired: number; changes: number; showPast: boolean }) {
+  const note = hiddenNoteFor(retired, changes, showPast);
+  if (note === null) return null;
+  return (
+    <Text as="p" size="sm" tone="muted" data-testid="roadmap-hidden-note">
+      {note}
+    </Text>
+  );
+}
+
 /**
  * F5's own roadmap timeline (docs/prompts/atlas-prompt-pack.md) — rows
  * grouped by capability, bars from a system's own lifecycle dates, plain
@@ -167,10 +170,9 @@ function RoadmapChangesList({ eligibleEvents }: { eligibleEvents: readonly Roadm
  * same role-boundary stance the capability map redesign already
  * established for this app's other structural-reference views.
  */
-export function RoadmapView({ groupsLabel = 'Capability domains', groups, branchEvents, mode, filters, granularity, horizon, windowStart, orgSlug, modelSlug, now = new Date() }: RoadmapViewProps) {
-  const { filteredGroups, eligibleEvents } = computeRoadmapVisibleData(groups, branchEvents, mode, filters, now);
-  const fullRange = computeRoadmapTimelineRange(allDatesFor(groups, branchEvents, mode), now);
-  const range = computeRoadmapWindow(horizon, fullRange, now, windowStart);
+export function RoadmapView({ groupsLabel = 'Capability domains', groups, branchEvents, mode, filters, granularity, horizon, windowStart, showPast, orgSlug, modelSlug, now = new Date() }: RoadmapViewProps) {
+  const { filteredGroups, eligibleEvents, hiddenRetiredCount, hiddenChangeCount } = computeRoadmapVisibleData(groups, branchEvents, mode, filters, now, showPast);
+  const range = roadmapRangeFor(groups, branchEvents, mode, horizon, windowStart, now, showPast);
   const todayPct = todayPercent(range, now);
 
   // "Find on this roadmap": only systems a row is drawn for, so a pick always lands. A system under several groups is one option.
@@ -190,11 +192,17 @@ export function RoadmapView({ groupsLabel = 'Capability domains', groups, branch
   }, [found]);
 
   if (filteredGroups.length === 0 && eligibleEvents.length === 0) {
-    return <EmptyState>No systems with a recorded lifecycle date (introduced, planned end or support end) yet.</EmptyState>;
+    return (
+      <>
+        <EmptyState>{hiddenRetiredCount + hiddenChangeCount === 0 ? 'No systems with a recorded lifecycle date (introduced, planned end or support end) yet.' : 'Nothing on the roadmap from today onward.'}</EmptyState>
+        <HiddenNote retired={hiddenRetiredCount} changes={hiddenChangeCount} showPast={showPast} />
+      </>
+    );
   }
 
   return (
     <div className={styles.roadmap}>
+      <HiddenNote retired={hiddenRetiredCount} changes={hiddenChangeCount} showPast={showPast} />
       {filteredGroups.length > 0 && (
         <>
           <LandscapeFind
@@ -222,7 +230,7 @@ export function RoadmapView({ groupsLabel = 'Capability domains', groups, branch
                 <div role="list" aria-label={`${group.label} systems`}>
                   {group.bars.map((bar) => (
                     <div key={bar.systemId} role="listitem">
-                      <RoadmapRow bar={bar} events={eventsForSystem(bar.systemId, branchEvents, mode)} range={range} todayPct={todayPct} orgSlug={orgSlug} modelSlug={modelSlug} found={found?.id === bar.systemId} />
+                      <RoadmapRow bar={bar} events={eventsForSystem(bar.systemId, branchEvents, mode)} range={range} todayPct={todayPct} showPast={showPast} orgSlug={orgSlug} modelSlug={modelSlug} found={found?.id === bar.systemId} />
                     </div>
                   ))}
                 </div>

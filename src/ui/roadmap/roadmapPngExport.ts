@@ -17,7 +17,7 @@
 import type { RoadmapMode } from './roadmapEligibility';
 import type { RoadmapFilters } from './roadmapFilter';
 import { type RoadmapGroup } from './roadmapLifecycleRows';
-import { computeRoadmapAxisTicks, percentAtIso, thinAxisTicksToFit, todayPercent, type RoadmapGranularity, type RoadmapTimelineRange } from './roadmapTimelineScale';
+import { computeRoadmapAxisTicks, isWithinRange, percentAtIso, thinAxisTicksToFit, todayPercent, type RoadmapGranularity, type RoadmapTimelineRange } from './roadmapTimelineScale';
 import { computeRoadmapVisibleData, eventsForSystem } from './roadmapVisibleData';
 import type { RoadmapBranchEvents } from '../../db/roadmapChangeEvents';
 
@@ -90,6 +90,7 @@ function groupLabelOf(group: Pick<RoadmapGroup, 'label'>): string {
 function markersForBar(systemId: string, branchEvents: readonly RoadmapBranchEvents[], mode: RoadmapMode, range: RoadmapTimelineRange): RoadmapPngMarker[] {
   const markers: RoadmapPngMarker[] = [];
   for (const { event, branch } of eventsForSystem(systemId, branchEvents, mode)) {
+    if (!isWithinRange(branch.target_date ?? undefined, range)) continue;
     const pct = percentAtIso(branch.target_date ?? undefined, range);
     if (pct === undefined) continue;
     const x = xAt(pct);
@@ -101,8 +102,8 @@ function markersForBar(systemId: string, branchEvents: readonly RoadmapBranchEve
 }
 
 /** The pure pixel layout — everything `drawRoadmapPng` needs to paint, computed once so the sizing math is unit-testable without a canvas. */
-export function computeRoadmapPngPlan(groups: readonly RoadmapGroup[], branchEvents: readonly RoadmapBranchEvents[], mode: RoadmapMode, filters: RoadmapFilters, granularity: RoadmapGranularity, range: RoadmapTimelineRange, now: Date): RoadmapPngPlan {
-  const { filteredGroups } = computeRoadmapVisibleData(groups, branchEvents, mode, filters, now);
+export function computeRoadmapPngPlan(groups: readonly RoadmapGroup[], branchEvents: readonly RoadmapBranchEvents[], mode: RoadmapMode, filters: RoadmapFilters, granularity: RoadmapGranularity, range: RoadmapTimelineRange, now: Date, showPast = false): RoadmapPngPlan {
+  const { filteredGroups } = computeRoadmapVisibleData(groups, branchEvents, mode, filters, now, showPast);
 
   let cursor = PADDING;
   const pngGroups: RoadmapPngGroup[] = [];
@@ -119,7 +120,7 @@ export function computeRoadmapPngPlan(groups: readonly RoadmapGroup[], branchEve
       for (const bar of group.bars) {
         const startPct = percentAtIso(bar.introduced, range);
         const endPct = percentAtIso(bar.plannedEnd, range);
-        const supportEndPct = percentAtIso(bar.supportEndsAt, range);
+        const supportEndPct = isWithinRange(bar.supportEndsAt, range) ? percentAtIso(bar.supportEndsAt, range) : undefined;
         const left = startPct ?? 0;
         const width = Math.max((endPct ?? 100) - left, 0.5);
         rows.push({

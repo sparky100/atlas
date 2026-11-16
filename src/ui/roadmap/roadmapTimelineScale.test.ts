@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { computeRoadmapAxisTicks, computeRoadmapTimelineRange, computeRoadmapWindow, defaultRoadmapWindowStart, horizonDurationMonths, percentAt, percentAtIso, shiftRoadmapWindowStart, thinAxisTicksToFit, todayPercent } from './roadmapTimelineScale';
+import { computeRoadmapAxisTicks, computeRoadmapForwardRange, computeRoadmapTimelineRange, isWithinRange, roadmapPastStart, computeRoadmapWindow, defaultRoadmapWindowStart, horizonDurationMonths, percentAt, percentAtIso, shiftRoadmapWindowStart, thinAxisTicksToFit, todayPercent } from './roadmapTimelineScale';
 
 const NOW = new Date('2026-06-15T00:00:00Z');
 
@@ -167,5 +167,38 @@ describe('roadmap horizon', () => {
     expect(inside).toBeGreaterThan(0);
     expect(inside).toBeLessThan(100);
     expect(todayPercent({ start: new Date('2027-01-01'), end: new Date('2028-01-01') }, NOW)).toBeUndefined();
+  });
+});
+
+describe('roadmap starts at today', () => {
+  const NOW = new Date(2026, 10, 16);
+
+  it('starts at the beginning of this month, or a year earlier with the past on', () => {
+    expect(roadmapPastStart(NOW, false)).toEqual(new Date(2026, 10, 1));
+    expect(roadmapPastStart(NOW, true)).toEqual(new Date(2025, 10, 1));
+  });
+
+  it('never lets an earlier date stretch the left edge', () => {
+    const range = computeRoadmapForwardRange(['2015-03-01', '2028-06-30'], NOW, false);
+    expect(range.start).toEqual(new Date(2026, 10, 1));
+    expect(range.end.getTime()).toBeGreaterThan(new Date('2028-06-30').getTime());
+  });
+
+  it('always shows at least a year ahead, even with nothing dated', () => {
+    const range = computeRoadmapForwardRange([], NOW, false);
+    expect(range.end.getTime()).toBeGreaterThan(new Date(2027, 10, 1).getTime());
+  });
+
+  it('starts every horizon at the same earliest month', () => {
+    expect(defaultRoadmapWindowStart('1y', NOW)).toEqual(new Date(2026, 10, 1));
+    expect(defaultRoadmapWindowStart('3y', NOW, true)).toEqual(new Date(2025, 10, 1));
+  });
+
+  it('only counts a date that is inside the range', () => {
+    const range = { start: new Date(2026, 10, 1), end: new Date(2027, 10, 1) };
+    expect(isWithinRange('2026-12-01', range)).toBe(true);
+    expect(isWithinRange('2026-01-01', range)).toBe(false);
+    expect(isWithinRange('2030-01-01', range)).toBe(false);
+    expect(isWithinRange(undefined, range)).toBe(false);
   });
 });

@@ -3,7 +3,7 @@ import type { BranchRow } from '../../db/types';
 import type { RoadmapBranchEvents } from '../../db/roadmapChangeEvents';
 import { EMPTY_ROADMAP_FILTERS, type RoadmapFilters } from './roadmapFilter';
 import type { RoadmapGroup, RoadmapLifecycleBar } from './roadmapLifecycleRows';
-import { computeRoadmapVisibleData, RECENT_CHANGES_LIMIT, recentRoadmapChanges } from './roadmapVisibleData';
+import { computeRoadmapVisibleData, hiddenNoteFor, RECENT_CHANGES_LIMIT, recentRoadmapChanges, roadmapRangeFor } from './roadmapVisibleData';
 
 const NOW = new Date('2026-06-15T00:00:00Z');
 
@@ -66,7 +66,7 @@ describe('computeRoadmapVisibleData', () => {
   });
 
   it('includes only branches eligible under the given mode', () => {
-    const openBranch = branch({ status: 'in_review' });
+    const openBranch = branch({ status: 'in_review', target_date: '2026-09-01' });
     const { eligibleEvents } = computeRoadmapVisibleData([], [{ branch: openBranch, events: [] }], 'asIs', EMPTY_ROADMAP_FILTERS, NOW);
     expect(eligibleEvents).toHaveLength(0);
 
@@ -101,5 +101,48 @@ describe('recentRoadmapChanges', () => {
     ];
     const rows = recentRoadmapChanges(events);
     expect(rows).toHaveLength(2);
+  });
+});
+
+describe('the roadmap starts at today', () => {
+  const retired = (id: string, plannedEnd: string | undefined) => bar({ systemId: id, name: id, plannedEnd, lifecycleTag: { state: 'retired', plannedEnd } });
+
+  it('hides systems retired before today and counts them once', () => {
+    const groups = [group({ bars: [bar({ systemId: 'live' }), retired('old', '2025-01-01')] }), group({ key: 'cap-2', bars: [retired('old', '2025-01-01')] })];
+    const { filteredGroups, hiddenRetiredCount } = computeRoadmapVisibleData(groups, [], 'toBe', EMPTY_ROADMAP_FILTERS, NOW);
+    expect(filteredGroups).toHaveLength(1);
+    expect(filteredGroups[0]?.bars.map((b) => b.systemId)).toEqual(['live']);
+    expect(hiddenRetiredCount).toBe(1);
+  });
+
+  it('with the past year on, brings back systems retired within it but not older ones', () => {
+    const groups = [group({ bars: [retired('recent', '2026-02-01'), retired('ancient', '2024-01-01'), retired('undated', undefined)] })];
+    const { filteredGroups, hiddenRetiredCount } = computeRoadmapVisibleData(groups, [], 'toBe', EMPTY_ROADMAP_FILTERS, NOW, true);
+    expect(filteredGroups[0]?.bars.map((b) => b.systemId)).toEqual(['recent', 'undated']);
+    expect(hiddenRetiredCount).toBe(1);
+  });
+
+  it('hides changes delivered before today and counts them, until the past year is on', () => {
+    const events = [{ branch: branch({ target_date: '2026-03-01' }), events: [] }, { branch: branch({ id: 'b2', target_date: '2026-09-01' }), events: [] }, { branch: branch({ id: 'b3', target_date: '2024-01-01' }), events: [] }];
+    const off = computeRoadmapVisibleData([], events, 'toBe', EMPTY_ROADMAP_FILTERS, NOW);
+    expect(off.eligibleEvents.map((e) => e.branch.id)).toEqual(['b2']);
+    expect(off.hiddenChangeCount).toBe(2);
+    const on = computeRoadmapVisibleData([], events, 'toBe', EMPTY_ROADMAP_FILTERS, NOW, true);
+    expect(on.eligibleEvents.map((e) => e.branch.id)).toEqual(['branch-1', 'b2']);
+    expect(on.hiddenChangeCount).toBe(1);
+  });
+
+  it('starts the range at today and pulls an earlier link start up to it', () => {
+    const range = roadmapRangeFor([group({ bars: [bar({ introduced: '2015-01-01', plannedEnd: '2029-01-01' })] })], [], 'toBe', '1y', new Date(2020, 0, 1), NOW, false);
+    expect(range.start).toEqual(new Date(2026, 5, 1));
+    expect(range.end).toEqual(new Date(2027, 5, 1));
+    expect(roadmapRangeFor([group({ bars: [bar({ plannedEnd: '2029-01-01' })] })], [], 'toBe', 'all', undefined, NOW, true).start).toEqual(new Date(2025, 5, 1));
+  });
+
+  it('says plainly what was left off', () => {
+    expect(hiddenNoteFor(0, 0, false)).toBeNull();
+    expect(hiddenNoteFor(1, 0, false)).toBe('1 already-retired system is hidden. Turn on “Show the past year” to see the most recent.');
+    expect(hiddenNoteFor(4, 2, false)).toContain('4 already-retired systems and 2 earlier changes are hidden');
+    expect(hiddenNoteFor(0, 3, true)).toBe('3 earlier changes from before the past year are not shown.');
   });
 });
