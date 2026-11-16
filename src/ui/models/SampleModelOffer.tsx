@@ -22,15 +22,24 @@ export interface SampleModelOfferProps {
 export function SampleModelOffer({ orgId, orgSlug, userId, existingSlugs }: SampleModelOfferProps) {
   const navigate = useNavigate();
   const { samples, loading, copyingId, error, copy } = useSampleModels(orgId, userId, true);
-  if (loading || samples.length === 0) return null;
+  if (loading) return null;
+  if (samples.length === 0) {
+    return (
+      <Panel>
+        <Text as="p" tone="muted" size="sm">
+          No sample models are available yet. Create an empty model below to start, then import a spreadsheet from Import.
+        </Text>
+      </Panel>
+    );
+  }
 
   return (
     <Panel>
       <Text as="h2" size="lg">
-        Start with a sample model
+        Look around first
       </Text>
       <Text as="p" tone="muted" size="sm">
-        Want to look around before adding your own systems? These are made-up organisations, with systems, owners, capabilities and how they connect. Adding one puts a separate copy in your organisation that you can change or delete. Nobody else sees it. Or create an empty model below.
+        See what Atlas shows: which applications support each capability, and how the applications connect to one another. These are made-up organisations. Adding one puts a separate copy in your organisation that you can change or delete. Nobody else sees it.
       </Text>
       <ul style={{ listStyle: 'none', padding: 0, margin: 0, display: 'grid', gap: 'var(--space-3)' }}>
         {samples.map((sample) => (
@@ -49,7 +58,7 @@ export function SampleModelOffer({ orgId, orgSlug, userId, existingSlugs }: Samp
                 disabled={copyingId !== null}
                 onClick={() => {
                   void copy(sample, existingSlugs).then((model) => {
-                    if (model) void navigate(`/o/${orgSlug}/m/${model.slug}/start`);
+                    if (model) void navigate(`/o/${orgSlug}/m/${model.slug}/capability-map`);
                   });
                 }}
               >

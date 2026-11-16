@@ -15,6 +15,11 @@ export interface LandscapeFindProps {
   options: readonly LandscapeFindOption[];
   /** Focus this element and bring it into view. */
   onPick: (elementId: UUID) => void;
+  /** Wording for other pages that reuse the box (the roadmap); defaults read for the landscape. */
+  label?: string;
+  placeholder?: string;
+  listLabel?: string;
+  emptyText?: string;
 }
 
 const MAX_RESULTS = 8;
@@ -26,7 +31,14 @@ const MAX_RESULTS = 8;
  * can hold hundreds of tiles; panning to look for one is the thing this
  * replaces. Keyboard: ↑/↓ to move, Enter to pick, Escape to clear.
  */
-export function LandscapeFind({ options, onPick }: LandscapeFindProps) {
+export function LandscapeFind({
+  options,
+  onPick,
+  label = 'Find on this landscape',
+  placeholder = 'Find a system…',
+  listLabel = 'Matches on this landscape',
+  emptyText = 'Nothing on this landscape matches. A filter or a collapsed lane may be hiding it.',
+}: LandscapeFindProps) {
   const [query, setQuery] = useState('');
   const [active, setActive] = useState(0);
   const listId = useId();
@@ -46,11 +58,11 @@ export function LandscapeFind({ options, onPick }: LandscapeFindProps) {
         className={styles.input}
         type="search"
         role="combobox"
-        aria-label="Find on this landscape"
+        aria-label={label}
         aria-expanded={open && matches.length > 0}
         aria-controls={listId}
         aria-activedescendant={open && matches[activeIndex] ? `${listId}-${matches[activeIndex].elementId}` : undefined}
-        placeholder="Find a system…"
+        placeholder={placeholder}
         value={query}
         onChange={(e) => {
           setQuery(e.target.value);
@@ -77,9 +89,9 @@ export function LandscapeFind({ options, onPick }: LandscapeFindProps) {
         }}
       />
       {open && (
-        <ul id={listId} className={styles.list} role="listbox" aria-label="Matches on this landscape">
+        <ul id={listId} className={styles.list} role="listbox" aria-label={listLabel}>
           {matches.length === 0 ? (
-            <li className={styles.empty}>Nothing on this landscape matches. A filter or a collapsed lane may be hiding it.</li>
+            <li className={styles.empty}>{emptyText}</li>
           ) : (
             matches.map((option, index) => (
               <li

@@ -15,6 +15,7 @@
  */
 import type { UUID } from '../../contracts/delta';
 import type { ElementsHeadRow } from '../../contracts/rows';
+import { plannedEndOf } from '../../engine/elementRead/fitAndExposure';
 import type { PortfolioCapabilityLink, PortfolioRow } from '../portfolio/usePortfolio';
 
 export type GapKind = 'run-cost' | 'criticality' | 'disposition' | 'fit' | 'owner';
@@ -39,7 +40,10 @@ export function isGapKind(value: string | null): value is GapKind {
 }
 
 function isLive(row: PortfolioRow): boolean {
-  return row.lifecycleStatus !== 'retired';
+  if (row.lifecycleStatus === 'retired') return false;
+  // Past its planned end date, a system has gone — nothing left to fill in on it.
+  const end = plannedEndOf(row.element);
+  return end === null || end.getTime() > Date.now();
 }
 
 function isSystem(row: PortfolioRow): boolean {

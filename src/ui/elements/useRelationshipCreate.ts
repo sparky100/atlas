@@ -1,6 +1,7 @@
 import { useQueryClient } from '@tanstack/react-query';
 import { useCallback, useState } from 'react';
-import type { CommitEnvelope, Delta, RelationshipType, UUID } from '../../contracts/delta';
+import { defaultCreateAttributes } from '../../contracts/attributeSchema';
+import type { ActorAttributes, CommitEnvelope, Delta, RelationshipType, UUID } from '../../contracts/delta';
 import type { Json } from '../../contracts/rows';
 import { commitToBranch } from '../../db/commits';
 import { describeEnvelope, type NameLookup } from '../../engine/describeEnvelope';
@@ -43,7 +44,7 @@ export interface UseRelationshipCreateResult {
    * override is simpler. `demotion`, when given, folds one extra
    * `relationship.update` into the same commit.
    */
-  create: (otherElementId: UUID, otherElementName: string, attributesOverride?: Record<string, Json>, demotion?: RelationshipCreateDemotion | null) => Promise<void>;
+  create: (otherElementId: UUID, otherElementName: string, attributesOverride?: Record<string, Json>, demotion?: RelationshipCreateDemotion | null, newActor?: Pick<ActorAttributes, 'subtype' | 'isExternal'>) => Promise<void>;
 }
 
 export interface UseRelationshipCreateInput {
@@ -85,7 +86,7 @@ export function useRelationshipCreate(input: UseRelationshipCreateInput): UseRel
   const queryClient = useQueryClient();
 
   const create = useCallback(
-    async (otherElementId: UUID, otherElementName: string, attributesOverride?: Record<string, Json>, demotion?: RelationshipCreateDemotion | null) => {
+    async (otherElementId: UUID, otherElementName: string, attributesOverride?: Record<string, Json>, demotion?: RelationshipCreateDemotion | null, newActor?: Pick<ActorAttributes, 'subtype' | 'isExternal'>) => {
       if (!userId) {
         setError('You must be signed in to add a relationship.');
         return;
@@ -135,7 +136,21 @@ export function useRelationshipCreate(input: UseRelationshipCreateInput): UseRel
         // relationship.create]`, so ordering the create delta last here
         // just falls through to its generic "(2 changes)" fallback rather
         // than accidentally matching the wrong combined phrasing.
-        const deltas = demoteDelta ? [demoteDelta, createDelta] : [createDelta];
+        // `newActor` (the owned-by picker's "add as a new owner"): the actor is created in this same commit, ahead of the link (`describeEnvelope`'s "create and link" shape).
+        const newActorDelta: Delta | null = newActor
+          ? {
+              kind: 'element.create',
+              id: crypto.randomUUID(),
+              elementId: otherElementId,
+              elementType: 'actor',
+              name: otherElementName,
+              parentId: null,
+              attributes: { ...defaultCreateAttributes('actor'), ...newActor },
+              sourceId: source.id,
+              confidence: 1,
+            }
+          : null;
+        const deltas = [...(newActorDelta ? [newActorDelta] : []), ...(demoteDelta ? [demoteDelta] : []), createDelta];
 
         const nameLookup: NameLookup = (id) => (id === elementId ? elementName : id === otherElementId ? otherElementName : undefined);
         const envelope: CommitEnvelope = {

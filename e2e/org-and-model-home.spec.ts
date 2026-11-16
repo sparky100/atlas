@@ -57,7 +57,7 @@ test('sign-up through org and model creation to ModelHome\'s front doors', async
   // creator is always its owner, ADR-009), and no models yet.
   await expect(page.getByRole('heading', { name: orgName })).toBeVisible();
   await expect(page.getByText('owner', { exact: true })).toBeVisible();
-  await expect(page.getByText('No models yet. A model is one landscape')).toBeVisible();
+  await expect(page.getByText('Or start with an empty model. A model is one landscape')).toBeVisible();
 
   await page.getByRole('button', { name: 'New model' }).click();
   await page.getByPlaceholder('Model name').fill(modelName);

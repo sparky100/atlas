@@ -45,7 +45,7 @@ import { listAllElements } from '../../db/elementBrowse';
 import { listActorsForLandscape, listSystemsForLandscape } from '../../db/landscape';
 import { listAllSupportsEdges, listDeltasForCommits, listRecentCommits } from '../../db/modelHome';
 import { listProfilesByIds } from '../../db/profiles';
-import { replacedElementIds } from '../../engine/elementRead/fitAndExposure';
+import { hasReachedPlannedEnd, replacedElementIds, supportsEdgesInForce } from '../../engine/elementRead/fitAndExposure';
 import type { ProfileRow } from '../../db/types';
 import { envelopeSubjects } from '../../engine/describeEnvelope';
 import { reportError } from '../errors/errorBannerStore';
@@ -183,6 +183,9 @@ export function useArchitectHomeInsights(modelId: UUID, userId: UUID | null): Ar
       // doc comment), so a platform's own modules are already in hand here
       // — no second query needed just to find them.
       const containers = usesAndFlowsToEndpoints.filter((el) => el.element_type === 'container');
+      // A system past its planned end stops counting as supporting a capability (see `supportsEdgesInForce`).
+      const today = new Date();
+      const elementsById = new Map<UUID, ElementsHeadRow>([...allElements, ...systems, ...containers].map((e) => [e.element_id, e]));
 
       // Sprint U4-1 B2: author display name and named-subject links for
       // each shown commit, both batched once across every row rather than
@@ -224,10 +227,14 @@ export function useArchitectHomeInsights(modelId: UUID, userId: UUID | null): Ar
           data: {
             recentCommits,
             duplicatesCount: duplicateCandidates.candidates.length,
-            systemsWithoutCapability: findSystemsWithoutCapability(systems, supportsEdges, containers),
+            systemsWithoutCapability: findSystemsWithoutCapability(
+              systems.filter((s) => !hasReachedPlannedEnd(s, elementsById, today)),
+              supportsEdgesInForce(supportsEdges, elementsById, today),
+              containers.filter((c) => !hasReachedPlannedEnd(c, elementsById, today)),
+            ),
             platformSupportsThatShouldMoveToModule: findPlatformSupportsThatShouldMoveToModule(systems, supportsEdges, containers),
             flowsToPlatformInsteadOfModule: findFlowsToPlatformInsteadOfModule(usesAndFlowsToEdges, usesAndFlowsToEndpointsById),
-            capabilitiesWithoutOwner: findCapabilitiesWithoutOwner(capabilities, supportsEdges, ownsEdges),
+            capabilitiesWithoutOwner: findCapabilitiesWithoutOwner(capabilities, supportsEdgesInForce(supportsEdges, elementsById, today), ownsEdges),
             staleAttributes: computeStaleAttributesFinding(facts, allElements, new Date(), staleAfterMonths),
             staleAfterMonths,
             unlabeledVerbRelationships: findUnlabeledVerbRelationships(usesAndFlowsToEdges, usesAndFlowsToEndpointsById),
@@ -243,7 +250,7 @@ export function useArchitectHomeInsights(modelId: UUID, userId: UUID | null): Ar
             boundaryCrossingsMissingVerb: findBoundaryCrossingsMissingVerb(usesAndFlowsToEdges, usesAndFlowsToEndpointsById),
             unusedIntegrationPlatforms: findUnusedIntegrationPlatforms(systems, usesAndFlowsToEdges, containers),
             unusedIntegrationInterfaces: findUnusedIntegrationInterfaces(systems, containers, usesAndFlowsToEdges),
-            systemsSupportingEssentialFunctionWithoutTechnicalOwner: findSystemsSupportingEssentialFunctionWithoutTechnicalOwner([...systems, ...containers], capabilities, supportsEdges, ownsEdges),
+            systemsSupportingEssentialFunctionWithoutTechnicalOwner: findSystemsSupportingEssentialFunctionWithoutTechnicalOwner([...systems, ...containers], capabilities, supportsEdgesInForce(supportsEdges, elementsById, today), ownsEdges),
             boundaryCrossingsMissingClassification: findBoundaryCrossingsMissingClassification(usesAndFlowsToEdges, usesAndFlowsToEndpointsById),
             criticalSystemsPastOrNearSupportEnd: findCriticalSystemsPastOrNearSupportEnd(systems),
             outgoingWithoutRetiringChange: findOutgoingWithoutRetiringChange([...systems, ...containers], retiringElementIds, new Map(systems.map((el) => [el.element_id, el]))),

@@ -1,6 +1,8 @@
+import { useState } from 'react';
 import { ANNUAL_RUN_COST_OPTIONS } from '../../contracts/attributeSchema';
-import type { Criticality } from '../../contracts/delta';
+import type { Criticality, FitForPurpose } from '../../contracts/delta';
 import { DISPOSITION_LEVELS } from '../../contracts/attributeSchema';
+import { CHART_FIT_ROWS } from './portfolioChart';
 import { annualRunCostLabel } from '../elements/annualRunCost';
 import { CRITICALITY_ORDER } from '../elements/criticalityTone';
 import { DEFAULT_PORTFOLIO_FILTERS, type PortfolioFilters } from './portfolioFilter';
@@ -17,15 +19,45 @@ export interface PortfolioToolbarProps {
   onFiltersChange: (filters: PortfolioFilters) => void;
   includeContainers: boolean;
   onIncludeContainersChange: (include: boolean) => void;
+  /** Table or chart: the same filters apply to both. */
+  view: PortfolioViewMode;
+  onViewChange: (view: PortfolioViewMode) => void;
+  /** A fit picked by clicking a chart box; shown as a removable chip, not a dropdown. */
+  fitPick: FitForPurpose | null;
+  onFitPickChange: (fit: FitForPurpose | null) => void;
+  shownCount: number;
+  totalCount: number;
 }
+
+export type PortfolioViewMode = 'table' | 'chart';
 
 const CRITICALITY_OPTIONS = Object.keys(CRITICALITY_ORDER) as Criticality[];
 const KIND_OPTIONS: PortfolioRowKind[] = ['system', 'platform', 'module'];
 
 /** The Portfolio's own toolbar: sort (any column, click-to-toggle direction via the already-sorted select), the four filters (task item 6), and the containers-inclusion toggle (item 2) — one row of plain controls, the same `<select>`/`<input type="checkbox">` shape `ElementBrowseTable.tsx`'s own toolbar already uses, not a bespoke filter-bar component. */
-export function PortfolioToolbar({ sortKey, sortDirection, onSortChange, filters, onFiltersChange, includeContainers, onIncludeContainersChange }: PortfolioToolbarProps) {
+export function PortfolioToolbar({ sortKey, sortDirection, onSortChange, filters, onFiltersChange, includeContainers, onIncludeContainersChange, view, onViewChange, fitPick, onFitPickChange, shownCount, totalCount }: PortfolioToolbarProps) {
+  const [moreOpen, setMoreOpen] = useState(false);
+  // A hidden filter that is doing something must never stay out of sight.
+  const moreActive = filters.signal !== 'all' || filters.cost !== 'all' || includeContainers;
+  const showMore = moreOpen || moreActive;
+  const chips: { label: string; clear: () => void }[] = [];
+  if (filters.kind !== 'all') chips.push({ label: `Kind: ${PORTFOLIO_ROW_KIND_LABEL[filters.kind]}`, clear: () => { onFiltersChange({ ...filters, kind: 'all' }); } });
+  if (filters.criticality !== 'all') chips.push({ label: `Criticality: ${filters.criticality}`, clear: () => { onFiltersChange({ ...filters, criticality: 'all' }); } });
+  if (filters.disposition !== 'all') chips.push({ label: `Planned action: ${filters.disposition === 'not_assessed' ? 'Not assessed' : (DISPOSITION_LEVELS.find((l) => l.key === filters.disposition)?.label ?? filters.disposition)}`, clear: () => { onFiltersChange({ ...filters, disposition: 'all' }); } });
+  if (filters.signal !== 'all') chips.push({ label: `Signal: ${PORTFOLIO_SIGNAL_LABEL[filters.signal]}`, clear: () => { onFiltersChange({ ...filters, signal: 'all' }); } });
+  if (filters.cost !== 'all') chips.push({ label: `Run cost: ${annualRunCostLabel(filters.cost)}`, clear: () => { onFiltersChange({ ...filters, cost: 'all' }); } });
+  if (fitPick) chips.push({ label: `Fit: ${CHART_FIT_ROWS.find((f) => f.key === fitPick)?.label ?? fitPick}`, clear: () => { onFitPickChange(null); } });
   return (
+    <>
     <div className={styles.toolbar}>
+      <div className={styles.switch} role="group" aria-label="Show as">
+        {(['table', 'chart'] as const).map((mode) => (
+          <button key={mode} type="button" className={[styles.switchButton, view === mode ? styles.switchOn : ''].filter(Boolean).join(' ')} aria-pressed={view === mode} onClick={() => { onViewChange(mode); }}>
+            {mode === 'table' ? 'Table' : 'Chart'}
+          </button>
+        ))}
+      </div>
+      {view === 'table' && (
       <label className={styles.field}>
         <span>Sort by</span>
         <div className={styles.sortControl}>
@@ -54,6 +86,7 @@ export function PortfolioToolbar({ sortKey, sortDirection, onSortChange, filters
           </button>
         </div>
       </label>
+      )}
 
       <label className={styles.field}>
         <span>Kind</span>
@@ -68,42 +101,6 @@ export function PortfolioToolbar({ sortKey, sortDirection, onSortChange, filters
           {KIND_OPTIONS.map((kind) => (
             <option key={kind} value={kind}>
               {PORTFOLIO_ROW_KIND_LABEL[kind]}
-            </option>
-          ))}
-        </select>
-      </label>
-
-      <label className={styles.field}>
-        <span>Signal</span>
-        <select
-          className={styles.select}
-          value={filters.signal}
-          onChange={(e) => {
-            onFiltersChange({ ...filters, signal: e.target.value as PortfolioFilters['signal'] });
-          }}
-        >
-          <option value="all">All signals</option>
-          {PORTFOLIO_SIGNAL_KEYS.map((key) => (
-            <option key={key} value={key}>
-              {PORTFOLIO_SIGNAL_LABEL[key]}
-            </option>
-          ))}
-        </select>
-      </label>
-
-      <label className={styles.field}>
-        <span>Run cost</span>
-        <select
-          className={styles.select}
-          value={filters.cost}
-          onChange={(e) => {
-            onFiltersChange({ ...filters, cost: e.target.value as PortfolioFilters['cost'] });
-          }}
-        >
-          <option value="all">All bands</option>
-          {ANNUAL_RUN_COST_OPTIONS.map((band) => (
-            <option key={band} value={band}>
-              {annualRunCostLabel(band)}
             </option>
           ))}
         </select>
@@ -146,28 +143,87 @@ export function PortfolioToolbar({ sortKey, sortDirection, onSortChange, filters
         </select>
       </label>
 
-      {(filters.kind !== 'all' || filters.signal !== 'all' || filters.cost !== 'all' || filters.criticality !== 'all' || filters.disposition !== 'all') && (
-        <button
-          type="button"
-          className={styles.clearButton}
-          onClick={() => {
-            onFiltersChange(DEFAULT_PORTFOLIO_FILTERS);
+      <button type="button" className={styles.moreButton} aria-expanded={showMore} onClick={() => { setMoreOpen((open) => !open); }} disabled={moreActive && !moreOpen}>
+        More filters {showMore ? '▴' : '▾'}
+      </button>
+      <span className={styles.count} role="status">
+        {shownCount} of {totalCount} {totalCount === 1 ? 'application' : 'applications'}
+      </span>
+    </div>
+    {showMore && (
+      <div className={styles.toolbar}>
+      <label className={styles.field}>
+        <span>Signal</span>
+        <select
+          className={styles.select}
+          value={filters.signal}
+          onChange={(e) => {
+            onFiltersChange({ ...filters, signal: e.target.value as PortfolioFilters['signal'] });
           }}
         >
-          Clear filters
-        </button>
-      )}
-
-      <label className={styles.toggle}>
-        <input
-          type="checkbox"
-          checked={includeContainers}
-          onChange={(e) => {
-            onIncludeContainersChange(e.target.checked);
-          }}
-        />
-        <span>Include containers (modules)</span>
+          <option value="all">All signals</option>
+          {PORTFOLIO_SIGNAL_KEYS.map((key) => (
+            <option key={key} value={key}>
+              {PORTFOLIO_SIGNAL_LABEL[key]}
+            </option>
+          ))}
+        </select>
       </label>
-    </div>
+
+      <label className={styles.field}>
+        <span>Run cost</span>
+        <select
+          className={styles.select}
+          value={filters.cost}
+          onChange={(e) => {
+            onFiltersChange({ ...filters, cost: e.target.value as PortfolioFilters['cost'] });
+          }}
+        >
+          <option value="all">All bands</option>
+          {ANNUAL_RUN_COST_OPTIONS.map((band) => (
+            <option key={band} value={band}>
+              {annualRunCostLabel(band)}
+            </option>
+          ))}
+        </select>
+      </label>
+
+
+        <label className={styles.toggle}>
+          <input
+            type="checkbox"
+            checked={includeContainers}
+            onChange={(e) => {
+              onIncludeContainersChange(e.target.checked);
+            }}
+          />
+          <span>Include containers (modules)</span>
+        </label>
+      </div>
+    )}
+    {chips.length > 0 && (
+      <ul className={styles.chips} aria-label="Applied filters">
+        {chips.map((chip) => (
+          <li key={chip.label}>
+            <button type="button" className={styles.chip} aria-label={`Remove filter ${chip.label}`} onClick={chip.clear}>
+              {chip.label} ✕
+            </button>
+          </li>
+        ))}
+        <li>
+          <button
+            type="button"
+            className={styles.clearButton}
+            onClick={() => {
+              onFiltersChange(DEFAULT_PORTFOLIO_FILTERS);
+              onFitPickChange(null);
+            }}
+          >
+            Clear filters
+          </button>
+        </li>
+      </ul>
+    )}
+    </>
   );
 }

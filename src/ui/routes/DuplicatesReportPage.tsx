@@ -2,6 +2,7 @@ import { Loading } from '../components/Loading/Loading';
 import { useParams } from 'react-router';
 import { AppHeader } from '../components/AppHeader/AppHeader';
 import { Breadcrumb } from '../components/Breadcrumb/Breadcrumb';
+import { reportsSection } from '../nav/reportsSection';
 import { ModelNav } from '../components/ModelNav/ModelNav';
 import navStyles from '../components/ModelNav/ModelNav.module.css';
 import { PageIntro } from '../components/PageIntro/PageIntro';
@@ -61,7 +62,7 @@ export function DuplicatesReportPage() {
         <ModelNav orgSlug={orgSlug ?? ''} modelSlug={modelSlug ?? ''} />
         <main className={styles.main}>
           <EditingBranchBanner activeRef={ref} modelId={model.id} orgSlug={orgSlug ?? ''} modelSlug={model.slug} showModeShortcuts={false} />
-          <Breadcrumb org={{ label: organisation?.name ?? '', href: `/o/${orgSlug ?? ''}` }} model={{ label: model.name, href: `/o/${orgSlug ?? ''}/m/${model.slug}` }} refLabel={refLabelOf(ref, branchLabel)} />
+          <Breadcrumb org={{ label: organisation?.name ?? '', href: `/o/${orgSlug ?? ''}` }} model={{ label: model.name, href: `/o/${orgSlug ?? ''}/m/${model.slug}` }} refLabel={refLabelOf(ref, branchLabel)} section={reportsSection(orgSlug ?? '', modelSlug ?? '')} segments={[{ label: 'Duplicates report', href: `/o/${orgSlug ?? ''}/m/${model.slug}/duplicates` }]} />
           <div className={styles.header}>
             <Text as="h1" size="2xl">
               Duplicates report

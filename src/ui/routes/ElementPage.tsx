@@ -430,7 +430,6 @@ export function ElementPage() {
                 element={state.data.element}
                 facts={state.data.facts}
                 relationships={state.data.relationships}
-                relationshipFacts={state.data.relationshipFacts}
                 searchCommitId={searchCommitId ?? state.data.commitId}
                 branch={editingBranch}
                 expectedHeadCommitId={state.data.commitId}

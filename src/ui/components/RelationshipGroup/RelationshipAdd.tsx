@@ -1,5 +1,5 @@
 import { useId, useRef, useState } from 'react';
-import type { ElementType, IntegrationProtocol, OwnsRole, RelationshipType, UUID } from '../../../contracts/delta';
+import type { ActorAttributes, ElementType, IntegrationProtocol, OwnsRole, RelationshipType, UUID } from '../../../contracts/delta';
 import { INTEGRATION_PROTOCOL_LEVELS } from '../../../contracts/relationshipAttributeSchema';
 import type { FactsRow, RelationshipsHeadRow } from '../../../contracts/rows';
 import type { RelationshipGroupSlot } from '../../../contracts/relationshipTypeRules';
@@ -12,7 +12,7 @@ import { useRelationshipTargetSearch } from '../../elements/useRelationshipTarge
 import { Button } from '../Button/Button';
 import { ElementTypeGlyph } from '../ElementTypeGlyph/ElementTypeGlyph';
 import { Text } from '../Text/Text';
-import { defaultAttributesForPlainPick } from './relationshipAddDefaults';
+import { defaultAttributesForPlainPick, hasExactNameMatch, NEW_OWNER_KINDS, newOwnerAttributes, type NewOwnerKind } from './relationshipAddDefaults';
 import { forcedOwnsAttributes } from './slotApplicability';
 import styles from './RelationshipAdd.module.css';
 
@@ -54,6 +54,8 @@ interface PendingTarget {
   name: string;
   /** Prompt 7k item 2: which capability/system the picked target is, needed for `owns`' own staged-role decision on the `outbound` direction (see `RelationshipAddProps.elementType`'s own comment). */
   elementType: ElementType;
+  /** Set only for an owner added inline from this picker ("+ Add 'X' as a new owner"): the actor is created in the same save as the link. */
+  newActor?: Pick<ActorAttributes, 'subtype' | 'isExternal'>;
 }
 
 /**
@@ -152,6 +154,12 @@ export function RelationshipAdd({ slot, direction, elementId, elementName, eleme
   const [pendingTarget, setPendingTarget] = useState<PendingTarget | null>(null);
   const [labelDraft, setLabelDraft] = useState('');
   const [showViaStage, setShowViaStage] = useState(false);
+  // The inline "add as a new owner" stage: the typed name, plus its type and (for a person/team) whether it sits outside our organisation.
+  const [newOwnerName, setNewOwnerName] = useState<string | null>(null);
+  const [newOwnerKind, setNewOwnerKind] = useState<NewOwnerKind>('organisation');
+  const [newOwnerOutside, setNewOwnerOutside] = useState(false);
+  const newOwnerKindId = useId();
+  const newOwnerOutsideId = useId();
   // ADR-026: each side's protocol, asked alongside the via pick — both optional.
   const [protocolIn, setProtocolIn] = useState<IntegrationProtocol | ''>('');
   const [protocolOut, setProtocolOut] = useState<IntegrationProtocol | ''>('');
@@ -207,6 +215,7 @@ export function RelationshipAdd({ slot, direction, elementId, elementName, eleme
       setPendingTarget(null);
       setLabelDraft('');
       setShowViaStage(false);
+      setNewOwnerName(null);
       setProtocolIn('');
       setProtocolOut('');
       if (targetIdRef.current) onCreated(targetIdRef.current);
@@ -267,7 +276,29 @@ export function RelationshipAdd({ slot, direction, elementId, elementName, eleme
   function answerOwnsRole(role: OwnsRole): void {
     if (!pendingTarget) return;
     targetIdRef.current = pendingTarget.elementId;
-    void create(pendingTarget.elementId, pendingTarget.name, { role });
+    void create(pendingTarget.elementId, pendingTarget.name, { role }, null, pendingTarget.newActor);
+  }
+
+  // Only the owned-by picker (an `owns` edge seen from the owned side) offers to add its owner on the spot.
+  const canAddNewOwner = slot.relationshipType === 'owns' && direction === 'inbound';
+
+  function confirmNewOwner(): void {
+    if (newOwnerName === null) return;
+    const newActor = newOwnerAttributes(newOwnerKind, newOwnerOutside);
+    const target: PendingTarget = { elementId: crypto.randomUUID(), name: newOwnerName, elementType: 'actor', newActor };
+    // C20: an outside owner's edge is `service` outright, so no role question.
+    if (newActor.isExternal) {
+      targetIdRef.current = target.elementId;
+      void create(target.elementId, target.name, { role: 'service' }, null, newActor);
+      return;
+    }
+    if (elementType === 'system' || elementType === 'container') {
+      setNewOwnerName(null);
+      setPendingTarget(target);
+      return;
+    }
+    targetIdRef.current = target.elementId;
+    void create(target.elementId, target.name, { role: 'business' }, null, newActor);
   }
 
   // Distinct from `close`: backs out of the primary/label stage to the
@@ -277,6 +308,7 @@ export function RelationshipAdd({ slot, direction, elementId, elementName, eleme
     setPendingTarget(null);
     setLabelDraft('');
     setShowViaStage(false);
+    setNewOwnerName(null);
   }
 
   // The via stage's own "Back" — returns to the label stage (keeping the
@@ -291,6 +323,8 @@ export function RelationshipAdd({ slot, direction, elementId, elementName, eleme
     setPendingTarget(null);
     setLabelDraft('');
     setShowViaStage(false);
+    setNewOwnerName(null);
+    setNewOwnerOutside(false);
     setProtocolIn('');
     setProtocolOut('');
   };
@@ -300,6 +334,56 @@ export function RelationshipAdd({ slot, direction, elementId, elementName, eleme
       <Button variant="ghost" onClick={() => { setOpen(true); setSearchWanted(true); }}>
         + Add {DIRECTION_VERB[slot.relationshipType][direction]}
       </Button>
+    );
+  }
+
+  if (newOwnerName !== null) {
+    return (
+      <div className={styles.panel}>
+        <Text as="p" size="sm">
+          Add “{newOwnerName}” as a new owner of {elementName}
+        </Text>
+        <label htmlFor={newOwnerKindId}>
+          <Text as="span" size="sm" tone="muted">
+            What is it?
+          </Text>
+        </label>
+        <select id={newOwnerKindId} className={styles.input} value={newOwnerKind} onChange={(e) => { setNewOwnerKind(e.target.value as NewOwnerKind); }}>
+          {NEW_OWNER_KINDS.map((kind) => (
+            <option key={kind.key} value={kind.key}>
+              {kind.label}
+            </option>
+          ))}
+        </select>
+        {newOwnerKind === 'organisation' ? (
+          <Text as="p" tone="muted" size="sm">
+            An organisation is outside ours, so it owns this as the service owner.
+          </Text>
+        ) : (
+          <label htmlFor={newOwnerOutsideId}>
+            <input id={newOwnerOutsideId} type="checkbox" checked={newOwnerOutside} onChange={(e) => { setNewOwnerOutside(e.target.checked); }} />{' '}
+            <Text as="span" size="sm">
+              Outside our organisation
+            </Text>
+          </label>
+        )}
+        <div className={styles.actions}>
+          <Button variant="secondary" onClick={confirmNewOwner} disabled={status === 'creating'}>
+            {status === 'creating' ? 'Adding…' : 'Add'}
+          </Button>
+          <Button variant="ghost" onClick={cancelPending} disabled={status === 'creating'}>
+            Back
+          </Button>
+          <Button variant="ghost" onClick={close} disabled={status === 'creating'}>
+            Cancel
+          </Button>
+        </div>
+        {error !== null && (
+          <Text as="p" size="sm">
+            {error}
+          </Text>
+        )}
+      </div>
     );
   }
 
@@ -524,6 +608,11 @@ export function RelationshipAdd({ slot, direction, elementId, elementName, eleme
         <Text as="p" tone="muted" size="sm">
           Nothing matches.
         </Text>
+      )}
+      {canAddNewOwner && search.status === 'ready' && search.query.trim().length > 0 && !hasExactNameMatch(search.query, availableResults.map((r) => r.name)) && (
+        <Button variant="ghost" onClick={() => { setNewOwnerName(search.query.trim()); }} disabled={status === 'creating'}>
+          + Add “{search.query.trim()}” as a new owner
+        </Button>
       )}
       {availableResults.length > 0 && (
         <ul className={styles.results}>

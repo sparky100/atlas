@@ -233,7 +233,7 @@ export function GapWalk({ kind, items, saver, owner, elementHref, backHref, onFi
         <LinkButton to={backHref}>Back to all gaps</LinkButton>
       </div>
       <Text as="p" size="sm" tone="muted">
-        {choices.length > 0 ? `Press 1–${String(choices.length)} to choose and move on; j skips, k goes back.` : 'Add an owner to move on; j skips, k goes back.'}
+        {choices.length > 0 ? `Press 1–${String(choices.length)} to choose and move on; j moves to the next, k goes back.` : 'Add an owner to move on; j moves to the next, k goes back.'}
       </Text>
     </section>
   );

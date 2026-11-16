@@ -65,7 +65,7 @@ import type { AnnualRunCost, UUID } from '../../contracts/delta';
 import type { ElementsHeadRow, RelationshipsHeadRow } from '../../contracts/rows';
 import { findBoundaryCrossings } from '../../db/healthFindings';
 import { annualRunCostLabel, annualRunCostOf, ANNUAL_RUN_COST_NOT_ENTERED_LABEL } from '../elements/annualRunCost';
-import { hasLifecycleExposureData, supportingSystemIds, systemsExposedByLifecycle } from '../capabilityMap/metrics';
+import { hasLifecycleExposureData, replacedElementIds, supportingSystemIds, systemsExposedByLifecycle } from '../capabilityMap/metrics';
 import type { ValueStreamTone } from '../valueStreams/valueStreamRollup';
 import type { CapabilityComparisonMetrics, OptionComparisonRow } from './compareOptions';
 import type { OptionTouch } from './optionTouch';
@@ -471,23 +471,26 @@ const TRIGGER_RESOLUTION_LABEL: Record<TriggerResolution['kind'], string> = {
  * exposed) — outside the sprint's own four-state list, and this row is
  * about resolving an existing trigger, not detecting a new one.
  */
-export function computeTriggerResolution(beforeSystems: readonly ElementsHeadRow[], afterSystems: readonly ElementsHeadRow[], now: Date = new Date()): TriggerResolution {
+export function computeTriggerResolution(beforeSystems: readonly ElementsHeadRow[], afterSystems: readonly ElementsHeadRow[], now: Date = new Date(), afterReplacedIds?: ReadonlySet<UUID>): TriggerResolution {
   if (beforeSystems.length === 0) return { kind: 'not_exposed' };
   if (!hasLifecycleExposureData(beforeSystems)) return { kind: 'unknown' };
   if (!systemsExposedByLifecycle(beforeSystems, now)) return { kind: 'not_exposed' };
-  return systemsExposedByLifecycle(afterSystems, now) ? { kind: 'still_exposed' } : { kind: 'resolved' };
+  // Retire keeps the old system's capability links, so on the option's own head a replaced system is still a supporter; the recorded replacement is what clears it (same rule as the capability map).
+  return systemsExposedByLifecycle(afterSystems, now, afterReplacedIds) ? { kind: 'still_exposed' } : { kind: 'resolved' };
 }
 
 export interface TriggerResolvedOptionInput {
   beforeSystems: readonly ElementsHeadRow[];
   afterSystems: readonly ElementsHeadRow[];
+  /** Elements this option's own head records a replacement for (`replacedElementIds`). */
+  afterReplacedIds?: ReadonlySet<UUID>;
 }
 
 /** A cell only ever marks `changed` on `'resolved'` — `'still_exposed'` is truthfully "nothing changed here", and the collapse rule (rule 2) should hide this row when every option leaves the concern equally exposed, same as it hides any other row no option affects. */
 export function buildTriggerResolvedRow(id: string, groupLabel: string, mainSystems: readonly ElementsHeadRow[], optionsInput: ReadonlyMap<UUID, TriggerResolvedOptionInput>, now: Date = new Date()): WhatChangesRow {
   const options = new Map<UUID, WhatChangesCell>();
   for (const [branchId, input] of optionsInput) {
-    const resolution = computeTriggerResolution(input.beforeSystems, input.afterSystems, now);
+    const resolution = computeTriggerResolution(input.beforeSystems, input.afterSystems, now, input.afterReplacedIds);
     options.set(branchId, cell(TRIGGER_RESOLUTION_LABEL[resolution.kind], resolution.kind === 'resolved'));
   }
   // Main's own column is never anything but a before-vs-itself read (no
@@ -594,7 +597,7 @@ export function buildWhatChangesRows(input: WhatChangesInput): WhatChangesRow[] 
     const triggerOptionsInput = new Map(
       input.options.map((o) => [
         o.branchId,
-        { beforeSystems: systemsFor(capability.element_id, o.mainAtFork.supportsEdges, o.mainAtFork.elementsById), afterSystems: systemsFor(capability.element_id, o.supportsEdges, o.elementsById) },
+        { beforeSystems: systemsFor(capability.element_id, o.mainAtFork.supportsEdges, o.mainAtFork.elementsById), afterSystems: systemsFor(capability.element_id, o.supportsEdges, o.elementsById), afterReplacedIds: replacedElementIds(o.relationshipsHead) },
       ]),
     );
     const mainSystems = systemsFor(capability.element_id, input.main.supportsEdges, input.main.elementsById);
@@ -609,7 +612,7 @@ export function buildWhatChangesRows(input: WhatChangesInput): WhatChangesRow[] 
       input.options.map((o) => {
         const before = o.mainAtFork.elementsById.get(element.element_id);
         const after = o.elementsById.get(element.element_id);
-        return [o.branchId, { beforeSystems: before ? [before] : [], afterSystems: after ? [after] : [] }];
+        return [o.branchId, { beforeSystems: before ? [before] : [], afterSystems: after ? [after] : [], afterReplacedIds: replacedElementIds(o.relationshipsHead) }];
       }),
     );
     const mainSelf = input.main.elementsById.get(element.element_id);

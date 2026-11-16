@@ -3,6 +3,7 @@ import { ModelEmptyState } from '../components/EmptyState/ModelEmptyState';
 import { useParams, useSearchParams } from 'react-router';
 import { AppHeader } from '../components/AppHeader/AppHeader';
 import { Breadcrumb } from '../components/Breadcrumb/Breadcrumb';
+import { reportsSection } from '../nav/reportsSection';
 import { ModelNav } from '../components/ModelNav/ModelNav';
 import navStyles from '../components/ModelNav/ModelNav.module.css';
 import { PageIntro } from '../components/PageIntro/PageIntro';
@@ -62,7 +63,7 @@ export function IntegrationsPage() {
         <ModelNav orgSlug={orgSlug ?? ''} modelSlug={modelSlug ?? ''} />
         <main className={styles.main}>
           {viewing ? <ViewingBranchBanner activeRef={ref} /> : <EditingBranchBanner activeRef={ref} modelId={model.id} orgSlug={orgSlug ?? ''} modelSlug={model.slug} showModeShortcuts={false} />}
-          <Breadcrumb org={{ label: organisation?.name ?? '', href: `/o/${orgSlug ?? ''}` }} model={{ label: model.name, href: `/o/${orgSlug ?? ''}/m/${model.slug}` }} refLabel={refLabelOf(ref)} />
+          <Breadcrumb org={{ label: organisation?.name ?? '', href: `/o/${orgSlug ?? ''}` }} model={{ label: model.name, href: `/o/${orgSlug ?? ''}/m/${model.slug}` }} refLabel={refLabelOf(ref)} section={reportsSection(orgSlug ?? '', modelSlug ?? '')} segments={[{ label: 'Integrations', href: `/o/${orgSlug ?? ''}/m/${model.slug}/integrations` }]} />
           <div className={styles.header}>
             <Text as="h1" size="2xl">
               Integrations

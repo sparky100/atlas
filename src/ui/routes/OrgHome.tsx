@@ -79,6 +79,9 @@ export function OrgHome() {
         <Text as="p" tone="muted">
           Models
         </Text>
+        {canCreateModel(role) && !modelsLoading && activeModels.length === 0 && (
+          <SampleModelOffer orgId={organisation.id} orgSlug={organisation.slug} userId={userId} existingSlugs={models.map((m) => m.slug)} />
+        )}
         <ModelList
           orgSlug={organisation.slug}
           models={activeModels}
@@ -89,9 +92,6 @@ export function OrgHome() {
             await createModel(name, slug, userId);
           }}
         />
-        {canCreateModel(role) && !modelsLoading && activeModels.length === 0 && (
-          <SampleModelOffer orgId={organisation.id} orgSlug={organisation.slug} userId={userId} existingSlugs={models.map((m) => m.slug)} />
-        )}
         {sharedModels.length > 0 && (
           // F7 item 4: "Shared with us" — every model another organisation
           // has granted this org read-only access to, view-only, resolving

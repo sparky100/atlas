@@ -9,7 +9,9 @@ import { buildReplacesDelta } from '../../engine/buildReplacesDelta';
 import { describeEnvelope } from '../../engine/describeEnvelope';
 import { getOrCreateManualSource } from '../../db/sources';
 import type { BranchRow } from '../../db/types';
+import { projectionRelationshipsForElement } from '../../db/branchProjection';
 import { applyCommitToCache } from '../query/applyCommitToCache';
+import { loadProjectionAtCommitCached } from '../query/cachedBranchProjection';
 import { supabase } from '../supabaseClient';
 import { reportToast } from '../toasts/toastStore';
 
@@ -40,7 +42,6 @@ export interface UseElementRetireInput {
   facts: Map<string, FactsRow>;
   /** The retiring element's own live relationships (`ElementPageData.relationships`) — used to find its own `supports` edges when a replacement is given; no new round trip. */
   relationships: readonly RelationshipsHeadRow[];
-  relationshipFacts: ReadonlyMap<UUID, Map<string, FactsRow>>;
   /** Which branch this commits to — see `useElementEditor.ts`'s identical `branch` doc comment. */
   branch: BranchRow;
   expectedHeadCommitId: UUID;
@@ -55,15 +56,17 @@ export interface UseElementRetireInput {
  * `element.update` shape `useElementEditor.ts` already uses (no new engine
  * primitive), plus an optional "replaced by" picker that (a) transfers the
  * retiring element's own `supports` edges to the replacement, one
- * capability at a time, in the *same* commit — old edge retracted, new
- * edge created `role: 'secondary'` — and (b) records the replacement
+ * capability at a time, in the *same* commit — the old edge is KEPT and a
+ * new `role: 'secondary'` edge is created on the replacement (a copy, never
+ * a move; Simon, 2026-11-16) — and (b) records the replacement
  * itself as a first-class fact: a `replaces` edge (ADR-001 amendment,
- * `buildReplacesDelta`) from the replacement to the retiring element. (a)
- * is what actually clears a capability's "lifecycle exposure" colour-by
- * (`src/ui/capabilityMap/metrics.ts`'s `lifecycleExposure`): that check
- * reads every *live* `supports` edge into a capability, so leaving the
- * retiring element's own edge in place would keep the capability reading
- * exposed regardless of what the replacement also supports.
+ * `buildReplacesDelta`) from the replacement to the retiring element. Only
+ * capability (`supports`) links are copied; integrations and other links are
+ * left on the old system for a person to review. The old system stops counting
+ * once its planned end passes (`supportsEdgesInForce`), and a capability's
+ * "lifecycle exposure" check ignores a replaced system through the `replaces`
+ * edge (`replacedElementIds`), so keeping the old edge no longer leaves the
+ * capability reading exposed.
  *
  * New edges always get `role: 'secondary'`, never a copy of the original
  * edge's own role — promoting one to `role: 'primary'` could collide with
@@ -75,16 +78,9 @@ export interface UseElementRetireInput {
  * own commits) — not worth adding here. A user who wants the replacement's
  * new supports edge to be primary can promote it afterward via the
  * existing supports "primary?" prompt.
- *
- * Nor does this hook pre-check whether the replacement already supports
- * one of the transferred capabilities (same branch-projection reasoning) —
- * C10 (no duplicate live relationship) is enforced at the commit boundary
- * regardless, so a genuine duplicate rejects the whole commit with the
- * server's own conflict message rather than silently succeeding or
- * silently dropping one edge.
  */
 export function useElementRetire(input: UseElementRetireInput): UseElementRetireResult {
-  const { modelId, orgId, userId, element, facts, relationships, relationshipFacts, branch, expectedHeadCommitId, onRetired } = input;
+  const { modelId, orgId, userId, element, facts, relationships, branch, expectedHeadCommitId, onRetired } = input;
   const [status, setStatus] = useState<ElementRetireStatus>('idle');
   const [error, setError] = useState<string | null>(null);
   const queryClient = useQueryClient();
@@ -149,17 +145,16 @@ export function useElementRetire(input: UseElementRetireInput): UseElementRetire
 
         if (replacement) {
           const ownSupportsEdges = relationships.filter((rel) => rel.relationship_type === 'supports' && rel.from_element_id === element.element_id);
+          // A capability the replacement already supports is skipped, never
+          // duplicated (C10 would reject the whole commit). Read from the
+          // projection at this branch's head, so it also sees a change's own edges.
+          const projection = await loadProjectionAtCommitCached(supabase, modelId, expectedHeadCommitId);
+          const alreadySupported = new Set(projectionRelationshipsForElement(projection, replacement.elementId).filter((rel) => rel.relationship_type === 'supports' && rel.from_element_id === replacement.elementId).map((rel) => rel.to_element_id));
           for (const edge of ownSupportsEdges) {
-            deltas.push({
-              kind: 'relationship.retract',
-              id: crypto.randomUUID(),
-              relationshipId: edge.relationship_id,
-              relationshipType: 'supports',
-              previousDeltaId: relationshipFacts.get(edge.relationship_id)?.get('$exists')?.delta_id ?? edge.exists_delta_id,
-              sourceId: source.id,
-              confidence: 1,
-            });
-
+            if (alreadySupported.has(edge.to_element_id)) continue;
+            // Copy, never move: the old system keeps its own link (it stops
+            // counting once its planned end passes — `supportsEdgesInForce`),
+            // so the capability still shows it until then.
             const description = attributesRecord(edge.attributes).description;
             deltas.push({
               kind: 'relationship.create',
@@ -216,7 +211,7 @@ export function useElementRetire(input: UseElementRetireInput): UseElementRetire
         setError(e instanceof Error ? e.message : 'Could not retire.');
       }
     },
-    [element, facts, relationships, relationshipFacts, modelId, orgId, userId, branch, expectedHeadCommitId, onRetired, queryClient],
+    [element, facts, relationships, modelId, orgId, userId, branch, expectedHeadCommitId, onRetired, queryClient],
   );
 
   return { status, error, retire };

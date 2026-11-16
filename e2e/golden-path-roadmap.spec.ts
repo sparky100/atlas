@@ -95,6 +95,14 @@ test('a retire-and-replace change, once merged, appears as an arrow on the roadm
   // supports-retract/create heuristic fallback ever attaches one.
   await expect(page.getByText('Legacy CRM replaced by New CRM Platform', { exact: true })).toBeVisible();
 
+  // "Find on this roadmap": picking Legacy CRM (it has a planned end, so a bar) scrolls to its row and outlines it.
+  const find = page.getByRole('combobox', { name: 'Find on this roadmap' });
+  await find.fill('Legacy');
+  await page.getByRole('option', { name: /Legacy CRM/ }).click();
+  await expect(find).toHaveValue('');
+  await expect(page.locator('[data-system-id][data-found="true"]').first()).toBeVisible();
+  await expect(page.locator('[data-system-id][data-found="true"]').first()).toContainText('Legacy CRM');
+
   // Regression coverage for the reported bug: axis tick labels overlapping
   // right on load, on mobile — assert every rendered tick's bounding box
   // is disjoint from its neighbour's, at whatever width this run's own
