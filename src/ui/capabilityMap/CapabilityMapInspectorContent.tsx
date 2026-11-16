@@ -12,7 +12,9 @@ import { LIFECYCLE_TONE } from '../elements/lifecycleTone';
 import { ownersByRole } from '../elements/ownersByRole';
 import { capabilityMapInspectorSupportingSystems } from './capabilityMapInspectorSelection';
 import { LandscapeZoomLink } from './CapabilityMapView';
-import { COLOUR_BY_OPTIONS, oldestLifecycleStage, otShareOf, worstCriticality, worstFitForPurpose, type ColourByMode } from './metrics';
+import { agentShareOf, COLOUR_BY_OPTIONS, oldestLifecycleStage, otShareOf, worstCriticality, worstFitForPurpose, type ColourByMode } from './metrics';
+import { AI_AUTONOMY_TONE } from '../elements/aiAutonomyTone';
+import { aiAutonomyLabel } from '../../engine/elementRead/aiAgent';
 import styles from './CapabilityMapInspectorContent.module.css';
 
 function capitalize(value: string): string {
@@ -92,6 +94,7 @@ export function CapabilityMapInspectorContent({
   const oldest = selectedCapability ? oldestLifecycleStage(selectedCapability.element_id, supportsEdges, systemsById) : null;
   const criticality = selectedCapability ? worstCriticality(selectedCapability.element_id, supportsEdges, systemsById) : null;
   const fit = selectedCapability ? worstFitForPurpose(selectedCapability.element_id, supportsEdges) : null;
+  const agents = selectedCapability ? agentShareOf(selectedCapability.element_id, supportsEdges, systemsById) : { agents: 0, total: 0, worst: null };
   const ot = selectedCapability ? otShareOf(selectedCapability.element_id, supportsEdges, systemsById) : { ot: 0, total: 0 };
 
   return (
@@ -132,6 +135,16 @@ export function CapabilityMapInspectorContent({
                   Fit for purpose
                 </Text>
                 <Chip tone={fitForPurposeToneFor(fit)}>{fit}</Chip>
+              </div>
+            )}
+            {agents.agents > 0 && agents.worst !== null && (
+              <div className={styles.attributeRow}>
+                <Text as="span" size="sm" tone="muted">
+                  Agent share
+                </Text>
+                <Chip tone={AI_AUTONOMY_TONE[agents.worst]}>
+                  {agents.agents}/{agents.total} AI agents · {aiAutonomyLabel(agents.worst).toLowerCase()}
+                </Chip>
               </div>
             )}
             {ot.ot > 0 && (
