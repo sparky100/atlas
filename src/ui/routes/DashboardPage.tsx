@@ -5,6 +5,7 @@ import { getDashboard } from '../../db/reports';
 import type { DashboardRow } from '../../db/types';
 import { AppHeader } from '../components/AppHeader/AppHeader';
 import { Breadcrumb } from '../components/Breadcrumb/Breadcrumb';
+import { reportsSection } from '../nav/reportsSection';
 import { ModelNav } from '../components/ModelNav/ModelNav';
 import navStyles from '../components/ModelNav/ModelNav.module.css';
 import { Text } from '../components/Text/Text';
@@ -15,6 +16,8 @@ import { useMembership } from '../orgs/useMembership';
 import { useOrganisationBySlug } from '../orgs/useOrganisationBySlug';
 import { DashboardView } from '../reports/DashboardView';
 import { ReportLoadError } from '../reports/ReportLoadError';
+import { refLabelOf } from '../../db/ref';
+import { useSelectedRef } from '../branches/useSelectedRef';
 import { supabase } from '../supabaseClient';
 import styles from './ViewPage.module.css';
 
@@ -24,6 +27,7 @@ type Loaded = { status: 'loading' } | { id: string; status: 'missing' } | { id: 
 export function DashboardPage() {
   const { orgSlug, modelSlug, id } = useParams<{ orgSlug: string; modelSlug: string; id: string }>();
   const { userId } = useAuth();
+  const { ref } = useSelectedRef();
   const { organisation, loading: orgLoading } = useOrganisationBySlug(orgSlug ?? '');
   const { models, loading: modelsLoading } = useModels(organisation?.id ?? null);
   const model = models.find((m) => m.slug === modelSlug);
@@ -55,7 +59,7 @@ export function DashboardPage() {
       <div className={navStyles.body}>
         <ModelNav orgSlug={orgSlug ?? ''} modelSlug={modelSlug ?? ''} />
         <main className={styles.main}>
-          {model && <Breadcrumb org={{ label: organisation?.name ?? '', href: `/o/${orgSlug ?? ''}` }} model={{ label: model.name, href: `/o/${orgSlug ?? ''}/m/${model.slug}` }} refLabel="Reports" />}
+          {model && <Breadcrumb org={{ label: organisation?.name ?? '', href: `/o/${orgSlug ?? ''}` }} model={{ label: model.name, href: `/o/${orgSlug ?? ''}/m/${model.slug}` }} refLabel={refLabelOf(ref)} section={reportsSection(orgSlug ?? '', modelSlug ?? '')} segments={[{ label: title, href: `/o/${orgSlug ?? ''}/m/${model.slug}/reports/dashboards/${id ?? ''}` }]} />}
           <div className={styles.header}>
             <Text as="h1" size="2xl">
               {title}
