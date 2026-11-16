@@ -245,3 +245,28 @@ describe('assignCapabilities — "|"-delimited literal list (Sprint F2b, SPEC-ca
     expect((result.candidates[0]?.proposal as RelationshipProposal<'supports'>).attributes.role).toBe('primary');
   });
 });
+
+describe('assignCapabilities — fit on the capability link (owner-approved importer exception, JSON import)', () => {
+  it('puts the row\'s fit on the supports link, with its own confidence, leaving role unchanged', async () => {
+    const capabilities = [capability({ element_id: 'cap-1', name: 'Customer Support' })];
+    const aliases: MatchAliasInput[] = [{ element_id: 'cap-1', alias_value: 'Customer Service', alias_type: 'name' }];
+    const matchIndex = buildMatchIndex(capabilities, aliases);
+    const llmClient = new RecordedLlmClient({ cassettes: new Map() });
+
+    const result = await assignCapabilities({ rows: [row({ fit: 'poor' })], matchIndex, llmClient, startSeq: 10, mainHead: emptyHead() });
+
+    const [candidate] = result.candidates;
+    expect((candidate?.proposal as RelationshipProposal<'supports'>).attributes).toEqual({ role: 'primary', fitForPurpose: 'poor' });
+    expect(candidate?.evidence.attributeConfidence).toEqual({ role: 1, fitForPurpose: 1 });
+  });
+
+  it('adds nothing to the link when the row has no fit', async () => {
+    const capabilities = [capability({ element_id: 'cap-1', name: 'Customer Support' })];
+    const aliases: MatchAliasInput[] = [{ element_id: 'cap-1', alias_value: 'Customer Service', alias_type: 'name' }];
+    const matchIndex = buildMatchIndex(capabilities, aliases);
+    const llmClient = new RecordedLlmClient({ cassettes: new Map() });
+
+    const result = await assignCapabilities({ rows: [row()], matchIndex, llmClient, startSeq: 10, mainHead: emptyHead() });
+    expect((result.candidates[0]?.proposal as RelationshipProposal<'supports'>).attributes).toEqual({ role: 'primary' });
+  });
+});

@@ -19,7 +19,7 @@ const DEMOS = [
   { file: 'docs/demo/meridian-retail.import.json', map: 'content/capability-maps/retail_energy/1.json' },
 ] as const;
 
-interface RawSystem { ai_autonomy?: string; ai_use?: string; technical_owner?: string; name: string; description?: string; platform?: string; capability?: string; quote?: string; confidence?: number }
+interface RawSystem { fit?: string; capability?: string; ai_autonomy?: string; ai_use?: string; technical_owner?: string; name: string; description?: string; platform?: string; capability?: string; quote?: string; confidence?: number }
 interface RawEntry { name?: string; from?: string; to?: string; via?: string; platform?: string; capability?: string; replaced_by?: string; quote?: string; confidence?: number }
 interface RawImport { systems: RawSystem[]; relationships: RawEntry[]; changes: RawEntry[] }
 
@@ -85,6 +85,14 @@ describe.each(DEMOS)('demo import $file', ({ file, map }) => {
     expect(raw.systems.filter((s) => s.ai_use).length).toBeGreaterThanOrEqual(2);
     // Every agent is wired to the systems it uses with ordinary relationships.
     for (const agent of agents) expect(raw.relationships.some((r) => r.from === agent.name)).toBe(true);
+  });
+
+  it('rates fit on capability links across the whole scale, never on a row with no capability', () => {
+    const rated = raw.systems.filter((s) => s.fit !== undefined);
+    expect(rated.length).toBeGreaterThan(20);
+    expect(new Set(rated.map((s) => s.fit))).toEqual(new Set(['excellent', 'good', 'adequate', 'poor']));
+    expect(rated.every((s) => Boolean(s.capability))).toBe(true);
+    expect(raw.systems.filter((s) => s.capability && s.fit === undefined)).toEqual([]);
   });
 
   it('carries provenance on every entry', () => {

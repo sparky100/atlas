@@ -27,6 +27,8 @@
  */
 import { validateAttributeValue } from '../contracts/attributeSchema';
 import { normalizeName } from '../engine/merge';
+import { FIT_FOR_PURPOSE_ORDER } from '../engine/elementRead/fitForPurpose';
+import type { FitForPurpose } from '../contracts/delta';
 
 /** The exact header names a row must use — order doesn't matter, extra columns are ignored, case-sensitive (matching every other attribute key in this product). Snake_case, this session's own plan's spelling — distinct from the camelCase attribute keys they map onto below. */
 export const IMPORT_COLUMNS = ['name', 'description', 'kind', 'lifecycle', 'criticality', 'annual_run_cost', 'disposition', 'domain', 'hosting_model', 'vendor', 'is_external', 'external_organisation', 'platform', 'capability', 'business_owner', 'technical_owner', 'interface_type', 'transformation', 'introduced', 'planned_end', 'support_ends_at', 'ai_autonomy', 'ai_use'] as const;
@@ -56,6 +58,8 @@ export interface ImportRow {
   platformName: string | null;
   /** Import close-out: the `capability` column accepts a `|`-delimited list — the first name is the primary `supports` link, the rest secondary. Empty array means the column was blank. */
   capabilityNames: string[];
+  /** Owner-approved importer exception (Simon, 2026-11-16): the fit-for-purpose rating of this system's capability link(s), JSON format only. It is a `supports` link attribute, not a system attribute, so it lives outside `attributes`; `undefined` means the field was absent. Applied to every capability link this row creates; ignored when the row names no capability. */
+  fit?: FitForPurpose | undefined;
   businessOwner: OwnerReference | null;
   technicalOwner: OwnerReference | null;
   /** JSON import follow-up: a supporting quote from whatever the file's author is working from — free text, never validated beyond non-blank. Carried onto every delta this row produces, appended to `sourceRef`. */
@@ -203,6 +207,14 @@ export function validateImportRow(raw: Record<string, unknown>, rowNumber: numbe
     if (!result.ok) return { ok: false, rowNumber, error: `"is_external": ${result.error}` };
   }
 
+  const fitCell = cellToString(raw.fit);
+  let fit: FitForPurpose | undefined;
+  if (fitCell !== undefined) {
+    const normalised = fitCell.toLowerCase();
+    if (!(normalised in FIT_FOR_PURPOSE_ORDER)) return { ok: false, rowNumber, error: `"fit" must be one of: ${Object.keys(FIT_FOR_PURPOSE_ORDER).join(', ')}, got "${fitCell}"` };
+    fit = normalised as FitForPurpose;
+  }
+
   const businessOwnerCell = cellToString(raw.business_owner);
   const technicalOwnerCell = cellToString(raw.technical_owner);
 
@@ -219,6 +231,7 @@ export function validateImportRow(raw: Record<string, unknown>, rowNumber: numbe
       isExternal,
       platformName,
       capabilityNames: parseCapabilityList(cellToString(raw.capability) ?? ''),
+      fit,
       businessOwner: businessOwnerCell !== undefined ? parseOwnerCell(businessOwnerCell) : null,
       technicalOwner: technicalOwnerCell !== undefined ? parseOwnerCell(technicalOwnerCell) : null,
       quote: cellToString(raw.quote),

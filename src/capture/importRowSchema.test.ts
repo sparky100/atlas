@@ -217,3 +217,26 @@ describe('validateImportRow', () => {
     if (result.ok) expect(result.row.attributes).toEqual({});
   });
 });
+
+describe('validateImportRow: fit (owner-approved importer exception)', () => {
+  it('accepts a fit rating, case-insensitively, kept outside the system attributes', () => {
+    const result = validateImportRow({ name: 'Northgate', capability: 'Billing', fit: 'Poor' }, 2);
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.row.fit).toBe('poor');
+      expect(result.row.attributes).toEqual({});
+    }
+  });
+
+  it('leaves fit unset when absent or blank', () => {
+    for (const raw of [{ name: 'A' }, { name: 'A', fit: '  ' }]) {
+      const result = validateImportRow(raw, 2);
+      expect(result.ok && result.row.fit).toBeFalsy();
+    }
+  });
+
+  it('rejects an unknown fit word instead of silently dropping it', () => {
+    const result = validateImportRow({ name: 'Northgate', fit: 'brilliant' }, 4);
+    expect(result).toEqual({ ok: false, rowNumber: 4, error: '"fit" must be one of: excellent, good, adequate, poor, got "brilliant"' });
+  });
+});
