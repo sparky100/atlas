@@ -19,7 +19,7 @@ test('tag main before and after a change, then diff the two tags by name', async
   const versionList = page.getByRole('list');
   await page.getByPlaceholder('Version name (e.g. v2026-Q2)').fill('v1');
   await page.getByPlaceholder('Note (optional)').fill('Before');
-  await page.getByRole('button', { name: 'Tag main now' }).click();
+  await page.getByRole('button', { name: 'Tag the live model now' }).click();
   await expect(versionList.getByText('v1', { exact: true })).toBeVisible();
 
   // After: a second system added.
@@ -30,7 +30,7 @@ test('tag main before and after a change, then diff the two tags by name', async
   await clickNavItem(page, 'History');
   await page.getByPlaceholder('Version name (e.g. v2026-Q2)').fill('v2');
   await page.getByPlaceholder('Note (optional)').fill('After');
-  await page.getByRole('button', { name: 'Tag main now' }).click();
+  await page.getByRole('button', { name: 'Tag the live model now' }).click();
   await expect(versionList.getByText('v2', { exact: true })).toBeVisible();
 
   // Diff v1 → v2 by tag name, via the two selects (no URL construction —

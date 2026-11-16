@@ -40,7 +40,7 @@ export function VersionsView({ modelId, orgId, userId, orgSlug, modelSlug, canTa
   const [toBeChoice, setToBeChoice] = useState(MAIN_OPTION);
   const [asIsChoice, setAsIsChoice] = useState(MAIN_OPTION);
 
-  const refOptions = [{ value: MAIN_OPTION, label: 'main (current)' }, ...tags.map((tag) => ({ value: `tag:${tag.name}`, label: tag.name }))];
+  const refOptions = [{ value: MAIN_OPTION, label: 'Live model (current)' }, ...tags.map((tag) => ({ value: `tag:${tag.name}`, label: tag.name }))];
   const diffHref = `/o/${orgSlug}/m/${modelSlug}/diff?${new URLSearchParams({ ref: toBeChoice, diff: asIsChoice }).toString()}`;
   const canCompare = toBeChoice !== asIsChoice;
 
@@ -64,7 +64,7 @@ export function VersionsView({ modelId, orgId, userId, orgSlug, modelSlug, canTa
             <input className={styles.input} type="text" placeholder="Version name (e.g. v2026-Q2)" value={name} onChange={(e) => { setName(e.target.value); }} disabled={!mainHeadCommitId} />
             <input className={styles.input} type="text" placeholder="Note (optional)" value={note} onChange={(e) => { setNote(e.target.value); }} disabled={!mainHeadCommitId} />
             <Button variant="primary" type="submit" disabled={status === 'tagging' || !mainHeadCommitId}>
-              {status === 'tagging' ? 'Tagging…' : 'Tag main now'}
+              {status === 'tagging' ? 'Tagging…' : 'Tag the live model now'}
             </Button>
           </form>
           {!mainHeadCommitId && (

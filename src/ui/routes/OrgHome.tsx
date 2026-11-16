@@ -107,7 +107,7 @@ export function OrgHome() {
                     <Text as="span" tone="muted" size="sm">
                       from {shared.ownerOrgName}
                     </Text>
-                    <Chip tone="neutral">{shared.tagName ?? 'current main'}</Chip>
+                    <Chip tone="neutral">{shared.tagName ?? 'live model'}</Chip>
                   </Link>
                 </li>
               ))}

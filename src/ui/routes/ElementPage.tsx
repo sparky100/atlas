@@ -628,7 +628,7 @@ export function ElementPage() {
                   />
                 </CollapsibleSection>
                 {/* An integration platform's own interfaces and flows come first after its attributes — what it exposes, and what goes through it, is what the page is for (ADR-026). */}
-                {state.data.element.element_type === 'system' && isIntegrationPlatform(state.data.element) && (
+                {state.data.element.element_type === 'system' && isIntegrationPlatform(state.data.element) && (state.data.children.some((c) => c.element_type === 'container') || canAddRelationship) && (
                   <CollapsibleSection title="Interfaces" meta={`(${String(state.data.children.filter((c) => c.element_type === 'container').length)})`}>
                     <InterfacesSection orgSlug={organisation?.slug ?? ''} modelSlug={model.slug} interfaces={state.data.children.filter((c) => c.element_type === 'container')} flows={state.data.flowsViaThisPlatform} />
                     {canAddRelationship && (
@@ -645,7 +645,7 @@ export function ElementPage() {
                     )}
                   </CollapsibleSection>
                 )}
-                {(isIntegrationPlatform(state.data.element) && state.data.element.element_type === 'system') || isIntegrationInterface(state.data.element, state.data.parent) ? (
+                {((isIntegrationPlatform(state.data.element) && state.data.element.element_type === 'system') || isIntegrationInterface(state.data.element, state.data.parent)) && state.data.flowsViaThisPlatform.length > 0 ? (
                   <CollapsibleSection title={state.data.element.element_type === 'container' ? 'Flows via this interface' : 'Flows via this platform'} meta={`(${String(state.data.flowsViaThisPlatform.length)})`}>
                     <PlatformFlowsSection
                       orgSlug={organisation?.slug ?? ''}
@@ -656,98 +656,102 @@ export function ElementPage() {
                     />
                   </CollapsibleSection>
                 ) : null}
-                <CollapsibleSection title="Relationships" meta={`(${String(state.data.relationships.length)})`}>
-                  <RelationshipsSection
-                    orgSlug={organisation?.slug ?? ''}
-                    modelSlug={model.slug}
-                    elementId={state.data.element.element_id}
-                    elementType={state.data.element.element_type}
-                    elementName={state.data.element.name}
-                    elementParentId={state.data.element.parent_id}
-                    elementIsPlatform={state.data.element.element_type === 'system' && isPlatform(state.data.element)}
-                    elementIsExternal={state.data.element.element_type === 'actor' && attributesRecord(state.data.element.attributes).isExternal === true}
-                    isInterface={isIntegrationInterface(state.data.element, state.data.parent)}
-                    relationships={state.data.relationships}
-                    endpoints={state.data.relationshipEndpoints}
-                    relationshipFacts={state.data.relationshipFacts}
-                    sources={state.data.sources}
-                    justAddedElementId={justAddedElementId}
-                    addRelationship={
-                      canAddRelationship
-                        ? {
-                            modelId: model.id,
-                            orgId: organisation?.id ?? '',
-                            userId,
-                            elementName: state.data.element.name,
-                            searchCommitId,
-                            branch: editingBranch,
-                            expectedHeadCommitId: state.data.commitId,
-                            onCreated: (otherElementId) => {
-                              setJustAddedElementId(otherElementId);
-                              reloadAfterCommit();
-                            },
-                          }
-                        : undefined
-                    }
-                    removeRelationship={
-                      canAddRelationship
-                        ? {
-                            modelId: model.id,
-                            orgId: organisation?.id ?? '',
-                            userId,
-                            branch: editingBranch,
-                            expectedHeadCommitId: state.data.commitId,
-                            onRemoved: reloadAfterCommit,
-                          }
-                        : undefined
-                    }
-                    editRelationship={
-                      canAddRelationship
-                        ? {
-                            modelId: model.id,
-                            orgId: organisation?.id ?? '',
-                            userId,
-                            branch: editingBranch,
-                            expectedHeadCommitId: state.data.commitId,
-                            onSaved: reloadAfterCommit,
-                          }
-                        : undefined
-                    }
-                    enablesAddRelationship={
-                      canAddEnablesRelationship
-                        ? {
-                            modelId: model.id,
-                            orgId: organisation?.id ?? '',
-                            userId,
-                            elementName: state.data.element.name,
-                            searchCommitId,
-                            branch: editingBranch,
-                            expectedHeadCommitId: state.data.commitId,
-                            onCreated: (otherElementId) => {
-                              setJustAddedElementId(otherElementId);
-                              reloadAfterCommit();
-                            },
-                          }
-                        : undefined
-                    }
-                    enablesRemoveRelationship={
-                      canAddEnablesRelationship
-                        ? {
-                            modelId: model.id,
-                            orgId: organisation?.id ?? '',
-                            userId,
-                            branch: editingBranch,
-                            expectedHeadCommitId: state.data.commitId,
-                            onRemoved: reloadAfterCommit,
-                          }
-                        : undefined
-                    }
-                  />
-                </CollapsibleSection>
-                <CollapsibleSection title="Structure">
-                  <StructureSection orgSlug={organisation?.slug ?? ''} modelSlug={model.slug} parent={state.data.parent} capabilityLevel={state.data.capabilityLevel} children={state.data.children} />
-                </CollapsibleSection>
-                {state.data.element.element_type === 'value_stream' && state.data.element.parent_id === null && (
+                {(state.data.relationships.length > 0 || canAddRelationship) && (
+                  <CollapsibleSection title="Relationships" meta={`(${String(state.data.relationships.length)})`}>
+                    <RelationshipsSection
+                      orgSlug={organisation?.slug ?? ''}
+                      modelSlug={model.slug}
+                      elementId={state.data.element.element_id}
+                      elementType={state.data.element.element_type}
+                      elementName={state.data.element.name}
+                      elementParentId={state.data.element.parent_id}
+                      elementIsPlatform={state.data.element.element_type === 'system' && isPlatform(state.data.element)}
+                      elementIsExternal={state.data.element.element_type === 'actor' && attributesRecord(state.data.element.attributes).isExternal === true}
+                      isInterface={isIntegrationInterface(state.data.element, state.data.parent)}
+                      relationships={state.data.relationships}
+                      endpoints={state.data.relationshipEndpoints}
+                      relationshipFacts={state.data.relationshipFacts}
+                      sources={state.data.sources}
+                      justAddedElementId={justAddedElementId}
+                      addRelationship={
+                        canAddRelationship
+                          ? {
+                              modelId: model.id,
+                              orgId: organisation?.id ?? '',
+                              userId,
+                              elementName: state.data.element.name,
+                              searchCommitId,
+                              branch: editingBranch,
+                              expectedHeadCommitId: state.data.commitId,
+                              onCreated: (otherElementId) => {
+                                setJustAddedElementId(otherElementId);
+                                reloadAfterCommit();
+                              },
+                            }
+                          : undefined
+                      }
+                      removeRelationship={
+                        canAddRelationship
+                          ? {
+                              modelId: model.id,
+                              orgId: organisation?.id ?? '',
+                              userId,
+                              branch: editingBranch,
+                              expectedHeadCommitId: state.data.commitId,
+                              onRemoved: reloadAfterCommit,
+                            }
+                          : undefined
+                      }
+                      editRelationship={
+                        canAddRelationship
+                          ? {
+                              modelId: model.id,
+                              orgId: organisation?.id ?? '',
+                              userId,
+                              branch: editingBranch,
+                              expectedHeadCommitId: state.data.commitId,
+                              onSaved: reloadAfterCommit,
+                            }
+                          : undefined
+                      }
+                      enablesAddRelationship={
+                        canAddEnablesRelationship
+                          ? {
+                              modelId: model.id,
+                              orgId: organisation?.id ?? '',
+                              userId,
+                              elementName: state.data.element.name,
+                              searchCommitId,
+                              branch: editingBranch,
+                              expectedHeadCommitId: state.data.commitId,
+                              onCreated: (otherElementId) => {
+                                setJustAddedElementId(otherElementId);
+                                reloadAfterCommit();
+                              },
+                            }
+                          : undefined
+                      }
+                      enablesRemoveRelationship={
+                        canAddEnablesRelationship
+                          ? {
+                              modelId: model.id,
+                              orgId: organisation?.id ?? '',
+                              userId,
+                              branch: editingBranch,
+                              expectedHeadCommitId: state.data.commitId,
+                              onRemoved: reloadAfterCommit,
+                            }
+                          : undefined
+                      }
+                    />
+                  </CollapsibleSection>
+                )}
+                {(state.data.parent !== null || state.data.children.length > 0) && (
+                  <CollapsibleSection title="Structure">
+                    <StructureSection orgSlug={organisation?.slug ?? ''} modelSlug={model.slug} parent={state.data.parent} capabilityLevel={state.data.capabilityLevel} children={state.data.children} />
+                  </CollapsibleSection>
+                )}
+                {state.data.element.element_type === 'value_stream' && state.data.element.parent_id === null && (state.data.children.length > 0 || canEdit) && (
                   <CollapsibleSection title="Stages" meta={`(${String(state.data.children.length)})`}>
                     <ValueStreamStagesSection
                       orgSlug={organisation?.slug ?? ''}
@@ -780,7 +784,7 @@ export function ElementPage() {
                     )}
                   </CollapsibleSection>
                 )}
-                {isImpactEligible && (
+                {isImpactEligible && (valueStreamImpact.status !== 'ready' || valueStreamImpact.affected.length > 0) && (
                   <CollapsibleSection title="Impact" meta={valueStreamImpact.status === 'ready' ? `(${String(valueStreamImpact.affected.length)})` : undefined}>
                     {valueStreamImpact.status === 'loading' && (
                       <Text as="p" tone="muted" size="sm">
@@ -790,7 +794,7 @@ export function ElementPage() {
                     {valueStreamImpact.status === 'ready' && <ValueStreamImpactSection orgSlug={organisation?.slug ?? ''} modelSlug={model.slug} affected={valueStreamImpact.affected} />}
                   </CollapsibleSection>
                 )}
-                {state.data.element.element_type === 'system' && isPlatform(state.data.element) && (
+                {state.data.element.element_type === 'system' && isPlatform(state.data.element) && (state.data.children.length > 0 || canAddRelationship) && (
                   <CollapsibleSection title="Modules" meta={`(${String(state.data.children.length)})`}>
                     <ModulesSection
                       orgSlug={organisation?.slug ?? ''}
@@ -821,32 +825,38 @@ export function ElementPage() {
               </div>
               <div className={styles.rightColumn}>
                 {/* These three load just after the rest of the page (`ElementPageData.secondary`): until then show "loading", never their empty value as if it were the answer. */}
-                <CollapsibleSection title="Changes touching this">
-                  {state.data.secondary === 'ready' ? <ChangesTouchingSection inFlightBranches={state.data.inFlightBranches} projectTitles={state.data.projectTitles} orgSlug={organisation?.slug ?? ''} modelSlug={model.slug} /> : <SecondaryPlaceholder status={state.data.secondary} />}
-                </CollapsibleSection>
-                <CollapsibleSection title="History">
-                  {state.data.secondary === 'ready' ? (
-                    <HistoryTimeline
-                      key={state.data.element.element_id}
-                      history={state.data.history}
-                      elementId={state.data.element.element_id}
-                      relationshipEndpoints={state.data.relationshipEndpoints}
-                      retractedElementNames={state.data.retractedElementNames}
-                    />
-                  ) : (
-                    <SecondaryPlaceholder status={state.data.secondary} />
-                  )}
-                </CollapsibleSection>
-                <CollapsibleSection title="Decisions" meta={state.data.secondary === 'ready' ? `(${String(state.data.elementDecisions.length)})` : undefined}>
-                  {/* "Why is this here" (prompt pack F3 PR6) — replaces the
-                      hardcoded EmptyState Prompt 7h bug B6 left here before
-                      the decisions schema existed at all. */}
-                  {state.data.secondary === 'ready' ? (
-                    <ElementDecisionsSection entries={state.data.elementDecisions} orgSlug={organisation?.slug ?? ''} modelSlug={model.slug} />
-                  ) : (
-                    <SecondaryPlaceholder status={state.data.secondary} />
-                  )}
-                </CollapsibleSection>
+                {(state.data.secondary !== 'ready' || state.data.inFlightBranches.length > 0) && (
+                  <CollapsibleSection title="Changes touching this">
+                    {state.data.secondary === 'ready' ? <ChangesTouchingSection inFlightBranches={state.data.inFlightBranches} projectTitles={state.data.projectTitles} orgSlug={organisation?.slug ?? ''} modelSlug={model.slug} /> : <SecondaryPlaceholder status={state.data.secondary} />}
+                  </CollapsibleSection>
+                )}
+                {(state.data.secondary !== 'ready' || state.data.history.length > 0) && (
+                  <CollapsibleSection title="History">
+                    {state.data.secondary === 'ready' ? (
+                      <HistoryTimeline
+                        key={state.data.element.element_id}
+                        history={state.data.history}
+                        elementId={state.data.element.element_id}
+                        relationshipEndpoints={state.data.relationshipEndpoints}
+                        retractedElementNames={state.data.retractedElementNames}
+                      />
+                    ) : (
+                      <SecondaryPlaceholder status={state.data.secondary} />
+                    )}
+                  </CollapsibleSection>
+                )}
+                {(state.data.secondary !== 'ready' || state.data.elementDecisions.length > 0) && (
+                  <CollapsibleSection title="Decisions" meta={state.data.secondary === 'ready' ? `(${String(state.data.elementDecisions.length)})` : undefined}>
+                    {/* "Why is this here" (prompt pack F3 PR6) — replaces the
+                        hardcoded EmptyState Prompt 7h bug B6 left here before
+                        the decisions schema existed at all. */}
+                    {state.data.secondary === 'ready' ? (
+                      <ElementDecisionsSection entries={state.data.elementDecisions} orgSlug={organisation?.slug ?? ''} modelSlug={model.slug} />
+                    ) : (
+                      <SecondaryPlaceholder status={state.data.secondary} />
+                    )}
+                  </CollapsibleSection>
+                )}
                 <CollapsibleSection title="Comments">
                   <CommentsSection
                     orgId={organisation?.id ?? ''}

@@ -153,7 +153,7 @@ export function ChangeView({ orgId, modelId, branchId, orgSlug, modelSlug, role,
     try {
       const main = await getMainBranch(supabase, modelId);
       if (!main) {
-        setDuplicateError('This model has no main to fork from.');
+        setDuplicateError('This model has nothing in it yet, so there is nothing to base a change on.');
         return;
       }
       const newBranch = await createChangeBranch(supabase, {
@@ -485,8 +485,8 @@ export function ChangeView({ orgId, modelId, branchId, orgSlug, modelSlug, role,
                     From {importSummary.state.fileName}
                   </Text>
                   <div className={styles.importCounts}>
-                    <Chip tone="info">{summaryState.status === 'ready' ? summaryState.summary.subjects.filter((s) => s.subjectType === 'element' && (s.elementType === 'system' || s.elementType === 'container') && s.deltas.some((d) => d.kind === 'element.create')).length : 0} new</Chip>
-                    <Chip tone="info">{summaryState.status === 'ready' ? summaryState.summary.subjects.filter((s) => s.subjectType === 'element' && (s.elementType === 'system' || s.elementType === 'container') && !s.deltas.some((d) => d.kind === 'element.create')).length : 0} changed</Chip>
+                    <Chip tone="neutral">{summaryState.status === 'ready' ? summaryState.summary.subjects.filter((s) => s.subjectType === 'element' && (s.elementType === 'system' || s.elementType === 'container') && s.deltas.some((d) => d.kind === 'element.create')).length : 0} new</Chip>
+                    <Chip tone="neutral">{summaryState.status === 'ready' ? summaryState.summary.subjects.filter((s) => s.subjectType === 'element' && (s.elementType === 'system' || s.elementType === 'container') && !s.deltas.some((d) => d.kind === 'element.create')).length : 0} changed</Chip>
                     {importSummary.state.notInFile.length > 0 && <Chip tone="warn">{importSummary.state.notInFile.length} not in file</Chip>}
                   </div>
                   {importSummary.state.notInFile.length > 0 && (

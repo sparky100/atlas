@@ -4,6 +4,7 @@ import { AppHeader } from '../components/AppHeader/AppHeader';
 import { Breadcrumb } from '../components/Breadcrumb/Breadcrumb';
 import { ModelNav } from '../components/ModelNav/ModelNav';
 import navStyles from '../components/ModelNav/ModelNav.module.css';
+import { PageIntro } from '../components/PageIntro/PageIntro';
 import { Text } from '../components/Text/Text';
 import { useAuth } from '../auth/useAuth';
 import { EditingBranchBanner } from '../branches/EditingBranchBanner/EditingBranchBanner';
@@ -66,6 +67,7 @@ export function DuplicatesReportPage() {
               Duplicates report
             </Text>
           </div>
+          <PageIntro>Elements that look like the same thing recorded twice, so you can merge them.</PageIntro>
           <DuplicatesReportView modelId={model.id} orgSlug={orgSlug ?? ''} modelSlug={model.slug} searchCommitId={mainBranch.head_commit_id} duplicatesCheckEnabled={model.duplicates_check_enabled} role={role} />
         </main>
       </div>

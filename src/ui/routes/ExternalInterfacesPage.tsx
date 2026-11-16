@@ -5,6 +5,7 @@ import { Breadcrumb } from '../components/Breadcrumb/Breadcrumb';
 import { EditingBranchBanner } from '../branches/EditingBranchBanner/EditingBranchBanner';
 import { ModelNav } from '../components/ModelNav/ModelNav';
 import navStyles from '../components/ModelNav/ModelNav.module.css';
+import { PageIntro } from '../components/PageIntro/PageIntro';
 import { Text } from '../components/Text/Text';
 import { ExternalInterfacesView } from '../externalInterfaces/ExternalInterfacesView';
 import { useSelectedRef } from '../branches/useSelectedRef';
@@ -48,6 +49,7 @@ export function ExternalInterfacesPage() {
               External interfaces
             </Text>
           </div>
+          <PageIntro>Connections to systems and parties outside your organisation.</PageIntro>
           <ExternalInterfacesView modelId={model.id} orgSlug={orgSlug ?? ''} modelSlug={model.slug} />
         </main>
       </div>

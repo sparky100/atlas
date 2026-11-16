@@ -437,7 +437,7 @@ export function CaptureReviewView({ modelId, orgId, jobId, reviewQueueHref }: Ca
           <Text as="span" size="sm">
             {multiSelected.size} selected
           </Text>
-          <Button variant="primary" onClick={() => { bulkDecide('accepted'); }}>
+          <Button variant="secondary" onClick={() => { bulkDecide('accepted'); }}>
             Accept selected
           </Button>
           <Button variant="secondary" onClick={() => { bulkDecide('rejected'); }}>

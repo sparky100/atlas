@@ -131,13 +131,20 @@ export function ReviewRequestView({ modelId, mergeRequestId, orgId, orgSlug, mod
           <Text as="span" tone="muted" size="sm">
             Requested by {profileLabel(requesterProfile)}
           </Text>
-          <Text as="span" tone="faint" size="xs">
-            {blockingSubjectCount} blocking · {advisorySubjectCount} advisory
-          </Text>
+          {blockingSubjectCount > 0 && (
+            <Text as="span" tone="faint" size="xs">
+              {blockingSubjectCount} {blockingSubjectCount === 1 ? 'clash' : 'clashes'} to sort out
+            </Text>
+          )}
+          {advisorySubjectCount > 0 && (
+            <Text as="span" tone="faint" size="xs">
+              {advisorySubjectCount} possible {advisorySubjectCount === 1 ? 'duplicate' : 'duplicates'}
+            </Text>
+          )}
           {/* S1 item 3: "comment count only when non-zero" — a "0 unresolved comments" line was never itself information a reviewer acts on. */}
           {totalUnresolved > 0 && (
             <Text as="span" tone="faint" size="xs">
-              {totalUnresolved} unresolved comment{totalUnresolved === 1 ? '' : 's'} — never a disabled reason
+              {totalUnresolved} unresolved comment{totalUnresolved === 1 ? '' : 's'}
             </Text>
           )}
           {/* S1 item 2: "review request ... pages get 'View this change'" — Landscape at this branch's ref, read-only. Available regardless of role/status: a reviewer looking at any request, at any point, can see the change's own To-be state. */}
@@ -149,7 +156,7 @@ export function ReviewRequestView({ modelId, mergeRequestId, orgId, orgSlug, mod
         {!threeWay.upToDateWithMain && (
           <div className={styles.banner}>
             <Text as="p" size="sm">
-              Main has moved since this change forked — a refresh is required before this can be approved.
+              The live model has changed since this change started. Bring it up to date (button at the bottom) before it can be approved.
             </Text>
           </div>
         )}
@@ -192,7 +199,7 @@ export function ReviewRequestView({ modelId, mergeRequestId, orgId, orgSlug, mod
       {structuralCardCount > 0 && (
         <Panel>
           <Text as="h2" size="lg">
-            Structural conflicts
+            Links and retirements that clash
           </Text>
           <ul className={styles.cardList}>
             {retractions.map((data) => (
@@ -232,7 +239,7 @@ export function ReviewRequestView({ modelId, mergeRequestId, orgId, orgSlug, mod
       {fieldConflictFindings.length > 0 && (
         <Panel>
           <Text as="h2" size="lg">
-            Field conflicts
+            Values you and someone else both changed
           </Text>
           <ul className={styles.cardList}>
             {fieldConflictFindings.map((finding) => (
@@ -254,10 +261,10 @@ export function ReviewRequestView({ modelId, mergeRequestId, orgId, orgSlug, mod
       {identityFindings.length > 0 && (
         <Panel>
           <Text as="h2" size="lg">
-            Identity warnings
+            Possible duplicates
           </Text>
           <Text as="p" tone="muted" size="sm">
-            Advisory only — never blocks approval. "Merge now" isn't built yet; "Keep both" just dismisses the warning for this browser session.
+            These never block approval. "Keep both" hides the warning on this screen for this session.
           </Text>
           <ul className={styles.cardList}>
             {identityFindings.map((finding, i) => (
@@ -313,7 +320,7 @@ export function ReviewRequestView({ modelId, mergeRequestId, orgId, orgSlug, mod
                 void rr.pushRefreshAndResubmit();
               }}
             >
-              {rr.stagedChoiceCount > 0 ? `Push refresh (${String(rr.stagedChoiceCount)} resolved) & resubmit` : 'Pull in main & resubmit'}
+              {rr.stagedChoiceCount > 0 ? `Bring up to date (${String(rr.stagedChoiceCount)} decided) and resubmit` : 'Bring up to date and resubmit'}
             </Button>
           )}
           {canApproveOrMerge && (request.status === 'pending' || request.status === 'changes_requested' || request.status === 'approved') && (
@@ -327,11 +334,11 @@ export function ReviewRequestView({ modelId, mergeRequestId, orgId, orgSlug, mod
               Reject
             </Button>
           )}
-          {!isMultiReviewer && canApproveOrMerge && (
+          {!isMultiReviewer && canApproveOrMerge && request.status === 'pending' && (
             <Button
               variant="primary"
               disabled={!canApproveNow || rr.actionStatus === 'working'}
-              title={!canApproveNow ? 'Needs no blocking conflicts, an up-to-date change, and a pending request' : undefined}
+              title={!canApproveNow ? 'Sort out the clashes and bring the change up to date first.' : undefined}
               onClick={() => {
                 void rr.approve();
               }}
@@ -348,7 +355,7 @@ export function ReviewRequestView({ modelId, mergeRequestId, orgId, orgSlug, mod
               <Button
                 variant="primary"
                 disabled={rr.actionStatus === 'working' || myVerdict.verdict === 'approve' || classification.hasBlockingConflict || !threeWay.upToDateWithMain}
-                title={classification.hasBlockingConflict || !threeWay.upToDateWithMain ? 'Needs no blocking conflicts and an up-to-date change' : undefined}
+                title={classification.hasBlockingConflict || !threeWay.upToDateWithMain ? 'Sort out the clashes and bring the change up to date first.' : undefined}
                 onClick={() => void rr.castVerdict('approve')}
               >
                 Approve

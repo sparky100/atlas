@@ -2,7 +2,6 @@ import { Link } from 'react-router';
 import type { UUID } from '../../../contracts/delta';
 import type { ElementsHeadRow, RelationshipsHeadRow } from '../../../contracts/rows';
 import { ElementTypeGlyph } from '../ElementTypeGlyph/ElementTypeGlyph';
-import { EmptyState } from '../EmptyState/EmptyState';
 import { Text } from '../Text/Text';
 import styles from './ModulesSection.module.css';
 
@@ -29,7 +28,7 @@ export interface ModulesSectionProps {
  */
 export function ModulesSection({ orgSlug, modelSlug, modules, moduleSupportsEdges, moduleSupportsCapabilities }: ModulesSectionProps) {
   if (modules.length === 0) {
-    return <EmptyState>No modules recorded for this platform yet.</EmptyState>;
+    return null;
   }
 
   const modulesById = new Map(modules.map((m) => [m.element_id, m]));

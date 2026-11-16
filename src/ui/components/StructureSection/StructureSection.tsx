@@ -2,7 +2,6 @@ import { Link } from 'react-router';
 import type { ElementsHeadRow } from '../../../contracts/rows';
 import { Chip } from '../Chip/Chip';
 import { ElementTypeGlyph } from '../ElementTypeGlyph/ElementTypeGlyph';
-import { EmptyState } from '../EmptyState/EmptyState';
 import { Text } from '../Text/Text';
 import { attributesRecord } from '../../elements/attributesRecord';
 import { lifecycleToneFor } from '../../elements/lifecycleTone';
@@ -39,7 +38,7 @@ function lifecycleOf(row: ElementsHeadRow): string | null {
  */
 export function StructureSection({ orgSlug, modelSlug, parent, capabilityLevel, children }: StructureSectionProps) {
   if (capabilityLevel === undefined && !parent && children.length === 0) {
-    return <EmptyState>No parent or children — this element stands alone in the structure.</EmptyState>;
+    return null;
   }
 
   return (

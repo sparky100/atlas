@@ -26,7 +26,7 @@ describe('refParamOf / refLabelOf round-trip', () => {
   it('main', () => {
     const ref = parseRefParam('main');
     expect(refParamOf(ref)).toBe('main');
-    expect(refLabelOf(ref)).toBe('main');
+    expect(refLabelOf(ref)).toBe('live model');
   });
 
   it('tag', () => {

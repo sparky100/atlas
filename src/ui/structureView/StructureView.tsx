@@ -5,7 +5,6 @@ import type { UUID } from '../../contracts/delta';
 import type { ElementVersionDiff, VersionDiff } from '../../engine/versionDiff';
 import { DiffBadge } from '../components/DiffBadge/DiffBadge';
 import { ElementTypeGlyph } from '../components/ElementTypeGlyph/ElementTypeGlyph';
-import { EmptyState } from '../components/EmptyState/EmptyState';
 import { Text } from '../components/Text/Text';
 import { attributesRecord } from '../elements/attributesRecord';
 import type { StructureGroup } from './structureGrouping';
@@ -60,8 +59,6 @@ export function StructureView({ group, orgSlug, modelSlug, refParam, diff = null
           {diffBadge(diffById, group.parent.element_id)}
           {addChild}
         </div>
-
-        {group.children.length === 0 && <EmptyState>No containers yet.</EmptyState>}
 
         <div className={styles.children}>
           {group.children.map((child) => (

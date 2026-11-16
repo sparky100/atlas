@@ -11,9 +11,9 @@
  */
 export function applyResultMessage(result: { appliedCount: number; merged: boolean; mergeSkippedReason?: string }): string {
   const base = `Applied ${String(result.appliedCount)} ${result.appliedCount === 1 ? 'item' : 'items'}.`;
-  if (result.merged) return `${base} Merged to main.`;
+  if (result.merged) return `${base} Merged into the live model.`;
   if (result.mergeSkippedReason !== undefined && result.mergeSkippedReason !== 'not_eligible_role' && result.mergeSkippedReason !== 'not_eligible_intent') {
-    return `${base} Couldn't merge it to main automatically (${result.mergeSkippedReason}) — submit this change for review from its own page instead.`;
+    return `${base} Couldn't merge it into the live model automatically (${result.mergeSkippedReason}) — submit this change for review from its own page instead.`;
   }
   return base;
 }

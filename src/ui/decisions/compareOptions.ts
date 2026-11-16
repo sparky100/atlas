@@ -210,7 +210,7 @@ export async function compareDecisionOptions(supabase: Client, input: CompareDec
   // `loadChangeSummariesForModel` uses) — both fetched once here rather
   // than once per row.
   const [plannedReplacements, commitLoader] = await Promise.all([loadPlannedReplacements(supabase, modelId), buildCommitLoader(supabase, modelId)]);
-  const mainResult = await computeComparisonRow(supabase, modelId, mainHeadCommitId, capabilityIds, null, 'Current (main)', plannedReplacements);
+  const mainResult = await computeComparisonRow(supabase, modelId, mainHeadCommitId, capabilityIds, null, 'Current (live model)', plannedReplacements);
   // `branchId` is captured directly from this option's own input row (a
   // real `UUID`, never `null`) rather than read back off the computed
   // result — `computeComparisonRow`'s return type is shared with the
@@ -226,7 +226,7 @@ export async function compareDecisionOptions(supabase: Client, input: CompareDec
       // means two options sharing a fork point reuse the same cached fold.
       const [result, mainAtFork] = await Promise.all([
         computeComparisonRow(supabase, modelId, o.headCommitId, capabilityIds, o.branchId, o.label, plannedReplacements),
-        computeComparisonRow(supabase, modelId, o.baseCommitId, capabilityIds, null, 'Main at fork', plannedReplacements),
+        computeComparisonRow(supabase, modelId, o.baseCommitId, capabilityIds, null, 'Live model at fork', plannedReplacements),
       ]);
       // `asIsHead` = this option's own fork point — `summarizeOwnDeltas`'s
       // own "as-is/to-be" pair, needed to resolve a touched subject's

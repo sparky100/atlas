@@ -1,6 +1,6 @@
 # Atlas User Guide
 
-**Status:** reviewed against the app on 2026-10-17, with the first-10-minutes section added 2026-11-10 (after F13 view exports and the project pack, cancelling and editing decisions, the Home split, capture review, and integration interfaces). Written for the in-app AI help chat to ground its answers in — if something here doesn't match what you see, the app is right and this guide needs correcting.
+**Status:** reviewed against the app on 2026-11-15 (after the guided change forms, the redesigned change page, project managers, sample models, "Export everything", and the removal of confidence dots). Whenever a change alters what people see, this guide changes in the same pull request. Written for the in-app AI help chat to ground its answers in — if something here doesn't match what you see, the app is right and this guide needs correcting.
 
 This is the guide the in-app **Help** assistant reads to answer your questions. It isn't reference documentation for developers (that's `docs/ADR-000-foundations.md` and `docs/SPEC-data-model.md`); it's written for the people who use Atlas: architects who maintain the model, and the senior people who read it.
 
@@ -15,7 +15,7 @@ This is the guide the in-app **Help** assistant reads to answer your questions. 
 - **Architect:** open Home and read **Where to focus**. Each row is a problem and links straight to it, with **Start a decision** or **Start a project** on the same row.
 - **Owner:** as an architect, plus **Invite a colleague** in organisation settings.
 
-**A new, empty model.** Home shows a **Get started** checklist: import your capabilities, add a system, link it to the capability it supports, and (owners only) invite a colleague.
+**A new, empty model.** If your organisation has no models yet, you may be offered **Start with a sample model**: a made-up organisation to look around in. **Add this sample** puts a separate copy in your organisation, and nothing you change in it affects anyone else. Home shows a **Get started** checklist: import your capabilities, add a system, link it to the capability it supports, and (owners only) invite a colleague.
 
 **A model that already has data.** Home shows a **Welcome** card with a few places to start, worded for your role. **Dismiss** hides it in that browser.
 
@@ -25,7 +25,7 @@ This is the guide the in-app **Help** assistant reads to answer your questions. 
 
 Atlas is an enterprise-architecture tool for organisations with one or two architects — councils, NHS boards, housing associations, universities — sized for teams currently getting by on Sparx, Visio or spreadsheets. Two kinds of people use it:
 
-- **An architect**, who lives in it: capturing systems and relationships, reviewing AI-assisted imports, proposing and merging changes, recording decisions.
+- **An architect**, who lives in it: recording systems and relationships, reviewing AI-assisted imports, proposing and merging changes, recording decisions.
 - **A senior reader** — a director or other stakeholder — who opens it a few times a quarter and should never need training to answer "what supports capability X, and what's changing about it?"
 
 These are ways of using Atlas, not settings: what someone can do depends only on their role (below). Who **owns** a system or capability — its business, technical or service owner — is something recorded in the model against that element, whatever that person's job title.
@@ -50,8 +50,8 @@ Everyone in an organisation has one role:
 | Role | Can |
 |---|---|
 | **Viewer** | See everything. Can't change the model, comment, or see the review queue. |
-| **Contributor** | Everything a viewer can, plus comment, start changes and edit inside them, submit them for review, run a capture, start decisions and projects, rate decision options and add what a decision concerns, and edit or cancel decisions they started or own. Can't edit main directly. |
-| **Architect** | Everything a contributor can, plus edit main directly, approve and merge changes, choose a decision's option, edit or cancel any proposed decision, create and archive models. |
+| **Contributor** | Everything a viewer can, plus comment, start changes and edit inside them, submit them for review, run an import, start decisions and projects, rate decision options and add what a decision concerns, and edit or cancel decisions they started or own. Can't edit the live model directly. |
+| **Architect** | Everything a contributor can, plus edit the live model directly, approve and add changes to it, choose a decision's option, edit or cancel any proposed decision, create and archive models. |
 | **Owner** | Everything an architect can, plus organisation settings, members and invites, custom attributes, restoring or deleting archived models. |
 
 ## The building blocks
@@ -75,7 +75,7 @@ Elements connect through **relationships**, which you record yourself:
 - **replaces** — one system or module replaces another (recorded when you retire something with a replacement).
 - **enables** — a capability enables a value-stream stage.
 
-Systems carry attributes such as lifecycle (planned, active, retiring, retired), criticality, run cost, planned action, hosting model and provider, IT/OT domain, **Uses AI** (built-in AI features, or uses an AI model or service), AI agent (how it acts: suggests only, acts with approval, or acts alone; an agent counts as using AI without filling in both), a system with either filled in shows a small **AI** tag on its page, the landscape, context diagrams and the integrations list), vendor, version, introduced, planned end and vendor support end. Owners can add **custom attributes** for their organisation (Organisation settings).
+Systems carry attributes such as lifecycle (planned, active, retiring, retired), criticality, run cost, planned action, hosting model and provider, IT/OT domain, **AI agent: how it acts** (suggests only, acts with approval, or acts alone; leave it blank if the system is not an AI agent), **Uses AI** (built-in AI features, or uses an AI model or service — for a system that uses AI but is not an agent), and a system counts as using AI if either is filled in, so you never fill in both for an agent. Either one shows a small **AI** tag on the system's page, the landscape, context diagrams and the integrations list, vendor, version, introduced, planned end and vendor support end. Owners can add **custom attributes** for their organisation (Organisation settings).
 
 ## Finding your way around
 
@@ -85,7 +85,7 @@ Every model page shares the same navigation, in four groups:
 |---|---|
 | **Model** | Home, Capability map, Landscape, Value streams, Elements |
 | **Analyse** | Portfolio, Roadmap, Reports, Ask Atlas |
-| **Work** | Projects, Changes, Decisions, Import (the **Work** heading opens a page explaining the three and offering **Start something**) |
+| **Work** | Projects, Changes, Decisions, Import (the **Work** heading opens a page explaining them and offering **Start something**; it lists **Waiting for review**, then Projects, Decisions and Changes) |
 | **Record** | History |
 
 On a phone, the bar at the bottom shows Home, Capabilities, Landscape and Changes; everything else is under **More**. Two items show a number of open items: **Changes** — changes still open (draft, proposed, in review or approved) — and **Decisions** — decisions still proposed. Projects has no number. On a phone, a dot on **More** means Decisions has a number inside it.
@@ -94,7 +94,7 @@ On a phone, the bar at the bottom shows Home, Capabilities, Landscape and Change
 
 **Zooming in.** Atlas is one continuous zoom through four levels: **capability map** (all your capabilities) → **landscape** (systems grouped by the capability they support) → **system context** (one system and its neighbours) → **containers** (inside one system).
 
-**The breadcrumb** at the top of a page shows where you are: `Org › Model › [ref] › …`. The `[ref]` chip says which state of the model you're looking at — `main`, a version like `v2026-Q1`, or a change like `Change: Housing CRM replacement`. Click it to switch.
+**The breadcrumb** at the top of a page shows where you are: `Org › Model › [ref] › …`. The `[ref]` chip says which state of the model you're looking at — the live model (shown as `main`), a version like `v2026-Q1`, or a change like `Change: Housing CRM replacement`. Click it to switch. **Back to main** (in the banner shown while you look at a version or a change) returns you to the live model.
 
 **Every page has a URL.** You can bookmark or share a link to any element, change, decision, project or version, and it opens straight to it.
 
@@ -109,35 +109,36 @@ Home has two views; switch with **Overview** / **My work** at the top. They do d
 
 **Get started.** A model with no capabilities, no systems or no system-to-capability links shows a **Get started** checklist on Home (for people who can add to the model). Owners also get an **Invite a colleague** step, which ticks once an invite has been sent. A model that already has data shows a **Welcome** card instead. Each step ticks itself from the model's real contents and links to the screen that does it; **Dismiss** hides it in that browser.
 
-Health findings include: systems not linked to a capability, capabilities with no owner, stale values, critical systems with no business owner or nearing end of life, critical systems near the end of vendor support, relationships missing a verb or a data classification across the IT/OT or enterprise boundary, and systems planned to move or switch off that nothing is retiring.
+Health findings include: AI agents that act alone with no technical owner, systems not linked to a capability, capabilities with no owner, stale values, critical systems with no business owner or nearing end of life, critical systems near the end of vendor support, relationships missing a verb or a data classification across the IT/OT or enterprise boundary, and systems planned to move or switch off that nothing is retiring.
 
 ## Element pages
 
 Open any element to see its **attributes**, **relationships**, **structure** (modules, or value-stream stages), the **changes touching it**, its **documents**, its **history**, its **decisions** and **comments**.
 
-- Each value has a small **provenance badge**: where it came from, its confidence (dots) and its age — anything over 12 months old shows in the warning colour. Hover or tap for the full source.
+- Each value has a small **provenance badge**: where it came from and **Last checked**, how long ago someone last confirmed it — anything over 12 months old shows in the warning colour. There are no confidence ratings on values a person has reviewed. Hover or tap for the full source.
 - **✎ Edit** changes its attributes; **+ Add …** under each relationship group adds a link.
 - **✓ Still accurate** confirms that everything on it is still right — see below.
 - To **rename** an element, click its name (a pencil appears beside it). The **⋯ menu** holds **Start a decision…** and **Start a project…**, then **Mark as retired…** (a planned end date, and optionally what replaces it — its capabilities move to the replacement), **Merge a duplicate into…** (when two elements are really the same thing; the old name stays findable by search), **Make this a module of…** (move a system inside a platform), and **Remove from model…** last.
 
+- **Changes touching it** lists each change that touches the element, with its project when it has one. **Decisions** lists the decisions that concern it.
 - **Documents** lists the documents behind an element — a design, a business case, a contract — as a name plus where it lives. Atlas never stores the document itself. Each entry is either a web link (Confluence, SharePoint and so on, which opens in a new tab) or a plain note of where to find it, such as "SharePoint › Business cases". Owners and architects use **+ Add a document**, **Edit** and **Remove**; everyone else can read them, and can leave a comment to ask for one to be added. Document changes save straight away and don't appear in History.
 
-What you can do depends on your role and on whether you're looking at main or a change (see below). On main, a contributor sees **Propose a change** instead of Edit.
+What you can do depends on your role and on whether you're looking at the live model or a change (see below). On the live model, a contributor sees **Propose a change** instead of Edit.
 
 ## The Elements page
 
-**Elements** lists everything in the model. Search by name or owner, filter by type, planned action or a custom attribute, tick **Uses AI** or **AI agents only**, or pick a **Finding** to see just the elements a health finding flagged. Sort by any column (an **AI** column appears when any listed system uses AI), and **Export CSV** or **Export XLSX**. The workbook carries each element's **Atlas ID** and its parent (a module's system, a capability's parent capability) and lists every relationship, so it can be brought back in through **Capture**: modules keep their platform and systems keep their capability links.
+**Elements** lists everything in the model. Search by name or owner, filter by type, planned action or a custom attribute, tick **AI agents only** or **Uses AI**, or pick a **Finding** to see just the elements a health finding flagged. Sort by any column (an **AI** column appears when any listed system uses AI: an agent shows how it acts, anything else shows **Built-in AI** or **AI service**), and **Export CSV** or **Export XLSX**. **Export everything (JSON)** downloads the whole model — every element, relationship, value and where it came from — whatever filter is on. The workbook carries each element's **Atlas ID** and its parent (a module's system, a capability's parent capability) and lists every relationship, so it can be brought back in through **Import**: modules keep their platform and systems keep their capability links.
 
 - **Edit in grid** turns the Lifecycle, Criticality and Planned action cells (and a custom attribute's column, when one is shown) into editable controls. **Save N changes** records them all as one edit — on main, or in the change you're working in. While editing, each row also has **✓ Still accurate**.
 - **Import…** (architects and owners) takes you to Import.
 
-## Bringing data in: capture
+## Bringing data in: import
 
 Rather than typing your landscape in by hand, you can feed Atlas source material and review what it proposes:
 
-1. Open **Import** and upload a spreadsheet (CSV or XLSX), a JSON file or a PDF, or paste in free text — meeting notes, an email, anything describing systems, owners or relationships.
-2. Atlas reads it (using AI for documents and text), matches what it finds against your model, and produces a **capture draft**: proposed elements, relationships and values, each with a confidence and a note on where in the source it came from. Spreadsheet columns such as "Criticality", "TIME" or "Disposition" are recognised.
-3. Review the draft — from Import, or the **Waiting for review** tab of Changes. Accept, reject, edit, split or merge each proposal; the keyboard works too (**j**/**k** to move, **a** accept, **r** reject, **e** edit, **x** to select several). Choose a **target change**, then **Apply decisions** to write the accepted facts into it. On a phone, tick **Select** on rows (or **Select all** on a group) and use **Accept selected** / **Reject selected**. If you rejected everything, there's nothing to apply: the button becomes **Finish review**, which closes the draft without creating a change. To throw a draft away without reviewing it, use **Discard this draft…** on the review page, or **Discard** in the review queue; if the same file was captured several times, the queue offers **Discard N older copies** to keep just the newest.
+1. Open **Import**. If you are starting from your own list, **Download a blank spreadsheet** gives you a workbook with the standard columns, a **Read me first** sheet that explains each one and the fixed choices, a Systems sheet and a Relationships sheet, with one clearly marked example row to delete. **AI prompt for preparing an import file** downloads instructions you can give an AI assistant to turn your notes into a file Atlas reads. Then upload a spreadsheet (CSV or XLSX), a JSON file or a PDF, or paste in free text — meeting notes, an email, anything describing systems, owners or relationships.
+2. Atlas reads it (using AI for documents and text; the standard column headings in a spreadsheet are recognised without it), matches what it finds against your model, and produces an **import draft**: proposed elements, relationships and values, each with a confidence and a note on where in the source it came from. Spreadsheet columns such as "Criticality", "TIME" or "Disposition" are recognised.
+3. Review the draft — from Import, or the **Waiting for review** tab of Changes. Accept, reject, edit, split or merge each proposal; the keyboard works too (**j**/**k** to move, **a** accept, **r** reject, **e** edit, **x** to select several). Choose a **target change**, then **Apply decisions** to write the accepted facts into it. On a phone, tick **Select** on rows (or **Select all** on a group) and use **Accept selected** / **Reject selected**. If you rejected everything, there's nothing to apply: the button becomes **Finish review**, which closes the draft without creating a change. To throw a draft away without reviewing it, use **Discard this draft…** on the review page, or **Discard** in the review queue; if the same file was imported several times, the queue offers **Discard N older copies** to keep just the newest.
 
 Nothing reaches your model without this review, and it always lands in a change you then submit like any other.
 
@@ -145,7 +146,7 @@ Nothing reaches your model without this review, and it always lands in a change 
 
 ## Changes
 
-Editing directly on **main** is for architects and owners making small, uncontroversial edits. Everything else happens in a **change**: a named, isolated set of edits you can review before it reaches main.
+Editing the live model directly is for architects and owners making small, uncontroversial edits. Everything else happens in a **change**: a named, separate set of edits you can review before it reaches the live model.
 
 Every change says **why** it exists:
 
@@ -156,15 +157,17 @@ Every change says **why** it exists:
 
 **Working in a change.** Create one from **Changes** (or **Propose a change** on an element page), then use **Edit in this change** in the banner at the top of the page: every edit you make while it shows **Editing in this change** goes into the change, not main. The change page shows what it touches.
 
-**Standard changes (no AI).** Under **New change**, choose **Add a new system**, **Retire a system** or **Change details of a system**. Atlas starts the change and opens the right screen on it: the add box, the Retire panel (replaced by an existing system, a new one, or nothing, with the planned end date) or the system's edit form.
+**The change page.** The main action for the change's stage sits in the header (**Submit for review**, **Approve & merge** and so on), so you don't have to hunt for it. The details are on the left (description, what the change does, its parts, comments) and the impact is on the right (affected capabilities and value streams, and other open changes touching the same elements). A section with nothing in it is hidden. The change's page also shows its project and the decisions it belongs to.
+
+**Standard changes (no AI).** Under **New change**, choose **Add a new system** (the form asks **Is it an AI agent?** and **Does it use AI?**), **Retire a system** or **Change details of a system**. Atlas starts the change and opens the right screen on it: the add box, the Retire panel (replaced by an existing system, a new one, or nothing, with the planned end date) or the system's edit form.
 
 **Draft with AI.** If Ask Atlas is enabled for your organisation, open Changes and pick a common change under **New change** (Add an integration, Add a system to a capability), or choose **Describe your own**. For a common change, pick the systems and capabilities involved from your model and edit the wording if you like. From a system on main, choose **Draft with AI** to describe a change to that system. If the setting is off, Changes says so and tells owners where to switch it on. Review the suggested system and relationship edits, check their source passages, then select **Apply to draft Change**. Open the draft to review its impact, add a target date and submit it for review. For a phased move, record any removals or retirement separately in the draft once you know their scope.
 
-**Getting it merged.**
+**Getting it added to the live model.**
 
 - **Record** and **Correct** changes need one architect or owner: **Approve & merge** on the change page.
 - **Propose** and **Explore** changes go through review: **Submit for review**, pick the reviewers, and they appear in the **Waiting for review** tab of Changes, and in a **Waiting for review** section at the top of the Changes list (drafts stay in the intent groups below it). Reviewers **Approve**, **Request changes** or **Abstain**; once the required reviewers approve, an architect or owner **Merges**.
-- If main moved on meanwhile, the review page shows any conflicts and lets you resolve them and **Push refresh** before merging.
+- If the live model has moved on since you started, the change page says **The model has changed since you started** and shows what clashes. Resolve each one, then press **Bring up to date**. A change already in review does the same from the review page, with **Pull in main & resubmit**.
 - A change in review can be **split**, sending some of its edits on ahead as their own change.
 - A change still in draft or proposed can be **cancelled** (with a reason); **Duplicate into a new draft** starts again from it. The Changes page lists open changes (draft, proposed, in review or approved) grouped by intent — the number on the **Changes** menu item is how many there are. Merged, cancelled, and rejected or archived changes each have their own collapsed section at the bottom.
 
@@ -184,9 +187,9 @@ Start a decision from **Decisions**, from a project, or with **Start a decision 
 
 A **project** holds one piece of architecture work — "Housing CRM replacement", say — together with the decisions it raises and the changes that deliver it. Open **Projects** (under Work) to see every project, grouped as active, on hold, closed or cancelled.
 
-- **Start a project** from the Projects page, from a health finding or weak capability ("Start a project →"), or from an element's ⋯ menu. Give it a title, its purpose, an owner, optional start and target dates, and the capabilities and systems it's about (its **declared scope**).
+- **Start a project** from the Projects page, from a health finding or weak capability ("Start a project →"), or from an element's ⋯ menu. Give it a title, its purpose, an **Architect** (who leads the design), an optional **Project manager** (pick an Atlas member, or type a name for someone who isn't on Atlas), optional start and target dates, and the capabilities and systems it's about (its **declared scope**).
 - **Its decision log** lists the decisions that are part of the project. Start one from the project page, or move a proposed decision in with **Add to project…** (or **Move…**, if it's already in another project) on its page — its draft options move with it. Decisions made elsewhere that constrain the project are listed separately as **constraining decisions**; linking one isn't possible from the app yet. Decisions don't have to belong to a project.
-- **Its changes** are its design deliverables, shown by stage: options being explored, the chosen design, in review, merged. Start one from the project page, or use **Add to project…** on any open change.
+- **Its changes** are its design deliverables, shown by stage: options being explored, the chosen design, in review, added to the live model. Start one from the project page, or use **Add to project…** on any open change.
 - **Scope against what it touches.** The page compares the declared scope with what the project's changes actually touch, and lists any difference — it never changes either for you.
 - **Evidence** — business cases, vendor documents and links — can be attached.
 - **On hold, close or cancel.** Close or cancel only once nothing in the project is still open; the page lists anything that is. Cancelling asks why. A closed or cancelled project can't be reopened.
@@ -196,11 +199,15 @@ A project is part of how your team works, not part of the model itself: it never
 
 ## Views
 
-- **Capability map** — every capability, in its hierarchy. **Colour by** coverage, oldest lifecycle stage, lifecycle exposure, criticality, OT share, fit, disposition or **AI share** (how many of the systems supporting it use AI, and the freest way any agent among them acts; each of the others is the worst among the systems supporting it). If the model is empty, you can **start from a capability map** — a ready-made set for your sector. Owners can also **Export as starter map** (in the map's ⋯ actions), saving this model's capabilities as a draft starter map for seeding other models.
+- **Capability map** — every capability, in its hierarchy. **Colour by** coverage, oldest lifecycle stage, lifecycle exposure, criticality, OT share, fit, disposition or **AI share** (how many of the systems supporting it use AI — for example "2/3 use AI" — and, once an agent is among them, the freest way any of them acts; each of the others is the worst among the systems supporting it). If the model is empty, you can **start from a capability map** — a ready-made set for your sector. Owners can also **Export as starter map** (in the map's ⋯ actions), saving this model's capabilities as a draft starter map for seeding other models.
 - **Landscape** — systems in lanes by the capability they mainly support, with OT systems in their own zone. Colour by criticality, hosting model or IT/OT domain. Zoom into a system for its **context**, and into a platform for its **modules**. **Find on this landscape** (above the diagram) takes part of a name: choosing a match focuses that tile, with its connections, and centres it — on a phone it opens the group and highlights the row. In a change's **Diff** view, a **context** diagram marks what the change adds (+), removes (−, dashed) and changes (~) on its connections and tiles, with a legend; everything unchanged is dimmed. A platform's own **context** draws each flow as source → platform → target, numbered on both sides so a line leaving the platform can be matched to the one that entered it; hover a source or target to pick out its flows. The change's list of edits names a module as "Platform · Module", like everywhere else. Opened from a capability (its supporting-system count on the capability map), it lists just the systems supporting that capability, with **Export CSV** and **Export XLSX**.
-- **Value streams** — how the organisation delivers its outcomes, stage by stage, and which capabilities enable each stage (weak supporting systems show up the stream). Value-stream structure is edited on main, or in a **Correct** change.
+- **Value streams** — how the organisation delivers its outcomes, stage by stage, and which capabilities enable each stage (weak supporting systems show up the stream). Keep stages short, one line each; Atlas suggests splitting a stream once it has more than 6 stages. Value-stream structure is edited on main, or in a **Correct** change.
 - **Roadmap** — systems' lifecycles over time (introduced, planned end, support end) and changes' target dates, **by capability**, **by value stream** or **by project**, in months, quarters or years, with filters, **Export table** (CSV) and **Export PNG**.
 - **Portfolio** — every system and module with run cost against fit, criticality, disposition, lifecycle and capabilities served, sortable and filterable, with **signals** where the combination matters (for example *Costly, poor fit*, *Costly overlap*, *Invest, poor fit*, *Justified*) and a note when a row is missing the inputs to judge it.
+
+Diagrams redraw to fit whenever you resize the window.
+
+**IT/OT crossings.** On the landscape and context diagrams, a link that crosses the IT/OT boundary is drawn as a heavier grey line with an **IT/OT** tag, and the key explains it. Orange is used only for lifecycle (retiring or retired).
 
 **Export PNG** and **Export PDF** on the capability map and the landscape download a picture of the view as you see it, with the current colour-by. Portfolio is a table, so it offers **Export Excel** (a spreadsheet of the rows with Portfolio's filters and sort applied, plus an About sheet with the stamp) and **Export PDF** instead of a PNG. Every picture is stamped with the model, which state you are looking at (main, a version, or a change by name) and the date. Any member can export. The landscape picture shows systems in their lanes but not the connections between them, and says so. A picture is a copy, not part of the model: it doesn't update when the model changes.
 
@@ -215,6 +222,8 @@ A project is part of how your team works, not part of the model itself: it never
 
 ### Saved reports, copies and dashboards
 
+A saved report's summary is written in plain English, for example how many systems match and what is missing.
+
 On **Elements** and **Portfolio**, **Save as report…** keeps the page's current search, filters and sort under a name. Tick **Share with the organisation** (owners and architects) to let everyone see it; otherwise it is private to you. Pick a saved report from **Saved reports** on either page to bring that view back. A report is live: it always shows main as it is now.
 
 - **Reports → your report** shows the result, with **Download CSV**, **Download Excel**, **Export PNG** and **Export PDF** (the picture is stamped with the model, the state and the date).
@@ -222,7 +231,7 @@ On **Elements** and **Portfolio**, **Save as report…** keeps the page's curren
 - To change which rows a report includes, open it from **Saved reports** on Elements or Portfolio, adjust the filters, and choose **Save changes to "…"**. Its chart settings are kept.
 - **Click a bar, a donut slice or a stacked segment** (on a report or a dashboard) to see just the rows behind it. A strip says what you are looking at; **Show the whole report** goes back. Nothing is saved by doing this.
 - **Save a copy now** keeps a frozen record of the result as at that moment. It never changes, even when the report or the model does, and opens under **Saved copies**. The person who made a copy can delete it (an owner or architect can delete a shared one) after a confirmation; deleting cannot be undone.
-- **Add standard dashboards…** (on the Reports page) adds ready-made dashboards to the model: **Application portfolio overview** (applications, missing owners and dispositions, lifecycle, criticality, critical applications) and **Rationalisation (TIME)** (disposition, fit by run cost, eliminate and migrate candidates, costly applications that fit poorly), and **AI in use** (systems using AI, how many are agents and how many act alone, how AI is used, and an **AI inventory** table with each system's owner and the capabilities it supports). "Uses AI" and "How it acts" are also fields in any report. Each comes with its saved reports, shared with the organisation when an owner or architect adds it, otherwise private. They are ordinary reports and dashboards: change or delete them as you like.
+- **Add standard dashboards…** (on the Reports page) adds ready-made dashboards to the model: **Application portfolio overview** (applications, missing owners and dispositions, lifecycle, criticality, critical applications) and **Rationalisation (TIME)** (disposition, fit by run cost, eliminate and migrate candidates, costly applications that fit poorly), and **AI in use** (how many systems use AI, how many are agents, how many act alone, how many have no business owner, how AI is used, how agents act, and an **AI inventory** table with each system's owner and the capabilities it supports). "How it acts" and "Uses AI" are also fields in any report. Each comes with its saved reports, shared with the organisation when an owner or architect adds it, otherwise private. They are ordinary reports and dashboards: change or delete them as you like.
 - **New dashboard…** (on the Reports page) shows several saved reports together, live. **Edit dashboard** adds a tile from a saved report (as a big number, bar chart, stacked bar chart, donut or table; one column, two or full width), changes a tile's chart type or how many rows a table tile shows, reorders, resizes and removes tiles. A big-number tile shows what share of the model it is. Hover over a donut or a stacked bar's legend to pick out one value. A dashboard shared with the organisation can only use shared reports.
 - **Present** fills the screen with the dashboard and no editing controls; **Esc** or **Exit presenting** goes back. **Export PNG** and **Export PDF** download the dashboard as a picture.
 
@@ -235,7 +244,7 @@ A report that uses a health-finding filter cannot be saved yet; the page says so
 - It is **off until an organisation owner switches it on**, in organisation settings under Ask Atlas. While it is on, your questions and the names, descriptions, attributes and relationships of the elements needed to answer them are sent to our AI provider. Comments and unreviewed imports are not sent.
 - It can only read. It cannot change anything. It can answer about elements and how they connect, saved reports, data-quality findings, portfolio signals, and the changes, decisions and projects recorded for the model (summaries only; comments and unreviewed imports are not read).
 - Every element it names is a link to that element's page. An answer that names no element is marked **Ungrounded**, and a reference it could not verify is removed and flagged. Open **What was looked up** under an answer to see each lookup and how many results it found.
-- Answers come from the live estate (main) only. Long lists are cut short, and the answer says so.
+- Answers come from the live model only. Long lists are cut short, and the answer says so.
 - Nothing is saved: reload the page, or press Clear, and the conversation is gone.
 
 ## Connect Claude Desktop
@@ -269,7 +278,7 @@ The **bell** in the top bar holds your notifications: when someone @mentions you
 
 ## History
 
-A **version** is a named, permanent snapshot of main at a point in time (e.g. a quarterly baseline) — a tag on that state, not a copy that can drift. On **Versions**, give one a name and an optional note to create it. Open any version read-only with the `[ref]` chip, or **compare two versions** to see what changed between them.
+A **version** is a named, permanent snapshot of the live model at a point in time (e.g. a quarterly baseline) — a tag on that state, not a copy that can drift. On **Versions**, give one a name and an optional note to create it. Open any version read-only with the `[ref]` chip, or **compare two versions** to see what changed between them.
 
 ## Settings
 

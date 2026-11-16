@@ -61,7 +61,7 @@ test('viewing a change read-only leaves the session\'s own editing selection unt
   // ref/viewing at all, at which point `SelectedRefProvider`'s own
   // URL-silent reconciliation restores B, the real editing selection,
   // proving A's viewing episode never touched it.
-  await page.getByRole('link', { name: 'Back to main' }).click();
+  await page.getByRole('link', { name: 'Back to the live model' }).click();
   await expect(page).toHaveURL(new RegExp(`/o/${orgSlug}/m/${modelSlug}/landscape\\?ref=branch(:|%3A)`));
   await expect(page).not.toHaveURL(/viewing=1/);
   await expect(page.getByText(`Editing in change: ${changeBTitle}`)).toBeVisible();

@@ -172,7 +172,7 @@ test('add a system on a change branch: a contributor at main gets the propose-a-
 
   // Decision 5: a contributor viewing main has no direct create-on-main —
   // the propose-a-change picker appears instead of the description sheet.
-  await expect(contributorPage.getByText('You can propose this as part of a change, not add it to main directly.')).toBeVisible();
+  await expect(contributorPage.getByText('You can propose this as part of a change, not add it to the live model directly.')).toBeVisible();
   await contributorPage.getByPlaceholder('Name (e.g. retire-northgate)').fill('retire-southgate');
   await contributorPage.getByRole('button', { name: 'Create & continue' }).click();
 
