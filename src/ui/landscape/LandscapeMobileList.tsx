@@ -4,6 +4,8 @@ import type { ReactNode } from 'react';
 import type { ActorSubtype } from '../../contracts/delta';
 import type { ElementsHeadRow } from '../../contracts/rows';
 import type { UUID } from '../../contracts/delta';
+import { AiAgentTag } from '../components/AiAgentTag/AiAgentTag';
+import { aiAutonomyOf } from '../../engine/elementRead/aiAgent';
 import { Chip } from '../components/Chip/Chip';
 import { CommentMarkerButton, type CommentMarkerState } from '../components/CommentMarkerButton/CommentMarkerButton';
 import { commentMarkerFor } from '../components/CommentMarkerButton/commentMarkerFor';
@@ -223,6 +225,7 @@ function SystemRow({
   const external = attrs.isExternal === true;
   const lifecycleStatus = typeof attrs.lifecycleStatus === 'string' ? attrs.lifecycleStatus : null;
   const lifecycleTone = lifecycleStatus !== null ? lifecycleToneFor(lifecycleStatus) : undefined;
+  const autonomy = system.element_type === 'system' ? aiAutonomyOf(system) : null;
   // S1 item 11a: an external actor is now a real member of the External
   // group (`landscapeGroups.ts`'s own `buildGroup` doc comment) — its own
   // subtype glyph (person/team/organisation), not the bare actor glyph.
@@ -241,6 +244,7 @@ function SystemRow({
         <Text as="span" className={styles.rowName}>
           {system.name}
         </Text>
+        {autonomy !== null && <AiAgentTag autonomy={autonomy} />}
         {lifecycleTone !== undefined && lifecycleStatus !== null && <span className={styles.lifecycleDot} data-tone={lifecycleTone} role="img" aria-label={lifecycleStatus} title={lifecycleStatus} />}
         {/* Secondary-supporter wording: "expanded groups list every
             supporting system with a role tag" — `role` is only ever

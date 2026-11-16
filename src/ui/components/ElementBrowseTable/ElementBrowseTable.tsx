@@ -4,6 +4,8 @@ import { Link } from 'react-router';
 import type { AttributeDefinitionKind } from '../../../contracts/attributeSchema';
 import { attributeDefinitionToFieldSchema } from '../../../contracts/attributeSchema';
 import type { ElementType, UUID } from '../../../contracts/delta';
+import { aiAutonomyOf, isAiAgent } from '../../../engine/elementRead/aiAgent';
+import { AiAutonomyChip } from '../AiAgentTag/AiAgentTag';
 import { ELEMENT_TYPE_FILTER_OPTIONS, FINDING_FILTER_OPTIONS, type BrowseRow } from '../../../db/elementBrowse';
 import type { AttributeDefinitionRow, BranchRow } from '../../../db/types';
 import type { ThreadCount } from '../../comments/useThreadCounts';
@@ -112,13 +114,15 @@ export interface GridAttestation {
 // never includes the `{ custom }` variant (that's the one dynamic column,
 // added separately below), and `key={column.key}` needs a valid React key,
 // which an object isn't.
-const COLUMNS: { key: 'name' | 'type' | 'owner' | 'lifecycle' | 'criticality' | 'disposition'; label: string }[] = [
+const COLUMNS: { key: 'name' | 'type' | 'owner' | 'lifecycle' | 'criticality' | 'disposition' | 'aiAutonomy'; label: string }[] = [
   { key: 'name', label: 'Name' },
   { key: 'type', label: 'Type' },
   { key: 'owner', label: 'Owner' },
   { key: 'lifecycle', label: 'Lifecycle' },
   { key: 'criticality', label: 'Criticality' },
   { key: 'disposition', label: 'Planned action' },
+  // Shown only while at least one listed element is an AI agent (see `showAgentColumn`).
+  { key: 'aiAutonomy', label: 'How it acts' },
 ];
 
 /** The edit bar's hint mentions the custom column too, when one is shown. */
@@ -239,6 +243,9 @@ export function ElementBrowseTable({ state, orgSlug, modelSlug, modelId, filenam
   // the null/empty fallbacks until then.
   const exportState = useElementExport({ modelId, commitId: state.status === 'ready' ? state.commitId : null, definitions: attributeDefinitions, rows: state.status === 'ready' ? state.rows : [], filenameBase });
   const page = useResultPage(state.status === 'ready' ? state.rows : undefined);
+  // The "How it acts" column appears only when something listed is an AI agent: a column that is blank on every row is clutter.
+  const showAgentColumn = state.status === 'ready' && state.rows.some((row) => isAiAgent(row.element));
+  const columns = COLUMNS.filter((column) => column.key !== 'aiAutonomy' || showAgentColumn);
 
   // Below the breakpoint, `ElementBrowseCards` replaces the two-table
   // sticky-header block entirely, rather than trying to make one render
@@ -355,7 +362,7 @@ export function ElementBrowseTable({ state, orgSlug, modelSlug, modelId, filenam
       observer.disconnect();
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps -- re-measures on anything that could change a rendered cell's natural width (including the header's own sort-arrow toggling); `tbodyRef.current`/`headerRowRef.current` themselves aren't valid deps.
-  }, [page.rows, narrow, customAttr, linkSupportsInline, decisionRowAction, state.status === 'ready' ? state.sortKey : null, state.status === 'ready' ? state.sortDirection : null, bulkEdit?.editing]);
+  }, [page.rows, narrow, showAgentColumn, customAttr, linkSupportsInline, decisionRowAction, state.status === 'ready' ? state.sortKey : null, state.status === 'ready' ? state.sortDirection : null, bulkEdit?.editing]);
 
   function syncHeaderScroll() {
     if (headerClipRef.current && tableWrapRef.current) {
@@ -461,6 +468,14 @@ export function ElementBrowseTable({ state, orgSlug, modelSlug, modelId, filenam
           ))}
           <option value="not_assessed">Not assessed</option>
         </select>
+        <label className={styles.agentsOnly}>
+          <input
+            type="checkbox"
+            checked={findingFilter === 'ai-agents'}
+            onChange={(e) => { onFindingFilterChange(e.target.checked ? 'ai-agents' : ''); }}
+          />
+          <Text as="span" size="sm">AI agents only</Text>
+        </label>
         <select
           className={styles.select}
           aria-label="Finding"
@@ -472,6 +487,8 @@ export function ElementBrowseTable({ state, orgSlug, modelSlug, modelId, filenam
               {option.label}
             </option>
           ))}
+          {/* "AI agents only" is the checkbox beside this list, not a finding; this entry only keeps the list in step when it is on. */}
+          {findingFilter === 'ai-agents' && <option value="ai-agents">AI agents only</option>}
         </select>
         <CustomAttributePicker definitions={applicableCustomDefinitions} selection={customAttr} onChange={onCustomAttrChange} />
         {narrow && (
@@ -493,7 +510,7 @@ export function ElementBrowseTable({ state, orgSlug, modelSlug, modelId, filenam
                 state.setSort(next.startsWith('custom:') ? { custom: next.slice('custom:'.length) } : (next as ElementBrowseSortKey));
               }}
             >
-              {COLUMNS.map((column) => (
+              {columns.map((column) => (
                 <option key={column.key} value={column.key}>
                   {column.label}
                 </option>
@@ -596,7 +613,7 @@ export function ElementBrowseTable({ state, orgSlug, modelSlug, modelId, filenam
               {colgroupEl}
               <thead>
                 <tr ref={headerRowRef}>
-                  {COLUMNS.map((column) => (
+                  {columns.map((column) => (
                     <th key={column.key} id={`${headerIdBase}-${column.key}`}>
                       <button type="button" className={styles.sortButton} onClick={() => { state.setSort(column.key); }}>
                         {column.label}
@@ -640,6 +657,7 @@ export function ElementBrowseTable({ state, orgSlug, modelSlug, modelId, filenam
               <tbody ref={tbodyRef}>
                 {page.rows.map((row) => {
                   const unresolvedCount = unresolvedCounts?.get(row.element.element_id)?.open ?? 0;
+                  const autonomy = aiAutonomyOf(row.element);
                   return (
                   <tr key={row.element.element_id}>
                     <td headers={`${headerIdBase}-name`}>
@@ -695,6 +713,17 @@ export function ElementBrowseTable({ state, orgSlug, modelSlug, modelId, filenam
                         </Text>
                       ))}
                     </td>
+                    {showAgentColumn && (
+                      <td headers={`${headerIdBase}-aiAutonomy`}>
+                        {autonomy !== null ? (
+                          <AiAutonomyChip autonomy={autonomy} />
+                        ) : (
+                          <Text as="span" tone="faint" size="sm">
+                            —
+                          </Text>
+                        )}
+                      </td>
+                    )}
                     {selectedCustomDefinition && (
                       <td headers={`${headerIdBase}-custom`}>
                         {editableCell(row.element, selectedCustomDefinition.key, selectedCustomDefinition) ?? (() => {

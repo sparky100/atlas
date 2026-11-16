@@ -4,10 +4,10 @@ import { parseReportSpec } from '../../contracts/reportSpec';
 import { runReport } from '../../engine/reportQuery';
 import { fakeElement, fakeRow } from '../portfolio/portfolioTestFixtures';
 import { tileKindsFor } from './dashboardTiles';
-import { PORTFOLIO_REPORT_FIELDS, PORTFOLIO_REPORT_HELPER_FIELDS, portfolioReportRow } from './portfolioReport';
+import { PORTFOLIO_REPORT_FIELDS, PORTFOLIO_REPORT_HELPER_FIELDS, PORTFOLIO_REPORT_OPTIONAL_FIELDS, portfolioReportRow } from './portfolioReport';
 import { STANDARD_DASHBOARDS } from './standardDashboards';
 
-const FIELDS = new Set<string>([...PORTFOLIO_REPORT_FIELDS, ...PORTFOLIO_REPORT_HELPER_FIELDS]);
+const FIELDS = new Set<string>([...PORTFOLIO_REPORT_FIELDS, ...PORTFOLIO_REPORT_OPTIONAL_FIELDS, ...PORTFOLIO_REPORT_HELPER_FIELDS]);
 const tiles = STANDARD_DASHBOARDS.flatMap((d) => d.tiles.map((t) => ({ dashboard: d.name, ...t })));
 
 describe('standard dashboards', () => {
@@ -61,5 +61,23 @@ describe('standard dashboards', () => {
     expect(count('To eliminate or migrate')).toBe(1);
     expect(count('Costly, poor fit')).toBe(1);
     expect(count('Run cost over £1m')).toBe(1);
+  });
+
+  it('the AI agents dashboard counts only systems marked as agents and lists the ones that act alone first', () => {
+    const rows = [
+      fakeRow({ element: fakeElement('plain'), name: 'Plain system' }),
+      fakeRow({ element: fakeElement('a', 'system', { aiAutonomy: 'suggests' }), name: 'Drafting agent' }),
+      fakeRow({ element: fakeElement('b', 'system', { aiAutonomy: 'acts_alone' }), name: 'Meter bot' }),
+      fakeRow({ element: fakeElement('c', 'system', { aiAutonomy: 'acts_alone' }), name: 'Claims bot', businessOwner: fakeElement('o', 'system') }),
+    ].map(portfolioReportRow);
+    const tile = (name: string) => {
+      const t = tiles.find((x) => x.name === name);
+      if (t === undefined) throw new Error(name);
+      return runReport(rows, t.spec);
+    };
+    expect(tile('AI agents').rowCount).toBe(3);
+    expect(tile('AI agents that act alone').rowCount).toBe(2);
+    expect(tile('AI agents with no business owner').rowCount).toBe(2);
+    expect(tile('AI agent inventory').rows.map((r) => r[0])).toEqual(['Claims bot', 'Meter bot', 'Drafting agent']);
   });
 });

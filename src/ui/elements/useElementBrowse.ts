@@ -4,6 +4,7 @@ import type { ElementsHeadRow, Json, RelationshipsHeadRow } from '../../contract
 import { CRITICALITY_ORDER } from './criticalityTone';
 import { DISPOSITION_ORDER } from './disposition';
 import type { Disposition } from '../../contracts/delta';
+import { aiAutonomyOf, aiAutonomyRank, isAiAgent } from '../../engine/elementRead/aiAgent';
 import { listAllElements, ownersByElementIdFromOwnsEdges, type BrowseRow } from '../../db/elementBrowse';
 import { useStaleAfterMonths } from '../orgs/staleThresholdContext';
 import { attributesRecord } from './attributesRecord';
@@ -97,6 +98,8 @@ export type ElementBrowseFilter =
   | 'stale-attributes'
   | 'no-technical-owner'
   | 'ai-agent-no-technical-owner'
+  /** Every system marked as an AI agent, however freely it acts. Not a finding: a plain "show me the agents" filter. */
+  | 'ai-agents'
   | 'critical-no-business-owner'
   | 'critical-exposed'
   | 'unused-integration-platform'
@@ -170,6 +173,9 @@ function compareRows(a: BrowseRow, b: BrowseRow, key: ElementBrowseSortKey): num
       return (a.lifecycleStatus ?? '').localeCompare(b.lifecycleStatus ?? '') || displayName(a).localeCompare(displayName(b));
     case 'criticality':
       return criticalityOrderOf(a.criticality) - criticalityOrderOf(b.criticality) || displayName(a).localeCompare(displayName(b));
+    case 'aiAutonomy':
+      // Not an agent first, then suggests, acts with approval, acts alone.
+      return aiAutonomyRank(aiAutonomyOf(a.element)) - aiAutonomyRank(aiAutonomyOf(b.element)) || displayName(a).localeCompare(displayName(b));
     case 'disposition':
       // Unset first, then best → worst (invest, tolerate, migrate, eliminate) — the same "unset sorts first" convention as criticality.
       return dispositionRankOf(a.disposition) - dispositionRankOf(b.disposition) || displayName(a).localeCompare(displayName(b));
@@ -377,6 +383,8 @@ export function useElementBrowse(
       } else if (filter === 'ai-agent-no-technical-owner') {
         const systems = elements.filter((e) => e.element_type === 'system');
         ids = new Set(findAiAgentsActingAloneWithoutTechnicalOwner(systems, ownsEdges).map((e) => e.element_id));
+      } else if (filter === 'ai-agents') {
+        ids = new Set(elements.filter((e) => e.element_type === 'system' && isAiAgent(e)).map((e) => e.element_id));
       } else if (filter === 'critical-no-business-owner') {
         const systems = elements.filter((e) => e.element_type === 'system');
         const containers = elements.filter((e) => e.element_type === 'container');
