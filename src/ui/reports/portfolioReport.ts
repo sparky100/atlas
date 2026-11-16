@@ -30,7 +30,7 @@ export const DEFAULT_PORTFOLIO_REPORT_STATE: PortfolioReportState = {
 };
 
 export const PORTFOLIO_REPORT_FIELDS = ['name', 'kind', 'cost', 'fit', 'criticality', 'disposition', 'lifecycle', 'capabilities', 'owner', 'signals'] as const;
-export const PORTFOLIO_REPORT_HELPER_FIELDS = ['id', 'elementType', 'signalKeys', 'costRank', 'fitRank', 'criticalityRank', 'dispositionRank', 'lifecycleRank', 'ownerSort', 'aiAutonomyRank', 'aiRank'] as const;
+export const PORTFOLIO_REPORT_HELPER_FIELDS = ['id', 'elementType', 'signalKeys', 'costRank', 'fitRank', 'criticalityRank', 'dispositionRank', 'lifecycleRank', 'ownerSort', 'aiAutonomyRank', 'aiRank', 'lifecycleExposed'] as const;
 /** Usable in a report but not a default column (blank for most systems): `aiAutonomy` is how freely an AI agent acts (empty for a non-agent); `aiUse` is how AI is used at all (`agent`, `built_in` or `external_service`, empty for none recorded). */
 export const PORTFOLIO_REPORT_OPTIONAL_FIELDS = ['aiAutonomy', 'aiUse'] as const;
 
@@ -51,6 +51,7 @@ export function portfolioReportRow(row: PortfolioRow): ReportRow {
     criticality: row.criticality,
     disposition: row.disposition,
     lifecycle: row.lifecycleStatus,
+    lifecycleExposed: row.lifecycleExposed,
     capabilities: row.capabilities.length,
     owner: ownerName,
     signals: row.signals.length,

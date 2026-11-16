@@ -16,6 +16,8 @@ import { DonutChart } from '../charts/DonutChart';
 import { StackedBarChart } from '../charts/StackedBarChart';
 import { Text } from '../components/Text/Text';
 import type { ExportTileItem } from '../exports/dashboardExport';
+import { PortfolioQuadrant } from '../portfolio/PortfolioQuadrant';
+import { quadrantItemsFromResult } from '../portfolio/quadrantItemsFromResult';
 import { kpiBaseline, specForTile } from './dashboardTiles';
 import { ResultTable } from './ReportResultView';
 import { drillSearch, type ReportDrill } from './reportDrill';
@@ -91,6 +93,9 @@ export function DashboardTileCard({ tile, report, rows, knownFields, basePath, o
       break;
     case 'donut':
       body = <DonutChart groups={result.groups} title={`By ${by}`} unit={spec.source === 'portfolio' ? 'items' : 'rows'} onSelect={byGroup} scale={groupScale} />;
+      break;
+    case 'quadrant':
+      body = <PortfolioQuadrant compact items={quadrantItemsFromResult(result)} hrefFor={(id) => `${basePath}/e/${encodeURIComponent(id)}?ref=main`} />;
       break;
     case 'table':
       body = <ResultTable result={result} compact live={{ rows: evaluation.displayedRows, basePath }} />;

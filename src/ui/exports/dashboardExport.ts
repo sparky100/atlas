@@ -14,6 +14,8 @@ import type { ReportSpec } from '../../contracts/reportSpec';
 import type { ReportResult } from '../../engine/reportQuery';
 import type { DashboardTileKind, DashboardTileSize } from '../../db/types';
 import { CHART_SLOT_COUNT, chartBars, chartCategories, chartStacked, type ChartCategory, type ValueScale } from '../charts/chartData';
+import { buildQuadrant, QUADRANT_LABEL, QUADRANT_ORDER } from '../portfolio/portfolioQuadrant';
+import { quadrantItemsFromResult } from '../portfolio/quadrantItemsFromResult';
 import { reportFieldLabel, reportValueLabel, reportValueScale } from '../reports/reportTable';
 import { EXPORT_PADDING, EXPORT_PALETTE, STAMP_HEIGHT, stampShapes, truncate, type ExportPlan, type ExportShape, type ExportStamp } from './viewExport';
 
@@ -45,6 +47,7 @@ const GAP = 16;
 const CARD_PAD = 16;
 const BAR_ROW = 24;
 const TABLE_ROW = 22;
+const QUADRANT_BOX_HEIGHT = 48;
 const TITLE_HEIGHT = 28;
 const MAX_BARS = 12;
 const MAX_TABLE_ROWS = 200;
@@ -119,6 +122,8 @@ function tileHeight(item: ExportTileItem, width: number): number {
       const categories = chartCategories(item.result.groups, CHART_SLOT_COUNT, groupScaleOf(item));
       return CARD_PAD + TITLE_HEIGHT + Math.max(140, categories.length * 18 + 8) + CARD_PAD;
     }
+    case 'quadrant':
+      return CARD_PAD + TITLE_HEIGHT + 2 * (QUADRANT_BOX_HEIGHT + 6) + 20 + CARD_PAD;
     case 'table': {
       const rows = visibleTableRows(item.result);
       const note = item.result.truncated || item.result.rows.length > MAX_TABLE_ROWS ? 22 : 0;
@@ -205,6 +210,22 @@ function tileShapes(item: ExportTileItem, x: number, y: number, width: number, h
         shapes.push(rect(legendX, ly - 5, 10, 10, exportColour(c), 2));
         shapes.push(text(legendX + 16, ly, `${truncate(c.label, 18)}  ${String(c.count)} · ${String(Math.round((c.count / total) * 1000) / 10)}%`, 11, EXPORT_PALETTE.text, false, inner - 2 * outer - 36));
       });
+      break;
+    }
+    case 'quadrant': {
+      // The picture is the four boxes with their counts (a dot cloud does not survive a page); the screen shows every dot.
+      shapes.push(title());
+      const built = buildQuadrant(quadrantItemsFromResult(item.result));
+      const boxW = (inner - 6) / 2;
+      QUADRANT_ORDER.forEach((key, i) => {
+        const bx = left + (i % 2) * (boxW + 6);
+        const by = top + Math.floor(i / 2) * (QUADRANT_BOX_HEIGHT + 6);
+        shapes.push(rect(bx, by, boxW, QUADRANT_BOX_HEIGHT, EXPORT_PALETTE.surface, 6, EXPORT_PALETTE.border));
+        shapes.push(text(bx + 8, by + 16, QUADRANT_LABEL[key].name, 12, EXPORT_PALETTE.text, true, boxW - 50));
+        shapes.push(text(bx + boxW - 8, by + 16, String(built.boxes[key].length), 16, EXPORT_PALETTE.text, true));
+        shapes.push(text(bx + 8, by + 34, truncate(QUADRANT_LABEL[key].caption, Math.floor((boxW - 16) / 5.5)), 10, EXPORT_PALETTE.textMuted, false, boxW - 16));
+      });
+      shapes.push(text(left, top + 2 * (QUADRANT_BOX_HEIGHT + 6) + 10, `Business fit up, technical health across. Not placed: ${String(built.notPlacedCount)}.`, 10, EXPORT_PALETTE.textMuted, false, inner));
       break;
     }
     case 'table': {

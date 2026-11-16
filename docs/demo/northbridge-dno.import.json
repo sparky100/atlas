@@ -323,7 +323,7 @@
     {
       "name": "DUoS Billing Engine",
       "capability": "Billing & Settlement",
-      "fit": "poor",
+      "fit": "good",
       "kind": "application",
       "vendor": "Capita",
       "lifecycle": "retiring",

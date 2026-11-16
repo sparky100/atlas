@@ -19,7 +19,7 @@ const DEMOS = [
   { file: 'docs/demo/meridian-retail.import.json', map: 'content/capability-maps/retail_energy/1.json' },
 ] as const;
 
-interface RawSystem { fit?: string; capability?: string; ai_autonomy?: string; ai_use?: string; technical_owner?: string; name: string; description?: string; platform?: string; capability?: string; quote?: string; confidence?: number }
+interface RawSystem { fit?: string; ai_autonomy?: string; ai_use?: string; technical_owner?: string; name: string; description?: string; platform?: string; capability?: string; quote?: string; confidence?: number }
 interface RawEntry { name?: string; from?: string; to?: string; via?: string; platform?: string; capability?: string; replaced_by?: string; quote?: string; confidence?: number }
 interface RawImport { systems: RawSystem[]; relationships: RawEntry[]; changes: RawEntry[] }
 

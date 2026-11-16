@@ -7,6 +7,8 @@ import type { AnnualRunCost } from '../../contracts/delta';
 import type { ChartFit } from './portfolioChart';
 import { PortfolioCards } from './PortfolioCards';
 import { PortfolioChart } from './PortfolioChart';
+import { PortfolioQuadrant } from './PortfolioQuadrant';
+import type { QuadrantItem } from './portfolioQuadrant';
 import { ExportViewButtons } from '../components/ExportViewButtons/ExportViewButtons';
 import { portfolioExportPlan, portfolioExportTable } from '../exports/portfolioExport';
 import type { ExportStamp } from '../exports/viewExport';
@@ -61,6 +63,11 @@ export function PortfolioView({ data, elementHref, exportStamp, savedReports }: 
   const filteredRows = useMemo(() => filterPortfolioRows(visibleRows, filters), [visibleRows, filters]);
   const rows = useMemo(() => sortPortfolioRows(fitPick ? filteredRows.filter((row) => (row.fit ?? 'unrated') === fitPick) : filteredRows, sortKey, sortDirection), [filteredRows, fitPick, sortKey, sortDirection]);
 
+  const quadrantItems = useMemo<QuadrantItem[]>(
+    () => filteredRows.map((row) => ({ id: row.element.element_id, name: row.name, fit: row.fit, lifecycle: row.lifecycleStatus, exposed: row.lifecycleExposed, cost: row.cost, disposition: row.disposition })),
+    [filteredRows],
+  );
+
   function handlePickCell(cost: AnnualRunCost, fit: ChartFit): void {
     setFilters((current) => ({ ...current, cost }));
     setFitPick(fit);
@@ -110,7 +117,7 @@ export function PortfolioView({ data, elementHref, exportStamp, savedReports }: 
         onViewChange={setView}
         fitPick={fitPick}
         onFitPickChange={setFitPick}
-        shownCount={view === 'chart' ? filteredRows.length : rows.length}
+        shownCount={view !== 'table' ? filteredRows.length : rows.length}
         totalCount={visibleRows.length}
       />
       {exportStamp && (
@@ -134,8 +141,10 @@ export function PortfolioView({ data, elementHref, exportStamp, savedReports }: 
           {notEntered} {notEntered === 1 ? 'row has' : 'rows have'} no run cost entered — excluded from every cost-based signal below, not treated as low.
         </Text>
       )}
-      {view === 'chart' ? (
+      {view === 'grid' ? (
         <PortfolioChart rows={filteredRows} onPickCell={handlePickCell} onShowTable={() => { setView('table'); }} />
+      ) : view === 'quadrant' ? (
+        <PortfolioQuadrant items={quadrantItems} hrefFor={elementHref} onShowTable={() => { setView('table'); }} />
       ) : narrow ? (
         <PortfolioCards rows={rows} expandedRowId={expandedRowId} onToggleExpand={handleToggleExpand} elementHref={elementHref} />
       ) : (

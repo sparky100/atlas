@@ -297,6 +297,16 @@ describe('saved reports, saved copies and dashboards (ADR-027) against a real lo
       expect(await listDashboardTiles(contributor.client, dashboard.id)).toEqual([]);
     });
 
+    it('round-trips a quadrant tile, and still refuses a tile kind it does not know', async () => {
+      const report = await newReport(contributor);
+      const dashboard = await createDashboard(contributor.client, { id: randomUUID(), orgId, modelId, name: 'Quadrant dashboard', createdBy: contributor.id });
+      const tile = await addDashboardTile(contributor.client, { id: randomUUID(), dashboardId: dashboard.id, reportId: report.id, position: 0, kind: 'quadrant' });
+      expect(tile.kind).toBe('quadrant');
+      const tiles = await listDashboardTiles(contributor.client, dashboard.id);
+      expect(tiles.map((t) => t.kind)).toEqual(['quadrant']);
+      await expect(addDashboardTile(contributor.client, { id: randomUUID(), dashboardId: dashboard.id, reportId: report.id, position: 1, kind: 'bubble' as never })).rejects.toThrow();
+    });
+
     it('refuses two tiles at one position', async () => {
       const report = await newReport(contributor);
       const dashboard = await createDashboard(contributor.client, { id: randomUUID(), orgId, modelId, name: 'Dup', createdBy: contributor.id });
