@@ -71,7 +71,7 @@ export function CaptureJobListView({ modelId, orgId, orgSlug, modelSlug, canCrea
         )}
       </div>
 
-      {canCreate && <ImportHelpers modelId={modelId} modelSlug={modelSlug} />}
+      {canCreate && <ImportHelpers modelId={modelId} modelSlug={modelSlug} prominent={jobs.length === 0 && status !== 'loading'} />}
 
       {!canCreate && (
         <Panel>
@@ -107,7 +107,6 @@ export function CaptureJobListView({ modelId, orgId, orgSlug, modelSlug, canCrea
             setUploadOpen(false);
           }}
           modelId={modelId}
-          modelSlug={modelSlug}
           createJob={createJob}
           status={status}
           error={error}

@@ -25,14 +25,12 @@ import { Text } from '../components/Text/Text';
 import { downloadMulesoftExportScript } from '../import/downloadMulesoftExportScript';
 import { supabase } from '../supabaseClient';
 import { isCreatingJob, type CreateCaptureJobInput, type CaptureJobsStatus } from './useCaptureJob';
-import { ImportHelpers } from '../import/ImportHelpers';
 import styles from './UploadCaptureDialog.module.css';
 
 export interface UploadCaptureDialogProps {
   open: boolean;
   onClose: () => void;
   modelId: UUID;
-  modelSlug: string;
   createJob: (input: CreateCaptureJobInput) => Promise<CaptureJob | null>;
   status: CaptureJobsStatus;
   error: string | null;
@@ -69,7 +67,7 @@ function formatMegabytes(bytes: number): string {
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }
 
-export function UploadCaptureDialog({ open, onClose, modelId, modelSlug, createJob, status, error }: UploadCaptureDialogProps) {
+export function UploadCaptureDialog({ open, onClose, modelId, createJob, status, error }: UploadCaptureDialogProps) {
   const [mode, setMode] = useState<Mode>('file');
   const [pastedText, setPastedText] = useState('');
   const [pasteName, setPasteName] = useState('');
@@ -463,7 +461,6 @@ export function UploadCaptureDialog({ open, onClose, modelId, modelSlug, createJ
                   )}
                 </>
               )}
-              {source === 'documents' && mode === 'file' && <ImportHelpers modelId={modelId} modelSlug={modelSlug} />}
               {source === 'documents' && mode === 'file' ? (
                 <input
                   className={styles.input}
