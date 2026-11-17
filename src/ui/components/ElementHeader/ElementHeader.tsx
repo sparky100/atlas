@@ -1,4 +1,4 @@
-import { useId, useLayoutEffect, useRef, useState } from 'react';
+import { useId, useLayoutEffect, useRef, useState, type ReactNode } from 'react';
 import type { ElementsHeadRow } from '../../../contracts/rows';
 import type { SourceRow } from '../../../db/types';
 import { attributesRecord } from '../../elements/attributesRecord';
@@ -134,6 +134,8 @@ export interface ElementHeaderProps {
   interfacePlatform?: { name: string; href: string; typeLabel: string | null } | undefined;
   /** Planned (not live yet) or retired, by the element's own dates: draws the shared tag beside the name. Omit for an active element. */
   lifecycleTag?: LifecycleTagProps | undefined;
+  /** "4 of 6 recorded" and what is missing, drawn beside the name; omitted where the element has no key facts. */
+  completeness?: ReactNode | undefined;
   /**
    * "Context →" — a system or container's own context diagram
    * (`/context/:elementId`, `ContextPage.tsx`). Omitted entirely (not
@@ -186,7 +188,7 @@ export interface ElementHeaderProps {
  * and adds "Retire…" (`onRetire`, system only) — both live in this same
  * overflow menu, not a standalone row.
  */
-export function ElementHeader({ element, existsFact, existsSource, onEdit, onConfirmStillAccurate, confirming, onProposeChange, rename, onRetire, onRemoveFromModel, onMerge, onConvertToModule, onDeactivate, onReactivate, readOnlyReason, interfacePlatform, lifecycleTag, contextHref, roadmapHref, startProjectHref, startDecisionHref }: ElementHeaderProps) {
+export function ElementHeader({ element, existsFact, existsSource, onEdit, onConfirmStillAccurate, confirming, onProposeChange, rename, onRetire, onRemoveFromModel, onMerge, onConvertToModule, onDeactivate, onReactivate, readOnlyReason, interfacePlatform, lifecycleTag, completeness, contextHref, roadmapHref, startProjectHref, startDecisionHref }: ElementHeaderProps) {
   const [menuOpen, setMenuOpen] = useState(false);
   const menuId = useId();
   const menuRef = useRef<HTMLDivElement>(null);
@@ -276,6 +278,7 @@ export function ElementHeader({ element, existsFact, existsSource, onEdit, onCon
           </Text>
         )}
         {lifecycleTag && <LifecycleTag {...lifecycleTag} />}
+        {completeness}
         {/* The tag already says planned or retired; the chip would repeat it. */}
         {lifecycleStatus !== null && lifecycleTone !== undefined && lifecycleStatus !== lifecycleTag?.state && <Chip tone={lifecycleTone}>{lifecycleStatus}</Chip>}
         {/* Plain text, not a Chip: version is free text in whatever scheme

@@ -131,6 +131,9 @@ function sortFieldOf(key: ElementBrowseSortKey): string {
       return 'dispositionRank';
     case 'aiAutonomy':
       return 'aiRank';
+    case 'completeness':
+      // Completeness comes from Portfolio rows, which a saved report doesn't read, so a report saved while sorted by it falls back to name.
+      return 'name';
   }
 }
 

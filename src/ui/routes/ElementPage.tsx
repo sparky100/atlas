@@ -1,6 +1,6 @@
 import { describeLifecycleMismatch, lifecycleMismatchOf } from '../../engine/elementRead/lifecycleDateMismatch';
 import { Loading } from '../components/Loading/Loading';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { Link, useLocation, useNavigate, useParams, useSearchParams } from 'react-router';
 import { ATTRIBUTE_SCHEMA_BY_TYPE, attributeDefinitionToFieldSchema, type AttributeFieldSchema } from '../../contracts/attributeSchema';
 import type { ElementsHeadRow, FactsRow } from '../../contracts/rows';
@@ -70,6 +70,9 @@ import { attributesRecord } from '../elements/attributesRecord';
 import { interfaceTypeLabelOf, isIntegrationInterface, isIntegrationPlatform, isPlatform } from '../elements/systemKind';
 import { useRouteTiming } from '../perf/useRouteTiming';
 import { useValueStreamImpact } from '../valueStreams/useValueStreamImpact';
+import { CompletenessChip } from '../gaps/CompletenessChip';
+import { completenessOf, firstWalkableKind, sumCompleteness } from '../gaps/gaps';
+import { usePortfolio } from '../portfolio/usePortfolio';
 import styles from './ElementPage.module.css';
 
 /**
@@ -330,6 +333,33 @@ export function ElementPage() {
     onSaved: reloadAfterCommit,
   });
 
+  // "4 of 6 recorded" for a system or module; for a capability, the same count rolled up over its supporting systems.
+  const completenessType = data?.element.element_type;
+  const wantsCompleteness = completenessType === 'system' || completenessType === 'container' || completenessType === 'capability';
+  const { state: portfolioState } = usePortfolio(wantsCompleteness ? (model?.id ?? '') : '', ref, mainBranch?.head_commit_id ?? null, { inlineErrors: true });
+  let completenessNode: ReactNode = null;
+  if (wantsCompleteness && data && model && portfolioState.status === 'ready') {
+    const rows = portfolioState.data.rows;
+    const gapsBase = `/o/${orgSlug ?? ''}/m/${model.slug}/gaps`;
+    const q = (extra: Record<string, string>) => {
+      const params = new URLSearchParams(refQueryParam(ref, viewing));
+      for (const [k, v] of Object.entries(extra)) params.set(k, v);
+      return `${gapsBase}?${params.toString()}`;
+    };
+    if (completenessType === 'capability') {
+      const supporters = rows.filter((row) => row.capabilities.some((link) => link.capabilityId === data.element.element_id));
+      const rolled = sumCompleteness(supporters);
+      completenessNode = <CompletenessChip completeness={rolled} scope={`across ${String(supporters.length)} supporting ${supporters.length === 1 ? 'system' : 'systems'}`} fillInHref={supporters.length > 0 && firstWalkableKind(rolled) !== null && canEdit ? q({ kind: firstWalkableKind(rolled) ?? 'fit', capability: data.element.element_id }) : undefined} />;
+    } else {
+      const row = rows.find((r) => r.element.element_id === data.element.element_id);
+      if (row) {
+        const c = completenessOf(row);
+        const kind = firstWalkableKind(c);
+        completenessNode = <CompletenessChip completeness={c} fillInHref={kind !== null && canEdit ? q({ kind, element: row.element.element_id }) : undefined} />;
+      }
+    }
+  }
+
   if (orgLoading || modelsLoading || !model) {
     return (
       <div>
@@ -373,6 +403,7 @@ export function ElementPage() {
               onProposeChange={canPropose ? () => { setProposingChange(true); } : undefined}
               readOnlyReason={underReview ? 'Read-only: under review' : undefined}
               lifecycleTag={lifecycleTagFor(state.data.element, state.data.parent)}
+              completeness={completenessNode}
               interfacePlatform={
                 state.data.parent && isIntegrationInterface(state.data.element, state.data.parent)
                   ? {

@@ -11,7 +11,7 @@
 import type { Json } from '../../contracts/rows';
 
 /** `{ custom: key }` sorts by an org-defined attribute's own raw value instead of one of the four fixed columns — one generic variant, not a fixed literal per attribute (F1's own decision 6). */
-export type ElementBrowseSortKey = 'name' | 'type' | 'owner' | 'lifecycle' | 'criticality' | 'disposition' | 'aiAutonomy' | { custom: string };
+export type ElementBrowseSortKey = 'name' | 'type' | 'owner' | 'lifecycle' | 'criticality' | 'disposition' | 'aiAutonomy' | 'completeness' | { custom: string };
 
 export function sortKeyEquals(a: ElementBrowseSortKey, b: ElementBrowseSortKey): boolean {
   if (typeof a === 'object' || typeof b === 'object') return typeof a === 'object' && typeof b === 'object' && a.custom === b.custom;

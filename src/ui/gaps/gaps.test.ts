@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { fakeElement, fakeRow, fakeSupportsEdge } from '../portfolio/portfolioTestFixtures';
 import type { PortfolioCapabilityLink } from '../portfolio/usePortfolio';
-import { gapElementCount, gapItemQuestion, gapItems, gapSummary } from './gaps';
+import { completenessLabel, completenessOf, firstWalkableKind, gapElementCount, gapItemQuestion, gapItems, gapSummary, missingFactsText } from './gaps';
 
 function link(fromId: string, capId: string, fit: PortfolioCapabilityLink['fit']): PortfolioCapabilityLink {
   return { capabilityId: capId, capabilityName: `Cap ${capId}`, fit, relationship: fakeSupportsEdge(fromId, capId), otherSupporters: [] };
@@ -42,5 +42,45 @@ describe('gapItems', () => {
   it('never lists a retired element', () => {
     const rows = [system('a', { lifecycleStatus: 'retired' }), system('b', { lifecycleStatus: 'retiring' })];
     expect(gapItems('criticality', rows).map((i) => i.key)).toEqual(['b']);
+  });
+});
+
+describe('completenessOf', () => {
+  const cases: [string, ReturnType<typeof system>][] = [
+    ['empty system', system('a')],
+    ['full system', system('b', { cost: 'under_50k', criticality: 'high', disposition: 'invest', ownsEdges: [{ ...fakeSupportsEdge('actor', 'b'), relationship_type: 'owns' as const }], capabilities: [link('b', 'c1', 'good')] })],
+    ['two links one unrated', system('c', { cost: 'under_50k', capabilities: [link('c', 'c1', null), link('c', 'c2', 'good')] })],
+    ['module', module_('m')],
+    ['retired system', system('r', { lifecycleStatus: 'retired' })],
+  ];
+
+  it.each(cases)('agrees with gapItems: %s', (_name, row) => {
+    const c = completenessOf(row);
+    const gapCount = (['fit', 'owner', 'run-cost', 'criticality', 'disposition'] as const).reduce((n, k) => n + gapItems(k, [row]).length, 0);
+    const linkGap = row.element.element_type === 'system' && c.total > 0 && row.capabilities.length === 0 ? 1 : 0;
+    expect(c.missing.length).toBe(gapCount + linkGap);
+    expect(c.recorded).toBe(c.total - c.missing.length);
+    expect(c.recorded).toBeLessThanOrEqual(c.total);
+  });
+
+  it('counts totals per element type', () => {
+    expect(completenessOf(system('a'))).toMatchObject({ recorded: 0, total: 5 });
+    expect(completenessOf(module_('m'))).toMatchObject({ recorded: 0, total: 1 });
+    expect(completenessOf(system('r', { lifecycleStatus: 'retired' }))).toEqual({ recorded: 0, total: 0, missing: [] });
+    expect(completenessOf(system('c', { capabilities: [link('c', 'c1', null), link('c', 'c2', 'good')] }))).toMatchObject({ total: 7 });
+  });
+
+  it('recording a fact never lowers the fraction', () => {
+    const before = completenessOf(system('a'));
+    const after = completenessOf(system('a', { cost: 'under_50k' }));
+    expect(after.recorded).toBeGreaterThan(before.recorded);
+    expect(after.total).toBe(before.total);
+  });
+
+  it('words', () => {
+    const c = completenessOf(system('a', { capabilities: [link('a', 'c1', null), link('a', 'c2', null)] }));
+    expect(completenessLabel(c)).toBe('1 of 7 recorded');
+    expect(missingFactsText(c)).toBe('owner, run cost, criticality, planned action, fit rating (2)');
+    expect(firstWalkableKind(c)).toBe('fit');
   });
 });

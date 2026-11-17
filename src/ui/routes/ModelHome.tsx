@@ -77,9 +77,11 @@ function ArchitectDoor({
   role,
   orgSlug,
   modelSlug,
+  mainCommitIdHint,
   onShowOverview,
 }: {
   modelId: UUID;
+  mainCommitIdHint: UUID | null;
   userId: UUID | null;
   /** Prompt pack F3 PR6: "Start a decision" on a health finding row is gated the same as any other decision-starting entry point (`canStartDecision`) — this door had no role prop at all before this. */
   role: MemberRole | null;
@@ -97,7 +99,7 @@ function ArchitectDoor({
   useRouteTiming('model-home', architectState.status === 'ready');
   if (architectState.status === 'loading') return <Loading />;
   if (architectState.status === 'error') return <Text as="p">{architectState.message}</Text>;
-  return <ArchitectHome data={architectState.data} insights={insightsState} role={role} orgSlug={orgSlug} modelSlug={modelSlug} onShowOverview={onShowOverview} />;
+  return <ArchitectHome data={architectState.data} modelId={modelId} mainCommitIdHint={mainCommitIdHint} insights={insightsState} role={role} orgSlug={orgSlug} modelSlug={modelSlug} onShowOverview={onShowOverview} />;
 }
 
 /**
@@ -239,7 +241,7 @@ export function ModelHome() {
             }}
           />
         )}
-        {homeMode === 'architect' && <ArchitectDoor modelId={model.id} userId={userId} role={role} orgSlug={organisation?.slug ?? ''} modelSlug={model.slug} onShowOverview={() => { setHomeMode('director'); }} />}
+        {homeMode === 'architect' && <ArchitectDoor modelId={model.id} mainCommitIdHint={mainBranch?.head_commit_id ?? null} userId={userId} role={role} orgSlug={organisation?.slug ?? ''} modelSlug={model.slug} onShowOverview={() => { setHomeMode('director'); }} />}
         </main>
       </div>
     </div>

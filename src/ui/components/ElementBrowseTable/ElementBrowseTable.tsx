@@ -118,13 +118,15 @@ export interface GridAttestation {
 // never includes the `{ custom }` variant (that's the one dynamic column,
 // added separately below), and `key={column.key}` needs a valid React key,
 // which an object isn't.
-const COLUMNS: { key: 'name' | 'type' | 'owner' | 'lifecycle' | 'criticality' | 'disposition' | 'aiAutonomy'; label: string }[] = [
+const COLUMNS: { key: 'name' | 'type' | 'owner' | 'lifecycle' | 'criticality' | 'disposition' | 'aiAutonomy' | 'completeness'; label: string }[] = [
   { key: 'name', label: 'Name' },
   { key: 'type', label: 'Type' },
   { key: 'owner', label: 'Owner' },
   { key: 'lifecycle', label: 'Lifecycle' },
   { key: 'criticality', label: 'Criticality' },
   { key: 'disposition', label: 'Planned action' },
+  // Shown once the model's key facts have loaded (see `showCompletenessColumn`).
+  { key: 'completeness', label: 'Completeness' },
   // Shown only while at least one listed element uses AI (see `showAgentColumn`).
   { key: 'aiAutonomy', label: 'AI' },
 ];
@@ -249,7 +251,8 @@ export function ElementBrowseTable({ state, orgSlug, modelSlug, modelId, filenam
   const page = useResultPage(state.status === 'ready' ? state.rows : undefined);
   // The "How it acts" column appears only when something listed is an AI agent: a column that is blank on every row is clutter.
   const showAgentColumn = state.status === 'ready' && state.rows.some((row) => usesAi(row.element));
-  const columns = COLUMNS.filter((column) => column.key !== 'aiAutonomy' || showAgentColumn);
+  const showCompletenessColumn = state.status === 'ready' && state.completenessById !== null;
+  const columns = COLUMNS.filter((column) => (column.key !== 'aiAutonomy' || showAgentColumn) && (column.key !== 'completeness' || showCompletenessColumn));
 
   // Below the breakpoint, `ElementBrowseCards` replaces the two-table
   // sticky-header block entirely, rather than trying to make one render
@@ -366,7 +369,7 @@ export function ElementBrowseTable({ state, orgSlug, modelSlug, modelId, filenam
       observer.disconnect();
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps -- re-measures on anything that could change a rendered cell's natural width (including the header's own sort-arrow toggling); `tbodyRef.current`/`headerRowRef.current` themselves aren't valid deps.
-  }, [page.rows, narrow, showAgentColumn, customAttr, linkSupportsInline, decisionRowAction, state.status === 'ready' ? state.sortKey : null, state.status === 'ready' ? state.sortDirection : null, bulkEdit?.editing]);
+  }, [page.rows, narrow, showAgentColumn, showCompletenessColumn, customAttr, linkSupportsInline, decisionRowAction, state.status === 'ready' ? state.sortKey : null, state.status === 'ready' ? state.sortDirection : null, bulkEdit?.editing]);
 
   function syncHeaderScroll() {
     if (headerClipRef.current && tableWrapRef.current) {
@@ -727,6 +730,22 @@ export function ElementBrowseTable({ state, orgSlug, modelSlug, modelId, filenam
                         </Text>
                       ))}
                     </td>
+                    {showCompletenessColumn && (
+                      <td headers={`${headerIdBase}-completeness`}>
+                        {(() => {
+                          const c = state.completenessById?.get(row.element.element_id);
+                          return c && c.total > 0 ? (
+                            <Text as="span" size="sm">
+                              {c.recorded} of {c.total}
+                            </Text>
+                          ) : (
+                            <Text as="span" tone="faint" size="sm">
+                              —
+                            </Text>
+                          );
+                        })()}
+                      </td>
+                    )}
                     {showAgentColumn && (
                       <td headers={`${headerIdBase}-aiAutonomy`}>
                         {mark !== null ? (

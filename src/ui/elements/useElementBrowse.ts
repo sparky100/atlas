@@ -136,6 +136,7 @@ export type ElementBrowseState =
   | {
       status: 'ready';
       rows: BrowseRow[];
+      completenessById: CompletenessById | null;
       typeFilter: ElementType | 'all';
       setTypeFilter: (type: ElementType | 'all') => void;
       /** F11: narrow to one disposition, or to systems/modules not yet assessed. */
@@ -163,7 +164,16 @@ function displayName(row: BrowseRow): string {
   return moduleDisplayName(row.element, row.parent);
 }
 
-function compareRows(a: BrowseRow, b: BrowseRow, key: ElementBrowseSortKey): number {
+/** "4 of 6 recorded" per element, for the Completeness column; absent for elements with no key facts. */
+export type CompletenessById = ReadonlyMap<UUID, { recorded: number; total: number }>;
+
+/** Least complete first; an element with no key facts (a capability, a retired system) sorts last. */
+function completenessRankOf(row: BrowseRow, byId: CompletenessById | null): number {
+  const c = byId?.get(row.element.element_id);
+  return c && c.total > 0 ? c.recorded / c.total : 2;
+}
+
+function compareRows(a: BrowseRow, b: BrowseRow, key: ElementBrowseSortKey, completenessById: CompletenessById | null): number {
   if (typeof key === 'object') {
     return compareCustomAttributeValues(attributesRecord(a.element.attributes)[key.custom], attributesRecord(b.element.attributes)[key.custom]) || displayName(a).localeCompare(displayName(b));
   }
@@ -181,6 +191,8 @@ function compareRows(a: BrowseRow, b: BrowseRow, key: ElementBrowseSortKey): num
     case 'aiAutonomy':
       // No AI first, then built-in AI, an AI service, then agents from suggests only to acts alone.
       return aiRankOf(a.element) - aiRankOf(b.element) || displayName(a).localeCompare(displayName(b));
+    case 'completeness':
+      return completenessRankOf(a, completenessById) - completenessRankOf(b, completenessById) || displayName(a).localeCompare(displayName(b));
     case 'disposition':
       // Unset first, then best → worst (invest, tolerate, migrate, eliminate) — the same "unset sorts first" convention as criticality.
       return dispositionRankOf(a.disposition) - dispositionRankOf(b.disposition) || displayName(a).localeCompare(displayName(b));
@@ -233,6 +245,8 @@ export function useElementBrowse(
   filter: ElementBrowseFilter = null,
   /** S1 item 15 (A2 remainder): the caller's own already-resolved main head commit id — same race-tolerant dedup shape `useDirectorHome.ts`'s own parameter comment explains, for the main/tag arm below. */
   mainCommitIdHint: UUID | null = null,
+  /** The Completeness column's data and sort order; `null` until Portfolio rows have loaded. */
+  completenessById: CompletenessById | null = null,
 ): ElementBrowseState {
   const staleAfterMonths = useStaleAfterMonths();
   const [status, setStatus] = useState<ElementBrowseStatus>('loading');
@@ -475,9 +489,9 @@ export function useElementBrowse(
       if (q === '') return true;
       return row.element.name.toLowerCase().includes(q) || (row.owner?.name.toLowerCase().includes(q) ?? false);
     });
-    const sorted = [...filtered].sort((a, b) => compareRows(a, b, sortKey));
+    const sorted = [...filtered].sort((a, b) => compareRows(a, b, sortKey, completenessById));
     return sortDirection === 'asc' ? sorted : sorted.reverse();
-  }, [loaded, typeFilter, dispositionFilter, query, sortKey, sortDirection]);
+  }, [loaded, typeFilter, dispositionFilter, query, sortKey, sortDirection, completenessById]);
 
   if (status === 'error') return { status: 'error', message: error ?? 'Failed to load elements.' };
   if (status === 'refNotFound') return { status: 'refNotFound' };
@@ -485,6 +499,7 @@ export function useElementBrowse(
   return {
     status: 'ready',
     rows,
+    completenessById,
     typeFilter,
     setTypeFilter,
     dispositionFilter,

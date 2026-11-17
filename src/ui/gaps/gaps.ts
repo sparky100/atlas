@@ -125,3 +125,68 @@ export function gapDoneSummary(kind: GapKind): string {
       return 'Every system has a planned action';
   }
 }
+
+/** A key fact beyond the five gap kinds: a system with no capability link doesn't appear on the capability map. */
+export type CompletenessFact = GapKind | 'capability-link';
+
+export interface Completeness {
+  recorded: number;
+  total: number;
+  /** What is missing, in the order Fill in lists the kinds; a fit gap appears once per unrated link. */
+  missing: CompletenessFact[];
+}
+
+/**
+ * "4 of 6 recorded": how many of an element's key facts are filled in. A plain
+ * count, never weighted or graded. Built on `gapItems`, so the numerator can
+ * never disagree with the Fill in queue. A retired or past-its-end element has
+ * no key facts (0 of 0).
+ */
+export function completenessOf(row: PortfolioRow): Completeness {
+  if (!isLive(row)) return { recorded: 0, total: 0, missing: [] };
+  const missing: CompletenessFact[] = [];
+  let total = 1; // run cost applies to systems and modules
+  for (const kind of GAP_KINDS) {
+    if (kind === 'fit') continue;
+    if (gapItems(kind, [row]).length > 0) missing.push(kind);
+  }
+  if (isSystem(row)) {
+    total += 3; // criticality, planned action, owner
+    total += 1; // at least one capability link
+    if (row.capabilities.length === 0) missing.push('capability-link');
+  }
+  total += row.capabilities.length;
+  for (const item of gapItems('fit', [row])) missing.push(item.kind);
+  return { recorded: total - missing.length, total, missing };
+}
+
+/** Rows added up for a model or a capability's supporters; zero when nothing has key facts. */
+export function sumCompleteness(rows: readonly PortfolioRow[]): Completeness {
+  const sum: Completeness = { recorded: 0, total: 0, missing: [] };
+  for (const row of rows) {
+    const c = completenessOf(row);
+    sum.recorded += c.recorded;
+    sum.total += c.total;
+    sum.missing.push(...c.missing);
+  }
+  return sum;
+}
+
+const FACT_WORDS: Record<CompletenessFact, string> = { owner: 'owner', 'run-cost': 'run cost', criticality: 'criticality', disposition: 'planned action', fit: 'fit rating', 'capability-link': 'capability link' };
+
+/** "4 of 6 recorded". */
+export function completenessLabel(c: Completeness): string {
+  return `${String(c.recorded)} of ${String(c.total)} recorded`;
+}
+
+/** "Missing: owner, run cost, fit rating (2)". */
+export function missingFactsText(c: Completeness): string {
+  const counts = new Map<CompletenessFact, number>();
+  for (const f of c.missing) counts.set(f, (counts.get(f) ?? 0) + 1);
+  return [...counts].map(([f, n]) => (n > 1 ? `${FACT_WORDS[f]} (${String(n)})` : FACT_WORDS[f])).join(', ');
+}
+
+/** The first missing fact the Fill in walk can fix, or null (a missing capability link needs the element page). */
+export function firstWalkableKind(c: Completeness): GapKind | null {
+  return GAP_KINDS.find((k) => c.missing.includes(k)) ?? null;
+}
