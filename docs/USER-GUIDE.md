@@ -214,6 +214,8 @@ Rather than typing your landscape in by hand, you can feed Atlas source material
 
 Nothing reaches your model without this review, and it always lands in a change you then submit like any other.
 
+**Importing goals.** Goals are not part of the landscape, so they do not go through that review. Owners and architects see **Import goals** at the top of Import: **Download a blank goals sheet**, fill in one goal per row (**Title** and **What success looks like** are needed; **Why now** and **Capabilities** are optional, the capabilities written as names separated by semicolons), then pick the file. Atlas shows what it will add, which rows it will skip and which capability names it could not match, and nothing is saved until you press **Add goals**. A goal whose title already exists is skipped, never changed, so importing the same file twice adds nothing. Contributors and viewers do not see the section. Import only adds goals; it cannot retire or edit one.
+
 **Connecting a tool instead of uploading a file.** Owners can link Atlas to MuleSoft Anypoint once, in **Organisation settings → Connections** (the page explains each step, including what to create in Anypoint). After that, on **Import → MuleSoft Anypoint**, **Fetch from MuleSoft** replaces the export script and the upload. You still review everything before it changes your model, and the file route still works. The client secret is saved encrypted and never shown again; owners set the connection up and remove it, architects can test it. See `docs/import/mulesoft/connector.md`.
 
 ## Changes
