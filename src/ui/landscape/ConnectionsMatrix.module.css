@@ -1,0 +1,143 @@
+/**
+ * A fixed grid sized by the number of areas. The frame takes the width the page
+ * leaves; the table scrolls inside it at any desktop width, with the area names
+ * held in place, so nothing ever forces the page itself wider.
+ */
+.frame {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  overflow: auto;
+}
+
+.toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.kindButton {
+  min-height: 2rem;
+  padding: var(--space-1) var(--space-3);
+  border: var(--border-width) solid var(--border-strong);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  color: var(--text);
+  cursor: pointer;
+}
+
+.kindButton[aria-pressed='true'] {
+  background: var(--accent-surface);
+  border-color: var(--accent);
+  font-weight: 600;
+}
+
+.scroll {
+  overflow: auto;
+  max-width: 100%;
+  border: var(--border-width) solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--surface);
+}
+
+.table {
+  border-collapse: separate;
+  border-spacing: 0;
+  width: max-content;
+  min-width: 100%;
+}
+
+.table th,
+.table td {
+  border-bottom: var(--border-width) solid var(--border);
+  border-right: var(--border-width) solid var(--border);
+  padding: var(--space-2);
+  text-align: center;
+  vertical-align: middle;
+}
+
+.corner,
+.head {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  background: var(--bg-subtle);
+  min-width: 6rem;
+  max-width: 10rem;
+  overflow-wrap: anywhere;
+}
+
+.corner {
+  left: 0;
+  z-index: 3;
+  text-align: left;
+}
+
+.rowHead {
+  position: sticky;
+  left: 0;
+  z-index: 1;
+  background: var(--bg-subtle);
+  text-align: left;
+  min-width: 8rem;
+  max-width: 12rem;
+  overflow-wrap: anywhere;
+}
+
+.cell {
+  min-width: 3rem;
+}
+
+.diagonal {
+  background: var(--bg-subtle);
+}
+
+.none {
+  color: var(--text-faint, var(--text-muted));
+}
+
+.count {
+  min-width: 2.25rem;
+  min-height: 2rem;
+  border: var(--border-width) solid var(--border-strong);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  color: var(--text);
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.count[aria-pressed='true'] {
+  background: var(--accent-surface);
+  border-color: var(--accent);
+}
+
+.detail {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.list {
+  margin: 0;
+  padding-left: var(--space-4);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+
+.item {
+  overflow-wrap: anywhere;
+}
+
+.visuallyHidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
