@@ -6,6 +6,7 @@ import { useAuth } from '../auth/useAuth';
 import { Button } from '../components/Button/Button';
 import { Panel } from '../components/Panel/Panel';
 import { Text } from '../components/Text/Text';
+import { LICENCE_URL, SOURCE_CODE_URL } from '../licence';
 import styles from './SignIn.module.css';
 
 interface LocationState {
@@ -189,6 +190,13 @@ export function SignIn() {
             </Button>
           )}
         </div>
+        <Text tone="muted" size="sm" as="p">
+          Atlas is open source under the{' '}
+          <a href={LICENCE_URL} target="_blank" rel="noopener noreferrer">
+            AGPL-3.0 licence
+          </a>
+          . <a href={SOURCE_CODE_URL} target="_blank" rel="noopener noreferrer">Get the source code</a>.
+        </Text>
       </Panel>
     </div>
   );

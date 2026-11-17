@@ -4,6 +4,7 @@ import { Link } from 'react-router';
 import { usePlatformAdmin } from '../../admin/usePlatformAdmin';
 import { useAuth } from '../../auth/useAuth';
 import { useOwnProfile } from '../../auth/useOwnProfile';
+import { LICENCE_URL, SOURCE_CODE_URL } from '../../licence';
 import { Button } from '../Button/Button';
 import { Text } from '../Text/Text';
 import { ThemeDensityToggle } from '../ThemeDensityToggle/ThemeDensityToggle';
@@ -124,6 +125,17 @@ export function UserMenu() {
               </Text>
             </Link>
           )}
+          {/* AGPL section 13: offer the source to network users (src/ui/licence.ts). */}
+          <a href={SOURCE_CODE_URL} className={styles.profileLink} target="_blank" rel="noopener noreferrer">
+            <Text as="span" size="sm">
+              Source code
+            </Text>
+          </a>
+          <a href={LICENCE_URL} className={styles.profileLink} target="_blank" rel="noopener noreferrer">
+            <Text as="span" size="sm">
+              Licence (AGPL-3.0)
+            </Text>
+          </a>
           {/* Sprint F7 item 2: this device only — the profile page's own "Sign out everywhere" is the explicit, heavier action (`{scope:'global'}`); this one previously had no scope at all, which supabase-js v2 defaults to 'global' — narrowing it to 'local' is the actual behaviour change this decision makes, not just a label. */}
           <Button
             variant="ghost"
