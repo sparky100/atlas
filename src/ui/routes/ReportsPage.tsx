@@ -98,15 +98,6 @@ export function ReportsPage() {
               basePath={`/o/${orgSlug ?? ""}/m/${model.slug}`}
             />
           )}
-          {organisation && (
-            <SavedReportsLibrary
-              modelId={model.id}
-              orgId={organisation.id}
-              userId={userId}
-              role={role}
-              basePath={`/o/${orgSlug ?? ""}/m/${model.slug}`}
-            />
-          )}
           <section className={reportStyles.section}>
             <Text as="h2" size="lg">
               Standing checks
@@ -118,6 +109,15 @@ export function ReportsPage() {
               modelSlug={model.slug}
             />
           </section>
+          {organisation && (
+            <SavedReportsLibrary
+              modelId={model.id}
+              orgId={organisation.id}
+              userId={userId}
+              role={role}
+              basePath={`/o/${orgSlug ?? ""}/m/${model.slug}`}
+            />
+          )}
         </main>
       </div>
     </div>
