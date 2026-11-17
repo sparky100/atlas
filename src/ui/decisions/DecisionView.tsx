@@ -297,10 +297,10 @@ export function DecisionView({ modelId, decisionId, orgId, orgSlug, modelSlug, r
         onSetStance={principlesState.setStance}
       />
 
-      {branchLinks.length > 0 && (
+      {(branchLinks.length > 0 || canAddOption) && (
         <Panel>
           <Text as="h2" size="lg">
-            Criteria
+            {branchLinks.length > 0 ? 'Criteria' : 'Options'}
           </Text>
           {branchLinks.length === 0 ? null : (
             (() => {

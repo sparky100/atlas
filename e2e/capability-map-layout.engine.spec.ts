@@ -30,6 +30,14 @@ async function cardColumnCount(page: Page): Promise<number> {
   return value.trim().split(/\s+/).filter(Boolean).length;
 }
 
+/** How many 240px-minimum columns fit the grid's own current width and gap — the `auto-fill` rule's own arithmetic. */
+async function expectedCardColumns(page: Page): Promise<number> {
+  return page.getByRole('list', { name: 'Finance capabilities' }).evaluate((el) => {
+    const gap = parseFloat(getComputedStyle(el).columnGap) || 0;
+    return Math.max(1, Math.floor((el.getBoundingClientRect().width + gap) / (240 + gap)));
+  });
+}
+
 async function hasHorizontalScroll(page: Page): Promise<boolean> {
   return page.evaluate(() => document.documentElement.scrollWidth > document.documentElement.clientWidth + 1);
 }
@@ -123,21 +131,24 @@ test('capability map layout: an expanded domain\'s card grid matches the respons
   await page.getByRole('button', { name: /Finance/ }).click();
   await expect(page.getByText('Payroll')).toBeVisible();
 
-  await page.setViewportSize({ width: 1440, height: 900 });
-  await expect(async () => { expect(await cardColumnCount(page)).toBe(4); }).toPass();
-  expect(await hasHorizontalScroll(page)).toBe(false);
-
-  await page.setViewportSize({ width: 1100, height: 900 });
-  await expect(async () => { expect(await cardColumnCount(page)).toBe(3); }).toPass();
-  expect(await hasHorizontalScroll(page)).toBe(false);
-
-  await page.setViewportSize({ width: 800, height: 900 });
-  await expect(async () => { expect(await cardColumnCount(page)).toBe(2); }).toPass();
-  expect(await hasHorizontalScroll(page)).toBe(false);
-
+  // The grid is `repeat(auto-fill, minmax(240px, 1fr))` (CapabilityMapView.module.css), so the
+  // column count follows the width it actually gets, with no breakpoints. Assert exactly that
+  // rule at each width, plus that wider windows never show fewer columns than narrower ones.
+  let previous = 0;
+  for (const [width, height] of [[390, 800], [800, 900], [1100, 900], [1440, 900], [1920, 1000]] as const) {
+    await page.setViewportSize({ width, height });
+    await expect(async () => { expect(await cardColumnCount(page)).toBe(await expectedCardColumns(page)); }).toPass();
+    const columns = await cardColumnCount(page);
+    expect(columns).toBeGreaterThanOrEqual(previous);
+    previous = columns;
+    expect(await hasHorizontalScroll(page)).toBe(false);
+  }
   await page.setViewportSize({ width: 390, height: 800 });
   await expect(async () => { expect(await cardColumnCount(page)).toBe(1); }).toPass();
-  expect(await hasHorizontalScroll(page)).toBe(false);
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await expect(async () => { expect(await cardColumnCount(page)).toBeGreaterThanOrEqual(3); }).toPass();
+  await page.setViewportSize({ width: 390, height: 800 });
+  await expect(async () => { expect(await cardColumnCount(page)).toBe(1); }).toPass();
 
   // Every domain (and, for the one expanded, every L2 child) is still
   // reachable at the narrowest tier — wrapped onto further rows, not

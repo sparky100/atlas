@@ -49,9 +49,8 @@ test('sign-up through org and model creation to ModelHome\'s front doors', async
   await page.getByLabel('Display name').fill(displayName);
   await page.getByRole('button', { name: 'Continue' }).click();
 
-  const orgLink = page.getByRole('link', { name: orgName });
-  await expect(orgLink).toBeVisible();
-  await orgLink.click();
+  // A just-created organisation opens by itself (Home.tsx, #488).
+  await expect(page).toHaveURL(/\/o\/[^/]+$/);
 
   // OrgHome: the org's own name, the owner role chip (a fresh org's
   // creator is always its owner, ADR-009), and no models yet.

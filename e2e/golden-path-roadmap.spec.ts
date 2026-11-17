@@ -47,7 +47,7 @@ test('a retire-and-replace change, once merged, appears as an arrow on the roadm
   // at, and merges in one click below without a review queue.
   await goToModelHome(page);
   await page.getByRole('link', { name: 'Changes' }).click();
-  await page.getByPlaceholder(/^Name \(e\.g\./).fill('sunset-legacy-crm');
+  await page.getByLabel("What's this change?").fill('sunset-legacy-crm');
   await page.locator('select').selectOption('record');
   const targetDate = isoDateDaysFromNow(120);
   await page.locator('input[type="date"]').fill(targetDate);
@@ -87,7 +87,11 @@ test('a retire-and-replace change, once merged, appears as an arrow on the roadm
   // runs — S2's own "fix until they pass at 1280 and 390").
   await clickNavItem(page, 'Roadmap');
   await expect(page.getByRole('heading', { name: 'Roadmap', exact: true })).toBeVisible();
-  await expect(page.getByText(quarterLabelDaysFromNow(120))).toBeVisible();
+  // The quarter axis thins its labels to fit the width (at 390 only every other quarter is
+  // named), so the quarter label is only asserted where it has room; the dated change list
+  // below proves the target date at every width.
+  if ((page.viewportSize()?.width ?? 0) >= 1000) await expect(page.getByText(quarterLabelDaysFromNow(120))).toBeVisible();
+  await expect(page.getByRole('listitem').filter({ hasText: `${targetDate} Legacy CRM replaced by New CRM Platform` })).toBeVisible();
   await expect(page.locator('[data-kind="replace"]').first()).toBeVisible();
   // No capability parenthetical: this event comes from the real `replaces`
   // edge the retire flow wrote (`roadmapChangeEvents.ts`'s direct-edge

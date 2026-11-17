@@ -36,7 +36,7 @@ test('roadmap grouped by project: the project\'s change lands under the project,
   await page.getByRole('button', { name: 'Start project' }).click();
   await expect(page.getByRole('heading', { name: 'CRM replacement', level: 1 })).toBeVisible();
 
-  await page.getByLabel('New change name').fill('sunset-legacy-crm');
+  await page.getByLabel("What's this change?").fill('sunset-legacy-crm');
   await page.getByLabel('New change intent').selectOption('record');
   await page.getByLabel('Delivered date').fill(isoDateDaysFromNow(120));
   await page.getByRole('button', { name: 'Start change' }).click();

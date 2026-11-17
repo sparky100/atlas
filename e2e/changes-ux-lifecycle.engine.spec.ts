@@ -51,7 +51,7 @@ test('propose a change from an element page as a contributor, edit, submit; appr
   await contributorPage.getByRole('button', { name: 'Propose a change' }).click();
 
   const changeName = `retire-ledger-vendor-${randomUUID().slice(0, 8)}`;
-  await contributorPage.getByPlaceholder("What's this change? (e.g. Retire the legacy CRM)").fill(changeName);
+  await contributorPage.getByLabel("What's this change?").fill(changeName);
   await contributorPage.getByRole('button', { name: 'Create & continue' }).click();
 
   // 2. Landed back on the same element, now selected into the new change —

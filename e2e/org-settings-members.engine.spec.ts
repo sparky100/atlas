@@ -96,7 +96,8 @@ test('the last owner cannot demote or remove themself — guard_last_owner surfa
   // The owner's own row is the only one, marked "(you)".
   await expect(page.getByText('(you)')).toBeVisible();
 
-  const ownRoleSelect = page.getByRole('combobox').first();
+  // By its own label, not "the first combobox": organisation settings has other selects above the member list now.
+  const ownRoleSelect = page.getByLabel(/^Role for /);
   await expect(ownRoleSelect).toHaveValue('owner');
   await ownRoleSelect.selectOption('architect');
   await expect(page.getByRole('alert').filter({ hasText: "Could not change this member's role" })).toBeVisible({ timeout: 15_000 });

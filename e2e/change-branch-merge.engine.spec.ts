@@ -115,7 +115,7 @@ test('create a change, edit it on its own branch, view it, submit, approve, and 
   // No conflicts on a first submit against an unmoved main: one clean
   // change, nothing blocking, Approve enabled straight away.
   await expect(page.getByText('Clean changes — no conflicts or warnings (1)')).toBeVisible();
-  await expect(page.getByText('0 blocking')).toBeVisible();
+  await expect(page.getByText(/clash(es)? to sort out/)).toHaveCount(0);
   const reviewUrl = page.url();
   const approveButton = page.getByRole('button', { name: 'Approve' });
   await expect(approveButton).toBeEnabled();

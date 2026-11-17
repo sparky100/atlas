@@ -43,5 +43,6 @@ test('add interfaces to an integration platform from its own page, with type and
   await interfacesSection(page).getByRole('link', { name: /Meter reads file/ }).click();
   await expect(page.getByRole('heading', { name: 'Meter reads file' })).toBeVisible();
   await expect(page.getByText('Turns the nightly meter-read file into a REST API')).toBeVisible();
-  await expect(page.getByText('Flows via this interface', { exact: false })).toBeVisible();
+  // With no flow through it yet, the "Flows via this interface" section is hidden rather than shown empty (ElementPage.tsx).
+  await expect(page.getByText('Flows via this interface', { exact: false })).toHaveCount(0);
 });

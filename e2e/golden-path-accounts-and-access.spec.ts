@@ -60,9 +60,9 @@ test('accounts and access: invite, accept, assign a role, then share a model rea
   const secondOrgName = `${prefix} Second Org ${randomUUID().slice(0, 8)}`;
   await page.getByPlaceholder('Organisation name').fill(secondOrgName);
   await page.getByRole('button', { name: 'Create', exact: true }).click();
-  const secondOrgLink = page.getByRole('link', { name: secondOrgName });
-  await expect(secondOrgLink).toBeVisible();
-  await secondOrgLink.click();
+  // A just-created organisation opens by itself (Home.tsx, #488).
+  await expect(page).toHaveURL(/\/o\/[^/]+$/);
+  await expect(page.getByRole('heading', { name: secondOrgName })).toBeVisible();
   const secondOrgSlugMatch = /\/o\/([^/]+)/.exec(page.url());
   if (!secondOrgSlugMatch?.[1]) throw new Error(`could not read the second org slug out of ${page.url()}`);
   const secondOrgSlug = secondOrgSlugMatch[1];
@@ -79,7 +79,7 @@ test('accounts and access: invite, accept, assign a role, then share a model rea
   await page.getByLabel('Organisation slug').fill(secondOrgSlug);
   await page.locator('form').filter({ has: page.getByLabel('Organisation slug') }).getByRole('button', { name: 'Share', exact: true }).click();
   await expect(page.getByText(secondOrgName)).toBeVisible({ timeout: 15_000 });
-  await expect(page.getByText('live model', { exact: true })).toBeVisible();
+  await expect(page.getByRole('main').getByText('live model', { exact: true })).toBeVisible();
 
   // 6. The second org's own "Shared with us" entry resolves — read-only,
   // never the owning org's settings menu.
