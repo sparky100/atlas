@@ -86,7 +86,9 @@ test('define a select attribute, set it on a system, and filter the browse table
   // "Applies to" already defaults to "system" — this golden path never
   // needs to touch it.
   await page.getByRole('button', { name: 'Define attribute' }).click();
-  await expect(page.getByText('Region', { exact: true })).toBeVisible();
+  // "Region" is also a field label in the MuleSoft connection panel higher up
+  // this page, so the new attribute's own entry is the last match.
+  await expect(page.getByText('Region', { exact: true }).last()).toBeVisible();
 
   // Back into the model, onto Northgate's own page, to set the value.
   await page.getByRole('link', { name: 'Atlas', exact: true }).click();
