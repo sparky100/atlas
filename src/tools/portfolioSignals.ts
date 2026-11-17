@@ -26,18 +26,22 @@ export function portfolioRowsOf(snapshot: ModelSnapshot, now: Date): PortfolioRo
 
 const schema = z.strictObject({
   signal: z.enum(PORTFOLIO_SIGNAL_KEYS as unknown as [string, ...string[]]).optional(),
+  includePlannedAndRetired: z.boolean().default(false),
   limit: z.number().int().min(1).max(MAX_TOOL_ROWS).default(DEFAULT_TOOL_ROWS),
 });
 
 export const portfolioSignals = defineTool({
   name: 'portfolio_signals',
-  description: `The Portfolio view over systems and modules: run cost band, fit, criticality, disposition, whether lifecycle exposure is known, capabilities served, business owner, and the signals that fire. With no "signal", returns how many rows each signal fires on. With a "signal" (one of: ${PORTFOLIO_SIGNAL_KEYS.join(', ')}), returns the rows it fires on.`,
+  description: `The Portfolio view over systems and modules: run cost band, fit, criticality, planned action, whether lifecycle exposure is known, capabilities served, business owner, and the signals that fire. Like the Portfolio page it covers today's live systems only; planned and retired ones are left out unless "includePlannedAndRetired" is true. With no "signal", returns how many rows each signal fires on. With a "signal" (one of: ${PORTFOLIO_SIGNAL_KEYS.join(', ')}), returns the rows it fires on.`,
   schema,
   run: async (ctx, input) => {
-    const rows = portfolioRowsOf(await ctx.snapshot(), ctx.now());
+    const everyRow = portfolioRowsOf(await ctx.snapshot(), ctx.now());
+    const rows = input.includePlannedAndRetired ? everyRow : everyRow.filter((r) => r.lifecycleState === 'active');
+    const leftOut = everyRow.length - rows.length;
     if (input.signal === undefined) {
       return okResult(ctx, {
         rows: rows.length,
+        ...(leftOut > 0 ? { leftOutPlannedOrRetired: leftOut } : {}),
         signals: PORTFOLIO_SIGNAL_KEYS.map((key) => ({ signal: key, label: PORTFOLIO_SIGNAL_LABEL[key], count: rows.filter((r) => r.signals.some((s) => s.key === key)).length })),
       });
     }
@@ -49,7 +53,8 @@ export const portfolioSignals = defineTool({
       cost: r.cost,
       fit: r.fit,
       criticality: r.criticality,
-      disposition: r.disposition,
+      plannedAction: r.disposition,
+      lifecycleState: r.lifecycleState,
       lifecycleExposed: r.lifecycleExposed,
       capabilities: r.capabilities.slice(0, 10).map((c) => ({ id: c.capabilityId, name: clip(c.capabilityName, 200) })),
       businessOwner: r.businessOwner ? { id: r.businessOwner.element_id, name: clip(r.businessOwner.name, 200) } : null,

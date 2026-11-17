@@ -25,7 +25,7 @@ const DEFAULT_COLUMNS = ['name', 'type', 'owner', 'lifecycle', 'criticality', 'd
 export const findElements = defineTool({
   name: 'find_elements',
   description:
-    'List elements that match filters, like the Elements page. Fields: name, type, owner, lifecycle, criticality, disposition, plus any recorded attribute by its key (for example supportEndsAt, plannedEnd, annualRunCost). Operators: eq, neq, contains, in, lt, lte, gt, gte, isEmpty, isNotEmpty. Dates compare as YYYY-MM-DD text. Returns id, the requested columns, the true total, and says when the list was cut.',
+    'List elements that match filters, like the Elements page; like the app\'s views of today, planned and retired systems are left out unless a filter on lifecycleState asks for them. Fields: name, type, owner, lifecycle, criticality, disposition (the app calls it Planned action), plus any recorded attribute by its key (for example supportEndsAt, plannedEnd, annualRunCost). Operators: eq, neq, contains, in, lt, lte, gt, gte, isEmpty, isNotEmpty. Dates compare as YYYY-MM-DD text. Returns id, the requested columns, the true total, and says when the list was cut.',
   schema,
   run: async (ctx, input) => {
     const filters: ReportFilter[] = input.filters.map((f) => ({ field: f.field, operator: f.operator, value: f.value }));

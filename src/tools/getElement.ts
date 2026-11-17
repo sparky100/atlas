@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import type { Json } from '../contracts/rows';
 import { attributesRecord } from '../engine/elementRead/attributesRecord';
+import { lifecycleStateOf } from '../engine/elementRead/fitAndExposure';
 import { clip, DEFAULT_RELATIONSHIPS, MAX_ATTRIBUTES } from './limits';
 import { defineTool, displayNameOf, elementRef, failure, indexSnapshot, okResult, uuidInput } from './toolKit';
 
@@ -15,7 +16,7 @@ function plain(value: Json | undefined): string | number | boolean | null {
 
 export const getElement = defineTool({
   name: 'get_element',
-  description: 'Everything recorded about one element: its type, name, parent, owner, lifecycle, criticality, disposition, attributes (with where each came from and how sure we are), and a count of its relationships. Use list_relationships for the relationships themselves.',
+  description: 'Everything recorded about one element: its type, name, parent, owner, lifecycle, whether it is planned, active or retired today, criticality, planned action, attributes (with where each came from and how sure we are), and a count of its relationships. Use list_relationships for the relationships themselves.',
   schema,
   run: async (ctx, input) => {
     const snapshot = await ctx.snapshot();
@@ -39,7 +40,8 @@ export const getElement = defineTool({
       owner: row.owner ? elementRef(index, row.owner) : null,
       lifecycle: row.lifecycleStatus,
       criticality: row.criticality,
-      disposition: row.disposition,
+      lifecycleState: lifecycleStateOf(element, new Map(snapshot.elements.map((e) => [e.element_id, e])), ctx.now()),
+      plannedAction: row.disposition,
       aliases: (snapshot.aliases.get(element.element_id) ?? []).slice(0, 20).map((a) => clip(a, 200)),
       attributes,
       attributesTruncated: Object.keys(attributesRecord(element.attributes)).length > MAX_ATTRIBUTES,

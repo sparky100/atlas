@@ -2,6 +2,8 @@ import { describe, expect, it } from 'vitest';
 import vocabulary from '../../../docs/VOCABULARY.md?raw';
 import guide from '../../../docs/USER-GUIDE.md?raw';
 import { buildHelpAssistantSystemPrompt } from './helpAssistantPrompt';
+import { askSystemPrompt } from '../../tools/askPrompt';
+import { atlasVocabularyForAi } from '../../tools/vocabularyForAi';
 import { RELATIONSHIP_TYPES } from '../../contracts/delta';
 import { AI_AUTONOMY_LABELS, AI_USE_LABELS, ANNUAL_RUN_COST_BANDS, DISPOSITION_LEVELS } from '../../contracts/attributeSchema';
 import { DISPOSITION_NOT_ASSESSED_LABEL } from '../../engine/elementRead/disposition';
@@ -53,5 +55,32 @@ describe('docs/USER-GUIDE.md and Help use the same words', () => {
     const prompt = buildHelpAssistantSystemPrompt();
     expect(prompt).toContain('=== VOCABULARY ===');
     expect(prompt).toContain('**Which one, uses or flows to?**');
+  });
+});
+
+describe('Ask Atlas explains the model in the same words', () => {
+  const prompt = askSystemPrompt('Test model', '2026-11-17');
+
+  it('includes the vocabulary block', () => {
+    expect(prompt).toContain(atlasVocabularyForAi());
+  });
+
+  it('explains every relationship type, by its stored name or as people read it', () => {
+    for (const type of RELATIONSHIP_TYPES) expect(prompt).toContain(type);
+  });
+
+  it('names every planned action and run cost band as the app does', () => {
+    for (const level of DISPOSITION_LEVELS) expect(prompt).toContain(level.label);
+    for (const band of ANNUAL_RUN_COST_BANDS) expect(prompt).toContain(band.label);
+  });
+
+  it('tells the assistant to answer for today and to say when planned or retired systems are left out', () => {
+    expect(prompt).toMatch(/answer for today/i);
+    expect(prompt).toMatch(/planned and retired systems are left out/i);
+  });
+
+  it('keeps the uses versus flows_to rule the vocabulary states', () => {
+    expect(vocabulary).toContain('does data travel from A to B?');
+    expect(prompt).toContain('does data travel from A to B?');
   });
 });
