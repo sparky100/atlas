@@ -15,7 +15,7 @@ Plain English, no engine words. Where the stored name differs from what people s
 | **Actor** | A person, team or organisation. Internal or external. |
 | **Value stream** | How the organisation delivers an outcome, as stages. |
 
-There is no element for data, services, processes, goals or projects. A **project**, **decision**, **change** and **principle** are records kept beside the model, not parts of it.
+There is no element for data, services, processes, goals or projects. A **goal**, **project**, **decision**, **change** and **principle** are records kept beside the model, not parts of it.
 
 ## Relationship types
 
@@ -61,6 +61,7 @@ Import and spreadsheets carry two of these as relationships (uses, flows to). Su
 | **Decision** | An architectural choice with context, options and reasons. Proposed, accepted, cancelled or superseded. |
 | **Project** | One piece of architecture work, with its decisions and changes. Active, on hold, closed or cancelled. |
 | **Principle** | A short rule decisions are checked against. Active or retired. |
+| **Goal** | What the organisation is trying to achieve; answers "why does this capability matter?". Linked to the capabilities that serve it. Active or retired. A note about intent, never part of the landscape. |
 
 ## Roles
 
@@ -89,7 +90,6 @@ Home's checks, in the words the app uses:
 
 - **Model:** Home, Capability map, Landscape, Value streams, Elements
 - **Analyse:** Portfolio, Roadmap, Reports, Ask Atlas
-- **Work:** Projects, Changes, Decisions, Principles, Import
+- **Direction:** Goals, Principles
+- **Work:** Projects, Changes, Decisions, Import
 - **Record:** History
-
-(Goals and a Direction menu are being added by a separate piece of work. When they merge, this list and the Principles entry move with them.)

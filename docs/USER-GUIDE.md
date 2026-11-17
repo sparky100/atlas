@@ -13,10 +13,11 @@ This is the guide the in-app **Help** assistant reads to answer your questions. 
 1. Start here: what Atlas is, your first 10 minutes, signing in and roles.
 2. The model: the building blocks and how things connect.
 3. Finding your way around, then looking at the model: Home, Views, Element pages, Elements.
-4. Changing the model: Import, Changes, Decisions, Principles, Projects.
-5. Reporting and AI: Reports, Ask Atlas, Connect Claude Desktop.
-6. Keeping it trustworthy: Planned action, Still accurate, Comments, History.
-7. Settings, licence and help.
+4. Where you are heading: Goals, Principles.
+5. Changing the model: Import, Changes, Decisions, Projects.
+6. Reporting and AI: Reports, Ask Atlas, Connect Claude Desktop.
+7. Keeping it trustworthy: Planned action, Still accurate, Comments, History.
+8. Settings, licence and help.
 
 ---
 
@@ -111,13 +112,14 @@ Several flows via the same interface is how reuse and combining show: the interf
 
 ## Finding your way around
 
-Every model page shares the same navigation, in four groups:
+Every model page shares the same navigation, in five groups:
 
 | Group | Pages |
 |---|---|
 | **Model** | Home, Capability map, Landscape, Value streams, Elements |
 | **Analyse** | Portfolio, Roadmap, Reports, Ask Atlas |
-| **Work** | Projects, Changes, Decisions, Principles, Import (the **Work** heading opens a page explaining them and offering **Start something**; it lists **Waiting for review**, then Projects, Decisions and Changes) |
+| **Direction** | Goals, Principles |
+| **Work** | Projects, Changes, Decisions, Import (the **Work** heading opens a page explaining them and offering **Start something**; it lists **Waiting for review**, then Projects, Decisions and Changes) |
 | **Record** | History |
 
 On a phone, the bar at the bottom shows Home, Capabilities, Landscape and Changes; everything else is under **More**. Two items show a number of open items: **Changes** — changes still open (draft, proposed, in review or approved) — and **Decisions** — decisions still proposed. Projects has no number. On a phone, a dot on **More** means Decisions has a number inside it.
@@ -175,12 +177,26 @@ What you can do depends on your role and on whether you're looking at the live m
 
 ## The Elements page
 
-**Elements** lists everything in the model. Search by name or owner, filter by type, planned action or a custom attribute, tick **AI agents only** or **Uses AI**, or pick a **Finding** to see just the elements a health finding flagged. Sort by any column (a **Completeness** column shows how many of a system's key facts are recorded, for example “4 of 6”, and sorting by it puts the least complete first; an **AI** column appears when any listed system uses AI: an agent shows how it acts, anything else shows **Built-in AI** or **AI service**), and **Export CSV** or **Export XLSX**. **Export everything (JSON)** downloads the whole model — every element, relationship (all six types), value, where each value came from, the sources, and your custom attribute definitions — whatever filter is on. It is a backup and analysis file: **Import cannot read it back**, and it does not hold decisions, principles, projects, changes, comments or versions. To bring data back in through **Import**, use the workbook instead. The workbook carries each element's **Atlas ID** and its parent (a module's system, a capability's parent capability) and lists every relationship, so it can be brought back in through **Import**: modules keep their platform and systems keep their capability links.
+**Elements** lists everything in the model. Search by name or owner, filter by type, planned action or a custom attribute, tick **AI agents only** or **Uses AI**, or pick a **Finding** to see just the elements a health finding flagged. Sort by any column (a **Completeness** column shows how many of a system's key facts are recorded, for example “4 of 6”, and sorting by it puts the least complete first; an **AI** column appears when any listed system uses AI: an agent shows how it acts, anything else shows **Built-in AI** or **AI service**), and **Export CSV** or **Export XLSX**. **Export everything (JSON)** downloads the whole model — every element, relationship (all six types), value, where each value came from, the sources, your custom attribute definitions, plus your goals and the capabilities that serve each — whatever filter is on. It is a backup and analysis file: **Import cannot read it back**, and it does not hold decisions, principles, projects, changes, comments or versions. To bring data back in through **Import**, use the workbook instead. The workbook carries each element's **Atlas ID** and its parent (a module's system, a capability's parent capability) and lists every relationship, so it can be brought back in through **Import**: modules keep their platform and systems keep their capability links.
 
 **Key facts “N of M recorded”.** A system or module shows how many of its key facts are recorded as a plain count, never a score: its run cost; for a system also its owner, criticality, planned action and at least one capability link; and a fit rating on each capability link. The chip beside its name (for example “4 of 6 recorded”) says what is missing and opens **Fill in** on that system. A capability shows the same count added up over the systems that support it. Retired systems have none. The same count is the **Completeness** column on Elements, the **key facts missing** count on My work, and the list on **Gaps** (under Reports).
 
 - **Edit in grid** turns the Lifecycle, Criticality and Planned action cells (and a custom attribute's column, when one is shown) into editable controls. **Save N changes** records them all as one edit — on the live model, or in the change you're working in. While editing, each row also has **✓ Still accurate**.
 - **Import…** (architects and owners) takes you to Import.
+
+## Goals
+
+A **goal** is what your organisation is trying to achieve, such as "Cut the time to connect a new customer". Goals answer one question: *why does this capability matter?* **Direction → Goals** lists them. Each has a **title**, **what success looks like** in a sentence or two, and optionally **why now** (a regulation, a merger, a contract ending). Under each goal you see the capabilities that **serve** it, with how many systems support each, as plain numbers, never a score. Owners and architects add, edit and **retire** goals and choose which capabilities serve each one; everyone else can read them. A retired goal is never deleted, its wording is fixed while it is retired, and **Make active again** brings it back.
+
+A capability's own page has a **Why it matters** section listing the goals it serves, where owners and architects can link another goal. A goal is a note about intent, not a part of the landscape: you cannot link a system or a relationship to one, and removing every goal changes nothing in the model.
+
+Ask Atlas and Claude Desktop can answer "why does this capability matter?" from the same goals.
+
+## Principles
+
+A **principle** is a short rule your team agrees decisions will be checked against, such as "Reuse before buying, buy before building". A good principle can change which option you choose; a rule that only says "keep the record complete" is a gap to fix, not a principle. **Direction → Principles** lists them, each with a title, **the rule** in a sentence or two, and optionally **why** a team would accept it. Owners and architects add, edit and **retire** them; everyone else can read them. A retired principle is never deleted: it stays on the decisions that cite it, its wording is fixed while it is retired, and **Make active again** brings it back.
+
+Each principle shows the decisions that **follow** it and the ones that **depart from** it, with the reason given for each departure, as plain counts and links. A decision can only cite an active principle from its own model, and only while the decision is still proposed. A departure always needs a reason; following one does not.
 
 ## Bringing data in: import
 
@@ -233,12 +249,6 @@ A decision that's no longer needed can be **cancelled** while it's still propose
 
 Start a decision from **Decisions**, from a project, or with **Start a decision →** on a Home finding, a weak capability or a value stream's panel. An element page's **Decisions** section shows the decisions that concern it.
 
-## Principles
-
-A **principle** is a short rule your team agrees decisions will be checked against, such as "Reuse before buying, buy before building". A good principle can change which option you choose; a rule that only says "keep the record complete" is a gap to fix, not a principle. **Work → Principles** lists them, each with a title, **the rule** in a sentence or two, and optionally **why** a team would accept it. Owners and architects add, edit and **retire** them; everyone else can read them. A retired principle is never deleted: it stays on the decisions that cite it, its wording is fixed while it is retired, and **Make active again** brings it back.
-
-Each principle shows the decisions that **follow** it and the ones that **depart from** it, with the reason given for each departure, as plain counts and links. A decision can only cite an active principle from its own model, and only while the decision is still proposed. A departure always needs a reason; following one does not.
-
 ## Projects
 
 A **project** holds one piece of architecture work — "Housing CRM replacement", say — together with the decisions it raises and the changes that deliver it. Open **Projects** (under Work) to see every project, grouped as active, on hold, closed or cancelled.
@@ -284,7 +294,7 @@ A report that uses a health-finding filter cannot be saved yet; the page says so
 **Analyse → Ask Atlas** (or press Ctrl-K and type "ask") lets you ask a question about the model in plain words, such as "Which systems are critical?".
 
 - It is **off until an organisation owner switches it on**, in organisation settings under Ask Atlas. While it is on, your questions and the names, descriptions, attributes and relationships of the elements needed to answer them are sent to our AI provider. Comments and unreviewed imports are not sent.
-- It can only read. It cannot change anything. It can answer about elements and how they connect, saved reports, data-quality findings, portfolio signals, and the changes, decisions and projects recorded for the model (summaries only; comments and unreviewed imports are not read).
+- It can only read. It cannot change anything. It can answer about elements and how they connect, saved reports, data-quality findings, portfolio signals, and the changes, decisions, projects and goals recorded for the model (summaries only; comments and unreviewed imports are not read).
 - Every element it names is a link to that element's page. An answer that names no element is marked **Ungrounded**, and a reference it could not verify is removed and flagged. Open **What was looked up** under an answer to see each lookup and how many results it found.
 - Answers come from the live model only (Claude Desktop, below, can also read a change). Long lists are cut short, and the answer says so.
 - Nothing is saved: reload the page, or press Clear, and the conversation is gone.

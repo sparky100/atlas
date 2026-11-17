@@ -236,3 +236,8 @@ export function canManageDuplicatesCheck(role: MemberRole | null): boolean {
 export function canRateDecisionOption(role: MemberRole | null, decision: DecisionRow): boolean {
   return canCreateChangeBranch(role) && decision.status === 'proposed';
 }
+
+/** ADR-035: mirrors `goals_insert`/`_update` and `goal_capabilities`' RLS floor — owners and architects write the goals and link them to capabilities; everyone else reads them. */
+export function canEditGoals(role: MemberRole | null): boolean {
+  return role === 'owner' || role === 'architect';
+}
