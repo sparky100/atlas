@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { ANNUAL_RUN_COST_OPTIONS } from '../../contracts/attributeSchema';
 import type { Criticality } from '../../contracts/delta';
 import { DISPOSITION_LEVELS } from '../../contracts/attributeSchema';
-import { CHART_FIT_ROWS, type ChartFit } from './portfolioChart';
+import { CHART_FIT_ROWS, type ChartFit } from './portfolioChartModel';
 import { annualRunCostLabel } from '../elements/annualRunCost';
 import { CRITICALITY_ORDER } from '../elements/criticalityTone';
 import { DEFAULT_PORTFOLIO_FILTERS, type PortfolioFilters } from './portfolioFilter';

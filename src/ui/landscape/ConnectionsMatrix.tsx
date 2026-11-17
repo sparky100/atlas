@@ -4,7 +4,7 @@ import type { UUID } from '../../contracts/delta';
 import type { ElementsHeadRow, RelationshipsHeadRow } from '../../contracts/rows';
 import { Text } from '../components/Text/Text';
 import { buildIntegrationRows } from '../integrations/integrationRows';
-import { buildConnectionsMatrix, connectionCellKey, type ConnectionKind } from './connectionsMatrix';
+import { buildConnectionsMatrix, connectionCellKey, type ConnectionKind } from './connectionsMatrixModel';
 import type { LandscapeGroup } from './landscapeGroups';
 import styles from './ConnectionsMatrix.module.css';
 

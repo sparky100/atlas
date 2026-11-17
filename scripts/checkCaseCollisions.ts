@@ -22,7 +22,9 @@ const paths = output.split('\n').filter(Boolean);
 
 const byLowercase = new Map<string, string[]>();
 for (const path of paths) {
-  const key = path.toLowerCase();
+  // Also drop the extension: `Foo.tsx` and `foo.ts` are different files to git,
+  // but an extension-less import (`./Foo`) resolves to `foo.ts` on Windows/macOS.
+  const key = path.toLowerCase().replace(/\.(d\.ts|tsx?|jsx?|mjs|cjs)$/, '');
   const bucket = byLowercase.get(key);
   if (bucket) {
     bucket.push(path);

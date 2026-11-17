@@ -5,7 +5,7 @@ import type { ElementsHeadRow, RelationshipsHeadRow } from '../../contracts/rows
 import { Chip } from '../components/Chip/Chip';
 import { Text } from '../components/Text/Text';
 import { fitForPurposeToneFor } from '../elements/fitForPurposeTone';
-import { buildSupportMatrix, cellKey } from './supportMatrix';
+import { buildSupportMatrix, cellKey } from './supportMatrixModel';
 import styles from './SupportMatrix.module.css';
 
 export interface SupportMatrixProps {
