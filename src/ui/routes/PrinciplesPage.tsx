@@ -6,7 +6,7 @@ import { ModelNav } from '../components/ModelNav/ModelNav';
 import navStyles from '../components/ModelNav/ModelNav.module.css';
 import { PageIntro } from '../components/PageIntro/PageIntro';
 import { Text } from '../components/Text/Text';
-import { WORK_COPY } from '../work/workCopy';
+import { DIRECTION_COPY } from '../work/workCopy';
 import { useAuth } from '../auth/useAuth';
 import { EditingBranchBanner } from '../branches/EditingBranchBanner/EditingBranchBanner';
 import { useBranchLabel } from '../branches/useBranchLabel';
@@ -62,7 +62,7 @@ export function PrinciplesPage() {
               Principles
             </Text>
           </div>
-          <PageIntro>{WORK_COPY.principle}</PageIntro>
+          <PageIntro>{DIRECTION_COPY.principle}</PageIntro>
           <PrinciplesView modelId={model.id} orgId={organisation?.id ?? ''} userId={userId} orgSlug={orgSlug ?? ''} modelSlug={model.slug} canEdit={canEditPrinciples(role)} />
         </main>
       </div>

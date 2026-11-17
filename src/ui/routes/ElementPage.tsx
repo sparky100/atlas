@@ -16,6 +16,7 @@ import { CollapsibleSection } from '../components/CollapsibleSection/Collapsible
 import { CommentsSection } from '../components/CommentsSection/CommentsSection';
 import { ConvertToModuleAction } from '../components/ConvertToModuleAction/ConvertToModuleAction';
 import { DocumentsSection } from '../components/DocumentsSection/DocumentsSection';
+import { CapabilityGoalsSection } from '../goals/CapabilityGoalsSection';
 import { ElementDecisionsSection } from '../components/ElementDecisionsSection/ElementDecisionsSection';
 import { ElementHeader } from '../components/ElementHeader/ElementHeader';
 import { lifecycleTagFor } from '../components/LifecycleTag/lifecycleTagFor';
@@ -51,7 +52,7 @@ import { DraftWithAi } from '../changes/DraftWithAi';
 import { ProposeChangePicker } from '../home/ProposeChangePicker';
 import { useModels } from '../models/useModels';
 import { canCreateChangeBranch, canEditBranch, canEditValueStreamStructure, useMembership } from '../orgs/useMembership';
-import { canEditOnMain, canStartProject } from '../orgs/roleGates';
+import { canEditGoals, canEditOnMain, canStartProject } from '../orgs/roleGates';
 import { canStartDecision } from '../orgs/useMembership';
 import { startDecisionFromElementHref } from '../decisions/decisionPrefill';
 import { startProjectFromElementHref } from '../projects/projectPrefill';
@@ -876,6 +877,11 @@ export function ElementPage() {
                     ) : (
                       <SecondaryPlaceholder status={state.data.secondary} />
                     )}
+                  </CollapsibleSection>
+                )}
+                {elementType === 'capability' && (
+                  <CollapsibleSection title="Why it matters">
+                    <CapabilityGoalsSection modelId={model.id} capabilityId={state.data.element.element_id} userId={userId} orgSlug={organisation?.slug ?? ''} modelSlug={model.slug} canEdit={canEditGoals(role)} />
                   </CollapsibleSection>
                 )}
                 {(state.data.secondary !== 'ready' || state.data.elementDecisions.length > 0) && (

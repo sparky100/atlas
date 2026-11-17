@@ -10,6 +10,7 @@ import { getModelName, listAllElements } from '../../db/elementBrowse';
 import { listAllRelationships } from '../../db/elements';
 import { listFactsForCommit } from '../../db/healthFindings';
 import { listSourcesForModel } from '../../db/sources';
+import { listGoalLinksForGoals, listGoalsForModel } from '../../db/goals';
 import { buildModelSnapshot } from '../exports/modelSnapshot';
 
 export type ElementExportStatus = 'idle' | 'working';
@@ -110,14 +111,16 @@ export function useElementExport({ modelId, commitId, definitions, rows, filenam
         setError('This model has no commits yet.');
         return;
       }
-      const [elements, relationships, facts, sources, modelName] = await Promise.all([
+      const goals = await listGoalsForModel(supabase, modelId);
+      const [elements, relationships, facts, sources, modelName, goalLinks] = await Promise.all([
         listAllElements(supabase, commitId),
         listAllRelationships(supabase, commitId),
         listFactsForCommit(supabase, commitId),
         listSourcesForModel(supabase, modelId),
         getModelName(supabase, modelId),
+        listGoalLinksForGoals(supabase, goals.map((g) => g.id)),
       ]);
-      const snapshot = buildModelSnapshot({ modelId, modelName: modelName ?? filenameBase, commitId, exportedAt: new Date(), elements, relationships, facts, sources, definitions });
+      const snapshot = buildModelSnapshot({ modelId, modelName: modelName ?? filenameBase, commitId, exportedAt: new Date(), elements, relationships, facts, sources, definitions, goals, goalLinks });
       downloadBlob(new Blob([JSON.stringify(snapshot, null, 2)], { type: 'application/json' }), `${sanitizeForFilename(modelName ?? filenameBase)}-everything.json`);
     } catch (e) {
       reportError("Couldn't export.", e);

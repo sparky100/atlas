@@ -2,8 +2,8 @@
   "manifest_version": "0.3",
   "name": "atlas-mcp",
   "display_name": "Atlas",
-  "description": "Ask your AI assistant about your organisation's Atlas model: capabilities, systems, owners, changes and decisions. Read-only.",
-  "long_description": "Lets your assistant read your Atlas models: search and open elements, follow relationships, run saved reports, see health findings and the application portfolio, and look at proposed changes, decisions and projects. It is read-only, shows only what you can already see in Atlas, and signs in as you with your own Atlas email and password. Your organisation's owner must have turned on Ask Atlas.",
+  "description": "Ask your AI assistant about your organisation's Atlas model: capabilities, systems, owners, changes, decisions and goals. Read-only.",
+  "long_description": "Lets your assistant read your Atlas models: search and open elements, follow relationships, run saved reports, see health findings and the application portfolio, and look at proposed changes, decisions, projects and goals. It is read-only, shows only what you can already see in Atlas, and signs in as you with your own Atlas email and password. Your organisation's owner must have turned on Ask Atlas.",
   "author": {
     "name": "Atlas"
   },

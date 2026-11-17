@@ -33,6 +33,10 @@ describe('modelNavSectionFor', () => {
     expect(modelNavSectionFor('/work')).toBe('work');
   });
 
+  it('matches goals', () => {
+    expect(modelNavSectionFor('/goals')).toBe('goals');
+  });
+
   it('matches principles', () => {
     expect(modelNavSectionFor('/principles')).toBe('principles');
   });
