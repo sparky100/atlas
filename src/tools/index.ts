@@ -10,10 +10,10 @@ import { listRelationships } from './listRelationships';
 import { portfolioSignals } from './portfolioSignals';
 import { listSavedReports, runSavedReport } from './savedReports';
 import { searchElements } from './searchElements';
-import { changeImpact, listChanges, listDecisions, listGoals, listProjects } from './workRecords';
+import { changeImpact, listChanges, listDecisions, listGoals, listPrinciples, listProjects } from './workRecords';
 import type { ModelTool, ToolContext, ToolResult } from './types';
 
-export const MODEL_TOOLS: readonly ModelTool[] = [searchElements, getElement, listRelationships, findElements, listSavedReports, runSavedReport, listHealthFindings, portfolioSignals, listChanges, changeImpact, listDecisions, listProjects, listGoals];
+export const MODEL_TOOLS: readonly ModelTool[] = [searchElements, getElement, listRelationships, findElements, listSavedReports, runSavedReport, listHealthFindings, portfolioSignals, listChanges, changeImpact, listDecisions, listProjects, listGoals, listPrinciples];
 
 export function callTool(ctx: ToolContext, name: string, input: unknown): Promise<ToolResult> {
   const tool = MODEL_TOOLS.find((t) => t.name === name);

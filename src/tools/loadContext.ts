@@ -15,6 +15,7 @@ import { listDecisionsForModel, listOpenDecisionElementLinksForModel } from '../
 import { listAllRelationships, listFactsForSubject } from '../db/elements';
 import { listGoalLinksForGoals, listGoalsForModel } from '../db/goals';
 import { getStaleAfterMonthsForModel } from '../db/organisations';
+import { listPrincipleLinksForPrinciples, listPrinciplesForModel } from '../db/principles';
 import { listProjectsForModel } from '../db/projects';
 import { listSavedReports } from '../db/reports';
 import { selectAll } from '../db/selectAll';
@@ -48,6 +49,8 @@ export function createToolContext(supabase: Client, model: { id: UUID; name: str
   let projects: ReturnType<typeof listProjectsForModel> | null = null;
   let goals: ReturnType<typeof listGoalsForModel> | null = null;
   let goalLinks: ReturnType<typeof listGoalLinksForGoals> | null = null;
+  let principles: ReturnType<typeof listPrinciplesForModel> | null = null;
+  let principleLinks: ReturnType<typeof listPrincipleLinksForPrinciples> | null = null;
   return {
     stamp: { modelId: model.id, modelName: model.name, ref, commitId },
     snapshot: () => (snapshot ??= loadSnapshot(supabase, model.id, commitId)),
@@ -62,6 +65,8 @@ export function createToolContext(supabase: Client, model: { id: UUID; name: str
     projects: () => (projects ??= listProjectsForModel(supabase, model.id)),
     goals: () => (goals ??= listGoalsForModel(supabase, model.id)),
     goalLinks: async () => (goalLinks ??= listGoalLinksForGoals(supabase, (await (goals ??= listGoalsForModel(supabase, model.id))).map((g) => g.id))),
+    principles: () => (principles ??= listPrinciplesForModel(supabase, model.id)),
+    principleLinks: async () => (principleLinks ??= listPrincipleLinksForPrinciples(supabase, (await (principles ??= listPrinciplesForModel(supabase, model.id))).map((p) => p.id))),
     changeImpact: (change) => loadChangeSummary(supabase, model.id, change),
     now: () => new Date(),
   };

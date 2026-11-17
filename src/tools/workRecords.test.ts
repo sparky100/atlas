@@ -140,3 +140,32 @@ describe('citations and non-element ids', () => {
     expect(result.unverifiedRemoved).toBe(3);
   });
 });
+
+describe('list_principles', () => {
+  const principle = (n: number, over: Record<string, unknown> = {}) => ({ id: uid(n), org_id: uid(900), model_id: uid(901), title: `Principle ${String(n)}`, statement: 'Reuse before buying.', why: '', status: 'active' as const, created_by: uid(902), created_at: '', retired_by: null, retired_at: null, ...over });
+  it('lists active principles with who follows and who departs, and names the id `principleId`', async () => {
+    const ctx = estateContext({
+      decisions: [decision(540, { title: 'Pick a CRM' }), decision(541, { title: 'Keep the old portal' })],
+      principles: [principle(560), principle(561, { status: 'retired', retired_by: uid(902), retired_at: '2026-11-01' })],
+      principleLinks: [
+        { decision_id: uid(540), principle_id: uid(560), stance: 'follows', reason: '', created_by: uid(902), created_at: '' },
+        { decision_id: uid(541), principle_id: uid(560), stance: 'departs', reason: 'Contract runs to 2028.', created_by: uid(902), created_at: '' },
+      ],
+    });
+    const result = data(await callTool(ctx, 'list_principles', {})) as { principles: { principleId: string; rule: string; followedBy: { total: number; decisions: { title: string }[] }; departedFrom: { total: number; decisions: { reason: string }[] } }[] };
+    expect(result.principles.map((p) => p.principleId)).toEqual([uid(560)]);
+    expect(result.principles[0]?.rule).toBe('Reuse before buying.');
+    expect(result.principles[0]?.followedBy).toMatchObject({ total: 1, decisions: [{ title: 'Pick a CRM' }] });
+    expect(result.principles[0]?.departedFrom).toMatchObject({ total: 1, decisions: [{ reason: 'Contract runs to 2028.' }] });
+    const retired = data(await callTool(ctx, 'list_principles', { status: 'retired' })) as { principles: { principleId: string }[] };
+    expect(retired.principles.map((p) => p.principleId)).toEqual([uid(561)]);
+  });
+});
+
+describe('list_decisions uses the app\'s word for a cancelled decision', () => {
+  it('reports and filters a stored "rejected" decision as cancelled', async () => {
+    const ctx = estateContext({ decisions: [decision(570, { status: 'rejected' }), decision(571, { status: 'accepted' })] });
+    const cancelled = data(await callTool(ctx, 'list_decisions', { status: 'cancelled' })) as { decisions: { decisionId: string; status: string }[] };
+    expect(cancelled.decisions).toEqual([expect.objectContaining({ decisionId: uid(570), status: 'cancelled' })]);
+  });
+});

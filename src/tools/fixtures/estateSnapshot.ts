@@ -9,6 +9,7 @@ import type { ElementsHeadRow, FactsRow, RelationshipsHeadRow } from '../../cont
 import type { ChangeSummary } from '../../db/changeSummary';
 import type { OpenDecisionElementLink } from '../../db/decisions';
 import type { GoalCapabilityRow, GoalRow } from '../../contracts/goals';
+import type { DecisionPrincipleRow, PrincipleRow } from '../../contracts/principles';
 import type { BranchRow, DecisionRow, ProjectRow, SavedReportRow } from '../../db/types';
 import type { ModelSnapshot, ToolContext } from '../types';
 
@@ -63,7 +64,7 @@ export function savedReport(n: number, name: string, spec: unknown): SavedReport
 
 export const FIXTURE_NOW = new Date('2026-11-06T12:00:00Z');
 
-export function estateContext(over: { snapshot?: ModelSnapshot; facts?: FactsRow[]; reports?: SavedReportRow[]; retired?: UUID[]; changes?: BranchRow[]; decisions?: DecisionRow[]; decisionLinks?: OpenDecisionElementLink[]; projects?: ProjectRow[]; goals?: GoalRow[]; goalLinks?: GoalCapabilityRow[]; impact?: Record<string, ChangeSummary | null> } = {}): ToolContext {
+export function estateContext(over: { snapshot?: ModelSnapshot; facts?: FactsRow[]; reports?: SavedReportRow[]; retired?: UUID[]; changes?: BranchRow[]; decisions?: DecisionRow[]; decisionLinks?: OpenDecisionElementLink[]; projects?: ProjectRow[]; goals?: GoalRow[]; goalLinks?: GoalCapabilityRow[]; principles?: PrincipleRow[]; principleLinks?: DecisionPrincipleRow[]; impact?: Record<string, ChangeSummary | null> } = {}): ToolContext {
   const snapshot = over.snapshot ?? estateSnapshot();
   return {
     stamp: { modelId: uid(901), modelName: 'Test estate', ref: 'main', commitId: uid(903) },
@@ -79,6 +80,8 @@ export function estateContext(over: { snapshot?: ModelSnapshot; facts?: FactsRow
     projects: () => Promise.resolve(over.projects ?? []),
     goals: () => Promise.resolve(over.goals ?? []),
     goalLinks: () => Promise.resolve(over.goalLinks ?? []),
+    principles: () => Promise.resolve(over.principles ?? []),
+    principleLinks: () => Promise.resolve(over.principleLinks ?? []),
     changeImpact: (change) => Promise.resolve(over.impact?.[change.id] ?? null),
     now: () => FIXTURE_NOW,
   };
