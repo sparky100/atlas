@@ -133,7 +133,9 @@ test('a scanned PDF with no text layer fails with a plain explanation', async ({
   // `runCapture.ts`'s own `NO_TEXT_LAYER` message ("This PDF is scanned...")
   // — this fails before any LLM call at all, so it needs no live model
   // connectivity, unlike the first test above.
-  await expect(page.getByText(/This PDF is scanned/i)).toBeVisible({ timeout: 60_000 });
+  // The page shows this message twice (the run's failure line and its
+  // detail), so `.first()`: strict mode rejects an ambiguous locator.
+  await expect(page.getByText(/This PDF is scanned/i).first()).toBeVisible({ timeout: 60_000 });
 });
 
 test('upload a JSON file, bulk-accept every new candidate by keyboard, and apply', async ({ page }, testInfo) => {
