@@ -311,6 +311,7 @@ If you use Claude Desktop, you can ask it about your models directly. **Home** h
 - It is **off until an organisation owner switches on Ask Atlas** (organisation settings). That switch covers connected apps too: while it is off, Claude Desktop is told your organisation has not turned on AI access and gets no model content.
 - Claude Desktop is your own choice of AI app, so what it reads goes to it and to its provider, not through Atlas's AI provider. Anything you copy out of a reply is yours to handle as you would any other Atlas data.
 - If you have more than one model, say which: "in the Council model, ...". Ask for a change by name to see a model as that change would leave it.
+- It signs in with an Atlas email and password. If you only ever sign in with **Microsoft**, you have no Atlas password, so it cannot connect for you yet.
 - It needs Node.js 20 or later on your computer. If it says you are not signed in, check the email and password in the extension's settings.
 - **Check for updates** (off by default) makes it fetch one small version file when it starts, so it can tell you a newer download exists. It sends nothing about you or your models.
 
