@@ -5,7 +5,7 @@ import type { ElementsHeadRow, RelationshipsHeadRow } from '../../contracts/rows
 import type { UUID } from '../../contracts/delta';
 import type { LandscapeColourByMode } from '../../contracts/userPreferences';
 import type { ChipTone } from '../components/Chip/Chip';
-import type { ElementVersionDiff, RelationshipVersionDiff, VersionDiff } from '../../engine/versionDiff';
+import { forLandscapeDisplay, type ElementVersionDiff, type RelationshipVersionDiff, type VersionDiff } from '../../engine/versionDiff';
 import { elementTypeGlyph } from '../components/ElementTypeGlyph/glyph';
 import { attributesRecord } from '../elements/attributesRecord';
 import { isIntegrationPlatform } from '../elements/systemKind';
@@ -346,8 +346,10 @@ export function LandscapeCanvas({
   const [hoverReference, setHoverReference] = useState<{ elementId: UUID; screenX: number; screenY: number } | null>(null);
   const dragRef = useRef<{ startX: number; startY: number; startTransform: Transform; moved: boolean } | null>(null);
 
-  const diffByElementId = useMemo(() => new Map<UUID, ElementVersionDiff>(diff?.elements.map((e) => [e.elementId, e]) ?? []), [diff]);
-  const diffByRelationshipId = useMemo(() => new Map<UUID, RelationshipVersionDiff>(diff?.relationships.map((r) => [r.relationshipId, r]) ?? []), [diff]);
+  // What the Landscape counts as "Changed" is narrower than the full diff (`forLandscapeDisplay`).
+  const shownDiff = useMemo(() => (diff ? forLandscapeDisplay(diff) : null), [diff]);
+  const diffByElementId = useMemo(() => new Map<UUID, ElementVersionDiff>(shownDiff?.elements.map((e) => [e.elementId, e]) ?? []), [shownDiff]);
+  const diffByRelationshipId = useMemo(() => new Map<UUID, RelationshipVersionDiff>(shownDiff?.relationships.map((r) => [r.relationshipId, r]) ?? []), [shownDiff]);
 
   // Integration platform context prompt: "with 'Route via platforms' on, a
   // focused integration platform highlights every via-flow through it" —

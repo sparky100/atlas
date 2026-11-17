@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { Json } from '../contracts/rows';
-import { computeVersionDiff } from './versionDiff';
+import { computeVersionDiff, forLandscapeDisplay } from './versionDiff';
 import { emptyHead, type ElementRow, type Head, type RelationshipRow } from './deltas';
 
 function withElement(head: Head, id: string, row: ElementRow): Head {
@@ -98,5 +98,34 @@ describe('computeVersionDiff', () => {
 
   it('produces nothing for two empty heads', () => {
     expect(computeVersionDiff(emptyHead(), emptyHead())).toEqual({ elements: [], relationships: [] });
+  });
+});
+
+describe('forLandscapeDisplay', () => {
+  const diffOf = (a: Record<string, Json>, b: Record<string, Json>) =>
+    forLandscapeDisplay(computeVersionDiff(withElement(emptyHead(), 's', system('CRM', null, a)), withElement(emptyHead(), 's', system('CRM', null, b))));
+
+  it('ignores dates, free text, housekeeping and contact details', () => {
+    for (const key of ['introduced', 'plannedEnd', 'supportEndsAt', 'description', 'transformation', 'inactiveReason', 'order', 'templateRef', 'memberId', 'email', 'orgUnit']) {
+      expect(diffOf({}, { [key]: 'x' }).elements[0]).toMatchObject({ state: 'unchanged', changedAttributes: [] });
+    }
+  });
+
+  it('still counts lifecycle, other fields and custom fields, listing only those', () => {
+    expect(diffOf({ lifecycleStatus: 'active' }, { lifecycleStatus: 'retiring', description: 'new' }).elements[0]).toMatchObject({ state: 'changed', changedAttributes: ['lifecycleStatus'] });
+    expect(diffOf({}, { vendor: 'Acme' }).elements[0]).toMatchObject({ state: 'changed' });
+    expect(diffOf({}, { myCustomField: 'x' }).elements[0]).toMatchObject({ state: 'changed' });
+  });
+
+  it('keeps moved, added and removed as they are', () => {
+    const moved = forLandscapeDisplay(computeVersionDiff(withElement(emptyHead(), 's', system('CRM', 'a')), withElement(emptyHead(), 's', system('CRM', 'b'))));
+    expect(moved.elements[0]?.state).toBe('moved');
+    expect(forLandscapeDisplay(computeVersionDiff(emptyHead(), withElement(emptyHead(), 's', system('CRM')))).elements[0]?.state).toBe('added');
+  });
+
+  it('ignores a connection verb phrase and fit notes but counts other connection fields', () => {
+    const rel = (attributes: Record<string, Json>) => withRelationship(emptyHead(), 'r', uses('a', 'b', attributes));
+    expect(forLandscapeDisplay(computeVersionDiff(rel({ description: 'uses' }), rel({ description: 'calls' }))).relationships[0]?.state).toBe('unchanged');
+    expect(forLandscapeDisplay(computeVersionDiff(rel({ protocol: 'REST' }), rel({ protocol: 'SOAP' }))).relationships[0]?.state).toBe('changed');
   });
 });
