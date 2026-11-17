@@ -95,3 +95,46 @@ export function computeVersionDiff(asIs: Head, toBe: Head): VersionDiff {
 
   return { elements, relationships };
 }
+
+/**
+ * Fields the Landscape's "Changed" marker does not count. `computeVersionDiff`
+ * above stays complete (a planned change must still apply a lifecycle or date
+ * edit — `plannedFuture.ts` relies on any non-unchanged state), so this is a
+ * display-only reading of it, applied by the Landscape alone.
+ *  - The three dates: a date moving an item in or out of view already reads as
+ *    Added/Removed. Lifecycle is deliberately NOT ignored: status colour is off
+ *    while differences are highlighted, so a lifecycle edit would not show.
+ *  - Free text and housekeeping: wording, sibling order, the starter-map link,
+ *    the member link.
+ *  - Email and Org unit: contact details, not a change to the estate.
+ * Custom (org-defined) fields are not listed, so they count.
+ */
+export const LANDSCAPE_IGNORED_ELEMENT_ATTRIBUTES: ReadonlySet<string> = new Set([
+  'introduced', 'plannedEnd', 'supportEndsAt',
+  'description', 'transformation', 'inactiveReason',
+  'order', 'templateRef', 'memberId',
+  'email', 'orgUnit',
+]);
+
+/** Connections: wording (verb phrase, descriptions) and free-text fit notes. */
+export const LANDSCAPE_IGNORED_RELATIONSHIP_ATTRIBUTES: ReadonlySet<string> = new Set(['description', 'fitForPurposeNotes']);
+
+/**
+ * The same diff as the Landscape marks it: an element or connection whose only
+ * differences are ignored fields is unchanged; otherwise `changedAttributes`
+ * lists just the fields that count. A `moved` element stays moved.
+ */
+export function forLandscapeDisplay(diff: VersionDiff): VersionDiff {
+  return {
+    elements: diff.elements.map((e) => {
+      const changedAttributes = e.changedAttributes.filter((k) => !LANDSCAPE_IGNORED_ELEMENT_ATTRIBUTES.has(k));
+      if (e.state !== 'changed') return { ...e, changedAttributes };
+      return { ...e, state: changedAttributes.length > 0 ? 'changed' : 'unchanged', changedAttributes };
+    }),
+    relationships: diff.relationships.map((r) => {
+      const changedAttributes = r.changedAttributes.filter((k) => !LANDSCAPE_IGNORED_RELATIONSHIP_ATTRIBUTES.has(k));
+      if (r.state !== 'changed') return { ...r, changedAttributes };
+      return { ...r, state: changedAttributes.length > 0 ? 'changed' : 'unchanged', changedAttributes };
+    }),
+  };
+}

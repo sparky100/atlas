@@ -9,7 +9,7 @@ export interface DiffBadgeProps {
 }
 
 const MARKER: Record<DiffState, string> = { unchanged: '', added: '+', removed: '−', changed: '~', moved: '⤴' };
-const LABEL: Record<DiffState, string> = { unchanged: 'Unchanged', added: 'Added', removed: 'Removed', changed: 'Changed', moved: 'Moved' };
+const LABEL: Record<DiffState, string> = { unchanged: 'Unchanged', added: 'Added', removed: 'Removed', changed: 'Changed', moved: 'Moved to another parent' };
 
 /**
  * One diff state, `--diff-*` tokens only — never `Chip`'s `--status-*`
