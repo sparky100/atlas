@@ -40,6 +40,7 @@ import { CapabilityLandscapeList } from '../landscape/CapabilityLandscapeList';
 import { Inspector } from '../components/Inspector/Inspector';
 import { useInspectorCollapsedPreference } from '../components/Inspector/useInspectorCollapsedPreference';
 import { LandscapeCanvas } from '../landscape/LandscapeCanvas';
+import { SupportMatrix } from '../landscape/SupportMatrix';
 import { LandscapeInspectorContent } from '../landscape/LandscapeInspectorContent';
 import { landscapeInspectorNeighbours, landscapeInspectorSupports } from '../landscape/landscapeInspectorSelection';
 import { ownersByRole } from '../elements/ownersByRole';
@@ -138,6 +139,8 @@ export function LandscapePage() {
   const viewing = isViewingMode(searchParams);
   const mode = parseViewMode(searchParams.get('mode'));
   const capabilityId = parseCapabilityParam(searchParams.get('capability'));
+  // `?view=matrix`: systems against capabilities instead of the map. Wide screens only (a phone keeps its list).
+  const matrixRequested = searchParams.get('view') === 'matrix';
   const { userId } = useAuth();
   // "View as at": a future date for the landscape on main — `?asat=`. Today (the default) is no param at all. Not for a change's own ref (it has As-is/To-be/Diff) or the capability-scoped list.
   const [todayIso] = useState(() => todayIsoDate());
@@ -469,6 +472,9 @@ export function LandscapePage() {
   // canvas-specific need this content doesn't have.
   const hasContent = displayState.status === 'ready' && (displayState.display.layout.nodes.length > 0 || displayState.display.layout.actorNodes.length > 0);
   const showCanvas = hasContent && !narrow;
+  const showMatrix = showCanvas && matrixRequested && capabilityId === null;
+  // The systems the Landscape's filters leave in, for the matrix (modules included).
+  const matrixSystems = state.status === 'ready' && displayState.status === 'ready' ? displayState.display.groups.groups.flatMap((g) => g.members.map((m) => m.system)) : [];
   // Item 7 regression fix: the CSS-class decision below must NOT depend on
   // `hasContent` (load state), unlike `showCanvas` above (correct for
   // deciding *what renders*). `<main>` is the element `canvasWidthRef`
@@ -638,6 +644,36 @@ export function LandscapePage() {
           )}
         </div>
 
+        {!narrow && capabilityId === null && state.status === 'ready' && (
+          <div className={styles.actions} role="group" aria-label="Landscape layout">
+            <Button
+              variant={showMatrix ? 'ghost' : 'secondary'}
+              aria-pressed={!showMatrix}
+              onClick={() => {
+                setSearchParams((prev) => {
+                  const updated = new URLSearchParams(prev);
+                  updated.delete('view');
+                  return updated;
+                });
+              }}
+            >
+              Map
+            </Button>
+            <Button
+              variant={showMatrix ? 'secondary' : 'ghost'}
+              aria-pressed={showMatrix}
+              onClick={() => {
+                setSearchParams((prev) => {
+                  const updated = new URLSearchParams(prev);
+                  updated.set('view', 'matrix');
+                  return updated;
+                });
+              }}
+            >
+              Matrix
+            </Button>
+          </div>
+        )}
         {ref.kind === 'main' && capabilityId === null && (
           <AsAtControl
             asAt={asAt}
@@ -799,6 +835,17 @@ export function LandscapePage() {
             )}
             {state.status === 'ready' && displayState.status === 'ready' && showCanvas && (
               <div className={styles.canvasRow}>
+                {showMatrix ? (
+                  <SupportMatrix
+                    systems={matrixSystems}
+                    supportsEdges={state.data.supportsEdges}
+                    capabilitiesById={state.data.capabilitiesById}
+                    focusedElementId={focusedElementId}
+                    onFocusElement={setFocusedElementId}
+                    capabilityHref={capabilityHref}
+                    elementHref={elementHref}
+                  />
+                ) : (
                 <LandscapeCanvas
                   layout={displayState.display.layout}
                   systemsById={state.data.systemsById}
@@ -838,6 +885,7 @@ export function LandscapePage() {
                     setAutoFocusComposer(true);
                   }}
                 />
+                )}
                 <Inspector
                   collapsed={inspectorCollapsed}
                   onToggleCollapsed={() => {
