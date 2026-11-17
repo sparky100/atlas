@@ -41,6 +41,7 @@ import { Inspector } from '../components/Inspector/Inspector';
 import { useInspectorCollapsedPreference } from '../components/Inspector/useInspectorCollapsedPreference';
 import { LandscapeCanvas } from '../landscape/LandscapeCanvas';
 import { SupportMatrix } from '../landscape/SupportMatrix';
+import { ConnectionsMatrix } from '../landscape/ConnectionsMatrix';
 import { LandscapeInspectorContent } from '../landscape/LandscapeInspectorContent';
 import { landscapeInspectorNeighbours, landscapeInspectorSupports } from '../landscape/landscapeInspectorSelection';
 import { ownersByRole } from '../elements/ownersByRole';
@@ -141,6 +142,8 @@ export function LandscapePage() {
   const capabilityId = parseCapabilityParam(searchParams.get('capability'));
   // `?view=matrix`: systems against capabilities instead of the map. Wide screens only (a phone keeps its list).
   const matrixRequested = searchParams.get('view') === 'matrix';
+  // `?view=connections`: which areas send data to, or rely on, which — counted. Same wide-screen rule.
+  const connectionsRequested = searchParams.get('view') === 'connections';
   const { userId } = useAuth();
   // "View as at": a future date for the landscape on main — `?asat=`. Today (the default) is no param at all. Not for a change's own ref (it has As-is/To-be/Diff) or the capability-scoped list.
   const [todayIso] = useState(() => todayIsoDate());
@@ -473,6 +476,7 @@ export function LandscapePage() {
   const hasContent = displayState.status === 'ready' && (displayState.display.layout.nodes.length > 0 || displayState.display.layout.actorNodes.length > 0);
   const showCanvas = hasContent && !narrow;
   const showMatrix = showCanvas && matrixRequested && capabilityId === null;
+  const showConnectionsOverview = showCanvas && connectionsRequested && capabilityId === null;
   // The systems the Landscape's filters leave in, for the matrix (modules included).
   const matrixSystems = state.status === 'ready' && displayState.status === 'ready' ? displayState.display.groups.groups.flatMap((g) => g.members.map((m) => m.system)) : [];
   // Item 7 regression fix: the CSS-class decision below must NOT depend on
@@ -647,8 +651,8 @@ export function LandscapePage() {
         {!narrow && capabilityId === null && state.status === 'ready' && (
           <div className={styles.actions} role="group" aria-label="Landscape layout">
             <Button
-              variant={showMatrix ? 'ghost' : 'secondary'}
-              aria-pressed={!showMatrix}
+              variant={showMatrix || showConnectionsOverview ? 'ghost' : 'secondary'}
+              aria-pressed={!showMatrix && !showConnectionsOverview}
               onClick={() => {
                 setSearchParams((prev) => {
                   const updated = new URLSearchParams(prev);
@@ -671,6 +675,19 @@ export function LandscapePage() {
               }}
             >
               Matrix
+            </Button>
+            <Button
+              variant={showConnectionsOverview ? 'secondary' : 'ghost'}
+              aria-pressed={showConnectionsOverview}
+              onClick={() => {
+                setSearchParams((prev) => {
+                  const updated = new URLSearchParams(prev);
+                  updated.set('view', 'connections');
+                  return updated;
+                });
+              }}
+            >
+              Connections
             </Button>
           </div>
         )}
@@ -835,7 +852,16 @@ export function LandscapePage() {
             )}
             {state.status === 'ready' && displayState.status === 'ready' && showCanvas && (
               <div className={styles.canvasRow}>
-                {showMatrix ? (
+                {showConnectionsOverview ? (
+                  <ConnectionsMatrix
+                    groups={displayState.display.groups.groups}
+                    internalActorIds={displayState.display.groups.actors.map((a) => a.element_id)}
+                    edges={state.data.edges}
+                    elementsById={allNodesById}
+                    elementHref={elementHref}
+                    integrationsHref={`/o/${orgSlug ?? ''}/m/${model.slug}/integrations?${refQuery}`}
+                  />
+                ) : showMatrix ? (
                   <SupportMatrix
                     systems={matrixSystems}
                     supportsEdges={state.data.supportsEdges}
