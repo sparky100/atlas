@@ -50,6 +50,9 @@ export interface SavedReportsLibraryProps {
 
 const canEdit = canEditReport;
 
+/** How many saved reports show before "Show all". */
+const VISIBLE_REPORTS = 5;
+
 export function SavedReportsLibrary({
   modelId,
   orgId,
@@ -67,6 +70,7 @@ export function SavedReportsLibrary({
   const [message, setMessage] = useState<string | null>(null);
   const [query, setQuery] = useState("");
   const [sortKey, setSortKey] = useState<SavedReportSortKey>("updated");
+  const [showAll, setShowAll] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -112,6 +116,9 @@ export function SavedReportsLibrary({
       ? [{ row, parsed }]
       : [];
   });
+  // A long list pushes the standing checks off screen, so show a few and let the reader open the rest. A search shows every match.
+  const capped = !showAll && query.trim() === "" && shown.length > VISIBLE_REPORTS;
+  const visible = capped ? shown.slice(0, VISIBLE_REPORTS) : shown;
   if (reports.length === 0 && copies.length === 0) {
     return (
       <section className={styles.section}>
@@ -190,7 +197,7 @@ export function SavedReportsLibrary({
               </tr>
             </thead>
             <tbody>
-              {shown.map(({ row: r, parsed }) => (
+              {visible.map(({ row: r, parsed }) => (
                 <tr key={r.id}>
                   {renaming?.id === r.id ? (
                     <td colSpan={6}>
@@ -344,6 +351,16 @@ export function SavedReportsLibrary({
               ))}
             </tbody>
           </table>
+          {(capped || (showAll && shown.length > VISIBLE_REPORTS)) && (
+            <Button
+              variant="ghost"
+              onClick={() => {
+                setShowAll(!showAll);
+              }}
+            >
+              {showAll ? "Show fewer" : `Show all ${String(shown.length)}`}
+            </Button>
+          )}
         </div>
       )}
       {copies.length > 0 && (

@@ -58,8 +58,8 @@ describe('standard dashboards', () => {
       return runReport(rows, t.spec).rowCount;
     };
     expect(count('Applications')).toBe(2);
-    expect(count('To eliminate or migrate')).toBe(1);
-    expect(count('Costly, poor fit')).toBe(1);
+    expect(count('How many: to eliminate or migrate')).toBe(1);
+    expect(count('How many: costly, poor fit')).toBe(1);
     expect(count('Run cost over £1m')).toBe(1);
   });
 
