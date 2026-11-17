@@ -50,4 +50,13 @@ describe('buildImportPromptSchema', () => {
     expect(schema).not.toContain('value_streams');
     expect(schema).toContain('never part of this file');
   });
+
+  it('explains uses and flows_to as different things, the planned action words and the date rule', () => {
+    const schema = buildImportPromptSchema();
+    expect(schema).toContain('`uses` means A relies on B');
+    expect(schema).toContain('`flows_to` means data moves');
+    expect(schema).toContain('"Move to another system"');
+    expect(schema).toContain('planned until its `introduced` date');
+    expect(schema).toContain('`fit`');
+  });
 });

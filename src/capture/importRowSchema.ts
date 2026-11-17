@@ -31,7 +31,7 @@ import { FIT_FOR_PURPOSE_ORDER } from '../engine/elementRead/fitForPurpose';
 import type { FitForPurpose } from '../contracts/delta';
 
 /** The exact header names a row must use — order doesn't matter, extra columns are ignored, case-sensitive (matching every other attribute key in this product). Snake_case, this session's own plan's spelling — distinct from the camelCase attribute keys they map onto below. */
-export const IMPORT_COLUMNS = ['name', 'description', 'kind', 'lifecycle', 'criticality', 'annual_run_cost', 'disposition', 'domain', 'hosting_model', 'vendor', 'is_external', 'external_organisation', 'platform', 'capability', 'business_owner', 'technical_owner', 'interface_type', 'transformation', 'introduced', 'planned_end', 'support_ends_at', 'ai_autonomy', 'ai_use'] as const;
+export const IMPORT_COLUMNS = ['name', 'description', 'kind', 'lifecycle', 'criticality', 'annual_run_cost', 'disposition', 'domain', 'hosting_model', 'vendor', 'is_external', 'external_organisation', 'platform', 'capability', 'fit', 'business_owner', 'technical_owner', 'interface_type', 'transformation', 'introduced', 'planned_end', 'support_ends_at', 'ai_autonomy', 'ai_use'] as const;
 export type ImportColumn = (typeof IMPORT_COLUMNS)[number];
 
 export type ImportRowElementType = 'system' | 'container';
