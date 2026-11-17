@@ -110,10 +110,14 @@ jobs:
         # workflow uses no secrets, by design), so it can only time out. It
         # still runs locally. The other AI-adjacent specs mock the model call
         # and do run here.
+        #
+        # It also skips the 300 ms route-timing budget spec (E8 acceptance):
+        # a speed budget is meaningless on a shared runner. Simon's decision,
+        # 2026-11-17; it still runs locally.
         run: >-
           pnpm exec playwright test --shard=${{ matrix.shard }}/8
           --reporter=list,blob
-          --grep-invert 'upload a spreadsheet, accept and reject candidates by keyboard'
+          --grep-invert 'upload a spreadsheet, accept and reject candidates by keyboard|E8 acceptance: route change under 300ms'
         env:
           PLAYWRIGHT_BLOB_OUTPUT_DIR: blob-report
       - name: Upload this shard's results
