@@ -320,10 +320,10 @@ function InspectButton({ name, onClick }: { name: string; onClick: () => void })
  * redesign's own role boundary asks every "fact, not a flag" surface here
  * to share, so a reviewer only has to check it's used correctly once.
  */
-function FactIndicator({ tone, label }: { tone: 'ok' | 'warn' | 'danger' | 'info' | 'neutral' | undefined; label: string }) {
+function FactIndicator({ tone, label, amount }: { tone: 'ok' | 'warn' | 'danger' | 'info' | 'neutral' | undefined; label: string; amount?: number | undefined }) {
   return (
     <span className={styles.factIndicator}>
-      <span className={styles.factDot} data-tone={tone ?? 'none'} aria-hidden="true" />
+      <span className={styles.factDot} data-tone={tone ?? 'none'} data-amount={amount} aria-hidden="true" />
       <Text as="span" size="sm" tone="muted">
         {label}
       </Text>
@@ -455,7 +455,7 @@ function DomainSection({
           {domainSystemsCountText(count)}
         </Text>
         {/* Coverage mode's own aggregate label is always this same "capabilities supported"/"no capabilities supported" non-value — already fully covered by the fraction/mini-bar/count above, so it's never shown for that one mode; every other colour-by mode's label is a real, distinct fact (a lifecycle stage, "exposed", a criticality level, an OT-share fraction, a fit rating) and still shows here. */}
-        {colourBy !== 'metric:supportingSystemCount' && aggregateColour.tone !== undefined && aggregateColour.label !== undefined && <FactIndicator tone={aggregateColour.tone} label={aggregateColour.label} />}
+        {colourBy !== 'metric:supportingSystemCount' && (aggregateColour.tone !== undefined || aggregateColour.amount !== undefined) && aggregateColour.label !== undefined && <FactIndicator tone={aggregateColour.tone} amount={aggregateColour.amount} label={aggregateColour.label} />}
         {!rollup.isOwned && <FactIndicator tone="warn" label="no owner recorded" />}
       </button>
       {domainExpanded && (
@@ -578,7 +578,7 @@ function CapabilityRow({
   const marker = commentMarkerFor(threadCounts, card.capability.element_id);
 
   return (
-    <div className={[styles.card, nested ? styles.cardNested : ''].filter(Boolean).join(' ')} data-tone={colour.tone ?? 'none'} role={nested ? undefined : 'listitem'}>
+    <div className={[styles.card, nested ? styles.cardNested : ''].filter(Boolean).join(' ')} data-tone={colour.tone ?? 'none'} data-amount={colour.amount} role={nested ? undefined : 'listitem'}>
       <div className={styles.cardMain}>
         <Link to={`/o/${orgSlug}/m/${modelSlug}/e/${card.capability.element_id}`} className={styles.cardLink} title={card.capability.name}>
           <Text as="span" size="md" className={styles.cardName}>
@@ -590,7 +590,7 @@ function CapabilityRow({
       </div>
       <div className={styles.cardSecondary}>
         {/* Coverage mode's own label is always the same "supporting systems"/"no supporting systems" non-value — the real count already sits beside the name above (`LandscapeZoomLink`), so it's never shown for that one mode; every other colour-by mode's label is a real, distinct fact and still shows here. */}
-        {colourBy !== 'metric:supportingSystemCount' && colour.tone !== undefined && colour.label !== undefined && <FactIndicator tone={colour.tone} label={colour.label} />}
+        {colourBy !== 'metric:supportingSystemCount' && (colour.tone !== undefined || colour.amount !== undefined) && colour.label !== undefined && <FactIndicator tone={colour.tone} amount={colour.amount} label={colour.label} />}
         {marker && onCommentMarkerClick && <CommentMarkerButton marker={marker} onClick={() => { onCommentMarkerClick(card.capability.element_id); }} />}
         {!nested && card.l3.length > 0 && (
           <button type="button" className={styles.expandButton} aria-expanded={expanded} onClick={() => { onToggleExpand(card.capability.element_id); }}>

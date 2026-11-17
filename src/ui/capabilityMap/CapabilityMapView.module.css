@@ -196,6 +196,25 @@
 .card[data-tone='neutral'] {
   border-left-color: var(--status-neutral);
 }
+/* Run cost: one hue reserved for "amount" (--amount), six steps from the cheapest band to the dearest. The band is always written on the tile too. */
+.card[data-amount='0'] {
+  border-left-color: color-mix(in srgb, var(--amount) 25%, var(--surface));
+}
+.card[data-amount='1'] {
+  border-left-color: color-mix(in srgb, var(--amount) 40%, var(--surface));
+}
+.card[data-amount='2'] {
+  border-left-color: color-mix(in srgb, var(--amount) 55%, var(--surface));
+}
+.card[data-amount='3'] {
+  border-left-color: color-mix(in srgb, var(--amount) 70%, var(--surface));
+}
+.card[data-amount='4'] {
+  border-left-color: color-mix(in srgb, var(--amount) 85%, var(--surface));
+}
+.card[data-amount='5'] {
+  border-left-color: var(--amount);
+}
 
 /** An L3 row, nested one level under its own expanded L2 parent — same card, indented, no expand toggle of its own (L3 has no further children). */
 .cardNested {
@@ -278,6 +297,24 @@
 }
 .factDot[data-tone='neutral'] {
   background: var(--status-neutral);
+}
+.factDot[data-amount='0'] {
+  background: color-mix(in srgb, var(--amount) 25%, var(--surface));
+}
+.factDot[data-amount='1'] {
+  background: color-mix(in srgb, var(--amount) 40%, var(--surface));
+}
+.factDot[data-amount='2'] {
+  background: color-mix(in srgb, var(--amount) 55%, var(--surface));
+}
+.factDot[data-amount='3'] {
+  background: color-mix(in srgb, var(--amount) 70%, var(--surface));
+}
+.factDot[data-amount='4'] {
+  background: color-mix(in srgb, var(--amount) 85%, var(--surface));
+}
+.factDot[data-amount='5'] {
+  background: var(--amount);
 }
 
 .expandButton {

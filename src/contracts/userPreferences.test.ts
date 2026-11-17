@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { defaultUserPreferences, fromUserPreferencesRow, resolveStartPage, START_PAGES, toUserPreferencesRow } from './userPreferences';
+import { CAPABILITY_MAP_COLOUR_BY_MODES, defaultUserPreferences, fromUserPreferencesRow, resolveStartPage, START_PAGES, toUserPreferencesRow } from './userPreferences';
 
 describe('defaultUserPreferences', () => {
   it('gives owners/architects the architect door and everyone else the director door', () => {
@@ -15,6 +15,16 @@ describe('defaultUserPreferences', () => {
 
   it('defaults capabilityMapColourBy to null — no row means no saved override (Sprint U4-1 C4)', () => {
     expect(defaultUserPreferences('u1', false).capabilityMapColourBy).toBeNull();
+  });
+});
+
+describe('capabilityMapColourBy run cost (Turbo EA item 3)', () => {
+  it('round-trips metric:runCost through the row shape and is one of the modes the contract names', () => {
+    expect(CAPABILITY_MAP_COLOUR_BY_MODES).toContain('metric:runCost');
+    const prefs = { ...defaultUserPreferences('u1', true), capabilityMapColourBy: 'metric:runCost' as const };
+    const row = toUserPreferencesRow(prefs);
+    expect(row.capability_map_colour_by).toBe('metric:runCost');
+    expect(fromUserPreferencesRow(row).capabilityMapColourBy).toBe('metric:runCost');
   });
 });
 

@@ -35,6 +35,10 @@ export function CapabilityWholeMapView({ tree, colourBy, supportsEdges, systemsB
           <Text as="p" size="sm" tone="muted">
             Nothing is coloured. Choose what to colour by under Filters.
           </Text>
+        ) : colourBy === 'metric:runCost' ? (
+          <Text as="p" size="sm" tone="muted">
+            Run cost is an amount, not a problem, so this one-page view does not tint it. Switch to the detailed map to see the costliest band on each capability.
+          </Text>
         ) : map.problemCount === 0 ? (
           <Text as="p" size="sm" tone="muted">
             No capability is flagged for the chosen colouring.
