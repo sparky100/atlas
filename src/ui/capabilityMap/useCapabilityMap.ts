@@ -10,7 +10,11 @@ import { lifecycleStateOf, replacedElementIds, supportsEdgesInForce } from '../.
 import { listAllEnablesEdges } from '../../db/valueStreams';
 import { refParamOf, resolveBranchRef, resolveRef, type Ref } from '../../db/ref';
 import type { ViewMode } from '../../db/viewMode';
-import { resolveBranchModeProjectionCached } from '../query/cachedBranchProjection';
+import { loadHeadAtCommitCached, resolveBranchModeProjectionCached } from '../query/cachedBranchProjection';
+import { loadPlannedFuture, type PlannedFuture } from '../../db/plannedFuture';
+import { serializeHeadProjection, type HeadProjection } from '../../engine/projection';
+import { todayIsoDate } from '../landscape/asAt';
+import { capabilitiesChangedByDate } from './asAtChanges';
 import { getOrCreateModelView } from '../../db/views';
 import type { ViewRow } from '../../db/types';
 import { reportError } from '../errors/errorBannerStore';
@@ -40,6 +44,8 @@ export interface CapabilityMapData {
   replacedIds: ReadonlySet<UUID>;
   /** Supporting systems and modules left out because they are planned (not live yet) or retired. Zero for a change branch, which shows its plan as it is. */
   hiddenByDate: { planned: number; retired: number };
+  /** For a future "as at" date: the planned changes laid on and the capabilities whose supporting systems differ from today. `null` for today (or a change). */
+  future: { picture: PlannedFuture; changedCapabilityIds: ReadonlySet<UUID> } | null;
 }
 
 export type CapabilityMapState = { status: 'loading' } | { status: 'error'; message: string } | { status: 'refNotFound' } | { status: 'ready'; data: CapabilityMapData };
@@ -80,6 +86,8 @@ export function useCapabilityMap(
   mode: ViewMode,
   /** S1 item 15 (A2 remainder): the caller's own already-resolved main head commit id — same race-tolerant dedup shape `useStructureView.ts`'s own parameter comment explains. */
   mainCommitIdHint: UUID | null = null,
+  /** "View as at": a future ISO date (`landscape/asAt.ts`'s `parseAsAtParam`), main only — `null` is today. */
+  asAt: string | null = null,
 ): UseCapabilityMapResult {
   const [state, setState] = useState<CapabilityMapState>({ status: 'loading' });
   const [reloadToken, setReloadToken] = useState(0);
@@ -108,19 +116,30 @@ export function useCapabilityMap(
       let replacedIds: Set<UUID>;
       let preloadedView: ViewRow | null = null;
 
-      if (ref.kind === 'branch') {
-        const branch = await resolveBranchRef(supabase, ref);
-        if (!branch) {
-          if (!cancelled) setState({ status: 'refNotFound' });
-          return;
+      let future: PlannedFuture | null = null;
+      const futureAsAt = ref.kind === 'main' && mainCommitIdHint !== null && asAt !== null && asAt > todayIsoDate() ? asAt : null;
+
+      if (ref.kind === 'branch' || futureAsAt !== null) {
+        let projection: HeadProjection;
+        if (futureAsAt !== null && mainCommitIdHint !== null) {
+          // View as at a future date: today's head with the agreed planned changes that land by then laid on top. Read-only — nothing is stored.
+          future = await loadPlannedFuture(supabase, modelId, mainCommitIdHint, futureAsAt, todayIsoDate(), (c) => loadHeadAtCommitCached(supabase, modelId, c));
+          projection = serializeHeadProjection(future.head);
+          commitId = mainCommitIdHint;
+        } else {
+          const branch = await resolveBranchRef(supabase, ref);
+          if (!branch) {
+            if (!cancelled) setState({ status: 'refNotFound' });
+            return;
+          }
+          const resolved = await resolveBranchModeProjectionCached(supabase, modelId, branch, mode);
+          if (!resolved) {
+            if (!cancelled) setState({ status: 'refNotFound' });
+            return;
+          }
+          projection = resolved.projection;
+          commitId = resolved.commitId;
         }
-        const resolved = await resolveBranchModeProjectionCached(supabase, modelId, branch, mode);
-        if (!resolved) {
-          if (!cancelled) setState({ status: 'refNotFound' });
-          return;
-        }
-        const { projection } = resolved;
-        commitId = resolved.commitId;
         capabilities = projection.elementsHead.filter((e) => e.element_type === 'capability');
         hasSystems = projection.elementsHead.some((e) => e.element_type === 'system');
         replacedIds = replacedElementIds(projection.relationshipsHead);
@@ -216,7 +235,22 @@ export function useCapabilityMap(
       // A system past its planned end stops counting as supporting a capability (Retire copies the links to the replacement and keeps the old ones).
       // A change branch shows its plan as it is; main and a tag show what is live.
       const hiddenByDate = { planned: 0, retired: 0 };
-      if (ref.kind !== 'branch') {
+      let futureResult: CapabilityMapData['future'] = null;
+      if (future !== null && futureAsAt !== null) {
+        // As at the chosen date: a system past its planned end by then stops counting, one introduced by then counts. Compared with the same rule applied to today.
+        const asAtDate = new Date(`${futureAsAt}T00:00:00`);
+        supportsEdges = supportsEdgesInForce(supportsEdges, systemsById, asAtDate);
+        const todayProjection = serializeHeadProjection(future.today);
+        const todayCaps = todayProjection.elementsHead.filter((e) => e.element_type === 'capability');
+        const todayCapIds = new Set(todayCaps.map((c) => c.element_id));
+        const todayById = new Map(todayProjection.elementsHead.map((e) => [e.element_id, e]));
+        const todaySupports = supportsEdgesInForce(
+          todayProjection.relationshipsHead.filter((r) => r.relationship_type === 'supports' && todayCapIds.has(r.to_element_id)),
+          todayById,
+          new Date(),
+        );
+        futureResult = { picture: future, changedCapabilityIds: capabilitiesChangedByDate(todayCapIds, new Set(capabilities.map((c) => c.element_id)), todaySupports, supportsEdges) };
+      } else if (ref.kind !== 'branch') {
         const now = new Date();
         for (const id of new Set(supportsEdges.map((edge) => edge.from_element_id))) {
           const supporter = systemsById.get(id);
@@ -227,7 +261,7 @@ export function useCapabilityMap(
       }
       const selfOwnedIds = computeSelfOwnedCapabilityIds(capabilities, supportsEdges, ownsEdges);
 
-      if (!cancelled) setState({ status: 'ready', data: { commitId, view, tree, supportsEdges, systemsById, hasSystems, capabilities, selfOwnedIds, ownsEdges, actorsById, enablesEdges, replacedIds, hiddenByDate } });
+      if (!cancelled) setState({ status: 'ready', data: { commitId, view, tree, supportsEdges, systemsById, hasSystems, capabilities, selfOwnedIds, ownsEdges, actorsById, enablesEdges, replacedIds, hiddenByDate, future: futureResult } });
     }
 
     load().catch((e: unknown) => {
@@ -240,7 +274,7 @@ export function useCapabilityMap(
     };
     // Same pitfall/fix as useElementPage.ts / useLandscape.ts: `refParam`
     // (a stable string) is the real dependency, not `ref` itself.
-  }, [modelId, orgId, userId, refParam, mode, reloadToken, mainCommitIdHint]);
+  }, [modelId, orgId, userId, refParam, mode, reloadToken, mainCommitIdHint, asAt]);
 
   return {
     state,

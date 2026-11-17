@@ -44,7 +44,9 @@ import { useHomeMode } from '../home/useHomeMode';
 import { downloadImportPrompt } from '../import/downloadImportPrompt';
 import { useRouteTiming } from '../perf/useRouteTiming';
 import { NotLiveNote } from '../landscape/NotLiveNote';
-import { addMonthsIso, todayIsoDate } from '../landscape/asAt';
+import { AS_AT_COMPARE_PARAM, AS_AT_PARAM, addMonthsIso, parseAsAtParam, todayIsoDate } from '../landscape/asAt';
+import { AsAtControl } from '../landscape/AsAtControl';
+import { FutureSummary } from '../landscape/FutureSummary';
 import { supabase } from '../supabaseClient';
 import styles from './CapabilityMapPage.module.css';
 
@@ -111,13 +113,17 @@ export function CapabilityMapPage() {
   const { models, loading: modelsLoading } = useModels(organisation?.id ?? null);
   const model = models.find((m) => m.slug === modelSlug);
   const { role } = useMembership(organisation?.id ?? null, userId);
-  const canEdit = ref.kind === 'main' && canEditOnMain(role);
+  // "View as at": a future date for the map on main — `?asat=`, the same link the Landscape uses. Today (the default) is no param at all. Read-only, so nothing is edited while one is set.
+  const [todayIso] = useState(() => todayIsoDate());
+  const asAt = ref.kind === 'main' ? parseAsAtParam(searchParams.get(AS_AT_PARAM), todayIso) : null;
+  const highlightChanges = searchParams.get(AS_AT_COMPARE_PARAM) !== 'off';
+  const canEdit = ref.kind === 'main' && asAt === null && canEditOnMain(role);
   const { branch: mainBranch, loading: mainBranchLoading, reload: reloadMainBranch } = useMainBranch(model?.id ?? null);
 
   // #244: no As-is/To-be/Diff selector on this page (unlike LandscapePage's
   // `?mode=` control) — always the branch's own current state, the same
   // default `parseViewMode` itself falls back to when `?mode=` is absent.
-  const { state, reload } = useCapabilityMap(hintedModelId(model?.id, ref, mainBranchLoading) ?? '', organisation?.id ?? '', userId, ref, 'toBe', mainBranch?.head_commit_id ?? null);
+  const { state, reload } = useCapabilityMap(hintedModelId(model?.id, ref, mainBranchLoading) ?? '', organisation?.id ?? '', userId, ref, 'toBe', mainBranch?.head_commit_id ?? null, asAt);
   // E8 ("performance") phase 1: this route's own resolve/first-paint/data-complete marks — see useRouteTiming.ts's own module comment.
   useRouteTiming('capability-map', state.status === 'ready');
   // S2 flow 1 bug fix: every mutation on this page (importing a starter
@@ -287,7 +293,7 @@ export function CapabilityMapPage() {
             Capability map
           </Text>
           <MakeStartPageButton page="capability-map" />
-          {state.status === 'ready' && (
+          {asAt === null && state.status === 'ready' && (
             <NotLiveNote
               planned={state.data.hiddenByDate.planned}
               retired={state.data.hiddenByDate.retired}
@@ -296,8 +302,32 @@ export function CapabilityMapPage() {
               noun={['system or module', 'systems and modules']}
             />
           )}
+          {ref.kind === 'main' && (
+            <AsAtControl
+              subject="capability map"
+              asAt={asAt}
+              todayIso={todayIso}
+              highlightChanges={highlightChanges}
+              onChange={(next) => {
+                setSearchParams((prev) => {
+                  const updated = new URLSearchParams(prev);
+                  if (next === null) updated.delete(AS_AT_PARAM);
+                  else updated.set(AS_AT_PARAM, next);
+                  return updated;
+                });
+              }}
+              onHighlightChange={(next) => {
+                setSearchParams((prev) => {
+                  const updated = new URLSearchParams(prev);
+                  if (next) updated.delete(AS_AT_COMPARE_PARAM);
+                  else updated.set(AS_AT_COMPARE_PARAM, 'off');
+                  return updated;
+                });
+              }}
+            />
+          )}
           {/* F13 step 1: a stamped picture of the map as shown — open to every member, unlike the editing actions beside it. */}
-          {state.status === 'ready' && state.data.tree.l1.length > 0 && (
+          {asAt === null && state.status === 'ready' && state.data.tree.l1.length > 0 && (
             <div className={styles.actions}>
               <ExportViewButtons
                 what="capability map"
@@ -358,6 +388,9 @@ export function CapabilityMapPage() {
 
         {state.status === 'loading' && <Loading />}
         {state.status === 'error' && <Text as="p">{state.message}</Text>}
+        {asAt !== null && state.status === 'ready' && state.data.future !== null && (
+          <FutureSummary future={state.data.future.picture} asAt={asAt} orgSlug={orgSlug ?? ''} modelSlug={model.slug} subject="capability map" />
+        )}
         {state.status === 'refNotFound' && canEdit && (
           <>
             <CapabilityMapImportPanel modelId={model.id} userId={userId} onImported={reloadAll} />
@@ -422,6 +455,7 @@ export function CapabilityMapPage() {
                 threadCounts={threadCounts}
                 onCommentMarkerClick={setCommentsPanelCapabilityId}
                 onInspectClick={setSelectedCapabilityId}
+                changedCapabilityIds={highlightChanges ? state.data.future?.changedCapabilityIds : undefined}
               />
               )}
               </div>

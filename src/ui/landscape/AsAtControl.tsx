@@ -10,6 +10,8 @@ export interface AsAtControlProps {
   highlightChanges: boolean;
   onChange: (asAt: string | null) => void;
   onHighlightChange: (highlight: boolean) => void;
+  /** What the date applies to, for the group's name and the highlight switch. Defaults to the landscape. */
+  subject?: string;
 }
 
 /**
@@ -18,10 +20,10 @@ export interface AsAtControlProps {
  * pressed when the chosen date is exactly what it points at; any other date
  * leaves all presets unpressed and shows in the date field.
  */
-export function AsAtControl({ asAt, todayIso, highlightChanges, onChange, onHighlightChange }: AsAtControlProps) {
+export function AsAtControl({ asAt, todayIso, highlightChanges, onChange, onHighlightChange, subject = 'landscape' }: AsAtControlProps) {
   const dateId = useId();
   return (
-    <div className={styles.wrap} role="group" aria-label="View the landscape as at a date">
+    <div className={styles.wrap} role="group" aria-label={`View the ${subject} as at a date`}>
       <Text as="span" size="sm" tone="muted">
         View as at
       </Text>
