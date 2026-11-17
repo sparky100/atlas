@@ -36,7 +36,7 @@ Fields (only what's actually known has to be filled in): \`${IMPORT_COLUMNS.join
 - \`lifecycle\` is one of: planned, active, retiring, retired.
 - \`criticality\` is one of: critical, high, medium, low.
 - \`annual_run_cost\` is one of: none_included, under_50k, 50k_250k, 250k_1m, 1m_5m, over_5m — a banded judgement of the avoidable annual run cost of this system or module ("None / included" … "Over £5m"). Leave it out if it isn't known; never guess, and never set it for a capability (it isn't a field there).
-- \`disposition\` is one of: tolerate, invest, migrate, eliminate — the TIME decision recorded for this system or module, when the source states one. Leave it out if it isn't stated; never infer it from other facts, and never set it for a capability.
+- \`disposition\` is one of: tolerate, invest, migrate, eliminate — the planned action (also called TIME) recorded for this system or module, when the source states one: tolerate is "Keep as is", invest is "Invest", migrate is "Move to another system", eliminate is "Switch off". Leave it out if it isn't stated; never infer it from other facts, and never set it for a capability.
 - \`domain\` is one of: it, ot, hybrid.
 - \`hosting_model\` is one of: on_premises, private_cloud, public_cloud, saas, hybrid.
 - \`vendor\` is free text. Only meaningful for a top-level system — leave it out on a module.
@@ -45,7 +45,7 @@ Fields (only what's actually known has to be filled in): \`${IMPORT_COLUMNS.join
 - \`capability\` names one or more capabilities from the list below, separated by \`|\` if there's more than one — the first one listed becomes the primary link, any others are secondary. Leave it out if nothing fits; never invent a capability name.
 - \`interface_type\` is one of: ${INTERFACE_TYPE_OPTIONS.join(', ')} — only for a module of an integration platform (an *interface*: an API, file drop, topic or job the platform exposes or consumes). Leave it out everywhere else.
 - \`transformation\` is free text: what the platform does to the data on this interface (maps, enriches, combines, converts a file to an API…). Only for an interface.
-- \`introduced\`, \`planned_end\` and \`support_ends_at\` are ISO dates (YYYY-MM-DD): when the system went live, when it is planned to be retired, and when vendor support ends (top-level systems only). They put the system on the Roadmap. Leave them out if the source doesn't state them; never guess.
+- \`introduced\`, \`planned_end\` and \`support_ends_at\` are ISO dates (YYYY-MM-DD): when the system went live, when it is planned to be retired, and when vendor support ends (top-level systems only). They put the system on the Roadmap, and they decide what counts as live today: a system is planned until its \`introduced\` date and active from then, so one with a future date stays out of today's views until it arrives. Leave \`introduced\` out for a system that is live now. Leave them out if the source doesn't state them; never guess.
 - \`ai_autonomy\` is one of: suggests, acts_with_approval, acts_alone — set it only if the system is an AI agent (a person does the work, a person approves, or it acts alone). Leave it out otherwise; never guess.
 - \`ai_use\` is one of: built_in (the product ships with AI features), external_service (it calls an AI model or service). For a system that uses AI but is not an agent. Leave it out for an agent and when the source does not say.
 - \`fit\` is one of: excellent, good, adequate, poor — how well this system serves the capability named in \`capability\` (applied to each capability link the entry creates). Leave it out if the source does not say; never guess.
@@ -58,7 +58,8 @@ An entry that matches an existing system or module by name updates it; a name th
 Fields: \`${RELATIONSHIP_IMPORT_COLUMNS.join(', ')}\`
 
 - \`from\`/\`to\` each name an existing or newly-described system or module, by its \`name\` from \`systems\`. To point at a module specifically (rather than a top-level system of the same name), write "Platform · Module" (e.g. "SAP · PM").
-- \`type\` is \`uses\` or \`flows_to\`.
+- \`type\` is \`uses\` or \`flows_to\`, and they mean different things. \`uses\` means A relies on B (A needs B to work); it says nothing about data moving. \`flows_to\` means data moves: A sends data to B. If both are true, add two entries, one of each.
+- The other relationship types are not entries here: a system supports a capability through its \`capability\` field, owners are set through \`business_owner\`/\`technical_owner\`, and a replacement is set through \`changes\`' \`replaced_by\`. A capability that does not already exist is never created by an import, and value streams, goals, principles, decisions and projects are never part of this file.
 - \`description\` is the verb phrase (e.g. "sends payment confirmations to") — always required.
 - \`via\` optionally names an integration platform (a system with \`kind = integration_platform\`) this connection actually routes through, or one of its interfaces as "Platform · Interface". Leave it out for a direct connection.
 - \`protocol_in\`/\`protocol_out\` are each one of: ${INTEGRATION_PROTOCOL_OPTIONS.join(', ')} — how data reaches the platform from \`from\`, and how it leaves the platform to \`to\` (e.g. file_sftp in, rest_api out). Only with \`via\`.

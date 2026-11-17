@@ -40,4 +40,18 @@ describe('import template', () => {
       for (const row of sheet.cells.slice(1)) expect(row[0] ?? '').toMatch(/^EXAMPLE /);
     }
   });
+
+  it('explains the two relationship types people mix up, and the planned action and date rule, in plain words', () => {
+    const text = buildImportTemplateSheets()[0]?.cells.map((r) => r[0]).join('\n') ?? '';
+    expect(text).toMatch(/uses means A relies on B/);
+    expect(text).toMatch(/flows_to means data moves/);
+    expect(text).toMatch(/Planned action \(also called TIME or disposition\)/);
+    expect(text).toMatch(/planned until its Introduced date/);
+    expect(text).toMatch(/Fit: excellent, good, adequate, poor/);
+  });
+
+  it('writes the planned action and fit headings the importer maps to their own roles', () => {
+    expect(lookupColumnSynonym(SYSTEM_COLUMN_HEADINGS.disposition)).toBe('disposition');
+    expect(lookupColumnSynonym(SYSTEM_COLUMN_HEADINGS.fit)).toBe('fit');
+  });
 });

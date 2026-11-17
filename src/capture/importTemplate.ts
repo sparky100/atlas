@@ -34,7 +34,7 @@ export const SYSTEM_COLUMN_HEADINGS: Readonly<Record<ImportColumn, string>> = {
   lifecycle: 'Lifecycle',
   criticality: 'Criticality',
   annual_run_cost: 'Run cost',
-  disposition: 'Disposition',
+  disposition: 'Planned action',
   domain: 'IT/OT domain',
   hosting_model: 'Hosting model',
   vendor: 'Vendor',
@@ -42,6 +42,7 @@ export const SYSTEM_COLUMN_HEADINGS: Readonly<Record<ImportColumn, string>> = {
   external_organisation: 'External organisation',
   platform: 'Parent system',
   capability: 'Capability',
+  fit: 'Fit',
   business_owner: 'Business owner',
   technical_owner: 'Technical owner',
   interface_type: 'Interface type',
@@ -66,7 +67,7 @@ export const RELATIONSHIP_COLUMN_HEADINGS: Readonly<Record<RelationshipColumn, s
 };
 
 const SYSTEM_EXAMPLES: readonly Partial<Record<ImportColumn, string>>[] = [
-  { name: 'EXAMPLE Customer records', description: 'Where customer contact details and history are kept.', kind: 'application', lifecycle: 'active', criticality: 'high', hosting_model: 'saas', vendor: 'Example Supplier Ltd', is_external: 'yes', capability: 'Customer management', business_owner: 'Customer Services', technical_owner: 'IT Applications' },
+  { name: 'EXAMPLE Customer records', description: 'Where customer contact details and history are kept.', kind: 'application', lifecycle: 'active', criticality: 'high', hosting_model: 'saas', vendor: 'Example Supplier Ltd', is_external: 'yes', capability: 'Customer management', fit: 'good', business_owner: 'Customer Services', technical_owner: 'IT Applications' },
   { name: 'EXAMPLE Message hub', description: 'Passes data between our systems.', kind: 'integration_platform', lifecycle: 'active', criticality: 'medium', hosting_model: 'public_cloud', business_owner: 'IT Applications' },
   { name: 'EXAMPLE Billing feed', description: 'The feed that sends invoices to the finance system.', platform: 'EXAMPLE Message hub', interface_type: 'api', lifecycle: 'planned', introduced: '2027-04-01' },
 ];
@@ -98,7 +99,8 @@ const INSTRUCTIONS: readonly string[] = [
   '- A column that holds a fixed choice only accepts the values listed below. A value that does not match is ignored and shown to you in the review, never guessed.',
   '- Capability should name capabilities that already exist in your model. Separate more than one with |. The first becomes the main link.',
   '- Business owner and Technical owner take one person, team or organisation. For an outside body write: Name (External: Organisation).',
-  '- Dates are written YYYY-MM-DD, for example 2027-04-01.',
+  '- Dates are written YYYY-MM-DD, for example 2027-04-01. A system is planned until its Introduced date and active from then; leave Introduced blank for a system that is live now. Views of today show only active systems.',
+  '- Fit says how well this system serves the capability in the Capability column (it applies to each capability named). Leave it blank if you do not know.',
   '- Outside our organisation: yes or no.',
   '',
   'Fixed choices',
@@ -106,7 +108,8 @@ const INSTRUCTIONS: readonly string[] = [
   '- Lifecycle: planned, active, retiring, retired',
   '- Criticality: critical, high, medium, low',
   '- Run cost: none_included, under_50k, 50k_250k, 250k_1m, 1m_5m, over_5m',
-  '- Disposition: tolerate, invest, migrate, eliminate',
+  '- Planned action (also called TIME or disposition): tolerate (Keep as is), invest (Invest), migrate (Move to another system), eliminate (Switch off)',
+  '- Fit: excellent, good, adequate, poor',
   '- IT/OT domain: it, ot, hybrid',
   '- Hosting model: on_premises, private_cloud, public_cloud, saas, hybrid',
   '- AI agent: how it acts: suggests, acts_with_approval, acts_alone (leave blank if it is not an AI agent)',
@@ -118,6 +121,8 @@ const INSTRUCTIONS: readonly string[] = [
   '- From and To name a system or module exactly as it is written on the Systems sheet or already in your model. For a module write: System · Module.',
   '- Description is the verb phrase, for example "sends payment confirmations to". It is required, and a row without one is left out.',
   '- Via names the integration platform a connection goes through. Leave it blank for a direct connection.',
+  '- Type uses means A relies on B (A needs B to work). It says nothing about data moving. Type flows_to means data moves: A sends data to B. If both are true, add two rows, one of each.',
+  '- The other relationship types are not rows here. A system supports a capability through the Capability column. Business owner and Technical owner record who owns it. Retiring a system with a replacement is done in Atlas, in a change. Value streams are edited in Atlas.',
   '',
   'Prefer to start from your own data? Use the other download on the Import page, "AI prompt for preparing an import file", to have an AI assistant turn your notes into a file Atlas reads.',
 ];

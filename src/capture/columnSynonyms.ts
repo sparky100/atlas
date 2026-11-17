@@ -46,7 +46,9 @@ export type SynonymOnlyColumnRole =
   // Agents in EA, step 1: what this product's own export writes for a system's `aiAutonomy` — the one synonym an owner-approved importer exception adds, so the field round-trips.
   | 'aiAutonomy'
   // Uses AI: what this product's own export writes for a system's `aiUse` — a second owner-approved importer exception (Simon, 2026-11-16), one synonym, so the field round-trips.
-  | 'aiUse';
+  | 'aiUse'
+  // Fit: the fit rating of this row's capability link(s) — a third owner-approved importer exception (Simon, 2026-11-17), so the spreadsheet can say what the JSON file already could.
+  | 'fit';
 
 /** Every role a column can end up with: prompt A's own, plus the synonym-only ones. */
 export type ColumnRole = PromptAColumnRole | SynonymOnlyColumnRole;
@@ -95,6 +97,7 @@ const COLUMN_SYNONYMS_RAW: Readonly<Record<ColumnRole, readonly string[]>> = {
   transformation: ['Transformation'],
   aiAutonomy: ['AI agent: how it acts'],
   aiUse: ['Uses AI'],
+  fit: ['Fit', 'Fit for purpose'],
 };
 
 const COLUMN_SYNONYMS: ReadonlyMap<string, ColumnRole> = new Map(

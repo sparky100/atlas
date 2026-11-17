@@ -39,6 +39,7 @@ import type { ActorSubtype, ElementType, FitForPurpose, OwnsRole, UUID } from '.
 import type { SourceRef } from '../contracts/sourceRef';
 import { DEFAULTED_ATTRIBUTE_CONFIDENCE, parseFactorFor, rowFactorFor, sheetAttrConf } from './confidence';
 import type { ColumnRoleAssignment } from './columnSynonyms';
+import { FIT_FOR_PURPOSE_ORDER } from '../engine/elementRead/fitForPurpose';
 import { normaliseName } from './normalise';
 import { looksLikePersonName, parseBool, parseDate, parseDisposition, parseEmail, parseHostingModel, parseLifecycle, parseName, parseOwnerCell } from './normaliseValue';
 import { extractDataRows, type CellMeta, type RawSheet } from './parse/sheetGrid';
@@ -84,7 +85,7 @@ export interface CapabilityColumnRow {
   systemName: string;
   description?: string;
   capabilityText: string;
-  /** JSON import only (owner-approved exception): the fit rating to put on every `supports` link this row creates. */
+  /** Owner-approved exception: the fit rating to put on every `supports` link this row creates (JSON, and from 2026-11-17 a spreadsheet's Fit column). */
   fit?: FitForPurpose;
   sourceRef: SourceRef;
 }
@@ -194,6 +195,8 @@ interface ElementGroup {
   sourceKeys: string[];
   capabilityColumnText?: string;
   capabilityColumnRef?: SourceRef;
+  /** The row's own `fit` cell (spreadsheet), applied to every capability link the row creates. */
+  fit?: FitForPurpose;
 }
 
 interface ActorGroup {
@@ -357,6 +360,22 @@ export function rowsToCandidates(input: RowsToCandidatesInput): RowsToCandidates
         if (raw !== '' && group.capabilityColumnText === undefined) {
           group.capabilityColumnText = raw;
           group.capabilityColumnRef = ref;
+        }
+        continue;
+      }
+
+      if (role === 'fit') {
+        if (raw === '') {
+          bailOnBlank();
+          continue;
+        }
+        const normalised = raw.trim().toLowerCase();
+        // The app's own exports say "Unrated" / "Not rated" where no fit is recorded: that is blank, not a bad value.
+        if (normalised === 'unrated' || normalised === 'not rated') continue;
+        if (Object.hasOwn(FIT_FOR_PURPOSE_ORDER, normalised)) {
+          group.fit ??= normalised as FitForPurpose;
+        } else {
+          group.warnings.push({ code: 'ENUM_UNPARSED', cell: refText, raw });
         }
         continue;
       }
@@ -574,6 +593,7 @@ export function rowsToCandidates(input: RowsToCandidatesInput): RowsToCandidates
         systemName: finalName,
         ...(typeof rowDescription === 'string' ? { description: rowDescription } : {}),
         capabilityText: group.capabilityColumnText,
+        ...(group.fit !== undefined ? { fit: group.fit } : {}),
         sourceRef: group.capabilityColumnRef,
       });
     }
