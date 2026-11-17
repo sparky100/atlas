@@ -198,6 +198,8 @@ A **principle** is a short rule your team agrees decisions will be checked again
 
 Each principle shows the decisions that **follow** it and the ones that **depart from** it, with the reason given for each departure, as plain counts and links. A decision can only cite an active principle from its own model, and only while the decision is still proposed. A departure always needs a reason; following one does not.
 
+**Start from a set.** You never have to write principles from scratch. When Atlas has published sets of principles, owners and architects see **Start from a set** at the top of the page. Open a set, **tick** the principles you want (none are ticked for you) and choose **Add**. Each one becomes your own principle: reword it, retire it, or leave it, and the set itself is never changed. A card says which set and version it started from. A principle you already have with the same title is left alone, so adding a set twice does nothing. You can always write your own principles too.
+
 ## Bringing data in: import
 
 Rather than typing your landscape in by hand, you can feed Atlas source material and review what it proposes:

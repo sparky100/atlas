@@ -27,9 +27,19 @@ Both tables enable and force RLS with policies in the same migration; `auth.uid(
 
 ### Not in this decision
 
-- A starter set of principles. A draft was written for review; if one is offered in the app it will be versioned content the person chooses to add, never added automatically (CLAUDE.md rule 7).
 - Linking principles to elements or capabilities, scoring or compliance percentages. Counts are shown as plain numbers, never a score.
+
+## Starter sets (PR 2)
+
+Simon, 2026-11-17: principles are offered as **versioned content like the capability maps**, and an organisation must always be able to write its own (it still can, on the same page).
+
+- **Where the content lives:** `principle_sets`, product content in the shape of `sample_models` (ADR-033): no `org_id`, `slug` + `version` unique, `name`, `description`, `payload` = `{ principles: [{ title, statement, why }] }` (1 to 50), `published_by`. Select for any signed-in user; insert only by a platform admin as themselves; no update or delete, and those privileges are revoked (rule 5). A new publish is a new version and the newest is the one offered. No application code holds any set's wording (rule 7).
+- **How it is published:** a platform admin uses **Publish as a set** on the Principles page. It publishes the model's **active** principles; retired ones are left out. A set holds only wording, so it carries no person, model or organisation.
+- **How a person uses it:** **Start from a set** (owner or architect, shown only when a set exists). They open a set, **tick** the principles they want (none are ticked for them) and add them. Each becomes an ordinary principle of the organisation's own, in one insert (all or none), under the same `principles_insert` policy as one typed by hand. A title the model already has (ignoring case) is skipped, so adding twice changes nothing. Nothing is ever added automatically.
+- **Provenance:** a copy records `from_set_slug`, `from_set_name` and `from_set_version` (all three or none; `principles_from_set_consistent`). They are insert-only (the update grant does not name them), and the card says "Started from the … set, version …". The copy is then the organisation's: reword or retire it and the set is untouched.
+- **No new function and no new index:** plain RLS, so no `SECURITY DEFINER` finding; `published_by` carries no foreign key (the `principles.created_by` precedent), so there is no unindexed-foreign-key or unused-index finding; the only index is the unique constraint's, which the advisor does not report as unused. The three columns on `principles` add none.
+- **Boundary tests:** `src/db/principleSets.integration.test.ts`: a non-admin cannot publish, nobody publishes in another's name or changes or removes a version, a signed-out caller reads nothing, an owner and an architect add into their own model, and a contributor, a viewer and a user from a different organisation cannot.
 
 ## Consequences
 
-One migration, a contract type and round-trip test, a Principles page under Work, and (in the next PR) a Principles section on the decision page, the ADR export and a departures count on the architect and director homes.
+One migration, a contract type and round-trip test, a Principles page under Direction, and (in the next PR) a Principles section on the decision page, the ADR export and a departures count on the architect and director homes.

@@ -18,6 +18,8 @@ export interface UsePrinciplesResult {
   create: (input: PrincipleInput) => Promise<boolean>;
   edit: (principleId: UUID, input: PrincipleInput) => Promise<boolean>;
   setStatus: (principleId: UUID, status: 'active' | 'retired') => Promise<boolean>;
+  /** Reads the list again, e.g. after principles were added from a set. */
+  reload: () => void;
 }
 
 const PROBLEM_TEXT: Record<string, string> = {
@@ -116,5 +118,5 @@ export function usePrinciples(modelId: UUID, orgId: UUID, userId: UUID | null): 
 
   const setStatus = useCallback((principleId: UUID, status: 'active' | 'retired') => run(status === 'retired' ? 'Could not retire this principle.' : 'Could not make this principle active again.', () => updatePrinciple(supabase, principleId, { status })), [run]);
 
-  return { loading, principles, links, decisions, error, saving, create, edit, setStatus };
+  return { loading, principles, links, decisions, error, saving, create, edit, setStatus, reload };
 }

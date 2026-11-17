@@ -85,3 +85,10 @@
 .uses li {
   overflow-wrap: anywhere;
 }
+
+.pick {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  cursor: pointer;
+}
