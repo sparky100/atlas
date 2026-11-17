@@ -139,6 +139,11 @@ export function canEditPrinciples(role: MemberRole | null): boolean {
   return role === 'owner' || role === 'architect';
 }
 
+/** ADR-034 PR 3: mirrors `decision_principles_insert`/`_delete`'s RLS — owner, architect or contributor, and only while the decision is still proposed. */
+export function canLinkDecisionPrinciples(role: MemberRole | null, decision: Pick<DecisionRow, 'status'>): boolean {
+  return decision.status === 'proposed' && canCreateChangeBranch(role);
+}
+
 /** F10 (ADR-024 §4): mirrors `projects_insert`'s RLS floor — owner/architect/contributor, the same as starting a decision. */
 export function canStartProject(role: MemberRole | null): boolean {
   return canCreateChangeBranch(role);
