@@ -31,7 +31,7 @@ describe('isValidStanceReason', () => {
 
 describe('row round trip', () => {
   it('survives JSON as stored', () => {
-    const principle: PrincipleRow = { id: 'p1', org_id: 'o', model_id: 'm', title: 'T', statement: 'S', why: 'W', status: 'retired', created_by: 'u', created_at: '2026-11-17T00:00:00Z', retired_by: 'u', retired_at: '2026-11-18T00:00:00Z' };
+    const principle: PrincipleRow = { id: 'p1', org_id: 'o', model_id: 'm', title: 'T', statement: 'S', why: 'W', status: 'retired', created_by: 'u', created_at: '2026-11-17T00:00:00Z', retired_by: 'u', retired_at: '2026-11-18T00:00:00Z', from_set_slug: 'core', from_set_name: 'Core', from_set_version: 1 };
     const link: DecisionPrincipleRow = { decision_id: 'd1', principle_id: 'p1', stance: 'departs', reason: 'Because.', created_by: 'u', created_at: '2026-11-17T00:00:00Z' };
     expect(JSON.parse(JSON.stringify(principle))).toEqual(principle);
     expect(JSON.parse(JSON.stringify(link))).toEqual(link);

@@ -142,7 +142,7 @@ describe('citations and non-element ids', () => {
 });
 
 describe('list_principles', () => {
-  const principle = (n: number, over: Record<string, unknown> = {}) => ({ id: uid(n), org_id: uid(900), model_id: uid(901), title: `Principle ${String(n)}`, statement: 'Reuse before buying.', why: '', status: 'active' as const, created_by: uid(902), created_at: '', retired_by: null, retired_at: null, ...over });
+  const principle = (n: number, over: Record<string, unknown> = {}) => ({ id: uid(n), org_id: uid(900), model_id: uid(901), title: `Principle ${String(n)}`, statement: 'Reuse before buying.', why: '', status: 'active' as const, created_by: uid(902), created_at: '', retired_by: null, retired_at: null, from_set_slug: null, from_set_name: null, from_set_version: null, ...over });
   it('lists active principles with who follows and who departs, and names the id `principleId`', async () => {
     const ctx = estateContext({
       decisions: [decision(540, { title: 'Pick a CRM' }), decision(541, { title: 'Keep the old portal' })],

@@ -59,6 +59,10 @@ export interface PrincipleRow {
   created_at: string;
   retired_by: string | null;
   retired_at: string | null;
+  /** Where it began, when it was added from a published set (ADR-034 "Starter sets"); null for one the organisation wrote. All three are set together. */
+  from_set_slug: string | null;
+  from_set_name: string | null;
+  from_set_version: number | null;
 }
 
 /** The literal shape of a row in `decision_principles` — primary key `(decision_id, principle_id)`. */
