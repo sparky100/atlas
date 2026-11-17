@@ -1,7 +1,7 @@
 /**
  * ADR-028 §1: the work records beside the model: changes, decisions and
- * projects. Summaries only; the ids are named `changeId`, `decisionId` and
- * `projectId` (never `id`) because they are not elements and must not be
+ * projects, and (ADR-035) goals. Summaries only; the ids are named `changeId`, `decisionId`,
+ * `projectId` and `goalId` (never `id`) because they are not elements and must not be
  * citable as elements. Comments and capture drafts are not exposed.
  */
 import { z } from 'zod';
@@ -121,5 +121,32 @@ export const listProjects = defineTool({
       targetDate: p.target_date,
     }));
     return okResult(ctx, { projects: shown }, all.length, all.length > shown.length);
+  },
+});
+
+export const listGoals = defineTool({
+  name: 'list_goals',
+  description: 'List the goals the organisation is working towards: title, what success looks like, why now, and the capabilities that serve each goal. Use it to answer why a capability matters. Retired goals are left out unless asked for.',
+  schema: z.strictObject({ status: z.enum(['active', 'retired']).default('active'), limit: limitInput }),
+  run: async (ctx, input) => {
+    const all = (await ctx.goals()).filter((g) => g.status === input.status);
+    const shownRows = all.slice(0, input.limit);
+    const links = await ctx.goalLinks();
+    const index = indexSnapshot(await ctx.snapshot());
+    const shown = shownRows.map((g) => ({
+      goalId: g.id,
+      title: clip(g.title, 200),
+      status: g.status,
+      statement: clip(g.statement, 300),
+      whyNow: g.why_now === '' ? null : clip(g.why_now, 300),
+      capabilities: links
+        .filter((l) => l.goal_id === g.id)
+        .slice(0, 25)
+        .flatMap((l) => {
+          const el = index.byId.get(l.capability_id);
+          return el ? [elementRef(index, el)] : [];
+        }),
+    }));
+    return okResult(ctx, { goals: shown }, all.length, all.length > shown.length);
   },
 });

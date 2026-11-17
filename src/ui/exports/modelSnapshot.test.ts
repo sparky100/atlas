@@ -45,3 +45,18 @@ describe('buildModelSnapshot', () => {
     expect(snapshot.attributeDefinitions).toEqual([expect.objectContaining({ key: 'tier', appliesTo: ['system'], deprecated: false })]);
   });
 });
+
+describe('buildModelSnapshot goals', () => {
+  const base = { modelId: 'm1', modelName: 'Distribution', commitId: 'c1', exportedAt: new Date('2026-11-15T12:00:00Z'), elements: [el('a', 'capability', 'Metering'), el('b', 'capability', 'Billing')], relationships: [], facts: [], sources: [], definitions: [] };
+  const goal = (id: string, title: string) => ({ id, org_id: 'o', model_id: 'm1', title, statement: 'S', why_now: 'W', status: 'active' as const, created_by: 'u', created_at: '', retired_by: null, retired_at: null });
+
+  it('exports each goal with the names of the capabilities that serve it, A to Z', () => {
+    const snapshot = buildModelSnapshot({ ...base, goals: [goal('g2', 'Zed'), goal('g1', 'Alpha')], goalLinks: [{ goal_id: 'g1', capability_id: 'a', created_by: 'u', created_at: '' }, { goal_id: 'g1', capability_id: 'b', created_by: 'u', created_at: '' }] });
+    expect(snapshot.goals.map((g) => g.title)).toEqual(['Alpha', 'Zed']);
+    expect(snapshot.goals[0]).toEqual({ id: 'g1', title: 'Alpha', statement: 'S', whyNow: 'W', status: 'active', capabilities: [{ id: 'b', name: 'Billing' }, { id: 'a', name: 'Metering' }] });
+    expect(snapshot.goals[1]?.capabilities).toEqual([]);
+  });
+  it('has an empty goals list when none are given', () => {
+    expect(buildModelSnapshot(base).goals).toEqual([]);
+  });
+});

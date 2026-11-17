@@ -2,7 +2,7 @@
 export const ATLAS_GUIDE = `How Atlas is organised
 - Atlas models an organisation as elements (capabilities, value streams, systems, actors, data, projects and so on) joined by relationships (a system supports a capability, an actor owns a system, one system integrates with another).
 - Capabilities say what the organisation does; systems are the applications and services that support them; owners are the people or teams responsible.
-- Work in progress lives in "changes": proposed edits that are not live yet. Decisions and projects are recorded beside the model.
+- Work in progress lives in "changes": proposed edits that are not live yet. Decisions, projects, goals and principles are recorded beside the model.
 
 Which tool answers which question
 - atlas_list_models: which models you can see. Call this first.
@@ -15,6 +15,7 @@ Which tool answers which question
 - atlas_portfolio_signals: the application portfolio at a glance.
 - atlas_list_changes / atlas_change_impact: proposed changes and what each would touch.
 - atlas_list_decisions / atlas_list_projects: the decision and project records.
+- atlas_list_goals: the goals the organisation is working towards, and the capabilities that serve each (why a capability matters).
 
 Reading a change instead of the live model
 - Every tool below atlas_list_models takes an optional "change" (a changeId from atlas_list_changes). The result then shows the model as that change would leave it. Without it you read the live model.

@@ -11,6 +11,7 @@
  */
 import type { UUID } from '../../contracts/delta';
 import type { ElementsHeadRow, FactsRow, RelationshipsHeadRow } from '../../contracts/rows';
+import type { GoalCapabilityRow, GoalRow } from '../../contracts/goals';
 import type { AttributeDefinitionRow, SourceRow } from '../../db/types';
 
 export const MODEL_SNAPSHOT_FORMAT = 'atlas-model-export';
@@ -26,6 +27,9 @@ export interface ModelSnapshotInput {
   facts: readonly FactsRow[];
   sources: readonly SourceRow[];
   definitions: readonly AttributeDefinitionRow[];
+  /** ADR-035: the model's goals and which capabilities serve each. Workflow records as they stand now, not as of `commitId`. Omitted means none. */
+  goals?: readonly GoalRow[];
+  goalLinks?: readonly GoalCapabilityRow[];
 }
 
 export interface ModelSnapshot {
@@ -65,6 +69,8 @@ export interface ModelSnapshot {
     assertedAt: string;
   }[];
   sources: { id: UUID; kind: string; name: string; uri: string | null; capturedAt: string | null; createdAt: string }[];
+  /** ADR-035: goals as they stand now (they are not part of any commit), each with the capabilities that serve it. */
+  goals: { id: UUID; title: string; statement: string; whyNow: string; status: string; capabilities: { id: UUID; name: string | null }[] }[];
   attributeDefinitions: { key: string; label: string; kind: string; options: readonly string[] | null; appliesTo: readonly string[]; required: boolean; description: string | null; deprecated: boolean }[];
 }
 
@@ -87,6 +93,19 @@ export function buildModelSnapshot(input: ModelSnapshotInput): ModelSnapshot {
       .sort((a, b) => byName(a.subject_id, b.subject_id) || byName(a.attribute, b.attribute))
       .map((f) => ({ subjectType: f.subject_type, subjectId: f.subject_id, attribute: f.attribute, value: f.value, sourceId: f.source_id, sourceRef: f.source_ref, confidence: f.confidence, effectiveDate: f.effective_date, assertedAt: f.asserted_at })),
     sources: [...input.sources].sort((a, b) => byName(a.id, b.id)).map((s) => ({ id: s.id, kind: s.kind, name: s.name, uri: s.uri, capturedAt: s.captured_at, createdAt: s.created_at })),
+    goals: [...(input.goals ?? [])]
+      .sort((a, b) => byName(a.title, b.title) || byName(a.id, b.id))
+      .map((g) => ({
+        id: g.id,
+        title: g.title,
+        statement: g.statement,
+        whyNow: g.why_now,
+        status: g.status,
+        capabilities: (input.goalLinks ?? [])
+          .filter((l) => l.goal_id === g.id)
+          .map((l) => ({ id: l.capability_id, name: nameById.get(l.capability_id) ?? null }))
+          .sort((a, b) => byName(a.name ?? '', b.name ?? '') || byName(a.id, b.id)),
+      })),
     attributeDefinitions: [...input.definitions]
       .sort((a, b) => a.order_index - b.order_index || byName(a.key, b.key))
       .map((d) => ({ key: d.key, label: d.label, kind: d.kind, options: d.options, appliesTo: d.applies_to, required: d.required, description: d.description, deprecated: d.deprecated_at !== null })),

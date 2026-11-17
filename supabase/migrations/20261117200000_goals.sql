@@ -1,0 +1,266 @@
+-- ADR-035 (docs/ADR-035-goals.md): goals. A goal is a short statement of what
+-- the organisation is trying to achieve, linked to the capabilities that serve
+-- it, so people can see why a capability matters. A workflow record on the
+-- same tier as `principles`, `decisions` and `projects`: never a delta, never
+-- folded into a head, never in a version, and not an element type (ADR-001).
+-- Goals are retired, never deleted; a link to a capability can be taken back.
+--
+-- Advisor discipline (CLAUDE.md rule 9): both tables enable and force RLS with
+-- policies in this migration; `auth.uid()` is wrapped in a select; no
+-- SECURITY DEFINER function is added (the two trigger functions are invoker
+-- functions with all execute revoked); every foreign key is covered by an
+-- index (`goals (model_id, status)`, and the primary key of `goal_capabilities`
+-- leads with `goal_id`); the audit columns and `org_id` carry no foreign key
+-- (the `principles` precedent); and `goal_capabilities.capability_id` is
+-- checked by trigger rather than by a foreign key, because an element's id is
+-- not a key of any one table (elements_head is keyed by commit too).
+
+create table goals (
+  id uuid primary key,
+  org_id uuid not null,
+  model_id uuid not null references models (id),
+  title text not null check (length(btrim(title)) > 0 and length(title) <= 120),
+  -- What success looks like, in one or two plain sentences.
+  statement text not null check (length(btrim(statement)) > 0 and length(statement) <= 500),
+  -- Why now: a regulation, a merger, a contract ending. Optional.
+  why_now text not null default '' check (length(why_now) <= 500),
+  status text not null default 'active' check (status in ('active', 'retired')),
+  created_by uuid not null,
+  created_at timestamptz not null default now(),
+  retired_by uuid,
+  retired_at timestamptz,
+  constraint goals_retired_consistent check ((status = 'retired') = (retired_at is not null and retired_by is not null))
+);
+
+comment on table goals is 'ADR-035: a goal the organisation is working towards, linked to the capabilities that serve it. A workflow record, never a landscape fact: not in deltas, heads or versions, and not an element type. Retired, never deleted. Edits stop while retired.';
+
+-- Covers the model_id foreign key and the list query.
+create index goals_model_status_idx on goals (model_id, status);
+
+create table goal_capabilities (
+  goal_id uuid not null references goals (id),
+  -- No foreign key on purpose: an element id is not a key of any one table.
+  -- atlas.check_goal_capability proves it is a capability in the goal's model
+  -- at insert, and atlas.delete_model clears this table first.
+  capability_id uuid not null,
+  created_by uuid not null,
+  created_at timestamptz not null default now(),
+  primary key (goal_id, capability_id)
+);
+
+comment on table goal_capabilities is 'ADR-035: which capabilities serve a goal. Pointing at a capability is a statement of intent, not a model fact, so a link can be taken back.';
+
+-- ---------------------------------------------------------------------------
+-- Triggers
+-- ---------------------------------------------------------------------------
+
+-- Stamps who retired a goal and when, clears that when it is made active
+-- again, and keeps the wording of a retired goal fixed.
+create or replace function atlas.guard_goal_update()
+returns trigger
+language plpgsql
+set search_path = public, pg_temp
+as $$
+begin
+  if old.status = 'retired' and new.status = 'retired'
+     and (new.title is distinct from old.title or new.statement is distinct from old.statement or new.why_now is distinct from old.why_now) then
+    raise exception 'guard_goal_update: a retired goal cannot be edited; make it active again first' using errcode = '42501';
+  end if;
+  if new.status = 'retired' and old.status = 'active' then
+    new.retired_by := auth.uid();
+    new.retired_at := now();
+  elsif new.status = 'active' then
+    new.retired_by := null;
+    new.retired_at := null;
+  end if;
+  return new;
+end;
+$$;
+
+create trigger goals_guard_update
+  before update on goals
+  for each row execute function atlas.guard_goal_update();
+
+revoke all on function atlas.guard_goal_update() from public, anon, authenticated;
+
+-- A goal can only point at a capability that exists in its own model.
+create or replace function atlas.check_goal_capability()
+returns trigger
+language plpgsql
+set search_path = public, pg_temp
+as $$
+declare
+  v_model uuid;
+begin
+  select model_id into v_model from goals where id = new.goal_id;
+  if v_model is null
+     or not exists (
+       select 1 from elements_head e
+       where e.model_id = v_model and e.element_id = new.capability_id and e.element_type = 'capability'
+     ) then
+    raise exception 'check_goal_capability: no capability % in this goal''s model', new.capability_id using errcode = '23503';
+  end if;
+  return new;
+end;
+$$;
+
+create trigger goal_capabilities_check
+  before insert on goal_capabilities
+  for each row execute function atlas.check_goal_capability();
+
+revoke all on function atlas.check_goal_capability() from public, anon, authenticated;
+
+-- ---------------------------------------------------------------------------
+-- RLS: goals
+-- ---------------------------------------------------------------------------
+
+alter table goals enable row level security;
+alter table goals force row level security;
+
+create policy goals_select on goals
+  for select to authenticated
+  using (atlas.is_member(org_id));
+
+-- Owners and architects write the goals; everyone in the organisation reads them.
+create policy goals_insert on goals
+  for insert to authenticated
+  with check (
+    atlas.has_role(org_id, 'owner', 'architect')
+    and created_by = (select auth.uid())
+    and status = 'active'
+    and retired_by is null
+    and retired_at is null
+    and exists (select 1 from models m where m.id = goals.model_id and m.org_id = goals.org_id)
+  );
+
+create policy goals_update on goals
+  for update to authenticated
+  using (atlas.has_role(org_id, 'owner', 'architect'))
+  with check (atlas.has_role(org_id, 'owner', 'architect'));
+
+revoke update on goals from authenticated;
+grant select, insert on goals to authenticated;
+-- Only the wording and the status are client-writable; retired_by/at are
+-- stamped by the trigger above. No delete policy: retire, never delete.
+grant update (title, statement, why_now, status) on goals to authenticated;
+
+-- ---------------------------------------------------------------------------
+-- RLS: goal_capabilities
+-- ---------------------------------------------------------------------------
+
+alter table goal_capabilities enable row level security;
+alter table goal_capabilities force row level security;
+
+create policy goal_capabilities_select on goal_capabilities
+  for select to authenticated
+  using (exists (select 1 from goals g where g.id = goal_capabilities.goal_id and atlas.is_member(g.org_id)));
+
+-- Same tier as the goal itself, and only while the goal is active.
+create policy goal_capabilities_insert on goal_capabilities
+  for insert to authenticated
+  with check (
+    created_by = (select auth.uid())
+    and exists (
+      select 1 from goals g
+      where g.id = goal_capabilities.goal_id
+        and g.status = 'active'
+        and atlas.has_role(g.org_id, 'owner', 'architect')
+    )
+  );
+
+create policy goal_capabilities_delete on goal_capabilities
+  for delete to authenticated
+  using (
+    exists (
+      select 1 from goals g
+      where g.id = goal_capabilities.goal_id
+        and g.status = 'active'
+        and atlas.has_role(g.org_id, 'owner', 'architect')
+    )
+  );
+
+grant select, insert, delete on goal_capabilities to authenticated;
+
+-- ---------------------------------------------------------------------------
+-- atlas.delete_model: same body as 20261117100000_principles.sql, with
+-- goal_capabilities and goals cleared too.
+-- ---------------------------------------------------------------------------
+
+create or replace function atlas.delete_model(p_model_id uuid)
+returns jsonb
+language plpgsql
+security definer
+set search_path = public, pg_temp
+as $$
+declare
+  v_org_id uuid;
+  v_archived_at timestamptz;
+begin
+  select org_id, archived_at into v_org_id, v_archived_at from models where id = p_model_id for update;
+  if v_org_id is null then
+    return jsonb_build_object('status', 'not_found');
+  end if;
+  if atlas.has_role(v_org_id, 'owner') is not true then
+    raise exception 'delete_model: only an owner may delete a model' using errcode = '42501';
+  end if;
+  if v_archived_at is null then
+    return jsonb_build_object('status', 'not_archived');
+  end if;
+
+  set constraints
+    deltas_previous_delta_id_fkey,
+    commits_parent_commit_id_fkey,
+    commits_merged_branch_head_commit_id_fkey,
+    branches_base_commit_id_fkey,
+    branches_head_commit_id_fkey,
+    commits_branch_id_fkey
+    deferred;
+
+  update comments set parent_comment_id = null where model_id = p_model_id;
+  update decisions set superseded_decision_id = null where model_id = p_model_id;
+  update capture_jobs set reimport_of_job_id = null where model_id = p_model_id;
+
+  delete from report_snapshots where model_id = p_model_id; -- references saved_reports, branches, commits
+  delete from dashboard_tiles where dashboard_id in (select id from dashboards where model_id = p_model_id); -- references dashboards, saved_reports
+  delete from dashboards where model_id = p_model_id;
+  delete from saved_reports where model_id = p_model_id;
+  delete from notifications where merge_request_id in (select id from merge_requests where model_id = p_model_id);
+  delete from comments where model_id = p_model_id; -- cascades comment_mentions, and any notifications by comment_id
+  delete from review_verdicts where model_id = p_model_id; -- references merge_requests
+  delete from decision_arguments where decision_id in (select id from decisions where model_id = p_model_id);
+  delete from decision_links where decision_id in (select id from decisions where model_id = p_model_id);
+  delete from decision_option_ratings where decision_id in (select id from decisions where model_id = p_model_id); -- references decisions, branches
+  delete from project_links where project_id in (select id from projects where model_id = p_model_id); -- references projects
+  delete from decision_principles where decision_id in (select id from decisions where model_id = p_model_id); -- references decisions
+  delete from principles where model_id = p_model_id; -- nothing references it once decision_principles is gone
+  delete from goal_capabilities where goal_id in (select id from goals where model_id = p_model_id); -- references goals
+  delete from goals where model_id = p_model_id; -- nothing references it once goal_capabilities is gone
+  delete from duplicate_candidates where model_id = p_model_id; -- references duplicate_check_runs
+  delete from duplicate_check_runs where model_id = p_model_id;
+  delete from duplicate_dismissals where model_id = p_model_id;
+  delete from assumptions where model_id = p_model_id;
+  delete from decisions where model_id = p_model_id; -- references branches, projects; self-ref already nulled
+  delete from element_merges where model_id = p_model_id; -- references evidence, commits
+  delete from evidence where model_id = p_model_id; -- references sources
+  delete from resolved_conflicts where model_id = p_model_id; -- references deltas
+  delete from merge_requests where model_id = p_model_id; -- references commits, branches
+  delete from views where model_id = p_model_id; -- cascades view_layouts, view_annotations
+  delete from facts where model_id = p_model_id; -- references deltas, sources
+  delete from tags where model_id = p_model_id; -- references commits
+  delete from elements_head where model_id = p_model_id; -- references deltas via exists_delta_id
+  delete from relationships_head where model_id = p_model_id; -- references deltas via exists_delta_id
+  delete from aliases where model_id = p_model_id; -- references sources
+  delete from deltas where model_id = p_model_id; -- self-ref deferred; commit_id/source_id -> commits/sources still required below
+  delete from sources where model_id = p_model_id; -- deltas/aliases/evidence/facts referencing it already gone; still referenced by capture_jobs below
+  delete from capture_jobs where model_id = p_model_id; -- cascades capture_candidates; self-ref already nulled; references branches
+  delete from commits where model_id = p_model_id; -- self-ref and branches' ref both deferred
+  delete from branches where model_id = p_model_id; -- references projects; ref to commits deferred
+  delete from projects where model_id = p_model_id; -- decisions/branches/project_links referencing it already gone
+  delete from models where id = p_model_id;
+
+  return jsonb_build_object('status', 'deleted');
+end;
+$$;
+
+revoke all on function atlas.delete_model from public;
+grant execute on function atlas.delete_model to authenticated;

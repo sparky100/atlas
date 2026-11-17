@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { BranchRow } from '../../db/types';
-import { canAddDecisionConcern, canApproveOrMergeRequest, canArchiveModel, canCancelDecision, canDiscardCaptureJob, canEditDecision, canDeleteModel, canEditBranch, canEditValueStreamStructure, canManageAttributeDefinitions, canManageOrgSettings, canRestoreModel, canReviewMergeRequest } from './roleGates';
+import { canAddDecisionConcern, canApproveOrMergeRequest, canArchiveModel, canCancelDecision, canDiscardCaptureJob, canEditDecision, canEditGoals, canDeleteModel, canEditBranch, canEditValueStreamStructure, canManageAttributeDefinitions, canManageOrgSettings, canRestoreModel, canReviewMergeRequest } from './roleGates';
 
 function branch(overrides: Partial<BranchRow>): BranchRow {
   return {
@@ -226,5 +226,15 @@ describe('canDiscardCaptureJob', () => {
   it('refuses once the job is reviewed or discarded', () => {
     expect(canDiscardCaptureJob('owner', { createdBy: 'user-1', status: 'reviewed' }, 'user-1')).toBe(false);
     expect(canDiscardCaptureJob('owner', { createdBy: 'user-1', status: 'discarded' }, 'user-1')).toBe(false);
+  });
+});
+
+describe('canEditGoals', () => {
+  it('lets owners and architects write goals and nobody else', () => {
+    expect(canEditGoals('owner')).toBe(true);
+    expect(canEditGoals('architect')).toBe(true);
+    expect(canEditGoals('contributor')).toBe(false);
+    expect(canEditGoals('viewer')).toBe(false);
+    expect(canEditGoals(null)).toBe(false);
   });
 });
