@@ -17,6 +17,7 @@ import {
   worstFitForPurposeOfSupporter,
 } from './metrics';
 import type { ElementsHeadRow, Json, RelationshipsHeadRow } from '../../contracts/rows';
+import { annualRunCostRank } from '../../engine/elementRead/annualRunCost';
 
 function system(id: string, lifecycleStatus?: string, plannedEnd?: string, criticality?: string, domain?: string): ElementsHeadRow {
   const attrs: Record<string, Json> = { isExternal: false };
@@ -25,6 +26,10 @@ function system(id: string, lifecycleStatus?: string, plannedEnd?: string, criti
   if (criticality !== undefined) attrs.criticality = criticality;
   if (domain !== undefined) attrs.domain = domain;
   return { element_id: id, element_type: 'system', name: id, parent_id: null, attributes: attrs, exists_delta_id: `d-${id}` };
+}
+
+function costed(id: string, band?: string, type: 'system' | 'container' = 'system'): ElementsHeadRow {
+  return { element_id: id, element_type: type, name: id, parent_id: null, attributes: band === undefined ? {} : { annualRunCost: band }, exists_delta_id: `d-${id}` };
 }
 
 function supports(systemId: string, capabilityId: string, fitForPurpose?: string, role?: string): RelationshipsHeadRow {
@@ -497,5 +502,40 @@ describe('AI share colour-by', () => {
     const systemsById = new Map([['a', agent('a', 'suggests')], ['b', agent('b', 'acts_alone')], ['c', system('c')], ['d', usesAi('d', 'built_in')]]);
     const edges = [supports('a', 'cap-1'), supports('c', 'cap-1'), supports('b', 'cap-2'), supports('d', 'cap-2')];
     expect(aggregateTileColourFor('metric:aiAgentShare', ['cap-1', 'cap-2'], edges, systemsById)).toEqual({ tone: 'danger', label: '3/4 AI · acts alone' });
+  });
+});
+
+describe('run cost colour-by', () => {
+  it('shows the costliest band among supporters, with the band written out and a shading step', () => {
+    const systemsById = new Map([['a', costed('a', 'under_50k')], ['b', costed('b', '1m_5m')], ['m', costed('m', '50k_250k', 'container')]]);
+    const edges = [supports('a', 'cap-1'), supports('b', 'cap-1'), supports('m', 'cap-1')];
+    const colour = tileColourFor('metric:runCost', 'cap-1', edges, systemsById);
+    expect(colour.tone).toBeUndefined();
+    expect(colour.label).toMatch(/^costliest: /);
+    expect(colour.amount).toBe(annualRunCostRank('1m_5m'));
+  });
+
+  it('never adds costs up: two cheap supporters stay as cheap as the dearest one', () => {
+    const systemsById = new Map([['a', costed('a', 'under_50k')], ['b', costed('b', 'under_50k')]]);
+    const one = tileColourFor('metric:runCost', 'cap-1', [supports('a', 'cap-1')], systemsById);
+    const two = tileColourFor('metric:runCost', 'cap-1', [supports('a', 'cap-1'), supports('b', 'cap-1')], systemsById);
+    expect(two).toEqual(one);
+  });
+
+  it('says "no run cost recorded" when supporters have none, and is silent with no supporters', () => {
+    const systemsById = new Map([['a', costed('a')]]);
+    expect(tileColourFor('metric:runCost', 'cap-1', [supports('a', 'cap-1')], systemsById)).toEqual({ tone: 'neutral', label: 'no run cost recorded' });
+    expect(tileColourFor('metric:runCost', 'cap-2', [supports('a', 'cap-1')], systemsById)).toEqual({ tone: undefined, label: undefined });
+  });
+
+  it('counts "none or included" as a recorded (cheapest) cost, not as missing', () => {
+    const systemsById = new Map([['a', costed('a', 'none_included')]]);
+    expect(tileColourFor('metric:runCost', 'cap-1', [supports('a', 'cap-1')], systemsById).amount).toBe(0);
+  });
+
+  it('takes the costliest across a group, counting a shared supporter once', () => {
+    const systemsById = new Map([['a', costed('a', '250k_1m')], ['b', costed('b', 'none_included')]]);
+    const edges = [supports('a', 'cap-1'), supports('a', 'cap-2'), supports('b', 'cap-2')];
+    expect(aggregateTileColourFor('metric:runCost', ['cap-1', 'cap-2'], edges, systemsById).amount).toBe(annualRunCostRank('250k_1m'));
   });
 });

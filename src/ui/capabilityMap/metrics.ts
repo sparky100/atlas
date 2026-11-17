@@ -82,7 +82,7 @@
  * alongside two metrics that need no such judgment call.
  */
 import type { ElementsHeadRow, RelationshipsHeadRow } from '../../contracts/rows';
-import type { AiAutonomy, Criticality, Disposition, FitForPurpose, LifecycleStatus, UUID } from '../../contracts/delta';
+import type { AiAutonomy, AnnualRunCost, Criticality, Disposition, FitForPurpose, LifecycleStatus, UUID } from '../../contracts/delta';
 import type { HomeMode } from '../../contracts/userPreferences';
 import type { ChipTone } from '../components/Chip/Chip';
 import { attributesRecord } from '../elements/attributesRecord';
@@ -93,6 +93,7 @@ import { dispositionLabel, dispositionOf, dispositionTone, worstDisposition } fr
 import { AI_AUTONOMY_TONE } from '../elements/aiAutonomyTone';
 import { domainOf } from '../elements/systemDomain';
 import { aiAutonomyOf, aiAutonomyRank, usesAi } from '../../engine/elementRead/aiAgent';
+import { annualRunCostLabel, annualRunCostOf, annualRunCostRank, highestAnnualRunCost } from '../../engine/elementRead/annualRunCost';
 import { fitForPurposeOf, hasLifecycleExposureData, replacedElementIds, supportsEdgesInForce, systemsExposedByLifecycle, worstFitForPurposeOfSupporter } from '../../engine/elementRead/fitAndExposure';
 
 export { fitForPurposeOf, hasLifecycleExposureData, replacedElementIds, supportsEdgesInForce, systemsExposedByLifecycle, worstFitForPurposeOfSupporter };
@@ -113,11 +114,14 @@ export const COLOUR_BY_OPTIONS: { value: ColourByMode; label: string }[] = [
   { value: 'metric:fitForPurpose', label: 'Fit' },
   { value: 'metric:disposition', label: 'Planned action' },
   { value: 'metric:aiAgentShare', label: 'AI share' },
+  { value: 'metric:runCost', label: 'Run cost' },
 ];
 
 export interface TileColour {
   tone: ChipTone | undefined;
   label: string | undefined;
+  /** Run cost only: which of the six cost bands (0 cheapest, 5 dearest) shades the tile. A separate field because cost is an amount, not a verdict, so it takes no status tone. */
+  amount?: number | undefined;
 }
 
 /** Every system id with a live `supports` edge into `capabilityId`. */
@@ -302,6 +306,23 @@ export function aiShareOf(capabilityId: UUID, supportsEdges: readonly Relationsh
 const AI_SHARE_WORDS: Record<AiAutonomy, string> = { acts_alone: 'acts alone', acts_with_approval: 'with approval', suggests: 'suggests' };
 
 /** Silent when no supporting system uses AI (zero is the ordinary case). Neutral "n/m use AI" when none is an agent; once an agent is among them, the same risk tone Criticality uses, with the words for the freest way any acts. */
+/** The costliest `annualRunCost` band among a capability's supporting systems and modules. `supporters` is how many there are; `band` is null when none has a cost recorded. Each element's own value is used, never a share of its platform's, and nothing is added up. */
+export function runCostOf(capabilityId: UUID, supportsEdges: readonly RelationshipsHeadRow[], systemsById: ReadonlyMap<UUID, ElementsHeadRow>): { band: AnnualRunCost | null; supporters: number } {
+  const bands: (AnnualRunCost | null)[] = [];
+  for (const id of new Set(supportingSystemIds(capabilityId, supportsEdges))) {
+    const system = systemsById.get(id);
+    if (system) bands.push(annualRunCostOf(system));
+  }
+  return { band: highestAnnualRunCost(bands).band, supporters: bands.length };
+}
+
+/** Silent with no supporters. With supporters but no cost recorded it says so, rather than looking cheap. */
+function runCostColour(cost: { band: AnnualRunCost | null; supporters: number }): TileColour {
+  if (cost.supporters === 0) return { tone: undefined, label: undefined };
+  if (cost.band === null) return { tone: 'neutral', label: 'no run cost recorded' };
+  return { tone: undefined, label: `costliest: ${annualRunCostLabel(cost.band)}`, amount: annualRunCostRank(cost.band) };
+}
+
 function aiShareColour(share: { using: number; total: number; worst: AiAutonomy | null }): TileColour {
   if (share.using === 0) return { tone: undefined, label: undefined };
   if (share.worst === null) return { tone: 'neutral', label: `${String(share.using)}/${String(share.total)} use AI` };
@@ -356,6 +377,8 @@ export function tileColourFor(mode: ColourByMode, capabilityId: UUID, supportsEd
       return dispositionColour(worstDispositionOf(capabilityId, supportsEdges, systemsById));
     case 'metric:aiAgentShare':
       return aiShareColour(aiShareOf(capabilityId, supportsEdges, systemsById));
+    case 'metric:runCost':
+      return runCostColour(runCostOf(capabilityId, supportsEdges, systemsById));
   }
 }
 
@@ -450,6 +473,21 @@ export function aggregateTileColourFor(mode: ColourByMode, descendantCapabilityI
         if (aiAutonomyRank(share.worst) > aiAutonomyRank(worst)) worst = share.worst;
       }
       return aiShareColour({ using, total, worst });
+    }
+    case 'metric:runCost': {
+      // Costliest band across the whole subtree; a supporter counted under two capabilities is still just one candidate.
+      const bands = new Set<AnnualRunCost>();
+      const supporterIds = new Set<UUID>();
+      for (const id of descendantCapabilityIds) {
+        for (const systemId of supportingSystemIds(id, supportsEdges)) {
+          const system = systemsById.get(systemId);
+          if (!system) continue;
+          supporterIds.add(systemId);
+          const band = annualRunCostOf(system);
+          if (band !== null) bands.add(band);
+        }
+      }
+      return runCostColour({ band: highestAnnualRunCost(bands).band, supporters: supporterIds.size });
     }
   }
 }
