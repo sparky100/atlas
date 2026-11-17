@@ -69,3 +69,9 @@ Two edge functions are deployed to this project — `send-invite-email` (Sprint 
 ## Layout
 
 See CLAUDE.md's "Code layout" section for what belongs where.
+
+## Licence
+
+Atlas is free software, licensed under the [GNU Affero General Public License v3.0 or later](LICENSE) (`AGPL-3.0-or-later`). You may use, modify and sell it, including as a hosted service, provided you share your changes under the same licence. Section 13 of the AGPL means that if you run a modified version for other people over a network, you must offer those users the source of your version. Atlas links to its source from the sign-in page and the account menu (`src/ui/licence.ts`); a fork that changes the app should point that link at its own source.
+
+The starter capability maps in `content/capability-maps/` state their own licence (CC BY 4.0) in each map's source description. Third-party dependencies keep their own licences (all permissive or weak-copyleft; see the pull request that introduced this section for the audit).
