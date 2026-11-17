@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { fakeElement, fakeSupportsEdge } from '../portfolio/portfolioTestFixtures';
-import { buildSupportMatrix, cellKey, matrixLinkCount } from './supportMatrix';
+import { buildSupportMatrix, cellKey, matrixLinkCount } from './supportMatrixModel';
 
 const cap = (id: string, parent: string | null) => ({ ...fakeElement(id), element_type: 'capability' as const, name: id, parent_id: parent });
 const sys = (id: string) => ({ ...fakeElement(id), name: id });

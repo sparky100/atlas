@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { buildCostFitGrid, CHART_COST_COLUMNS, CHART_FIT_ROWS } from './portfolioChart';
+import { buildCostFitGrid, CHART_COST_COLUMNS, CHART_FIT_ROWS } from './portfolioChartModel';
 import { fakeRow } from './portfolioTestFixtures';
 
 function cellAt(grid: ReturnType<typeof buildCostFitGrid>, fit: string, cost: string) {

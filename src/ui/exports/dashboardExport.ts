@@ -14,7 +14,7 @@ import type { ReportSpec } from '../../contracts/reportSpec';
 import type { ReportResult } from '../../engine/reportQuery';
 import type { DashboardTileKind, DashboardTileSize } from '../../db/types';
 import { CHART_SLOT_COUNT, chartBars, chartCategories, chartStacked, type ChartCategory, type ValueScale } from '../charts/chartData';
-import { buildQuadrant, QUADRANT_LABEL, QUADRANT_ORDER } from '../portfolio/portfolioQuadrant';
+import { buildQuadrant, QUADRANT_LABEL, QUADRANT_ORDER } from '../portfolio/portfolioQuadrantModel';
 import { quadrantItemsFromResult } from '../portfolio/quadrantItemsFromResult';
 import { reportFieldLabel, reportValueLabel, reportValueScale } from '../reports/reportTable';
 import { EXPORT_PADDING, EXPORT_PALETTE, STAMP_HEIGHT, stampShapes, truncate, type ExportPlan, type ExportShape, type ExportStamp } from './viewExport';

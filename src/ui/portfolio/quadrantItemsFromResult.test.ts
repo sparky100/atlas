@@ -5,7 +5,7 @@ import { runReportWithRows } from '../../engine/reportQuery';
 import { portfolioReportRow } from '../reports/portfolioReport';
 import { fakeRow } from './portfolioTestFixtures';
 import { quadrantItemsFromResult } from './quadrantItemsFromResult';
-import { buildQuadrant } from './portfolioQuadrant';
+import { buildQuadrant } from './portfolioQuadrantModel';
 
 describe('quadrant tile: a Portfolio report to quadrant boxes', () => {
   const spec: ReportSpec = { specVersion: REPORT_SPEC_VERSION, source: 'portfolio', filters: [], columns: ['name'], sort: [{ field: 'name', direction: 'asc' }], presentation: { kind: 'table', limit: 5 } };
