@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { fakeElement } from '../portfolio/portfolioTestFixtures';
-import { ACTORS_AREA_KEY, buildConnectionsMatrix, connectionCellKey, connectionLinkCount } from './connectionsMatrix';
+import { ACTORS_AREA_KEY, buildConnectionsMatrix, connectionCellKey, connectionLinkCount } from './connectionsMatrixModel';
 
 const sys = (id: string) => ({ ...fakeElement(id), name: id });
 const group = (key: string, ...ids: string[]) => ({ key, label: key.toUpperCase(), members: ids.map((id) => ({ system: sys(id), usesCount: 0, usedByCount: 0 })) });

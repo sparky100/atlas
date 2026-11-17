@@ -3,7 +3,7 @@ import { annualRunCostLabel } from '../elements/annualRunCost';
 import { dispositionLabel, dispositionTone } from '../elements/disposition';
 import { Text } from '../components/Text/Text';
 import { EmptyState } from '../components/EmptyState/EmptyState';
-import { buildQuadrant, dotSizeOf, NOT_PLACED_LABEL, QUADRANT_LABEL, QUADRANT_ORDER, type NotPlacedReason, type QuadrantItem } from './portfolioQuadrant';
+import { buildQuadrant, dotSizeOf, NOT_PLACED_LABEL, QUADRANT_LABEL, QUADRANT_ORDER, type NotPlacedReason, type QuadrantItem } from './portfolioQuadrantModel';
 import styles from './PortfolioQuadrant.module.css';
 
 export interface PortfolioQuadrantProps {

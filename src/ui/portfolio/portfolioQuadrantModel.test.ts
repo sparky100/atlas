@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { buildQuadrant, dotSizeOf, quadrantOf, techHealthOf, type QuadrantItem } from './portfolioQuadrant';
+import { buildQuadrant, dotSizeOf, quadrantOf, techHealthOf, type QuadrantItem } from './portfolioQuadrantModel';
 
 function item(overrides: Partial<QuadrantItem> = {}): QuadrantItem {
   return { id: 'a', name: 'A', fit: 'good', lifecycle: 'active', exposed: false, cost: '50k_250k', disposition: null, ...overrides };

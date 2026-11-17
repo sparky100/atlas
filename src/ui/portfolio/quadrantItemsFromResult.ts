@@ -1,7 +1,7 @@
 import type { AnnualRunCost, Disposition, FitForPurpose } from '../../contracts/delta';
 import type { ReportResult } from '../../engine/reportQuery';
 import type { QUADRANT_REPORT_COLUMNS } from '../reports/dashboardTiles';
-import type { QuadrantItem } from './portfolioQuadrant';
+import type { QuadrantItem } from './portfolioQuadrantModel';
 
 /** The quadrant tile's rows, read from a Portfolio report result run with `QUADRANT_REPORT_COLUMNS`; a column the result does not have reads as unrecorded. */
 export function quadrantItemsFromResult(result: Pick<ReportResult, 'columns' | 'rows'>): QuadrantItem[] {
