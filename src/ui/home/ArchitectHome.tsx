@@ -27,6 +27,7 @@ import { attributesRecord } from '../elements/attributesRecord';
 import { canStartProject } from '../orgs/roleGates';
 import { selectRecentActivity, splitActivitySubjects, type GroupedActivityItem } from './groupRecentActivity';
 import { checksClearLabel, partitionHealthChecks, type HealthCheck } from './healthChecks';
+import { MissingFactsStat } from '../gaps/MissingFactsStat';
 import type { ArchitectHomeData } from './useArchitectHome';
 import type { ArchitectHomeInsightsState, RecentCommitRow } from './useArchitectHomeInsights';
 import styles from './DoorHome.module.css';
@@ -58,6 +59,9 @@ function ActivitySubjects({ subjects, elementHref }: { subjects: { elementId: st
 
 export interface ArchitectHomeProps {
   data: ArchitectHomeData;
+  modelId: string;
+  /** Main's head commit, so the missing-facts count doesn't re-resolve it. */
+  mainCommitIdHint?: string | null | undefined;
   /** E8 item (4): Health findings and Recent activity load after first paint, in their own state machine (`useArchitectHomeInsights.ts`) — this component renders `data`'s Review-queue/My-changes panels regardless of this state, and shows a muted "Loading…" in place of the two panels that need it. */
   insights: ArchitectHomeInsightsState;
   /** Gates every "Start a decision →" card action below (`canStartDecision`) — omitted entirely, not shown disabled, for a viewer. */
@@ -171,7 +175,7 @@ function resolveCardAction(check: HealthCheck): FindingCardAction | null {
  *    (`gridAssuranceChecks`/`infoAssuranceChecks` below) rather than a
  *    second, parallel layout.
  */
-export function ArchitectHome({ data, insights, role, orgSlug, modelSlug, onShowOverview }: ArchitectHomeProps) {
+export function ArchitectHome({ data, modelId, mainCommitIdHint, insights, role, orgSlug, modelSlug, onShowOverview }: ArchitectHomeProps) {
   const now = new Date();
   // E8 item (4): `null` while Health findings/Recent activity are still
   // loading (or failed) — every array below built from it defaults to
@@ -618,6 +622,7 @@ export function ArchitectHome({ data, insights, role, orgSlug, modelSlug, onShow
             duplicates report's own open-candidate count, real from here on
             (previously a permanent "wired to 0" placeholder line below the
             grid instead of a stat at all). */}
+        <MissingFactsStat modelId={modelId} mainCommitIdHint={mainCommitIdHint ?? null} orgSlug={orgSlug} modelSlug={modelSlug} className={styles.stat} />
         <div className={styles.stat}>
           <Link to={duplicatesHref}>
             <Text as="span" size="2xl" className={insightsData && insightsData.duplicatesCount > 0 ? styles.statWarn : undefined}>

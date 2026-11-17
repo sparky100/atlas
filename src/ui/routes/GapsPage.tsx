@@ -57,7 +57,14 @@ export function GapsPage() {
   // Waits for main when viewing it, as `hintedModelId` does (inlined: the React Compiler can't preserve this page's memoization across a call taking `model`).
   const { state, reload } = usePortfolio(ref.kind === 'main' && mainBranchLoading ? '' : (model?.id ?? ''), ref, mainBranch?.head_commit_id ?? null);
   // Gaps are about what is live: a planned system has no inputs to fill in yet, and a retired one is gone.
+  const onlyElement = searchParams.get('element');
+  const onlyCapability = searchParams.get('capability');
   const liveRows = useMemo(() => (state.status === 'ready' ? state.data.rows.filter((row) => row.lifecycleState === 'active') : []), [state]);
+  // `?element=` (one system's own "Fill in") or `?capability=` (a capability's supporting systems) narrows the walk; the overview always shows the whole model.
+  const walkRows = useMemo(
+    () => liveRows.filter((row) => (onlyElement === null || row.element.element_id === onlyElement) && (onlyCapability === null || row.capabilities.some((link) => link.capabilityId === onlyCapability))),
+    [liveRows, onlyElement, onlyCapability],
+  );
 
   const kindParam = searchParams.get('kind');
   const kind: GapKind | null = isGapKind(kindParam) ? kindParam : null;
@@ -68,7 +75,7 @@ export function GapsPage() {
   // Adjusted during render (React's own "storing information from previous
   // renders" pattern), not in an effect.
   if (kind === null && walk !== null) setWalk(null);
-  if (kind !== null && state.status === 'ready' && walk?.kind !== kind) setWalk({ kind, items: gapItems(kind, liveRows) });
+  if (kind !== null && state.status === 'ready' && walk?.kind !== kind) setWalk({ kind, items: gapItems(kind, walkRows) });
 
   const saver = useMemo<GapWalkSaver | null>(() => {
     if (!model || !organisation || !userId || !writeBranch || !canFill) return null;

@@ -28,7 +28,9 @@ import { useModels } from '../models/useModels';
 import { canCreateChangeBranch, canEditOnMain, canStartDecision, useMembership } from '../orgs/useMembership';
 import { useAttributeDefinitions } from '../orgs/useAttributeDefinitions';
 import { useOrganisationBySlug } from '../orgs/useOrganisationBySlug';
-import { useElementBrowse, type ElementBrowseFilter } from '../elements/useElementBrowse';
+import { useElementBrowse, type CompletenessById, type ElementBrowseFilter } from '../elements/useElementBrowse';
+import { completenessOf } from '../gaps/gaps';
+import { usePortfolio } from '../portfolio/usePortfolio';
 import type { BrowseRow } from '../../db/elementBrowse';
 import { StartProjectLink } from '../projects/StartProjectLink';
 import { canEditBranch, canStartProject } from '../orgs/roleGates';
@@ -183,7 +185,13 @@ export function ElementsPage() {
     setSearchParams(params);
   };
 
-  const state = useElementBrowse(hintedModelId(model?.id, ref, mainBranchLoading) ?? '', ref, 'toBe', filter, mainBranch?.head_commit_id ?? null);
+  // The Completeness column: the same rows and rule as Gaps (`completenessOf`).
+  const { state: portfolioState } = usePortfolio(hintedModelId(model?.id, ref, mainBranchLoading) ?? '', ref, mainBranch?.head_commit_id ?? null, { inlineErrors: true });
+  const completenessById = useMemo<CompletenessById | null>(
+    () => (portfolioState.status === 'ready' ? new Map(portfolioState.data.rows.map((row) => [row.element.element_id, completenessOf(row)])) : null),
+    [portfolioState],
+  );
+  const state = useElementBrowse(hintedModelId(model?.id, ref, mainBranchLoading) ?? '', ref, 'toBe', filter, mainBranch?.head_commit_id ?? null, completenessById);
   // E8 ("performance") phase 1: this route's own resolve/first-paint/data-complete marks — see useRouteTiming.ts's own module comment.
   useRouteTiming('elements', state.status === 'ready');
   const onLinked = () => {
