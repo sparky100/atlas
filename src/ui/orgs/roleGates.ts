@@ -134,6 +134,11 @@ export function canStartDecision(role: MemberRole | null): boolean {
   return canCreateChangeBranch(role);
 }
 
+/** ADR-034: mirrors `principles_insert`/`_update`'s RLS floor — owners and architects write the rules; everyone else reads them. */
+export function canEditPrinciples(role: MemberRole | null): boolean {
+  return role === 'owner' || role === 'architect';
+}
+
 /** F10 (ADR-024 §4): mirrors `projects_insert`'s RLS floor — owner/architect/contributor, the same as starting a decision. */
 export function canStartProject(role: MemberRole | null): boolean {
   return canCreateChangeBranch(role);
