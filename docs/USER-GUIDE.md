@@ -11,7 +11,7 @@ This is the guide the in-app **Help** assistant reads to answer your questions. 
 1. Start here: what Atlas is, your first 10 minutes, signing in and roles.
 2. The model: the building blocks and how things connect.
 3. Finding your way around, then looking at the model: Home, Views, Element pages, Elements.
-4. Changing the model: Import, Changes, Decisions, Projects.
+4. Changing the model: Import, Changes, Decisions, Principles, Projects.
 5. Reporting and AI: Reports, Ask Atlas, Connect Claude Desktop.
 6. Keeping it trustworthy: Planned action, Still accurate, Comments, History.
 7. Settings and help.
@@ -115,7 +115,7 @@ Every model page shares the same navigation, in four groups:
 |---|---|
 | **Model** | Home, Capability map, Landscape, Value streams, Elements |
 | **Analyse** | Portfolio, Roadmap, Reports, Ask Atlas |
-| **Work** | Projects, Changes, Decisions, Import (the **Work** heading opens a page explaining them and offering **Start something**; it lists **Waiting for review**, then Projects, Decisions and Changes) |
+| **Work** | Projects, Changes, Decisions, Principles, Import (the **Work** heading opens a page explaining them and offering **Start something**; it lists **Waiting for review**, then Projects, Decisions and Changes) |
 | **Record** | History |
 
 On a phone, the bar at the bottom shows Home, Capabilities, Landscape and Changes; everything else is under **More**. Two items show a number of open items: **Changes** — changes still open (draft, proposed, in review or approved) — and **Decisions** — decisions still proposed. Projects has no number. On a phone, a dot on **More** means Decisions has a number inside it.
@@ -228,6 +228,12 @@ While a decision is proposed, **✎ Edit decision** changes its title, context, 
 A decision that's no longer needed can be **cancelled** while it's still proposed — **Cancel decision…** on its page, by its owner or an architect or owner, giving the reason. It isn't deleted: it stays in the decision log marked cancelled, with who cancelled it, when and why, and any options still in draft are cancelled with it. A cancelled decision can't be reopened; start a new one instead. Cancelling is also how you clear a decision that's stopping its project from closing.
 
 Start a decision from **Decisions**, from a project, or with **Start a decision →** on a Home finding, a weak capability or a value stream's panel. An element page's **Decisions** section shows the decisions that concern it.
+
+## Principles
+
+A **principle** is a short rule your team agrees decisions will be checked against, such as "Reuse before buying, buy before building". A good principle can change which option you choose; a rule that only says "keep the record complete" is a gap to fix, not a principle. **Work → Principles** lists them, each with a title, **the rule** in a sentence or two, and optionally **why** a team would accept it. Owners and architects add, edit and **retire** them; everyone else can read them. A retired principle is never deleted: it stays on the decisions that cite it, its wording is fixed while it is retired, and **Make active again** brings it back.
+
+Each principle shows the decisions that **follow** it and the ones that **depart from** it, with the reason given for each departure, as plain counts and links. A decision can only cite an active principle from its own model, and only while the decision is still proposed. A departure always needs a reason; following one does not.
 
 ## Projects
 

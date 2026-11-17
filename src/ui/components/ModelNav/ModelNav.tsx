@@ -1,4 +1,4 @@
-import { ClipboardList, Ellipsis, FolderKanban, GitBranch, History, Home, LayoutDashboard, List, Search, Map, Milestone, Scale, Sparkles, Upload, Wallet, Workflow, Grid as GridIcon, type LucideIcon } from 'lucide-react';
+import { ClipboardList, Compass, Ellipsis, FolderKanban, GitBranch, History, Home, LayoutDashboard, List, Search, Map, Milestone, Scale, Sparkles, Upload, Wallet, Workflow, Grid as GridIcon, type LucideIcon } from 'lucide-react';
 import { useEffect, useId, useRef, useState } from 'react';
 import { Link, useLocation, useSearchParams } from 'react-router';
 import { Chip } from '../Chip/Chip';
@@ -28,7 +28,7 @@ type RealSection = Exclude<ModelNavSection, null>;
 const NAV_GROUPS: { caption: string; sections: RealSection[] }[] = [
   { caption: 'Model', sections: ['home', 'capability-map', 'landscape', 'value-streams', 'elements'] },
   { caption: 'Analyse', sections: ['portfolio', 'roadmap', 'reports', 'ask'] },
-  { caption: 'Work', sections: ['work', 'projects', 'changes', 'decisions', 'capture'] },
+  { caption: 'Work', sections: ['work', 'projects', 'changes', 'decisions', 'principles', 'capture'] },
   { caption: 'Record', sections: ['versions'] },
 ];
 
@@ -47,6 +47,7 @@ const SECTION_LABELS: Record<RealSection, string> = {
   capture: 'Import',
   projects: 'Projects',
   decisions: 'Decisions',
+  principles: 'Principles',
   versions: 'History',
 };
 
@@ -79,6 +80,7 @@ const SECTION_ICONS: Record<RealSection, LucideIcon> = {
   capture: Upload,
   projects: FolderKanban,
   decisions: Scale,
+  principles: Compass,
   versions: History,
 };
 
@@ -407,6 +409,8 @@ function sectionPath(section: RealSection): string {
       return 'projects';
     case 'decisions':
       return 'decisions';
+    case 'principles':
+      return 'principles';
     case 'versions':
       return 'versions';
   }
