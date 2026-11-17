@@ -55,6 +55,8 @@ GitHub Actions runs exactly one workflow, `.github/workflows/deploy-migrations.y
 - `pnpm build`, then `pnpm exec playwright test` — the full Playwright suite, the required perf tests included
 - `pnpm check:case-collisions` — case-only path collisions; a local pre-push script (`scripts/checkCaseCollisions.ts`), not a workflow — there is no git hook enforcing it, so run it and say so
 
+**Tests also run in GitHub Actions** (`.github/workflows/tests.yml`, on every pull request and on demand; added 2026-11-17 because a contributor's machine can't always run local Supabase in Docker). The workflow needs no secrets and runs the same commands as above on a clean Linux runner. A green run of it counts as the "run locally" evidence for the integration and Playwright suites; say so in the sprint summary and link the run.
+
 **Coverage** (docs/prompts/atlas-prompt-pack.md §2, added by Sprint S2): a flow is covered only by a click-only golden-path spec from Home at 1280 and 390 (`e2e/golden-path-*.spec.ts`). Deep-linking specs are named `*.engine.spec.ts` and do not count as user coverage — they exercise the engine/UI at a specific state reached by URL, not the click path a real user would take to get there.
 
 ## Definition of done for a sprint
