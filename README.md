@@ -44,13 +44,13 @@ The browser only ever reads the `VITE_`-prefixed environment variables (`src/ui/
 
 The app itself is live at **https://atlas.simmodlr.app** — Cloudflare Pages/Workers, deployed by `.github/workflows/deploy-migrations.yml`'s own deploy-hook step (see "What runs when" above), pointed at the Supabase project below.
 
-There is one live Supabase project this repository deploys to: **"Architecture"** (ref `xakqcssapdiatwrmnjop`, `eu-central-1`, org `eyuhmtxtmcddtsptqvyv`) — the closest thing this product has to a "dev" environment today. There is no separate staging/production split yet; every migration in `supabase/migrations` is applied there. (A sibling project, "Des-studio", exists in the same organisation and belongs to the unrelated "existing suite" ADR-014/ADR-017 discuss — never target it. The "Architecture" project's own `public` schema was also found, during Sprint H1's environment work, to hold a handful of tables with no connection to Atlas or to that existing suite at all — `events`, `lap_data`, `strava_activities`, `training_metrics`, and a few `v_*` views — left over from unrelated use of the same project. They are not Atlas's; nothing here reads or writes them, and nothing in this repo should.)
+There is one live Supabase project this repository deploys to: **"Architecture"** (ref `<your-project-ref>`, `<your-region>`, org `<your-org-id>`) — the closest thing this product has to a "dev" environment today. There is no separate staging/production split yet; every migration in `supabase/migrations` is applied there. (A sibling project, "Des-studio", exists in the same organisation and belongs to the unrelated "existing suite" ADR-014/ADR-017 discuss — never target it. The "Architecture" project's own `public` schema was also found, during Sprint H1's environment work, to hold a handful of tables with no connection to Atlas or to that existing suite at all — `events`, `lap_data`, `strava_activities`, `training_metrics`, and a few `v_*` views — left over from unrelated use of the same project. They are not Atlas's; nothing here reads or writes them, and nothing in this repo should.)
 
 To link a local checkout to it (needed for `supabase link`-dependent commands like `db push`/`db pull`/`migration repair`):
 
 ```sh
 pnpm exec supabase login                              # once per machine; opens a browser
-pnpm exec supabase link --project-ref xakqcssapdiatwrmnjop
+pnpm exec supabase link --project-ref <your-project-ref>
 ```
 
 `supabase link` writes `supabase/.temp/project-ref` (gitignored — this is per-checkout state, never committed).
@@ -58,7 +58,7 @@ pnpm exec supabase link --project-ref xakqcssapdiatwrmnjop
 **How migrations — and the app — reach the live project:** `.github/workflows/deploy-migrations.yml` runs `supabase db push` automatically on every push to `main`, then POSTs the Cloudflare deploy hook — GitHub Actions' only job, per "What runs when" above; it trusts that verification already happened locally, the same way `git push` trusts a build already ran. It needs four repository secrets a human with access to both the Supabase project and the Cloudflare Pages/Workers project must set under Settings → Secrets and variables → Actions:
 
 - `SUPABASE_ACCESS_TOKEN` — a personal access token from https://supabase.com/dashboard/account/tokens; authenticates `supabase link` and the management-API side of `db push`.
-- `SUPABASE_PROJECT_ID` — the project ref (`xakqcssapdiatwrmnjop` for "Architecture"); passed to `supabase link --project-ref`. Kept as a secret rather than a literal in the workflow so the same file could point at a different project without editing it, unlike the earlier version of this workflow which hardcoded the ref directly.
+- `SUPABASE_PROJECT_ID` — the project ref (`<your-project-ref>` for "Architecture"); passed to `supabase link --project-ref`. Kept as a secret rather than a literal in the workflow so the same file could point at a different project without editing it, unlike the earlier version of this workflow which hardcoded the ref directly.
 - `SUPABASE_DB_PASSWORD` — the project's own Postgres password (Settings → Database on the Supabase dashboard); the separate credential `db push` needs to open its own direct Postgres connection, distinct from the management-API token above.
 - `CLOUDFLARE_DEPLOY_HOOK` — a deploy hook URL from the Cloudflare Pages/Workers project (Settings → Builds & deployments → Deploy hooks); POSTing it triggers a deploy without needing a Cloudflare API token in this repository. Create one and set it as this secret before relying on this workflow to deploy the app — see the note above about Workers Builds' own auto-build now being off.
 
