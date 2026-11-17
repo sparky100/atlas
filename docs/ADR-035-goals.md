@@ -38,5 +38,5 @@ Both tables enable and force RLS with policies in the same migration; `auth.uid(
 
 - **Importing goals.** The importer reads facts into reviewed capture drafts with provenance. A goal is not a fact and has no review step, so importing goals is a separate design question (recommended: a plain "goals" section applied directly by an owner or architect, not through a capture draft). Not built; the importer is untouched.
 - **Dispensations** (a departure from a principle with a review-by date). Parked by Simon on 2026-11-17: not wanted yet. Nothing here blocks them.
-- A goal highlight on the capability map, a Home count of goals with no capability, and a "Serves goals" line in the decision ADR export: the next PR.
+- **Built in the second PR:** a "Show goal" filter on the capability map (outline plus words, other tiles faded, `?goal=` in the URL, list layout only), a Home note counting active goals with no capability, and a "Goals served" section in the decision ADR export and project pack (active goals served by the capabilities the decision concerns). No schema change.
 - Starter goal sets, goal owners, scoring.

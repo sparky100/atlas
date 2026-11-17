@@ -23,6 +23,7 @@ import {
   type DecisionPrefill,
 } from '../decisions/decisionPrefill';
 import { canStartDecision } from '../orgs/useMembership';
+import { GoalsWithoutCapabilityNote } from '../goals/GoalsWithoutCapabilityNote';
 import { PrincipleDeparturesNote } from '../principles/PrincipleDeparturesNote';
 import { attributesRecord } from '../elements/attributesRecord';
 import { canStartProject } from '../orgs/roleGates';
@@ -663,6 +664,7 @@ export function ArchitectHome({ data, modelId, mainCommitIdHint, insights, role,
             )}
           </Panel>
 
+          <GoalsWithoutCapabilityNote modelId={modelId} goalsHref={`${modelHref}/goals`} />
           <PrincipleDeparturesNote modelId={modelId} principlesHref={`${modelHref}/principles`} />
 
           {/* UI-principles §3 (2026-10-04, step 3): what's waiting on this

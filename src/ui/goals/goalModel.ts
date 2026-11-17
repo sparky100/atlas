@@ -63,3 +63,24 @@ export function goalsForCapability(capabilityId: string, goals: readonly GoalRow
 export function countText(n: number, one: string, many: string): string {
   return `${String(n)} ${n === 1 ? one : many}`;
 }
+
+/** The capabilities a goal is linked to (for the capability map's "Show goal"). */
+export function capabilityIdsForGoal(goalId: string, links: readonly GoalCapabilityRow[]): Set<string> {
+  return new Set(links.filter((l) => l.goal_id === goalId).map((l) => l.capability_id));
+}
+
+/** Active goals with no capability linked yet: a plain count for the homes, never a score. */
+export function countGoalsWithoutCapability(goals: readonly GoalRow[], links: readonly GoalCapabilityRow[]): number {
+  const linked = new Set(links.map((l) => l.goal_id));
+  return goals.filter((g) => g.status === 'active' && !linked.has(g.id)).length;
+}
+
+/** The titles of the active goals served by any of these capabilities (a decision's concerns), A to Z, each once. */
+export function goalTitlesServedBy(capabilityIds: readonly string[], goals: readonly GoalRow[], links: readonly GoalCapabilityRow[]): string[] {
+  const wanted = new Set(capabilityIds);
+  const goalIds = new Set(links.filter((l) => wanted.has(l.capability_id)).map((l) => l.goal_id));
+  return goals
+    .filter((g) => g.status === 'active' && goalIds.has(g.id))
+    .map((g) => g.title)
+    .sort((a, b) => a.localeCompare(b));
+}

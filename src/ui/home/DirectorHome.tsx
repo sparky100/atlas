@@ -15,6 +15,7 @@ import { CapabilityMapImportPanel } from '../capabilityMap/CapabilityMapImportPa
 import { attributesRecord } from '../elements/attributesRecord';
 import { decisionPrefillToSearchParams, prefillFromCapabilityNoSupportersFinding, prefillFromWeakFitCapabilities, prefillFromSystemAtEndOfLife } from '../decisions/decisionPrefill';
 import { StartDecisionLink } from '../decisions/StartDecisionLink';
+import { GoalsWithoutCapabilityNote } from '../goals/GoalsWithoutCapabilityNote';
 import { PrincipleDeparturesNote } from '../principles/PrincipleDeparturesNote';
 import { importanceLabel } from './capabilityImportance';
 import { compareWeakTiles, formatWeakFitPillLabel, isCapabilityTileWeak, tileSeverity, weakFitPillTone } from './capabilityTileFit';
@@ -187,6 +188,7 @@ export function DirectorHome({ data, reload, modelId, userId, role, orgSlug, mod
               </LinkButton>
             )}
           </div>
+          <GoalsWithoutCapabilityNote modelId={modelId} goalsHref={`${modelHref}/goals`} />
           <PrincipleDeparturesNote modelId={modelId} principlesHref={`${modelHref}/principles`} />
           {whatWeAreDoing.projects.length === 0 && whatWeAreDoing.decisionsOutsideProjects.length === 0 ? (
             <EmptyState>No projects or open decisions right now.</EmptyState>

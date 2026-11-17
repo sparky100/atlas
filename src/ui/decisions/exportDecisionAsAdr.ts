@@ -58,6 +58,8 @@ export interface DecisionAdrExportInput {
   whatChangesRows: readonly WhatChangesRow[];
   /** ADR-034: the principles this decision follows or departs from, follows first. Optional: absent or empty prints no section. */
   principles?: readonly { title: string; stance: 'follows' | 'departs'; reason: string }[];
+  /** Titles of the active goals that the capabilities this decision concerns serve. Optional: absent or empty prints no section. */
+  goalsServed?: readonly string[];
   /** The one `decision_arguments` row `atlas.choose_decision_option` writes (`stance: 'for'`) — `null` until the decision is `accepted`. */
   reasons: string | null;
 }
@@ -96,6 +98,7 @@ function whatChangesRowLine(row: WhatChangesRow, optionLabelsByBranchId: Readonl
 export function exportDecisionAsAdrMarkdown(input: DecisionAdrExportInput): string {
   const { decision, ownerName, concerns, options, whatChangesRows, reasons } = input;
   const principles = input.principles ?? [];
+  const goalsServed = input.goalsServed ?? [];
   const lines: string[] = [];
   lines.push(`# ADR: ${decision.title}`);
   lines.push('');
@@ -138,6 +141,13 @@ export function exportDecisionAsAdrMarkdown(input: DecisionAdrExportInput): stri
     lines.push('## Principles');
     lines.push('');
     for (const p of principles) lines.push(p.stance === 'departs' ? `- Departs from **${p.title}** — ${p.reason}` : `- Follows **${p.title}**`);
+  }
+
+  if (goalsServed.length > 0) {
+    lines.push('');
+    lines.push('## Goals served');
+    lines.push('');
+    for (const g of goalsServed) lines.push(`- ${g}`);
   }
 
   lines.push('');

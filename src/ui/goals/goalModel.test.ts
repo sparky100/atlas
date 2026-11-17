@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { GoalCapabilityRow, GoalRow } from '../../contracts/goals';
-import { countText, goalsForCapability, linkableCapabilities, orderGoals, summariseGoals } from './goalModel';
+import { capabilityIdsForGoal, countGoalsWithoutCapability, countText, goalTitlesServedBy, goalsForCapability, linkableCapabilities, orderGoals, summariseGoals } from './goalModel';
 
 const goal = (id: string, title: string, status: 'active' | 'retired' = 'active'): GoalRow => ({ id, org_id: 'o', model_id: 'm', title, statement: 's', why_now: '', status, created_by: 'u', created_at: '', retired_by: null, retired_at: null });
 const link = (goal_id: string, capability_id: string): GoalCapabilityRow => ({ goal_id, capability_id, created_by: 'u', created_at: '' });
@@ -49,5 +49,29 @@ describe('countText', () => {
   it('pluralises', () => {
     expect(countText(1, 'capability', 'capabilities')).toBe('1 capability');
     expect(countText(0, 'capability', 'capabilities')).toBe('0 capabilities');
+  });
+});
+
+describe('capabilityIdsForGoal', () => {
+  it("returns only that goal's capabilities", () => {
+    expect([...capabilityIdsForGoal('g1', [link('g1', 'c1'), link('g2', 'c2'), link('g1', 'c3')])].sort()).toEqual(['c1', 'c3']);
+  });
+});
+
+describe('countGoalsWithoutCapability', () => {
+  it('counts active goals with no link, and ignores retired ones', () => {
+    const goals = [goal('g1', 'A'), goal('g2', 'B'), goal('g3', 'C', 'retired')];
+    expect(countGoalsWithoutCapability(goals, [link('g1', 'c1')])).toBe(1);
+    expect(countGoalsWithoutCapability(goals, [])).toBe(2);
+    expect(countGoalsWithoutCapability([], [])).toBe(0);
+  });
+});
+
+describe('goalTitlesServedBy', () => {
+  it('lists each active goal once, A to Z, for any of the capabilities', () => {
+    const goals = [goal('g1', 'Zed'), goal('g2', 'Alpha'), goal('g3', 'Gone', 'retired')];
+    const links = [link('g1', 'c1'), link('g1', 'c2'), link('g2', 'c2'), link('g3', 'c1')];
+    expect(goalTitlesServedBy(['c1', 'c2'], goals, links)).toEqual(['Alpha', 'Zed']);
+    expect(goalTitlesServedBy(['c9'], goals, links)).toEqual([]);
   });
 });

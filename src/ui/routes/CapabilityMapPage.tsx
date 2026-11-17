@@ -48,6 +48,8 @@ import { AS_AT_COMPARE_PARAM, AS_AT_PARAM, addMonthsIso, parseAsAtParam, todayIs
 import { AsAtControl } from '../landscape/AsAtControl';
 import { FutureSummary } from '../landscape/FutureSummary';
 import { supabase } from '../supabaseClient';
+import { capabilityIdsForGoal } from '../goals/goalModel';
+import { useModelGoals } from '../goals/useModelGoals';
 import styles from './CapabilityMapPage.module.css';
 
 /**
@@ -199,6 +201,23 @@ export function CapabilityMapPage() {
         const updated = new URLSearchParams(prev);
         if (next === 'whole') updated.set('layout', 'whole');
         else updated.delete('layout');
+        return updated;
+      },
+      { replace: true },
+    );
+  };
+  // "Show goal": the capabilities that serve one goal stand out and the rest fade. Kept in the URL so a link opens the same view; a goal that is gone or retired is simply not highlighted.
+  const modelGoals = useModelGoals(model?.id ?? '');
+  const activeGoals = (modelGoals?.goals ?? []).filter((g) => g.status === 'active');
+  const goalParam = searchParams.get('goal');
+  const goalId = goalParam !== null && activeGoals.some((g) => g.id === goalParam) ? goalParam : null;
+  const goalCapabilityIds = goalId !== null && modelGoals ? capabilityIdsForGoal(goalId, modelGoals.links) : null;
+  const setGoal = (next: string | null): void => {
+    setSearchParams(
+      (prev) => {
+        const updated = new URLSearchParams(prev);
+        if (next) updated.set('goal', next);
+        else updated.delete('goal');
         return updated;
       },
       { replace: true },
@@ -455,6 +474,7 @@ export function CapabilityMapPage() {
                 threadCounts={threadCounts}
                 onCommentMarkerClick={setCommentsPanelCapabilityId}
                 onInspectClick={setSelectedCapabilityId}
+                goalCapabilityIds={goalCapabilityIds}
                 changedCapabilityIds={highlightChanges ? state.data.future?.changedCapabilityIds : undefined}
               />
               )}
@@ -486,6 +506,9 @@ export function CapabilityMapPage() {
                     reorderMode={reorderMode}
                     onReorderModeChange={setReorderMode}
                     canReorder={reorderCapability !== undefined}
+                    goalOptions={activeGoals.map((g) => ({ id: g.id, title: g.title }))}
+                    goalId={goalId}
+                    onGoalChange={setGoal}
                   />
                 </Inspector>
               )}

@@ -195,4 +195,10 @@ describe('exportDecisionAsAdrMarkdown', () => {
     expect(exportDecisionAsAdrMarkdown({ ...base, principles: [] })).not.toContain('## Principles');
     expect(exportDecisionAsAdrMarkdown(base)).not.toContain('## Principles');
   });
+  it('lists the goals the concerned capabilities serve, and prints nothing when there are none', () => {
+    const base = { decision: makeDecision(), ownerName: 'Alice', concerns: [], options: [], whatChangesRows: [], reasons: null };
+    expect(exportDecisionAsAdrMarkdown({ ...base, goalsServed: ['Cut run cost', 'Serve citizens online'] })).toContain('## Goals served\n\n- Cut run cost\n- Serve citizens online\n');
+    expect(exportDecisionAsAdrMarkdown({ ...base, goalsServed: [] })).not.toContain('## Goals served');
+    expect(exportDecisionAsAdrMarkdown(base)).not.toContain('## Goals served');
+  });
 });

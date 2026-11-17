@@ -365,3 +365,16 @@
 .changesMark {
   font-style: italic;
 }
+
+/* "Show goal": capabilities serving the picked goal stay at full strength with a solid outline and the words "Serves this goal"; the rest fade. Outline plus words, never colour alone, in the interface accent that no data colour uses. */
+.card[data-goal='match'] {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+.card[data-goal='other'],
+.domain[data-goal='other'] {
+  opacity: 0.45;
+}
+.goalMark {
+  font-weight: 600;
+}

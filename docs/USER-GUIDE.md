@@ -190,6 +190,8 @@ A **goal** is what your organisation is trying to achieve, such as "Cut the time
 
 A capability's own page has a **Why it matters** section listing the goals it serves, where owners and architects can link another goal. A goal is a note about intent, not a part of the landscape: you cannot link a system or a relationship to one, and removing every goal changes nothing in the model.
 
+On the **Capability map**, open the filters and choose **Show goal** to see where a goal lands: the capabilities that serve it get an outline and the words “Serves this goal”, and everything else fades. It is a filter, not a colour, and it works in the list layout; the whole-map layout does not show it. Your **Home** page says how many goals have no capability linked yet, with a link to Goals. A decision's **Copy as ADR markdown** and the project pack add a **Goals served** list: the active goals served by the capabilities that decision concerns.
+
 Ask Atlas and Claude Desktop can answer "why does this capability matter?" from the same goals.
 
 ## Principles

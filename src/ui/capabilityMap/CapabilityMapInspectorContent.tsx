@@ -60,6 +60,10 @@ export interface CapabilityMapInspectorContentProps {
   colourBy: ColourByMode;
   onColourByChange: (mode: ColourByMode) => void;
   hasSystems: boolean;
+  /** ADR-035: the model's active goals, for "Show goal". Empty omits the control (a goal that does not exist cannot be shown). */
+  goalOptions: readonly { id: string; title: string }[];
+  goalId: string | null;
+  onGoalChange: (goalId: string | null) => void;
 
   reorderMode: boolean;
   onReorderModeChange: (mode: boolean) => void;
@@ -82,11 +86,15 @@ export function CapabilityMapInspectorContent({
   colourBy,
   onColourByChange,
   hasSystems,
+  goalOptions,
+  goalId,
+  onGoalChange,
   reorderMode,
   onReorderModeChange,
   canReorder,
 }: CapabilityMapInspectorContentProps) {
   const colourById = useId();
+  const goalSelectId = useId();
   const reorderModeId = useId();
 
   const supportingSystems = selectedCapability ? capabilityMapInspectorSupportingSystems(selectedCapability.element_id, supportsEdges, systemsById) : [];
@@ -239,6 +247,30 @@ export function CapabilityMapInspectorContent({
               </option>
             ))}
           </select>
+          {goalOptions.length > 0 && (
+            <>
+              <label htmlFor={goalSelectId}>
+                <Text as="span" size="sm" tone="muted">
+                  Show goal
+                </Text>
+              </label>
+              <select
+                id={goalSelectId}
+                className={styles.select}
+                value={goalId ?? ''}
+                onChange={(e) => {
+                  onGoalChange(e.target.value === '' ? null : e.target.value);
+                }}
+              >
+                <option value="">None</option>
+                {goalOptions.map((g) => (
+                  <option key={g.id} value={g.id}>
+                    {g.title}
+                  </option>
+                ))}
+              </select>
+            </>
+          )}
           {colourBy === 'none' && !hasSystems && (
             <Text as="span" size="sm" tone="muted">
               Link systems to capabilities to see coverage.
