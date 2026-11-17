@@ -13,6 +13,7 @@
  * solving a problem that doesn't exist yet.
  */
 import userGuide from '../../../docs/USER-GUIDE.md?raw';
+import vocabulary from '../../../docs/VOCABULARY.md?raw';
 
 export function buildHelpAssistantSystemPrompt(): string {
   return [
@@ -30,6 +31,13 @@ export function buildHelpAssistantSystemPrompt(): string {
     userGuide,
     '',
     '=== END OF KNOWLEDGE BASE ===',
+    '',
+    '=== VOCABULARY ===',
+    'These are the words Atlas uses, defined once. Use them exactly. If the person uses an older or different word (for example "disposition" or "TIME" for Planned action, or "main" for the live model), answer in the word the app uses now and say once that it is the same thing.',
+    '',
+    vocabulary,
+    '',
+    '=== END OF VOCABULARY ===',
     '',
     '=== CONTEXT HANDLING ===',
     'The user may send context about which page they are on and, for a model-scoped page, coarse counts about the model — never the model\'s actual data (element names, relationships, or content). Use it to tailor your answer, but never claim to know specifics you were not given.',

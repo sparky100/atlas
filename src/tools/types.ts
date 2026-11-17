@@ -8,6 +8,7 @@ import type { UUID } from '../contracts/delta';
 import type { ElementsHeadRow, FactsRow, RelationshipsHeadRow } from '../contracts/rows';
 import type { ChangeSummary } from '../db/changeSummary';
 import type { OpenDecisionElementLink } from '../db/decisions';
+import type { GoalCapabilityRow, GoalRow } from '../contracts/goals';
 import type { BranchRow, DecisionRow, ProjectRow, SavedReportRow } from '../db/types';
 
 /** Everything the tools need from the model, read once per question. Plain arrays, so a test can build one by hand. */
@@ -45,6 +46,9 @@ export interface ToolContext {
   /** The elements each still-open decision concerns. */
   openDecisionLinks: () => Promise<readonly OpenDecisionElementLink[]>;
   projects: () => Promise<readonly ProjectRow[]>;
+  /** ADR-035: the model's goals, and which capabilities serve each. */
+  goals: () => Promise<readonly GoalRow[]>;
+  goalLinks: () => Promise<readonly GoalCapabilityRow[]>;
   /** What one change touches and who it affects, read from its own work against main; `null` when it has made no work yet or does not exist. */
   changeImpact: (change: BranchRow) => Promise<ChangeSummary | null>;
   /** The clock, passed in so findings that depend on today's date are testable (rule 6). */

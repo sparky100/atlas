@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import type { GoalRow } from '../contracts/goals';
 import type { ChangeSummary } from '../db/changeSummary';
 import type { BranchRow, DecisionRow, ProjectRow } from '../db/types';
 import { runAsk } from './askLoop';
@@ -91,6 +92,25 @@ describe('list_decisions', () => {
     expect(all.decisions.find((d) => d.decisionId === uid(520))?.concerns).toEqual([{ id: uid(10), type: 'system', name: 'CRM Platform' }]);
     const open = data(await callTool(ctx, 'list_decisions', { status: 'proposed' })) as { decisions: unknown[] };
     expect(open.decisions).toHaveLength(1);
+  });
+});
+
+function goal(n: number, over: Partial<GoalRow> = {}): GoalRow {
+  return { id: uid(n), org_id: uid(900), model_id: uid(901), title: `Goal ${String(n)}`, statement: 'Connect customers faster.', why_now: '', status: 'active', created_by: uid(902), created_at: '', retired_by: null, retired_at: null, ...over };
+}
+
+describe('list_goals', () => {
+  it('lists active goals with the capabilities that serve them, and names the goal `goalId`', async () => {
+    const ctx = estateContext({
+      goals: [goal(550, { why_now: 'Regulator deadline.' }), goal(551, { status: 'retired', retired_by: uid(902), retired_at: '2026-11-01' })],
+      goalLinks: [{ goal_id: uid(550), capability_id: uid(10), created_by: uid(902), created_at: '' }, { goal_id: uid(550), capability_id: uid(9999), created_by: uid(902), created_at: '' }],
+    });
+    const result = data(await callTool(ctx, 'list_goals', {})) as { goals: { goalId: string; whyNow: string | null; capabilities: Rec[] }[] };
+    expect(result.goals.map((g) => g.goalId)).toEqual([uid(550)]);
+    expect(result.goals[0]?.whyNow).toBe('Regulator deadline.');
+    expect(result.goals[0]?.capabilities.length).toBeLessThanOrEqual(1);
+    const retired = data(await callTool(ctx, 'list_goals', { status: 'retired' })) as { goals: { goalId: string }[] };
+    expect(retired.goals.map((g) => g.goalId)).toEqual([uid(551)]);
   });
 });
 

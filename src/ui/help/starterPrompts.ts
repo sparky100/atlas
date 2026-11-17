@@ -5,4 +5,8 @@ export const DEFAULT_STARTER_PROMPTS: readonly string[] = [
   'How do I make a change and get it into the live model?',
   'What are Versions, and how do I create one?',
   'How do I record that a system is an AI agent or uses AI?',
+  "What's the difference between uses and flows to?",
+  'How do I see what the landscape will look like in two years?',
+  'What does "4 of 6 recorded" mean on a system?',
+  'How do I add a principle and use it on a decision?',
 ];

@@ -48,6 +48,7 @@ const DecisionOptionLandscapePage = lazyRoute(() => import('./routes/DecisionOpt
 const DecisionPage = lazyRoute(() => import('./routes/DecisionPage'), (module) => module.DecisionPage);
 const DecisionsPage = lazyRoute(() => import('./routes/DecisionsPage'), (module) => module.DecisionsPage);
 const ProjectPage = lazyRoute(() => import('./routes/ProjectPage'), (module) => module.ProjectPage);
+const GoalsPage = lazyRoute(() => import('./routes/GoalsPage'), (module) => module.GoalsPage);
 const PrinciplesPage = lazyRoute(() => import('./routes/PrinciplesPage'), (module) => module.PrinciplesPage);
 const ProjectsPage = lazyRoute(() => import('./routes/ProjectsPage'), (module) => module.ProjectsPage);
 const WorkPage = lazyRoute(() => import('./routes/WorkPage'), (module) => module.WorkPage);
@@ -125,6 +126,7 @@ export function App() {
                 <Route path="/o/:orgSlug/m/:modelSlug/changes/:branchId" element={<ChangePage />} />
                 <Route path="/o/:orgSlug/m/:modelSlug/projects" element={<ProjectsPage />} />
                 <Route path="/o/:orgSlug/m/:modelSlug/projects/:projectId" element={<ProjectPage />} />
+                <Route path="/o/:orgSlug/m/:modelSlug/goals" element={<GoalsPage />} />
                 <Route path="/o/:orgSlug/m/:modelSlug/principles" element={<PrinciplesPage />} />
                 <Route path="/o/:orgSlug/m/:modelSlug/decisions" element={<DecisionsPage />} />
                 <Route path="/o/:orgSlug/m/:modelSlug/decisions/:decisionId" element={<DecisionPage />} />
