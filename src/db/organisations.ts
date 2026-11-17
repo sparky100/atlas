@@ -142,7 +142,7 @@ export async function setReviewPeriod(supabase: Client, orgId: UUID, days: numbe
 export async function getReviewPeriodDays(supabase: Client, orgId: UUID): Promise<number> {
   const { data, error } = await supabase.from('organisations').select('review_period_days').eq('id', orgId).single();
   if (error) throw new Error(`getReviewPeriodDays: ${error.message}`);
-  return (data as { review_period_days: number }).review_period_days;
+  return data.review_period_days;
 }
 
 /** Owner or architect (`atlas.set_stale_threshold`'s own check): the organisation-wide number of months a value can go unchecked before it is flagged stale (1–60). */
