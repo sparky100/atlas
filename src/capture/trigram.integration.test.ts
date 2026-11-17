@@ -24,12 +24,20 @@ const namePairArb = fc.tuple(fc.string({ minLength: 1, maxLength: 40 }), fc.stri
 describe('trigramSimilarity vs Postgres pg_trgm.similarity() (P-K2)', () => {
   it('matches Postgres to 4 decimal places for 1,000 generated name pairs', async () => {
     const pairs = fc.sample(namePairArb, 1000);
-    for (const [a, b] of pairs) {
-      const { data, error } = await service.schema('atlas').rpc('trigram_similarity', { p_a: a, p_b: b });
-      if (error) throw error;
-      const postgresScore = Math.round((data as number) * 10000) / 10000;
-      const tsScore = Math.round(trigramSimilarity(a.toLowerCase(), b.toLowerCase()) * 10000) / 10000;
-      expect(tsScore).toBeCloseTo(postgresScore, 4);
+    // One round trip per pair, so run them in bounded concurrent batches: the
+    // check itself is unchanged (every pair, 4 decimal places), only the
+    // wall-clock cost on a slow machine is.
+    const BATCH = 25;
+    for (let i = 0; i < pairs.length; i += BATCH) {
+      await Promise.all(
+        pairs.slice(i, i + BATCH).map(async ([a, b]) => {
+          const { data, error } = await service.schema('atlas').rpc('trigram_similarity', { p_a: a, p_b: b });
+          if (error) throw error;
+          const postgresScore = Math.round((data as number) * 10000) / 10000;
+          const tsScore = Math.round(trigramSimilarity(a.toLowerCase(), b.toLowerCase()) * 10000) / 10000;
+          expect(tsScore).toBeCloseTo(postgresScore, 4);
+        }),
+      );
     }
-  });
+  }, 120_000);
 });
