@@ -16,7 +16,7 @@ const reportRows = rows.map(portfolioReportRow);
 const withState = (over: Partial<PortfolioReportState>): PortfolioReportState => ({ ...DEFAULT_PORTFOLIO_REPORT_STATE, ...over });
 
 function pageOrder(state: PortfolioReportState): string[] {
-  return sortPortfolioRows(filterPortfolioRows(visiblePortfolioRows(rows, state.includeContainers), state.filters), state.sortKey, state.sortDirection).map((r) => r.element.element_id);
+  return sortPortfolioRows(filterPortfolioRows(visiblePortfolioRows(rows, state.includeContainers, state.lifecycleStates), state.filters), state.sortKey, state.sortDirection).map((r) => r.element.element_id);
 }
 function reportOrder(state: PortfolioReportState): string[] {
   const made = portfolioStateToSpec(state);
@@ -62,3 +62,23 @@ function cases(): [string, PortfolioReportState][] {
     ['everything', withState({ includeContainers: true, sortKey: 'lifecycle', sortDirection: 'asc', filters: { kind: 'module', signal: 'justified', cost: 'under_50k', criticality: 'high', disposition: 'migrate' } })],
   ];
 }
+
+describe('portfolio report: Active / Planned / Retired', () => {
+  it('active only saves no lifecycle filter', () => {
+    const made = portfolioStateToSpec(DEFAULT_PORTFOLIO_REPORT_STATE);
+    expect(made.ok && made.spec.filters.some((f) => f.field === 'lifecycleState')).toBe(false);
+  });
+  it.each([[['planned']], [['retired']], [['active', 'planned']], [['active', 'planned', 'retired']]] as const)('round-trips %j', (picked) => {
+    const state = withState({ lifecycleStates: picked });
+    const made = portfolioStateToSpec(state);
+    if (!made.ok) throw new Error(made.reason);
+    const back = specToPortfolioState(made.spec);
+    expect(back.ok && back.state.lifecycleStates).toEqual(picked);
+  });
+  it('a report saved by the old "Include planned and retired" switch still opens as all three', () => {
+    const made = portfolioStateToSpec(withState({ lifecycleStates: ['active', 'planned', 'retired'] }));
+    if (!made.ok) throw new Error(made.reason);
+    const back = specToPortfolioState({ ...made.spec, filters: [{ field: 'lifecycleState', operator: 'in', value: ['active', 'planned', 'retired'] }] });
+    expect(back.ok && back.state.lifecycleStates).toEqual(['active', 'planned', 'retired']);
+  });
+});

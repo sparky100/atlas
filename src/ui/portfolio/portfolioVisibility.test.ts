@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { visiblePortfolioRows } from './portfolioVisibility';
+import { portfolioLifecycleCounts, togglePortfolioLifecycleState, visiblePortfolioRows } from './portfolioVisibility';
 import { fakeElement, fakeRow } from './portfolioTestFixtures';
 
 describe('visiblePortfolioRows', () => {
@@ -40,6 +40,23 @@ describe('visiblePortfolioRows: current portfolio by default', () => {
   const rows = [fakeRow({ name: 'live' }), fakeRow({ name: 'planned', lifecycleState: 'planned' }), fakeRow({ name: 'retired', lifecycleState: 'retired' })];
   it('leaves out planned and retired rows unless asked', () => {
     expect(visiblePortfolioRows(rows, false).map((r) => r.name)).toEqual(['live']);
-    expect(visiblePortfolioRows(rows, false, true).map((r) => r.name)).toEqual(['live', 'planned', 'retired']);
+    expect(visiblePortfolioRows(rows, false, ['active', 'planned', 'retired']).map((r) => r.name)).toEqual(['live', 'planned', 'retired']);
+  });
+
+  it('shows only planned, or only retired, when that is the one picked', () => {
+    expect(visiblePortfolioRows(rows, false, ['planned']).map((r) => r.name)).toEqual(['planned']);
+    expect(visiblePortfolioRows(rows, false, ['retired']).map((r) => r.name)).toEqual(['retired']);
+  });
+
+  it('counts each group, leaving containers out unless included', () => {
+    const withModule = [...rows, fakeRow({ name: 'mod', element: fakeElement('mod', 'container'), lifecycleState: 'planned' })];
+    expect(portfolioLifecycleCounts(withModule, false)).toEqual({ active: 1, planned: 1, retired: 1 });
+    expect(portfolioLifecycleCounts(withModule, true)).toEqual({ active: 1, planned: 2, retired: 1 });
+  });
+
+  it('toggles a group, keeps the order, and never turns off the last one', () => {
+    expect(togglePortfolioLifecycleState(['active'], 'retired')).toEqual(['active', 'retired']);
+    expect(togglePortfolioLifecycleState(['active', 'planned'], 'active')).toEqual(['planned']);
+    expect(togglePortfolioLifecycleState(['planned'], 'planned')).toEqual(['planned']);
   });
 });

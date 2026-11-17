@@ -5,11 +5,12 @@
  * rank lowest, unset owners sort first), names compare by lower-cased code
  * units rather than the host locale.
  */
-import { INCLUDE_NOT_LIVE_FILTER, LIFECYCLE_STATE_FIELD } from '../../engine/reportQuery';
+import { LIFECYCLE_STATE_FIELD } from '../../engine/reportQuery';
 import { aiAutonomyOf, aiAutonomyRank, aiRankOf, aiUseReportValueOf } from '../../engine/elementRead/aiAgent';
 import type { AnnualRunCost, Criticality, Disposition } from '../../contracts/delta';
 import { REPORT_SPEC_VERSION, type ReportFilter, type ReportRow, type ReportSort, type ReportSpec } from '../../contracts/reportSpec';
 import { DEFAULT_PORTFOLIO_FILTERS, type PortfolioFilters } from '../portfolio/portfolioFilter';
+import { DEFAULT_PORTFOLIO_LIFECYCLE_STATES, PORTFOLIO_LIFECYCLE_STATES, type PortfolioLifecycleState } from '../portfolio/portfolioVisibility';
 import { rowKindOf, type PortfolioRowKind } from '../portfolio/portfolioRowKind';
 import { PORTFOLIO_SIGNAL_KEYS } from '../portfolio/portfolioSignalLabels';
 import { criticalityRank, costRank, DEFAULT_PORTFOLIO_SORT_DIRECTION, DEFAULT_PORTFOLIO_SORT_KEY, dispositionRank, fitRank, lifecycleRank, type PortfolioSortKey } from '../portfolio/portfolioSort';
@@ -18,8 +19,8 @@ import type { PortfolioRow } from '../portfolio/usePortfolio';
 /** The Portfolio page's saveable state. */
 export interface PortfolioReportState {
   includeContainers: boolean;
-  /** "Include planned and retired" — off means the current portfolio (a report counts only live rows unless it says otherwise, `reportQuery.ts`). */
-  includeNotLive: boolean;
+  /** Which of Active / Planned / Retired to show. Active only is the current portfolio (a report counts only live rows unless it says otherwise, `reportQuery.ts`). */
+  lifecycleStates: readonly PortfolioLifecycleState[];
   filters: PortfolioFilters;
   sortKey: PortfolioSortKey;
   sortDirection: 'asc' | 'desc';
@@ -27,7 +28,7 @@ export interface PortfolioReportState {
 
 export const DEFAULT_PORTFOLIO_REPORT_STATE: PortfolioReportState = {
   includeContainers: false,
-  includeNotLive: false,
+  lifecycleStates: DEFAULT_PORTFOLIO_LIFECYCLE_STATES,
   filters: DEFAULT_PORTFOLIO_FILTERS,
   sortKey: DEFAULT_PORTFOLIO_SORT_KEY,
   sortDirection: DEFAULT_PORTFOLIO_SORT_DIRECTION,
@@ -95,7 +96,8 @@ export function portfolioStateToSpec(state: PortfolioReportState): PortfolioSpec
   const f = state.filters;
   const filters: ReportFilter[] = [];
   if (!state.includeContainers) filters.push({ field: 'elementType', operator: 'neq', value: 'container' });
-  if (state.includeNotLive) filters.push(INCLUDE_NOT_LIVE_FILTER);
+  const onlyActive = state.lifecycleStates.length === 1 && state.lifecycleStates[0] === 'active';
+  if (!onlyActive) filters.push({ field: LIFECYCLE_STATE_FIELD, operator: 'in', value: PORTFOLIO_LIFECYCLE_STATES.filter((s) => state.lifecycleStates.includes(s)) });
   if (f.kind !== 'all') filters.push({ field: 'kind', operator: 'eq', value: f.kind });
   if (f.signal !== 'all') filters.push({ field: 'signalKeys', operator: 'contains', value: `|${f.signal}|` });
   if (f.cost !== 'all') filters.push({ field: 'cost', operator: 'eq', value: f.cost });
@@ -122,7 +124,7 @@ export function specToPortfolioState(spec: ReportSpec): PortfolioStateResult {
   if (spec.groupBy !== undefined || spec.presentation.kind !== 'table' || spec.presentation.limit !== undefined) return { ok: false, reason: NOT_SHOWABLE };
 
   let includeContainers = true;
-  let includeNotLive = false;
+  let lifecycleStates: readonly PortfolioLifecycleState[] = DEFAULT_PORTFOLIO_LIFECYCLE_STATES;
   const filters: { -readonly [K in keyof PortfolioFilters]: PortfolioFilters[K] } = { ...DEFAULT_PORTFOLIO_FILTERS };
   const seen = new Set<string>();
   for (const filter of spec.filters) {
@@ -132,8 +134,11 @@ export function specToPortfolioState(spec: ReportSpec): PortfolioStateResult {
     const value = filter.value;
     if (filter.field === 'elementType' && filter.operator === 'neq' && value === 'container') {
       includeContainers = false;
-    } else if (filter.field === LIFECYCLE_STATE_FIELD && filter.operator === 'in' && JSON.stringify(filter.value) === JSON.stringify(INCLUDE_NOT_LIVE_FILTER.value)) {
-      includeNotLive = true;
+    } else if (filter.field === LIFECYCLE_STATE_FIELD && filter.operator === 'in') {
+      // Any non-empty mix of the three groups; the all-three list is what the old "Include planned and retired" switch saved.
+      const wanted = Array.isArray(value) ? value : [];
+      if (wanted.length === 0 || !wanted.every((v) => PORTFOLIO_LIFECYCLE_STATES.includes(v as PortfolioLifecycleState))) return { ok: false, reason: NOT_SHOWABLE };
+      lifecycleStates = PORTFOLIO_LIFECYCLE_STATES.filter((s) => wanted.includes(s));
     } else if (filter.field === 'kind' && filter.operator === 'eq' && typeof value === 'string') {
       filters.kind = value as PortfolioRowKind;
     } else if (filter.field === 'signalKeys' && filter.operator === 'contains' && typeof value === 'string') {
@@ -164,5 +169,5 @@ export function specToPortfolioState(spec: ReportSpec): PortfolioStateResult {
     sortKey = known;
     sortDirection = first.direction;
   }
-  return { ok: true, state: { includeContainers, includeNotLive, filters, sortKey, sortDirection } };
+  return { ok: true, state: { includeContainers, lifecycleStates, filters, sortKey, sortDirection } };
 }
