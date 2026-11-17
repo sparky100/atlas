@@ -10,6 +10,8 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { parseReportSpec, REPORT_SPEC_VERSION, type ReportSpec } from '../contracts/reportSpec';
 import { runReport } from '../engine/reportQuery';
 import { createChangeBranch, getMainBranch } from './branches';
+import { commitToBranch } from './commits';
+import { getOrCreateManualSource } from './sources';
 import type { Client } from './client';
 import { createServiceRoleClient, createSupabaseClient } from './client';
 import { loadEnv } from './env';
@@ -83,6 +85,8 @@ describe('saved reports, saved copies and dashboards (ADR-027) against a real lo
   let modelId: string;
   let mainBranch: BranchRow;
   let changeBranch: BranchRow;
+  /** A real commit that exists in this model but sits on the change branch, not on main. */
+  let changeOnlyCommitId: string;
 
   beforeAll(async () => {
     owner = await createSignedInUser('reports-owner');
@@ -116,6 +120,28 @@ describe('saved reports, saved copies and dashboards (ADR-027) against a real lo
       intent: 'propose',
       mainHeadCommitId: main.head_commit_id,
     });
+    // A new change branch's head is still main's head commit, so on its own it
+    // proves nothing about "a commit that is not on the branch". Put one real
+    // commit on the change branch so there is a commit that is in this model
+    // but not on main.
+    const source = await getOrCreateManualSource(owner.client, { id: randomUUID(), orgId, modelId, userId: owner.id });
+    changeOnlyCommitId = randomUUID();
+    const committed = await commitToBranch(owner.client, {
+      modelId,
+      branchId: changeBranch.id,
+      expectedHeadCommitId: main.head_commit_id,
+      envelope: {
+        id: changeOnlyCommitId,
+        branchId: changeBranch.id,
+        parentCommitId: main.head_commit_id,
+        mergedBranchHeadCommitId: null,
+        kind: 'manual',
+        title: 'a commit only on the change branch',
+        body: null,
+        deltas: [{ kind: 'element.create', id: randomUUID(), elementId: randomUUID(), elementType: 'system', name: 'Change-only system', parentId: null, attributes: { lifecycleStatus: 'active', isExternal: false }, sourceId: source.id, confidence: 1 }],
+      },
+    });
+    if (!committed.ok) throw new Error(`commit on change branch: ${committed.message}`);
   });
 
   afterAll(async () => {
@@ -218,7 +244,7 @@ describe('saved reports, saved copies and dashboards (ADR-027) against a real lo
 
     it('refuses a copy from a change branch, a commit that is not on the branch, and a result over the cap', async () => {
       await expect(createReportSnapshot(contributor.client, snapshotInput(contributor, null, { branchId: changeBranch.id, commitId: changeBranch.head_commit_id }))).rejects.toThrow(/main model/);
-      await expect(createReportSnapshot(contributor.client, snapshotInput(contributor, null, { commitId: changeBranch.head_commit_id }))).rejects.toThrow(/not on this branch/);
+      await expect(createReportSnapshot(contributor.client, snapshotInput(contributor, null, { commitId: changeOnlyCommitId }))).rejects.toThrow(/not on this branch/);
       const huge = runReport(Array.from({ length: 5001 }, (_, i) => ({ id: `r${String(i)}`, name: 'x', lifecycle: 'active' })), { ...SPEC, filters: [] });
       await expect(createReportSnapshot(contributor.client, snapshotInput(contributor, null, { result: huge }))).rejects.toThrow();
     });
