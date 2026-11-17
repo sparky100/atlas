@@ -1,4 +1,4 @@
-import { useId } from 'react';
+import { createContext, useContext, useId } from 'react';
 import { Info } from 'lucide-react';
 import { Link } from 'react-router';
 import type { ElementsHeadRow, RelationshipsHeadRow } from '../../contracts/rows';
@@ -38,7 +38,13 @@ export interface CapabilityMapEditContext {
   expectedHeadCommitId: UUID;
 }
 
+/** For a future "as at" date: the capabilities whose supporting systems differ from today. Empty (the default) marks nothing. */
+const NO_CHANGES: ReadonlySet<UUID> = new Set();
+const ChangedByDateContext = createContext<ReadonlySet<UUID>>(NO_CHANGES);
+
 export interface CapabilityMapViewProps {
+  /** Capabilities to mark "Changes by this date" (a future date's difference from today). Omit to mark nothing. */
+  changedCapabilityIds?: ReadonlySet<UUID> | undefined;
   tree: CapabilityMapTree;
   supportsEdges: RelationshipsHeadRow[];
   replacedIds: ReadonlySet<UUID>;
@@ -180,6 +186,7 @@ export function CapabilityMapView({
   threadCounts,
   onCommentMarkerClick,
   onInspectClick,
+  changedCapabilityIds,
 }: CapabilityMapViewProps) {
   // Sprint U4-2a item 3: "reorder controls behind a Reorder mode" — the
   // move buttons used to render inline on every row whenever the caller
@@ -204,6 +211,7 @@ export function CapabilityMapView({
   for (const edge of enablesEdges) enablesCountById.set(edge.from_element_id, (enablesCountById.get(edge.from_element_id) ?? 0) + 1);
 
   return (
+    <ChangedByDateContext.Provider value={changedCapabilityIds ?? NO_CHANGES}>
     <div>
       {tree.l1.length > 0 && (
         <div className={styles.domains} role="list" aria-label="Capability domains">
@@ -253,6 +261,7 @@ export function CapabilityMapView({
         </div>
       )}
     </div>
+    </ChangedByDateContext.Provider>
   );
 }
 
@@ -576,9 +585,10 @@ function CapabilityRow({
   const colour = tileColourFor(colourBy, card.capability.element_id, supportsEdges, systemsById, replacedIds);
   const count = supportingSystemIds(card.capability.element_id, supportsEdges).length;
   const marker = commentMarkerFor(threadCounts, card.capability.element_id);
+  const changesByDate = useContext(ChangedByDateContext).has(card.capability.element_id);
 
   return (
-    <div className={[styles.card, nested ? styles.cardNested : ''].filter(Boolean).join(' ')} data-tone={colour.tone ?? 'none'} data-amount={colour.amount} role={nested ? undefined : 'listitem'}>
+    <div className={[styles.card, nested ? styles.cardNested : ''].filter(Boolean).join(' ')} data-tone={colour.tone ?? 'none'} data-amount={colour.amount} data-changes={changesByDate ? 'true' : undefined} role={nested ? undefined : 'listitem'}>
       <div className={styles.cardMain}>
         <Link to={`/o/${orgSlug}/m/${modelSlug}/e/${card.capability.element_id}`} className={styles.cardLink} title={card.capability.name}>
           <Text as="span" size="md" className={styles.cardName}>
@@ -588,6 +598,11 @@ function CapabilityRow({
         <LandscapeZoomLink capabilityId={card.capability.element_id} count={count} orgSlug={orgSlug} modelSlug={modelSlug} refParam={refParam} />
         <EnablesStagesCount count={enablesCountById.get(card.capability.element_id) ?? 0} />
       </div>
+      {changesByDate && (
+        <Text as="span" size="sm" tone="muted" className={styles.changesMark}>
+          Changes by this date
+        </Text>
+      )}
       <div className={styles.cardSecondary}>
         {/* Coverage mode's own label is always the same "supporting systems"/"no supporting systems" non-value — the real count already sits beside the name above (`LandscapeZoomLink`), so it's never shown for that one mode; every other colour-by mode's label is a real, distinct fact and still shows here. */}
         {colourBy !== 'metric:supportingSystemCount' && (colour.tone !== undefined || colour.amount !== undefined) && colour.label !== undefined && <FactIndicator tone={colour.tone} amount={colour.amount} label={colour.label} />}

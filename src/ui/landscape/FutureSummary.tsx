@@ -9,6 +9,8 @@ export interface FutureSummaryProps {
   asAt: string;
   orgSlug: string;
   modelSlug: string;
+  /** Defaults to the landscape. */
+  subject?: string;
 }
 
 function changeLabel(branch: BranchRow): string {
@@ -21,13 +23,13 @@ function changeLabel(branch: BranchRow): string {
  * something in them: no "nothing to report" lines (UX rule), except the one
  * line that says the picture is read-only.
  */
-export function FutureSummary({ future, asAt, orgSlug, modelSlug }: FutureSummaryProps) {
+export function FutureSummary({ future, asAt, orgSlug, modelSlug, subject = 'landscape' }: FutureSummaryProps) {
   const base = `/o/${orgSlug}/m/${modelSlug}`;
   const changeHref = (branch: BranchRow) => `${base}/changes/${branch.id}`;
   return (
     <div className={styles.summary} data-testid="future-summary">
       <Text as="p" size="sm">
-        The landscape as it is planned to be on {asAt}. Read-only. Planned changes with a date by then are applied, and systems appear or go according to their own start and end dates.
+        The {subject} as it is planned to be on {asAt}. Read-only. Planned changes with a date by then are applied, and systems appear or go according to their own start and end dates.
       </Text>
       {future.applied.length > 0 ? (
         <div>
@@ -44,7 +46,7 @@ export function FutureSummary({ future, asAt, orgSlug, modelSlug }: FutureSummar
         </div>
       ) : (
         <Text as="p" size="sm" tone="muted">
-          No planned change has a date by then, so this is today’s landscape plus system start and end dates.
+          No planned change has a date by then, so this is today’s {subject} plus system start and end dates.
         </Text>
       )}
       {future.capabilitiesWithoutSystem.length > 0 && (

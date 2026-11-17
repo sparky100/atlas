@@ -356,3 +356,12 @@
   background: var(--surface-raised);
   color: var(--text);
 }
+
+/* "As at" a future date: a tile whose supporting systems differ from today. Outline plus words, never colour alone, and no colour that means anything else. */
+.card[data-changes='true'] {
+  outline: 2px dashed var(--border-strong);
+  outline-offset: 2px;
+}
+.changesMark {
+  font-style: italic;
+}
