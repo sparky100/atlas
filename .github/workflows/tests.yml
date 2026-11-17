@@ -1,0 +1,145 @@
+name: Tests
+
+# Runs the whole local verification list from CLAUDE.md on GitHub's free
+# Linux runners, so it doesn't have to run on a developer machine:
+#   checks       lint, typecheck, unit tests, case collisions, build
+#   integration  real Supabase + RLS (pnpm test:integration)
+#   e2e          Playwright, both projects (chromium and chromium-390), in shards
+#   e2e-report   merges the shards into one HTML report
+#
+# Security: this needs NO secrets at all. It talks only to a throwaway Supabase
+# started on the runner, so a pull request from a fork can run it safely. It
+# uses `pull_request` (never `pull_request_target`), which gives fork PRs a
+# read-only token and no secrets, and the token here is read-only too.
+#
+# It never runs on `main` pushes: deploy-migrations.yml owns that, untouched.
+# Standard `ubuntu-latest` runners only (free for public repos) — never switch
+# to a "larger runner", which is paid.
+on:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: tests-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  checks:
+    name: Lint, typecheck, unit tests, build
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/setup-node-pnpm
+      - run: pnpm lint
+      - run: pnpm typecheck
+      - run: pnpm test
+      - run: pnpm check:case-collisions
+      - run: pnpm build
+
+  integration:
+    name: Integration tests (real Supabase)
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/setup-node-pnpm
+      - uses: ./.github/actions/local-stack
+      - run: pnpm test:integration
+      - name: Show Supabase logs if it failed
+        if: failure()
+        run: docker ps --format '{{.Names}}' | xargs -I{} sh -c 'echo "::group::{}"; docker logs --tail 80 {} 2>&1; echo "::endgroup::"'
+
+  e2e:
+    name: Playwright (shard ${{ matrix.shard }} of 8)
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1, 2, 3, 4, 5, 6, 7, 8]
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/setup-node-pnpm
+      - name: Read the Playwright version
+        id: pw
+        run: echo "version=$(pnpm exec playwright --version | awk '{print $2}')" >> "$GITHUB_OUTPUT"
+      - name: Cache Playwright browsers
+        id: pw-cache
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ steps.pw.outputs.version }}
+      - name: Install Chromium and its system libraries
+        if: steps.pw-cache.outputs.cache-hit != 'true'
+        run: pnpm exec playwright install --with-deps chromium
+      - name: Install system libraries only (browser came from cache)
+        if: steps.pw-cache.outputs.cache-hit == 'true'
+        run: pnpm exec playwright install-deps chromium
+      - uses: ./.github/actions/local-stack
+      - run: pnpm build
+      - name: Run this shard
+        # `blob` feeds the merged report; `list` keeps the log readable.
+        # The config already keeps a trace and video for failed tests.
+        run: pnpm exec playwright test --shard=${{ matrix.shard }}/8 --reporter=list,blob
+        env:
+          PLAYWRIGHT_BLOB_OUTPUT_DIR: blob-report
+      - name: Upload this shard's results
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: playwright-blob-${{ matrix.shard }}
+          path: blob-report
+          retention-days: 7
+          if-no-files-found: ignore
+      - name: Upload traces and videos of failures
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: playwright-traces-shard-${{ matrix.shard }}
+          path: test-results
+          retention-days: 7
+          if-no-files-found: ignore
+      - name: Show Supabase logs if it failed
+        if: failure()
+        run: docker ps --format '{{.Names}}' | xargs -I{} sh -c 'echo "::group::{}"; docker logs --tail 80 {} 2>&1; echo "::endgroup::"'
+
+  e2e-report:
+    name: Merge Playwright report
+    needs: e2e
+    if: ${{ !cancelled() }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/setup-node-pnpm
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          pattern: playwright-blob-*
+          path: all-blob-reports
+          merge-multiple: true
+      - name: Merge into one HTML report
+        run: pnpm exec playwright merge-reports --reporter html ./all-blob-reports
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: playwright-html-report
+          path: playwright-report
+          retention-days: 14
+      - name: Summarise in the run page
+        run: |
+          {
+            echo "### Playwright"
+            echo "Download **playwright-html-report** below, unzip it and open \`index.html\`."
+            echo "Failed tests also have a trace under **playwright-traces-shard-N**."
+          } >> "$GITHUB_STEP_SUMMARY"

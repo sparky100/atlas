@@ -1,0 +1,41 @@
+name: Start the local Supabase stack
+description: >
+  Starts a throwaway Supabase in Docker on the runner (migrations applied from
+  supabase/migrations), bundles the edge functions, and exports the local URL
+  and keys as environment variables for the following steps. Uses no secrets:
+  every key here is generated fresh by the local stack and dies with the runner.
+runs:
+  using: composite
+  steps:
+    - uses: supabase/setup-cli@46f7f98c7f948ad727d22c1e67fab04c223a0520 # v3.0.0
+      with:
+        version: 2.116.0
+    - name: Bundle the edge functions
+      shell: bash
+      run: |
+        pnpm functions:bundle:capture-run
+        pnpm functions:bundle:ask-model
+        pnpm functions:bundle:api
+        pnpm functions:bundle:connector-fetch
+    - name: Start Supabase (applies every migration from zero)
+      shell: bash
+      # Studio, image proxy, log/analytics and the pooler are never used by the
+      # tests; leaving them out saves image pulls and start-up time.
+      run: supabase start -x studio,imgproxy,vector,logflare,supavisor,postgres-meta
+    - name: Export the local URL and keys
+      shell: bash
+      run: |
+        supabase status -o env > "$RUNNER_TEMP/supabase.env"
+        get() { grep -E "^$1=" "$RUNNER_TEMP/supabase.env" | head -1 | cut -d= -f2- | tr -d '"'; }
+        url="$(get API_URL)"; anon="$(get ANON_KEY)"; service="$(get SERVICE_ROLE_KEY)"
+        if [ -z "$url" ] || [ -z "$anon" ] || [ -z "$service" ]; then
+          echo "::error::supabase status did not report API_URL, ANON_KEY and SERVICE_ROLE_KEY"; exit 1
+        fi
+        echo "::add-mask::$anon"; echo "::add-mask::$service"
+        {
+          echo "SUPABASE_URL=$url"
+          echo "SUPABASE_ANON_KEY=$anon"
+          echo "SUPABASE_SERVICE_ROLE_KEY=$service"
+          echo "VITE_SUPABASE_URL=$url"
+          echo "VITE_SUPABASE_ANON_KEY=$anon"
+        } >> "$GITHUB_ENV"
