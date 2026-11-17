@@ -53,6 +53,8 @@ export interface LandscapeData {
   /** V2b's Inspector panel, Selection section's own "owners by role" — `owns` edges targeting a system at this commit, same "raw input, fetched once here" shape as `supportsEdges` above. */
   ownsEdges: RelationshipsHeadRow[];
   l1AncestorByCapabilityId: Map<UUID, ElementsHeadRow>;
+  /** Every capability in the model at this commit, for the Matrix view's columns. */
+  capabilitiesById: Map<UUID, ElementsHeadRow>;
   /** Populated only when `ref` is a branch and `mode === 'diff'` (UI-principles §6.2/§6.3) — `null` for `main`/`tag`, and for `asIs`/`toBe`, where there's nothing to highlight against. */
   diff: VersionDiff | null;
   /** Populated only for a view "as at" a future date (`asAt`): what was laid on, what was left out, and what the date leaves without a system. `null` for today. */
@@ -228,6 +230,7 @@ export function useLandscape(
         | { edges: (systemIds: UUID[], actorIds: UUID[]) => RelationshipsHeadRow[]; supports: (systemIds: UUID[]) => RelationshipsHeadRow[]; owns: (systemIds: UUID[]) => RelationshipsHeadRow[]; byIds: (ids: UUID[]) => Map<UUID, ElementsHeadRow> }
         | undefined;
 
+      let projectionCapabilities: ElementsHeadRow[] = [];
       // A folded projection (a change branch's, or the planned future) stands in for the head tables: every query below reads it in memory.
       const projectionLists = (projection: HeadProjection): [ElementsHeadRow[], ElementsHeadRow[], ElementsHeadRow[]] => [
         projectionSystemsForLandscape(projection),
@@ -257,6 +260,7 @@ export function useLandscape(
         diff = resolved.diff;
         [allSystems, allActors, allContainers] = projectionLists(resolved.projection);
         systemsSource = projectionSource(resolved.projection);
+        projectionCapabilities = resolved.projection.elementsHead.filter((e) => e.element_type === 'capability');
       } else if (ref.kind === 'main' && mainCommitIdHint && futureAsAt !== null && futureAsAt > todayIsoDate()) {
         // View as at a future date: today's head with the planned changes that land by then laid on top (`engine/plannedFuture.ts`). Read-only — nothing is stored.
         commitId = mainCommitIdHint;
@@ -272,6 +276,7 @@ export function useLandscape(
         const futureProjection = serializeHeadProjection(renderHead);
         [allSystems, allActors, allContainers] = projectionLists(futureProjection);
         systemsSource = projectionSource(futureProjection);
+        projectionCapabilities = futureProjection.elementsHead.filter((e) => e.element_type === 'capability');
       } else if (ref.kind === 'main' && mainCommitIdHint) {
         // Shared lookup: the caller already resolved `main`, so skip this
         // hook's own `resolveRef` round trip entirely — see this
@@ -333,11 +338,13 @@ export function useLandscape(
       let supportsEdges: RelationshipsHeadRow[];
       let ownsEdges: RelationshipsHeadRow[];
       let l1AncestorByCapabilityId: Map<UUID, ElementsHeadRow>;
+      let allCapabilitiesById: Map<UUID, ElementsHeadRow>;
       let view: ViewRow;
       if (systemsSource) {
         edges = systemsSource.edges(systemIds, actorIds);
         supportsEdges = systemsSource.supports(systemIds);
         ownsEdges = systemsSource.owns(systemIds);
+        allCapabilitiesById = new Map(projectionCapabilities.map((c) => [c.element_id, c]));
         const projectionByIds = systemsSource.byIds;
         l1AncestorByCapabilityId = await loadL1AncestorByCapabilityId((ids) => Promise.resolve(projectionByIds([...ids])), supportsEdges);
         // Still recorded (ADR-011: "a view is a saved query") — just never
@@ -349,6 +356,7 @@ export function useLandscape(
         supportsEdges = filterSupportsEdgesForSystems(commitScope.supportsRows, systemIds);
         ownsEdges = filterOwnsEdgesForSystems(commitScope.ownsRows, systemIds);
         const capabilitiesById = new Map(commitScope.capabilities.map((c) => [c.element_id, c]));
+        allCapabilitiesById = capabilitiesById;
         l1AncestorByCapabilityId = new Map();
         for (const id of new Set(supportsEdges.map((edge) => edge.to_element_id))) {
           const l1 = l1AncestorOf(id, capabilitiesById);
@@ -361,7 +369,7 @@ export function useLandscape(
 
       const systemsById = new Map(allSystems.map((s) => [s.element_id, s]));
       const actorsById = new Map(allActors.map((a) => [a.element_id, a]));
-      if (!cancelled) setState({ status: 'ready', data: { commitId, view, systemsById, platformIdByInterfaceId, actorsById, edges, supportsEdges, ownsEdges, l1AncestorByCapabilityId, diff, future, hiddenByDate } });
+      if (!cancelled) setState({ status: 'ready', data: { commitId, view, systemsById, platformIdByInterfaceId, actorsById, edges, supportsEdges, ownsEdges, l1AncestorByCapabilityId, capabilitiesById: allCapabilitiesById, diff, future, hiddenByDate } });
     }
 
     load().catch((e: unknown) => {
