@@ -1,6 +1,6 @@
 # ADR-029: A local MCP server for Claude Desktop, Claude Code and other MCP apps
 
-**Status:** **Proposed 2026-11-06.** Sign-in method decided by Simon 2026-11-06: email and password (open point 1, option a). Built in steps 2 to 6 on PR #375; moves to Accepted when that merges.
+**Status:** **Accepted and built** (merged; updated 2026-11-17). Sign-in method decided by Simon 2026-11-06: email and password (open point 1, option a). Known gap: people who only sign in with Microsoft have no Atlas password, so cannot use it yet. Its guide text and the tool descriptions use the shared vocabulary in `docs/VOCABULARY.md` (via `src/tools/vocabularyForAi.ts`), and a test checks the guide names every tool.
 **Depends on:** ADR-028 (the read-only tools layer in `src/tools/` this server reuses), ADR-017 (tenancy), ADR-009 (RLS is the tenancy check), rules 4, 7 and 8 of `CLAUDE.md`, `docs/PLAN-2026-11-reports-ai-mcp.md` (F16).
 
 ## Context
