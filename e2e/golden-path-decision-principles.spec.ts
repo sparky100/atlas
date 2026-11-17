@@ -27,13 +27,14 @@ test('a decision follows a principle, then departs from it with a reason; read-o
   await expect(page.getByRole('heading', { name: 'Principles', level: 2 })).toBeVisible();
   await expect(page.getByRole('heading', { name: 'Reuse before buying' })).toBeVisible();
 
-  await page.getByLabel('Follows Reuse before buying').check();
+  // click(), not check(): the radio is controlled and only reflects the stance once it has been saved and reloaded, so check()'s immediate state assertion would fail; the toBeChecked() below retries until the save lands.
+  await page.getByLabel('Follows Reuse before buying').click();
   await expect(page.getByLabel('Follows Reuse before buying')).toBeChecked();
 
   // A departure needs a reason.
   await page.getByLabel('Departs from Reuse before buying').check();
   await page.getByRole('button', { name: 'Save departure' }).click();
-  await expect(page.getByText('A departure needs a reason')).toBeVisible();
+  await expect(page.getByText('A departure needs a reason,')).toBeVisible();
   await page.getByLabel('Why depart from it? (required)').fill('Nothing we own can take the call volume.');
   await page.getByRole('button', { name: 'Save departure' }).click();
   await expect(page.getByLabel('Departs from Reuse before buying')).toBeChecked();

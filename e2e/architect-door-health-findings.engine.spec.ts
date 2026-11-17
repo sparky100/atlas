@@ -391,7 +391,8 @@ test('S1 item 7: a model with nothing to flag collapses each group to one "N che
   // architect-door layout prompt's `capability-no-supporters` and the
   // `poor-fit-no-replacement` check both left (their one home is Overview's
   // weak-capability grid, UI-principles §3); ADR-026's unused-interface
-  // check makes it 13 — all zero here.
+  // check makes it 13; two more checks since (including #500's lifecycle status/dates
+  // disagreement) make it 15 — all zero here.
   await page.goto(`/o/${orgSlug}/m/${modelSlug}`);
   // `exact: true`: this model's own title, "Health Findings Clean Test
   // Model", contains "Health Findings" as a substring, so a non-exact
@@ -402,8 +403,8 @@ test('S1 item 7: a model with nothing to flag collapses each group to one "N che
   // match into a reliable strict-mode violation.
   await expect(page.getByRole('heading', { name: 'Health findings', exact: true })).toBeVisible();
   await expect(page.getByRole('heading', { name: 'Assurance' })).toBeVisible();
-  const healthClear = page.getByRole('button', { name: '13 checks clear' });
-  const assuranceClear = page.getByRole('button', { name: '5 checks clear' });
+  const healthClear = page.getByRole('button', { name: '15 checks clear', exact: true });
+  const assuranceClear = page.getByRole('button', { name: '5 checks clear', exact: true });
   await expect(healthClear).toBeVisible();
   await expect(assuranceClear).toBeVisible();
   // Collapsed by default — no individual check's own line rendered yet,
@@ -415,7 +416,7 @@ test('S1 item 7: a model with nothing to flag collapses each group to one "N che
   await expect(page.getByTestId('health-findings-panel').getByText(/duplicates flagged/)).toHaveCount(0);
 
   // Expanding the Health findings group's own line reveals each of its
-  // 14 checks' own "0 X" summary — including ones the panel above never
+  // 15 checks' own "0 X" summary — including ones the panel above never
   // showed a live example of.
   await healthClear.click();
   await expect(page.getByText('0 systems not linked to a capability', { exact: true })).toBeVisible();

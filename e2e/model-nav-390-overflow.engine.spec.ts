@@ -160,6 +160,6 @@ test('model-scoped routes: no horizontal scroll at 390px, including a long branc
     if (route.path.includes(refQuery)) {
       await expect(page.getByRole('navigation', { name: 'Model navigation' }).getByText(changeTitle)).toBeVisible();
     }
-    expect(await hasHorizontalScroll(page)).toBe(false);
+    expect(await hasHorizontalScroll(page), `horizontal scroll on ${route.path}`).toBe(false);
   }
 });

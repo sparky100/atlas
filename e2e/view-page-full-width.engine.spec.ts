@@ -38,6 +38,9 @@ const VIEWPORT_WIDTH = 1800;
 // rendered width well under this — comfortably past both the old cap and
 // ordinary sub-pixel/scrollbar rounding.
 const ESCAPED_WIDTH_FLOOR = 1500;
+// `--page-max-wide` (src/ui/styles/tokens.css); the empty map keeps this cap, a viewport past it shows that.
+const PAGE_MAX_WIDE = 2200;
+const EMPTY_VIEWPORT_WIDTH = 2600;
 
 async function mainWidth(page: Page): Promise<number> {
   return page.locator('main').evaluate((el) => el.getBoundingClientRect().width);
@@ -152,8 +155,11 @@ test('capability map stays at the ordinary centred max-width while it has nothin
   const modelSlug = `viewpage-width-empty-model-${modelId.slice(0, 8)}`;
   await createModel(signedIn, { id: modelId, orgId, name: 'View Page Width Empty Test Model', slug: modelSlug, createdBy: userId });
 
-  await page.setViewportSize({ width: VIEWPORT_WIDTH, height: 900 });
+  // The ordinary column is now the wide page cap (`--page-max-wide`, 2200px in
+  // tokens.css), not a fixed 1400px, so the viewport must be wider than that cap
+  // for it to show: the empty map stays at the cap instead of filling the window.
+  await page.setViewportSize({ width: EMPTY_VIEWPORT_WIDTH, height: 900 });
   await page.goto(`/o/${orgSlug}/m/${modelSlug}/capability-map`);
   await expect(page.getByRole('heading', { name: 'Start from a capability map' })).toBeVisible();
-  expect(await mainWidth(page)).toBeLessThan(ESCAPED_WIDTH_FLOOR);
+  expect(await mainWidth(page)).toBeLessThanOrEqual(PAGE_MAX_WIDE);
 });

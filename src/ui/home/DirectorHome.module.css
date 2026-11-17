@@ -47,7 +47,9 @@
    Review queue count already uses, not a Chip pill. */
 .statsRow {
   display: flex;
-  gap: var(--space-6);
+  /* Wraps: five stats side by side are wider than a 390px screen. */
+  flex-wrap: wrap;
+  gap: var(--space-3) var(--space-6);
   margin-bottom: var(--space-3);
 }
 

@@ -55,7 +55,7 @@ test('disposition: Migrate raises a finding, a project retires the system, the f
   await expect(page.getByRole('heading', { name: 'Move Legacy Payroll to another system', level: 1 })).toBeVisible();
 
   // 4. A record change inside the project retires the system.
-  await page.getByLabel('New change name').fill('retire-legacy-payroll');
+  await page.getByLabel("What's this change?").fill('retire-legacy-payroll');
   await page.getByLabel('New change intent').selectOption('record');
   await page.getByLabel('Delivered date').fill(isoDateDaysFromNow(120));
   await page.getByRole('button', { name: 'Start change' }).click();

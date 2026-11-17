@@ -148,6 +148,9 @@ export async function submitForReviewWithReviewers(page: Page, includeSelf: bool
     }
   }
   await page.getByRole('button', { name: 'Submit for review' }).last().click();
+  // Submitting is a real round trip and can pass the default 5s under load; every caller
+  // goes on to the review request's own page.
+  await expect(page).toHaveURL(/\/review\//, { timeout: 15_000 });
 }
 
 /**

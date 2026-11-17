@@ -70,9 +70,11 @@ export async function signUpCreateOrgAndModel(page: Page, prefix: string): Promi
   await page.getByLabel('Display name').fill(ownerDisplayName);
   await page.getByRole('button', { name: 'Continue' }).click();
 
-  const orgLink = page.getByRole('link', { name: orgName });
-  await expect(orgLink).toBeVisible();
-  await orgLink.click();
+  // A just-created organisation opens by itself once the display name is
+  // saved (Home.tsx, #488) — there is no org link to click any more, and
+  // Home flashes by too quickly to click one reliably.
+  await expect(page).toHaveURL(/\/o\/[^/]+$/);
+  await expect(page.getByRole('heading', { name: orgName })).toBeVisible();
   const orgSlugMatch = /\/o\/([^/]+)/.exec(page.url());
   if (!orgSlugMatch?.[1]) throw new Error(`could not read the org slug out of ${page.url()}`);
 
