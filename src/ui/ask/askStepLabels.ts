@@ -8,6 +8,12 @@ const LABELS: Record<string, string> = {
   run_saved_report: 'Ran a saved report',
   list_health_findings: 'Checked data-quality findings',
   portfolio_signals: 'Read portfolio signals',
+  list_changes: 'Listed changes',
+  change_impact: 'Read what a change touches',
+  list_decisions: 'Listed decisions',
+  list_projects: 'Listed projects',
+  list_goals: 'Listed goals',
+  list_principles: 'Listed principles',
 };
 
 export function askStepLabel(name: string): string {

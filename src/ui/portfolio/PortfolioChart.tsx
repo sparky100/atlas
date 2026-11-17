@@ -3,7 +3,7 @@ import type { AnnualRunCost, Disposition } from '../../contracts/delta';
 import { dispositionLabel, dispositionTone } from '../elements/disposition';
 import { Text } from '../components/Text/Text';
 import { EmptyState } from '../components/EmptyState/EmptyState';
-import { buildCostFitGrid, type ChartFit, CHART_COST_COLUMNS, CHART_FIT_ROWS } from './portfolioChart';
+import { buildCostFitGrid, type ChartFit, CHART_COST_COLUMNS, CHART_FIT_ROWS } from './portfolioChartModel';
 import type { PortfolioRow } from './usePortfolio';
 import styles from './PortfolioChart.module.css';
 

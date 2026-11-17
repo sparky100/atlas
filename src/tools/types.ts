@@ -9,6 +9,7 @@ import type { ElementsHeadRow, FactsRow, RelationshipsHeadRow } from '../contrac
 import type { ChangeSummary } from '../db/changeSummary';
 import type { OpenDecisionElementLink } from '../db/decisions';
 import type { GoalCapabilityRow, GoalRow } from '../contracts/goals';
+import type { DecisionPrincipleRow, PrincipleRow } from '../contracts/principles';
 import type { BranchRow, DecisionRow, ProjectRow, SavedReportRow } from '../db/types';
 
 /** Everything the tools need from the model, read once per question. Plain arrays, so a test can build one by hand. */
@@ -49,6 +50,9 @@ export interface ToolContext {
   /** ADR-035: the model's goals, and which capabilities serve each. */
   goals: () => Promise<readonly GoalRow[]>;
   goalLinks: () => Promise<readonly GoalCapabilityRow[]>;
+  /** ADR-034: the model's principles, and which decisions follow or depart from each. */
+  principles: () => Promise<readonly PrincipleRow[]>;
+  principleLinks: () => Promise<readonly DecisionPrincipleRow[]>;
   /** What one change touches and who it affects, read from its own work against main; `null` when it has made no work yet or does not exist. */
   changeImpact: (change: BranchRow) => Promise<ChangeSummary | null>;
   /** The clock, passed in so findings that depend on today's date are testable (rule 6). */

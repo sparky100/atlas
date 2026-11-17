@@ -182,4 +182,17 @@ describe('exportDecisionAsAdrMarkdown', () => {
     expect(markdown).toContain('## Decision\n\nCancelled without choosing an option: The vendor withdrew the product.');
     expect(markdown).not.toContain('Not yet decided');
   });
+  it('lists the principles it follows and departs from (with the reason), and prints nothing when there are none', () => {
+    const base = { decision: makeDecision(), ownerName: 'Alice', concerns: [], options: [], whatChangesRows: [], reasons: null };
+    const withPrinciples = exportDecisionAsAdrMarkdown({
+      ...base,
+      principles: [
+        { title: 'Reuse before buying', stance: 'follows', reason: '' },
+        { title: 'One main system per capability', stance: 'departs', reason: 'Two regions run separate stacks until 2028.' },
+      ],
+    });
+    expect(withPrinciples).toContain('## Principles\n\n- Follows **Reuse before buying**\n- Departs from **One main system per capability** — Two regions run separate stacks until 2028.\n');
+    expect(exportDecisionAsAdrMarkdown({ ...base, principles: [] })).not.toContain('## Principles');
+    expect(exportDecisionAsAdrMarkdown(base)).not.toContain('## Principles');
+  });
 });

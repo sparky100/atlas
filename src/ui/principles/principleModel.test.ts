@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import type { DecisionPrincipleRow, PrincipleRow } from '../../contracts/principles';
 import { countText, orderPrinciples, summarisePrinciples } from './principleModel';
 
-const principle = (id: string, title: string, status: 'active' | 'retired' = 'active'): PrincipleRow => ({ id, org_id: 'o', model_id: 'm', title, statement: 'S', why: '', status, created_by: 'u', created_at: '', retired_by: null, retired_at: null });
+const principle = (id: string, title: string, status: 'active' | 'retired' = 'active'): PrincipleRow => ({ id, org_id: 'o', model_id: 'm', title, statement: 'S', why: '', status, created_by: 'u', created_at: '', retired_by: null, retired_at: null, from_set_slug: null, from_set_name: null, from_set_version: null });
 const link = (decision: string, p: string, stance: 'follows' | 'departs', reason = ''): DecisionPrincipleRow => ({ decision_id: decision, principle_id: p, stance, reason, created_by: 'u', created_at: '' });
 
 describe('summarisePrinciples', () => {

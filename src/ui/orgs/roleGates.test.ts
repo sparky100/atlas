@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { BranchRow } from '../../db/types';
-import { canAddDecisionConcern, canApproveOrMergeRequest, canArchiveModel, canCancelDecision, canDiscardCaptureJob, canEditDecision, canEditGoals, canDeleteModel, canEditBranch, canEditValueStreamStructure, canManageAttributeDefinitions, canManageOrgSettings, canRestoreModel, canReviewMergeRequest } from './roleGates';
+import { canAddDecisionConcern, canApproveOrMergeRequest, canArchiveModel, canCancelDecision, canDiscardCaptureJob, canEditDecision, canEditGoals, canLinkDecisionPrinciples, canDeleteModel, canEditBranch, canEditValueStreamStructure, canManageAttributeDefinitions, canManageOrgSettings, canRestoreModel, canReviewMergeRequest } from './roleGates';
 
 function branch(overrides: Partial<BranchRow>): BranchRow {
   return {
@@ -236,5 +236,17 @@ describe('canEditGoals', () => {
     expect(canEditGoals('contributor')).toBe(false);
     expect(canEditGoals('viewer')).toBe(false);
     expect(canEditGoals(null)).toBe(false);
+  });
+});
+
+describe('canLinkDecisionPrinciples', () => {
+  it('is owner, architect or contributor, and only while the decision is proposed', () => {
+    for (const role of ['owner', 'architect', 'contributor'] as const) {
+      expect(canLinkDecisionPrinciples(role, { status: 'proposed' })).toBe(true);
+      expect(canLinkDecisionPrinciples(role, { status: 'accepted' })).toBe(false);
+      expect(canLinkDecisionPrinciples(role, { status: 'rejected' })).toBe(false);
+    }
+    expect(canLinkDecisionPrinciples('viewer', { status: 'proposed' })).toBe(false);
+    expect(canLinkDecisionPrinciples(null, { status: 'proposed' })).toBe(false);
   });
 });

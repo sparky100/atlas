@@ -277,3 +277,29 @@ describe('rowsToCandidates — formula-error cells', () => {
     expect(result.candidates[0]?.evidence.warnings).toContainEqual({ code: 'FORMULA_ERROR', cell: 'B2' });
   });
 });
+
+describe('rowsToCandidates — a Fit column (owner-approved importer exception, 2026-11-17)', () => {
+  it('carries the fit onto the row\'s capability link, case-insensitively', () => {
+    const result = run(['Application', 'Capability', 'Fit'], [['CRM', 'Customer Service', 'Good'], ['Billing', 'Finance', 'POOR']]);
+    expect(result.capabilityRows.map((r) => [r.systemName, r.fit])).toEqual([['CRM', 'good'], ['Billing', 'poor']]);
+  });
+
+  it('leaves fit off when the cell is blank, and warns (without guessing) when it is not one of the four ratings', () => {
+    const blank = run(['Application', 'Capability', 'Fit'], [['CRM', 'Customer Service', '']]);
+    expect(blank.capabilityRows[0]).not.toHaveProperty('fit');
+    const odd = run(['Application', 'Capability', 'Fit'], [['CRM', 'Customer Service', 'Fantastic']]);
+    expect(odd.capabilityRows[0]).not.toHaveProperty('fit');
+    expect(odd.candidates[0]?.evidence.warnings).toContainEqual({ code: 'ENUM_UNPARSED', cell: 'C2', raw: 'Fantastic' });
+  });
+
+  it('treats the app\'s own "Unrated" and "Not rated" as blank, not as a bad value', () => {
+    const result = run(['Application', 'Capability', 'Fit'], [['CRM', 'Customer Service', 'Unrated'], ['Billing', 'Finance', 'Not rated']]);
+    expect(result.capabilityRows.every((r) => r.fit === undefined)).toBe(true);
+    expect(result.candidates.every((c) => c.evidence.warnings.length === 0)).toBe(true);
+  });
+
+  it('has no effect when the row names no capability', () => {
+    const result = run(['Application', 'Fit'], [['CRM', 'good']]);
+    expect(result.capabilityRows).toEqual([]);
+  });
+});

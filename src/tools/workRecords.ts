@@ -1,7 +1,7 @@
 /**
  * ADR-028 §1: the work records beside the model: changes, decisions and
- * projects, and (ADR-035) goals. Summaries only; the ids are named `changeId`, `decisionId`,
- * `projectId` and `goalId` (never `id`) because they are not elements and must not be
+ * projects, and (ADR-035, ADR-034) goals and principles. Summaries only; the ids are named `changeId`, `decisionId`,
+ * `projectId`, `goalId` and `principleId` (never `id`) because they are not elements and must not be
  * citable as elements. Comments and capture drafts are not exposed.
  */
 import { z } from 'zod';
@@ -79,17 +79,17 @@ export const changeImpact = defineTool({
 
 export const listDecisions = defineTool({
   name: 'list_decisions',
-  description: 'List decisions recorded about the model: title, status (proposed = still open, accepted, superseded, rejected = cancelled), when it is needed by, a short statement, and the elements an open decision concerns.',
-  schema: z.strictObject({ status: z.enum(['proposed', 'accepted', 'superseded', 'rejected']).optional(), limit: limitInput }),
+  description: 'List decisions recorded about the model: title, status (proposed = still open, accepted, cancelled, superseded), when it is needed by, a short statement, and the elements an open decision concerns.',
+  schema: z.strictObject({ status: z.enum(['proposed', 'accepted', 'cancelled', 'superseded']).optional(), limit: limitInput }),
   run: async (ctx, input) => {
-    const all = (await ctx.decisions()).filter((d) => input.status === undefined || d.status === input.status);
+    const all = (await ctx.decisions()).filter((d) => input.status === undefined || d.status === (input.status === 'cancelled' ? 'rejected' : input.status));
     const shownRows = all.slice(0, input.limit);
     const links = await ctx.openDecisionLinks();
     const index = indexSnapshot(await ctx.snapshot());
     const shown = shownRows.map((d) => ({
       decisionId: d.id,
       title: clip(d.title, 200),
-      status: d.status,
+      status: d.status === 'rejected' ? 'cancelled' : d.status,
       neededBy: d.needed_by,
       decidedAt: d.decided_at,
       projectId: d.project_id,
@@ -148,5 +148,33 @@ export const listGoals = defineTool({
         }),
     }));
     return okResult(ctx, { goals: shown }, all.length, all.length > shown.length);
+  },
+});
+
+export const listPrinciples = defineTool({
+  name: 'list_principles',
+  description: 'List the principles the organisation has agreed decisions are checked against: title, the rule, why a team would accept it, and which decisions follow it and which depart from it (with the reason given for each departure). Retired principles are left out unless asked for.',
+  schema: z.strictObject({ status: z.enum(['active', 'retired']).default('active'), limit: limitInput }),
+  run: async (ctx, input) => {
+    const all = (await ctx.principles()).filter((p) => p.status === input.status);
+    const shownRows = all.slice(0, input.limit);
+    const links = await ctx.principleLinks();
+    const decisions = new Map((await ctx.decisions()).map((d) => [d.id, d]));
+    const decisionRef = (id: string) => ({ decisionId: id, title: clip(decisions.get(id)?.title ?? '', 200) });
+    const shown = shownRows.map((p) => {
+      const mine = links.filter((l) => l.principle_id === p.id);
+      const follows = mine.filter((l) => l.stance === 'follows');
+      const departs = mine.filter((l) => l.stance === 'departs');
+      return {
+        principleId: p.id,
+        title: clip(p.title, 200),
+        status: p.status,
+        rule: clip(p.statement, 300),
+        why: p.why === '' ? null : clip(p.why, 300),
+        followedBy: { total: follows.length, decisions: follows.slice(0, 10).map((l) => decisionRef(l.decision_id)) },
+        departedFrom: { total: departs.length, decisions: departs.slice(0, 10).map((l) => ({ ...decisionRef(l.decision_id), reason: clip(l.reason, 300) })) },
+      };
+    });
+    return okResult(ctx, { principles: shown }, all.length, all.length > shown.length);
   },
 });

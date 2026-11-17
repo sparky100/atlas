@@ -4,17 +4,17 @@ import { Text } from '../components/Text/Text';
 import { countAnnualRunCosts } from '../elements/annualRunCost';
 import { useIsNarrowViewport } from '../landscape/useIsNarrowViewport';
 import type { AnnualRunCost } from '../../contracts/delta';
-import type { ChartFit } from './portfolioChart';
+import type { ChartFit } from './portfolioChartModel';
 import { PortfolioCards } from './PortfolioCards';
 import { PortfolioChart } from './PortfolioChart';
 import { PortfolioQuadrant } from './PortfolioQuadrant';
-import type { QuadrantItem } from './portfolioQuadrant';
+import type { QuadrantItem } from './portfolioQuadrantModel';
 import { ExportViewButtons } from '../components/ExportViewButtons/ExportViewButtons';
 import { portfolioExportPlan, portfolioExportTable } from '../exports/portfolioExport';
 import type { ExportStamp } from '../exports/viewExport';
 import { DEFAULT_PORTFOLIO_FILTERS, filterPortfolioRows, type PortfolioFilters } from './portfolioFilter';
 import { DEFAULT_PORTFOLIO_SORT_DIRECTION, DEFAULT_PORTFOLIO_SORT_KEY, sortPortfolioRows, type PortfolioSortKey } from './portfolioSort';
-import { visiblePortfolioRows } from './portfolioVisibility';
+import { DEFAULT_PORTFOLIO_LIFECYCLE_STATES, portfolioLifecycleCounts, visiblePortfolioRows, type PortfolioLifecycleState } from './portfolioVisibility';
 import { PortfolioTable } from './PortfolioTable';
 import { PortfolioToolbar, type PortfolioViewMode } from './PortfolioToolbar';
 import type { PortfolioData } from './usePortfolio';
@@ -49,7 +49,7 @@ const MOBILE_BREAKPOINT_PX = 768;
  */
 export function PortfolioView({ data, elementHref, exportStamp, savedReports }: PortfolioViewProps) {
   const [includeContainers, setIncludeContainers] = useState(false);
-  const [includeNotLive, setIncludeNotLive] = useState(false);
+  const [lifecycleStates, setLifecycleStates] = useState<readonly PortfolioLifecycleState[]>(DEFAULT_PORTFOLIO_LIFECYCLE_STATES);
   const [sortKey, setSortKey] = useState<PortfolioSortKey>(DEFAULT_PORTFOLIO_SORT_KEY);
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>(DEFAULT_PORTFOLIO_SORT_DIRECTION);
   const [filters, setFilters] = useState<PortfolioFilters>(DEFAULT_PORTFOLIO_FILTERS);
@@ -59,7 +59,8 @@ export function PortfolioView({ data, elementHref, exportStamp, savedReports }: 
   const [fitPick, setFitPick] = useState<ChartFit | null>(null);
   const narrow = useIsNarrowViewport(MOBILE_BREAKPOINT_PX);
 
-  const visibleRows = useMemo(() => visiblePortfolioRows(data.rows, includeContainers, includeNotLive), [data.rows, includeContainers, includeNotLive]);
+  const visibleRows = useMemo(() => visiblePortfolioRows(data.rows, includeContainers, lifecycleStates), [data.rows, includeContainers, lifecycleStates]);
+  const lifecycleCounts = useMemo(() => portfolioLifecycleCounts(data.rows, includeContainers), [data.rows, includeContainers]);
   const notEntered = useMemo(() => countAnnualRunCosts(visibleRows.map((row) => row.cost)).notEntered, [visibleRows]);
   const filteredRows = useMemo(() => filterPortfolioRows(visibleRows, filters), [visibleRows, filters]);
   const rows = useMemo(() => sortPortfolioRows(fitPick ? filteredRows.filter((row) => (row.fit ?? 'unrated') === fitPick) : filteredRows, sortKey, sortDirection), [filteredRows, fitPick, sortKey, sortDirection]);
@@ -94,12 +95,12 @@ export function PortfolioView({ data, elementHref, exportStamp, savedReports }: 
         <SavedReportBar
           source="portfolio"
           {...savedReports}
-          current={portfolioStateToSpec({ includeContainers, includeNotLive, filters, sortKey, sortDirection })}
+          current={portfolioStateToSpec({ includeContainers, lifecycleStates, filters, sortKey, sortDirection })}
           onOpen={(spec) => {
             const restored = specToPortfolioState(spec);
             if (!restored.ok) return restored.reason;
             setIncludeContainers(restored.state.includeContainers);
-            setIncludeNotLive(restored.state.includeNotLive);
+            setLifecycleStates(restored.state.lifecycleStates);
             setFilters(restored.state.filters);
             setSortKey(restored.state.sortKey);
             setSortDirection(restored.state.sortDirection);
@@ -115,8 +116,9 @@ export function PortfolioView({ data, elementHref, exportStamp, savedReports }: 
         onFiltersChange={setFilters}
         includeContainers={includeContainers}
         onIncludeContainersChange={setIncludeContainers}
-        includeNotLive={includeNotLive}
-        onIncludeNotLiveChange={setIncludeNotLive}
+        lifecycleStates={lifecycleStates}
+        lifecycleCounts={lifecycleCounts}
+        onLifecycleStatesChange={setLifecycleStates}
         view={view}
         onViewChange={setView}
         fitPick={fitPick}

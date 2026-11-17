@@ -9,6 +9,7 @@ import { Loading } from '../components/Loading/Loading';
 import { Panel } from '../components/Panel/Panel';
 import { Text } from '../components/Text/Text';
 import { countText, orderPrinciples, summarisePrinciples, type PrincipleSummary } from './principleModel';
+import { PrincipleSetsPanel } from './PrincipleSetsPanel';
 import { usePrinciples } from './usePrinciples';
 import styles from './PrinciplesView.module.css';
 
@@ -30,7 +31,7 @@ const EMPTY: PrincipleInput = { title: '', statement: '', why: '' };
  * depart from it (and why). Counts are plain numbers, never a score.
  */
 export function PrinciplesView({ modelId, orgId, userId, orgSlug, modelSlug, canEdit }: PrinciplesViewProps) {
-  const { loading, principles, links, decisions, error, saving, create, edit, setStatus } = usePrinciples(modelId, orgId, userId);
+  const { loading, principles, links, decisions, error, saving, create, edit, setStatus, reload } = usePrinciples(modelId, orgId, userId);
   const [draft, setDraft] = useState<PrincipleInput>(EMPTY);
   const [editingId, setEditingId] = useState<UUID | null>(null);
   const [editDraft, setEditDraft] = useState<PrincipleInput>(EMPTY);
@@ -66,6 +67,8 @@ export function PrinciplesView({ modelId, orgId, userId, orgSlug, modelSlug, can
           {error !== null && editingId === null && <Text as="p">{error}</Text>}
         </Panel>
       )}
+
+      <PrincipleSetsPanel modelId={modelId} orgId={orgId} userId={userId} canEdit={canEdit} onChanged={reload} />
 
       {loading && <Loading />}
       {!loading && principles.length === 0 && <EmptyState>No principles yet. {canEdit ? 'Add the first one above.' : 'An owner or architect can add them.'}</EmptyState>}
@@ -232,6 +235,11 @@ function PrincipleCard({ summary, decisionHref, canEdit, saving, editing, editDr
           {principle.why !== '' && (
             <Text as="p" tone="muted" size="sm">
               Why: {principle.why}
+            </Text>
+          )}
+          {principle.from_set_name !== null && principle.from_set_version !== null && (
+            <Text as="p" size="sm" tone="muted">
+              Started from the {principle.from_set_name} set, version {principle.from_set_version}. It is yours now: reword it as you like.
             </Text>
           )}
           <Text as="p" size="sm" tone="muted">

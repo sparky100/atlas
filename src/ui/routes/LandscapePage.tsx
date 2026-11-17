@@ -133,6 +133,9 @@ import styles from './LandscapePage.module.css';
  * state — the same shape the canvas's own `onCommentMarkerClick` already
  * used, just reaching two more renderers instead of one.
  */
+/** What the markers mean on the Landscape — Changed is a field edit by a planned Change; connection edits mark only the line. */
+const LANDSCAPE_DIFF_NOTE = 'Changed means a planned Change edits this item. A change to a connection marks only its line. Dates bring an item in (Added) or take it out (Removed).';
+
 export function LandscapePage() {
   const { orgSlug, modelSlug } = useParams<{ orgSlug: string; modelSlug: string }>();
   const [searchParams, setSearchParams] = useSearchParams();
@@ -715,7 +718,7 @@ export function LandscapePage() {
           />
         )}
         {asAt !== null && state.status === 'ready' && state.data.future !== null && <FutureSummary future={state.data.future} asAt={asAt} orgSlug={orgSlug ?? ''} modelSlug={model.slug} />}
-        {asAt !== null && highlightChanges && state.status === 'ready' && <DiffLegend />}
+        {asAt !== null && highlightChanges && state.status === 'ready' && <DiffLegend note={LANDSCAPE_DIFF_NOTE} />}
         {asAt === null && ref.kind !== 'branch' && state.status === 'ready' && (
           <NotLiveNote
             planned={state.data.hiddenByDate.planned}
@@ -737,7 +740,7 @@ export function LandscapePage() {
             }}
           />
         )}
-        {ref.kind === 'branch' && mode === 'diff' && <DiffLegend />}
+        {ref.kind === 'branch' && mode === 'diff' && <DiffLegend note={LANDSCAPE_DIFF_NOTE} />}
 
         {/* Sprint U4-2c item 2: while a capability filter is active, `CapabilityLandscapeList` (desktop and mobile alike — no lanes, no cross-lane chips, so no viewport split either) replaces every bit of the lane-based rendering below it, which `useLandscape` itself no longer even loads (its own `enabled` doc comment). Branches on `capabilityId` (the URL param `useCapabilityLandscape` actually reads), not `capability` (the breadcrumb element, which can still be loading) — see the title above for the one place that distinction matters. */}
         {capabilityId !== null ? (

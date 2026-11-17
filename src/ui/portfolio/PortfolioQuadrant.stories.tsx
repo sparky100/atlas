@@ -2,7 +2,7 @@ import type { Meta, StoryObj } from '@storybook/react-vite';
 import type { AnnualRunCost, Disposition, FitForPurpose } from '../../contracts/delta';
 import northbridge from '../../../docs/demo/northbridge-dno.import.json';
 import { PortfolioQuadrant } from './PortfolioQuadrant';
-import type { QuadrantItem } from './portfolioQuadrant';
+import type { QuadrantItem } from './portfolioQuadrantModel';
 
 /*
  * Visual review only: the quadrant over the Northbridge demo file's own

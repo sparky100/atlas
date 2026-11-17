@@ -9,7 +9,7 @@ import styles from './DiffLegend.module.css';
  * VersionDiffView.tsx's own comment on why), so it renders at the top
  * instead — same content, adapted position for a non-canvas surface.
  */
-export function DiffLegend() {
+export function DiffLegend({ note }: { note?: string }) {
   return (
     <div className={styles.legend}>
       <Text as="span" size="sm" tone="muted">
@@ -19,6 +19,11 @@ export function DiffLegend() {
       <DiffBadge state="removed" />
       <DiffBadge state="changed" />
       <DiffBadge state="moved" />
+      {note !== undefined && (
+        <Text as="span" size="sm" tone="muted">
+          {note}
+        </Text>
+      )}
     </div>
   );
 }

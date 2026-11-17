@@ -56,6 +56,8 @@ export interface DecisionAdrExportInput {
   options: readonly DecisionAdrExportOption[];
   /** Only the rows the What-changes table itself renders as visible (`groupWhatChangesRows(comparison.whatChangesRows).visible`) — never the collapsed "N rows unchanged in all options" group, matching the brief's own "only differing rows". Empty when nothing differs (or no options are linked yet). */
   whatChangesRows: readonly WhatChangesRow[];
+  /** ADR-034: the principles this decision follows or departs from, follows first. Optional: absent or empty prints no section. */
+  principles?: readonly { title: string; stance: 'follows' | 'departs'; reason: string }[];
   /** The one `decision_arguments` row `atlas.choose_decision_option` writes (`stance: 'for'`) — `null` until the decision is `accepted`. */
   reasons: string | null;
 }
@@ -93,6 +95,7 @@ function whatChangesRowLine(row: WhatChangesRow, optionLabelsByBranchId: Readonl
  */
 export function exportDecisionAsAdrMarkdown(input: DecisionAdrExportInput): string {
   const { decision, ownerName, concerns, options, whatChangesRows, reasons } = input;
+  const principles = input.principles ?? [];
   const lines: string[] = [];
   lines.push(`# ADR: ${decision.title}`);
   lines.push('');
@@ -128,6 +131,13 @@ export function exportDecisionAsAdrMarkdown(input: DecisionAdrExportInput): stri
     lines.push('');
     const optionLabelsByBranchId = new Map(options.map((o) => [o.branch.id, intentHeaderLine(o.branch)]));
     for (const row of whatChangesRows) lines.push(whatChangesRowLine(row, optionLabelsByBranchId));
+  }
+
+  if (principles.length > 0) {
+    lines.push('');
+    lines.push('## Principles');
+    lines.push('');
+    for (const p of principles) lines.push(p.stance === 'departs' ? `- Departs from **${p.title}** — ${p.reason}` : `- Follows **${p.title}**`);
   }
 
   lines.push('');

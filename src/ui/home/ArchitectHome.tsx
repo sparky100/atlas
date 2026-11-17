@@ -23,6 +23,7 @@ import {
   type DecisionPrefill,
 } from '../decisions/decisionPrefill';
 import { canStartDecision } from '../orgs/useMembership';
+import { PrincipleDeparturesNote } from '../principles/PrincipleDeparturesNote';
 import { attributesRecord } from '../elements/attributesRecord';
 import { canStartProject } from '../orgs/roleGates';
 import { selectRecentActivity, splitActivitySubjects, type GroupedActivityItem } from './groupRecentActivity';
@@ -661,6 +662,8 @@ export function ArchitectHome({ data, modelId, mainCommitIdHint, insights, role,
               <EmptyState>Nothing in review right now.</EmptyState>
             )}
           </Panel>
+
+          <PrincipleDeparturesNote modelId={modelId} principlesHref={`${modelHref}/principles`} />
 
           {/* UI-principles §3 (2026-10-04, step 3): what's waiting on this
               user as an owner — their open decisions (overdue first) and

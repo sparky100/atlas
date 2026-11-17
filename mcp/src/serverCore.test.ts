@@ -92,6 +92,16 @@ describe('the Atlas MCP server', () => {
     expect(textOf(result)).toMatch(/atlas_search_elements/);
   });
 
+  it('names every tool in the guide, and states nothing Atlas does not have', async () => {
+    const client = await connect(fakeSupabase({ signedIn: false }));
+    const guide = textOf(await client.callTool({ name: 'atlas_get_guide', arguments: {} }));
+    for (const t of MODEL_TOOLS) expect(guide).toContain(`atlas_${t.name}`);
+    expect(guide).not.toMatch(/integrates with/);
+    expect(guide).not.toMatch(/elements \([^)]*\b(data|projects)\b/);
+    expect(guide).toContain('does data travel from A to B?');
+    expect(guide).toContain('Planned action');
+  });
+
   it('says so when the named model is not one the user can see', async () => {
     const client = await connect(fakeSupabase({ signedIn: true }));
     const result = await client.callTool({ name: 'atlas_search_elements', arguments: { query: 'CRM', model: 'Nowhere' } });
