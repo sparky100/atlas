@@ -21,6 +21,10 @@ import type { AlsoAffectedElement } from './alsoAffected';
 import { DecisionCriteriaGrid, type DecisionCriteriaOption } from './DecisionCriteriaGrid';
 import { DecisionGoLive } from './DecisionGoLive';
 import { DecisionLinkPicker } from './DecisionLinkPicker';
+import { DecisionPrinciplesPanel } from '../principles/DecisionPrinciplesPanel';
+import { adrPrincipleItems } from '../principles/decisionPrinciples';
+import { useDecisionPrinciples } from '../principles/useDecisionPrinciples';
+import { canLinkDecisionPrinciples } from '../orgs/roleGates';
 import { decisionStatusLabel, decisionStatusTone } from './decisionStatus';
 import { cancelDecision, createDecisionLink, updateDecision } from '../../db/decisions';
 import { getElementsByIds } from '../../db/elements';
@@ -82,6 +86,7 @@ export function DecisionView({ modelId, decisionId, orgId, orgSlug, modelSlug, r
   // and a second independent `useDecisionRatings` instance there would
   // mean two separate fetches/polling loops for the same table.
   const ratingsState = useDecisionRatings(modelId, decisionId);
+  const principlesState = useDecisionPrinciples(modelId, decisionId, userId);
 
   const [addingOption, setAddingOption] = useState(false);
   const [optionTitle, setOptionTitle] = useState('');
@@ -147,6 +152,7 @@ export function DecisionView({ modelId, decisionId, orgId, orgSlug, modelSlug, r
         linkedBranchesById,
         args,
         ratings: ratingsState.ratings,
+        principles: adrPrincipleItems(principlesState.principles, principlesState.links),
         whatChangesRows: comparison.status === 'ready' ? groupWhatChangesRows(comparison.whatChangesRows).visible : [],
         ownerName,
       }),
@@ -276,6 +282,16 @@ export function DecisionView({ modelId, decisionId, orgId, orgSlug, modelSlug, r
           />
         )}
       </Panel>
+
+      <DecisionPrinciplesPanel
+        principles={principlesState.principles}
+        links={principlesState.links}
+        editable={canLinkDecisionPrinciples(role, decision)}
+        saving={principlesState.saving}
+        error={principlesState.error}
+        principlesHref={`/o/${orgSlug}/m/${modelSlug}/principles`}
+        onSetStance={principlesState.setStance}
+      />
 
       {branchLinks.length > 0 && (
         <Panel>

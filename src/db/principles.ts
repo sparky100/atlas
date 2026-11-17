@@ -111,3 +111,14 @@ export async function listPrincipleLinksForPrinciples(supabase: Client, principl
   const rows = await selectAll<DecisionPrincipleRow>(query);
   return rows.filter((row) => wanted.has(row.principle_id));
 }
+
+/**
+ * Every departure link the caller can read, for the homes' "decisions that depart from a principle" count.
+ * Not an `.in()` on decision ids (rule 8): RLS already limits the rows to the caller's organisations, so this pages
+ * through the departures and the caller keeps the ones for decisions in the model it is looking at.
+ */
+export async function listDepartureLinks(supabase: Client): Promise<DecisionPrincipleRow[]> {
+  // Ordered by the primary key, which is unique, so paging cannot skip or repeat a row.
+  const query = supabase.from('decision_principles').select('*', { count: 'exact' }).eq('stance', 'departs').order('decision_id', { ascending: true }).order('principle_id', { ascending: true });
+  return selectAll<DecisionPrincipleRow>(query);
+}
