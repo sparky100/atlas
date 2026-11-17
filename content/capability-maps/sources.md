@@ -132,3 +132,26 @@ above for each sector. `status: draft`,
 seedable for review, not published, until a named reviewer edits that
 field and runs `pnpm content:publish-capability-map electricity_network 3`
 / `pnpm content:publish-capability-map utility 2`.
+
+## any_organisation, police and fire_rescue (2026-11-17)
+
+Three new draft maps, each version 1. **`any_organisation`** (Any Organisation) is a
+sector-neutral starting point: the eight shared capabilities plus four
+sector-neutral level-1 capabilities (Customers & Stakeholders, Products &
+Services, Delivery & Operations, Change & Improvement) and six value
+streams, including the cross-sector Recruit to Retire and Buy to Pay.
+**`police`** (Police Force) and **`fire_rescue`** (Fire & Rescue Service) are
+UK-wide and neutral between the nations. References consulted for scope and
+vocabulary only, nothing copied: APQC Process Classification Framework and UK
+Government Functional Standards (any_organisation); College of Policing Authorised
+Professional Practice and HMICFRS (police); National Fire Chiefs Council,
+Fire Standards Board and HMICFRS (fire and rescue).
+
+Judgement calls for the reviewer: `police` has six sector-specific level-1
+capabilities (14 in total) because Professional Standards & Vetting did not
+fit under any other group; `fire_rescue` has 13. Both are above the 8-12
+editorial range and flagged in `docs/review/capability-maps.md`, like
+`rail_transport`. All three are `status: draft`, `reviewedBy: "Pending human
+review — drafted by Claude Code"`, so they are seedable for review but not
+published until a named reviewer edits that field and runs
+`pnpm content:publish-capability-map <sector> 1`.
