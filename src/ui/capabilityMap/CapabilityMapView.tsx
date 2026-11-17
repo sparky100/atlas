@@ -41,8 +41,12 @@ export interface CapabilityMapEditContext {
 /** For a future "as at" date: the capabilities whose supporting systems differ from today. Empty (the default) marks nothing. */
 const NO_CHANGES: ReadonlySet<UUID> = new Set();
 const ChangedByDateContext = createContext<ReadonlySet<UUID>>(NO_CHANGES);
+/** ADR-035: the capabilities serving the goal picked in "Show goal"; `null` (the default) means no goal is picked and nothing is dimmed. */
+const GoalFocusContext = createContext<ReadonlySet<UUID> | null>(null);
 
 export interface CapabilityMapViewProps {
+  /** The capabilities serving the goal picked in "Show goal": they stay at full strength and say so, the rest fade. Omit (or `null`) to show the map as usual. */
+  goalCapabilityIds?: ReadonlySet<UUID> | null | undefined;
   /** Capabilities to mark "Changes by this date" (a future date's difference from today). Omit to mark nothing. */
   changedCapabilityIds?: ReadonlySet<UUID> | undefined;
   tree: CapabilityMapTree;
@@ -187,6 +191,7 @@ export function CapabilityMapView({
   onCommentMarkerClick,
   onInspectClick,
   changedCapabilityIds,
+  goalCapabilityIds,
 }: CapabilityMapViewProps) {
   // Sprint U4-2a item 3: "reorder controls behind a Reorder mode" — the
   // move buttons used to render inline on every row whenever the caller
@@ -212,6 +217,7 @@ export function CapabilityMapView({
 
   return (
     <ChangedByDateContext.Provider value={changedCapabilityIds ?? NO_CHANGES}>
+    <GoalFocusContext.Provider value={goalCapabilityIds ?? null}>
     <div>
       {tree.l1.length > 0 && (
         <div className={styles.domains} role="list" aria-label="Capability domains">
@@ -261,6 +267,7 @@ export function CapabilityMapView({
         </div>
       )}
     </div>
+    </GoalFocusContext.Provider>
     </ChangedByDateContext.Provider>
   );
 }
@@ -418,9 +425,11 @@ function DomainSection({
   const count = rollup.supportingSystemIds.length;
   const aggregateColour = aggregateTileColourFor(colourBy, rollup.subtreeCapabilityIds, supportsEdges, systemsById, replacedIds);
   const segments = domainCoverageSegments(rollup.subtreeCapabilityIds, rollup.subtreeSupportsEdges);
+  const goalFocus = useContext(GoalFocusContext);
+  const servingGoal = goalFocus === null ? 0 : rollup.subtreeCapabilityIds.filter((id) => goalFocus.has(id)).length;
 
   return (
-    <div className={styles.domain} role="listitem">
+    <div className={styles.domain} role="listitem" data-goal={goalFocus === null ? undefined : servingGoal > 0 ? 'match' : 'other'}>
       {/*
        * Redesign item 1/2: collapsed by default, a single row — chevron,
        * name, a plain coverage sentence, a segmented mini-bar — each its
@@ -466,6 +475,11 @@ function DomainSection({
         {/* Coverage mode's own aggregate label is always this same "capabilities supported"/"no capabilities supported" non-value — already fully covered by the fraction/mini-bar/count above, so it's never shown for that one mode; every other colour-by mode's label is a real, distinct fact (a lifecycle stage, "exposed", a criticality level, an OT-share fraction, a fit rating) and still shows here. */}
         {colourBy !== 'metric:supportingSystemCount' && (aggregateColour.tone !== undefined || aggregateColour.amount !== undefined) && aggregateColour.label !== undefined && <FactIndicator tone={aggregateColour.tone} amount={aggregateColour.amount} label={aggregateColour.label} />}
         {!rollup.isOwned && <FactIndicator tone="warn" label="no owner recorded" />}
+        {servingGoal > 0 && (
+          <Text as="span" size="sm" className={styles.goalMark}>
+            {servingGoal === 1 ? '1 serves this goal' : `${String(servingGoal)} serve this goal`}
+          </Text>
+        )}
       </button>
       {domainExpanded && (
         <div id={panelId} className={styles.domainBody}>
@@ -586,9 +600,11 @@ function CapabilityRow({
   const count = supportingSystemIds(card.capability.element_id, supportsEdges).length;
   const marker = commentMarkerFor(threadCounts, card.capability.element_id);
   const changesByDate = useContext(ChangedByDateContext).has(card.capability.element_id);
+  const goalFocus = useContext(GoalFocusContext);
+  const servesGoal = goalFocus?.has(card.capability.element_id) === true;
 
   return (
-    <div className={[styles.card, nested ? styles.cardNested : ''].filter(Boolean).join(' ')} data-tone={colour.tone ?? 'none'} data-amount={colour.amount} data-changes={changesByDate ? 'true' : undefined} role={nested ? undefined : 'listitem'}>
+    <div className={[styles.card, nested ? styles.cardNested : ''].filter(Boolean).join(' ')} data-tone={colour.tone ?? 'none'} data-amount={colour.amount} data-changes={changesByDate ? 'true' : undefined} data-goal={goalFocus === null ? undefined : servesGoal ? 'match' : 'other'} role={nested ? undefined : 'listitem'}>
       <div className={styles.cardMain}>
         <Link to={`/o/${orgSlug}/m/${modelSlug}/e/${card.capability.element_id}`} className={styles.cardLink} title={card.capability.name}>
           <Text as="span" size="md" className={styles.cardName}>
@@ -598,6 +614,11 @@ function CapabilityRow({
         <LandscapeZoomLink capabilityId={card.capability.element_id} count={count} orgSlug={orgSlug} modelSlug={modelSlug} refParam={refParam} />
         <EnablesStagesCount count={enablesCountById.get(card.capability.element_id) ?? 0} />
       </div>
+      {servesGoal && (
+        <Text as="span" size="sm" className={styles.goalMark}>
+          Serves this goal
+        </Text>
+      )}
       {changesByDate && (
         <Text as="span" size="sm" tone="muted" className={styles.changesMark}>
           Changes by this date

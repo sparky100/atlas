@@ -19,6 +19,8 @@ import { exportDecisionAsAdrMarkdown } from '../decisions/exportDecisionAsAdr';
 import { intentHeaderLine } from '../changes/branchIntent';
 import { loadDecisionPageData } from '../decisions/useDecision';
 import { listPrinciplesForDecision, listPrinciplesForModel } from '../../db/principles';
+import { listGoalLinksForGoals, listGoalsForModel } from '../../db/goals';
+import { goalTitlesServedBy } from '../goals/goalModel';
 import { adrPrincipleItems } from '../principles/decisionPrinciples';
 import { groupWhatChangesRows } from '../decisions/whatChangesRows';
 import { scopeDifference } from '../projects/projectModel';
@@ -29,6 +31,8 @@ import type { ProjectPackDecision, ProjectPackInput } from './projectPack';
 
 async function decisionAdr(modelId: UUID, mainHeadCommitId: UUID | null, decision: DecisionRow, nameOfUser: (id: UUID) => string): Promise<ProjectPackDecision> {
   const [page, ratings, principles, principleLinks] = await Promise.all([loadDecisionPageData(modelId, decision.id), listDecisionRatingsForDecision(supabase, decision.id), listPrinciplesForModel(supabase, modelId), listPrinciplesForDecision(supabase, decision.id)]);
+  const goals = (await listGoalsForModel(supabase, modelId)).filter((g) => g.status === 'active');
+  const goalLinks = await listGoalLinksForGoals(supabase, goals.map((g) => g.id));
   if (page.status !== 'ready') throw new Error(`Couldn't load the decision "${decision.title}".`);
   const { capabilityIds, otherElementIds } = decisionConcernIds(page.links, page.linkedElementsById);
   const options = decisionOptionBranches(page.links, page.linkedBranchesById).map((b) => ({ branchId: b.id, baseCommitId: b.base_commit_id, headCommitId: b.head_commit_id, label: intentHeaderLine(b) }));
@@ -42,6 +46,7 @@ async function decisionAdr(modelId: UUID, mainHeadCommitId: UUID | null, decisio
       args: page.args,
       ratings,
       principles: adrPrincipleItems(principles, principleLinks),
+      goalsServed: goalTitlesServedBy(capabilityIds, goals, goalLinks),
       whatChangesRows: comparison ? groupWhatChangesRows(comparison.whatChangesRows).visible : [],
       ownerName: nameOfUser(page.decision.owner_id),
     }),

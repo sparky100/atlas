@@ -50,13 +50,15 @@ export interface DecisionAdrSource {
   ratings: readonly DecisionOptionRatingRow[];
   /** The principles the decision follows or departs from (`adrPrincipleItems`); omitted or empty prints nothing. */
   principles?: DecisionAdrExportInput['principles'];
+  /** Titles of the goals the concerned capabilities serve (`goalTitlesServedBy`); omitted or empty prints nothing. */
+  goalsServed?: DecisionAdrExportInput['goalsServed'];
   /** Only the What-changes rows the table shows (`groupWhatChangesRows(...).visible`). */
   whatChangesRows: readonly WhatChangesRow[];
   ownerName: string;
 }
 
 export function buildDecisionAdrExportInput(source: DecisionAdrSource): DecisionAdrExportInput {
-  const { decision, links, linkedElementsById, linkedBranchesById, args, ratings, whatChangesRows, ownerName, principles } = source;
+  const { decision, links, linkedElementsById, linkedBranchesById, args, ratings, whatChangesRows, ownerName, principles, goalsServed } = source;
   const { capabilityIds, otherElementIds } = decisionConcernIds(links, linkedElementsById);
   return {
     decision,
@@ -68,6 +70,7 @@ export function buildDecisionAdrExportInput(source: DecisionAdrSource): Decision
     options: decisionOptionBranches(links, linkedBranchesById).map((b) => ({ branch: b, isChosen: b.id === decision.branch_id, ratings: optionRatingsFor(ratings, b.id) })),
     whatChangesRows,
     ...(principles !== undefined ? { principles } : {}),
+    ...(goalsServed !== undefined ? { goalsServed } : {}),
     // The one `stance: 'for'` row `atlas.choose_decision_option` writes — null until decided.
     reasons: args.find((a) => a.stance === 'for')?.body ?? null,
   };

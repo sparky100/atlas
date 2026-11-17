@@ -24,6 +24,8 @@ import { DecisionLinkPicker } from './DecisionLinkPicker';
 import { DecisionPrinciplesPanel } from '../principles/DecisionPrinciplesPanel';
 import { adrPrincipleItems } from '../principles/decisionPrinciples';
 import { useDecisionPrinciples } from '../principles/useDecisionPrinciples';
+import { goalTitlesServedBy } from '../goals/goalModel';
+import { useModelGoals } from '../goals/useModelGoals';
 import { canLinkDecisionPrinciples } from '../orgs/roleGates';
 import { decisionStatusLabel, decisionStatusTone } from './decisionStatus';
 import { cancelDecision, createDecisionLink, updateDecision } from '../../db/decisions';
@@ -34,7 +36,7 @@ import { reportError } from '../errors/errorBannerStore';
 import { queryKeys } from '../query/keys';
 import { ProjectAssignment } from '../projects/ProjectAssignment';
 import { supabase } from '../supabaseClient';
-import { buildDecisionAdrExportInput } from './decisionAdrInput';
+import { buildDecisionAdrExportInput, decisionConcernIds } from './decisionAdrInput';
 import { exportDecisionAsAdrMarkdown } from './exportDecisionAsAdr';
 import type { DecisionPageState } from './useDecision';
 import { useDecisionComparison, type DecisionComparisonOption } from './useDecisionComparison';
@@ -87,6 +89,7 @@ export function DecisionView({ modelId, decisionId, orgId, orgSlug, modelSlug, r
   // mean two separate fetches/polling loops for the same table.
   const ratingsState = useDecisionRatings(modelId, decisionId);
   const principlesState = useDecisionPrinciples(modelId, decisionId, userId);
+  const modelGoals = useModelGoals(modelId);
 
   const [addingOption, setAddingOption] = useState(false);
   const [optionTitle, setOptionTitle] = useState('');
@@ -153,6 +156,7 @@ export function DecisionView({ modelId, decisionId, orgId, orgSlug, modelSlug, r
         args,
         ratings: ratingsState.ratings,
         principles: adrPrincipleItems(principlesState.principles, principlesState.links),
+        goalsServed: modelGoals ? goalTitlesServedBy(decisionConcernIds(links, linkedElementsById).capabilityIds, modelGoals.goals.filter((g) => g.status === 'active'), modelGoals.links) : [],
         whatChangesRows: comparison.status === 'ready' ? groupWhatChangesRows(comparison.whatChangesRows).visible : [],
         ownerName,
       }),
