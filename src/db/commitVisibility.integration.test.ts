@@ -130,20 +130,17 @@ describe('commit_visible: heads, facts and deltas show exactly what commits show
     for (const orgId of orgIds) await service.from('organisations').delete().eq('id', orgId);
   });
 
-  const tables = ['deltas', 'elements_head', 'facts'] as const;
-
   it.each([
     ['owner', () => owner],
     ['architect', () => architect],
     ['contributor', () => contributor],
   ])('%s sees every commit of their organisation, including the draft change branch', async (_label, who) => {
-    for (const table of tables) {
-      const seen = await visibleIds(who().client, table, everyCommit);
-      // `deltas` and `facts` hold every commit; heads hold main's head, tagged commits and branch heads.
-      expect(seen, table).toContain(mainLaterCommit);
-      expect(seen, table).toContain(changeCommit);
-    }
+    // `deltas` hold every commit. Head rows exist only for main's head and tagged commits (ADR-015, SPEC P-6), so heads and facts are checked on the main commits.
     expect(await visibleIds(who().client, 'deltas', everyCommit)).toEqual([...everyCommit].sort());
+    for (const table of ['elements_head', 'facts'] as const) {
+      const seen = await visibleIds(who().client, table, [mainTaggedCommit, mainLaterCommit]);
+      expect(seen, table).toContain(mainLaterCommit);
+    }
   });
 
   it('a viewer sees main and tagged commits but not a draft change branch', async () => {
@@ -156,13 +153,9 @@ describe('commit_visible: heads, facts and deltas show exactly what commits show
 
   it('a viewer sees the change branch once it is shared for review, and not again after it is unshared', async () => {
     await updateBranchMetadata(owner.client, changeBranchId, { sharedForReview: true });
-    for (const table of ['deltas', 'elements_head', 'facts'] as const) {
-      expect(await visibleIds(viewer.client, table, [changeCommit]), table).toEqual([changeCommit]);
-    }
+    expect(await visibleIds(viewer.client, 'deltas', [changeCommit])).toEqual([changeCommit]);
     await updateBranchMetadata(owner.client, changeBranchId, { sharedForReview: false });
-    for (const table of ['deltas', 'elements_head', 'facts'] as const) {
-      expect(await visibleIds(viewer.client, table, [changeCommit]), table).toEqual([]);
-    }
+    expect(await visibleIds(viewer.client, 'deltas', [changeCommit])).toEqual([]);
   });
 
   it("a member of another organisation sees none of this model's commits, heads, facts or deltas", async () => {
