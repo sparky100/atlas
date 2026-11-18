@@ -11,6 +11,7 @@
  * as its content file says. Loading skips any map already published, and
  * v4 is published only if it isn't yet, so a re-run changes nothing.
  */
+import { assertLocalTestEnvironment } from '../src/db/assertLocalSupabase';
 import { createServiceRoleClient } from '../src/db/client';
 import { loadEnv } from '../src/db/env';
 import { loadAllCapabilityMaps } from '../scripts/loadCapabilityMaps';
@@ -19,6 +20,7 @@ import { publishCapabilityMap } from '../scripts/publishCapabilityMap';
 const PUBLISHED_FOR_TESTS: readonly { sector: string; version: number }[] = [{ sector: 'electricity_network', version: 4 }];
 
 export default async function globalSetup(): Promise<void> {
+  assertLocalTestEnvironment();
   const supabase = createServiceRoleClient(loadEnv());
   await loadAllCapabilityMaps(supabase);
   for (const { sector, version } of PUBLISHED_FOR_TESTS) {

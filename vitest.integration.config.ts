@@ -8,6 +8,7 @@ export default defineConfig({
   test: {
     include: ['src/**/*.integration.test.ts', 'mcp/**/*.integration.test.ts'],
     environment: 'node',
+    globalSetup: ['./src/db/integrationGlobalSetup.ts'],
     globals: false,
     passWithNoTests: true,
     // Integration tests share one Postgres instance and reset their own
