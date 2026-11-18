@@ -117,6 +117,10 @@ test("What's recent lists a project closed since the last version, and it leaves
   await page.getByRole('link', { name: 'Start a project', exact: true }).click();
   await page.getByLabel('Project title').fill(projectTitle);
   await page.getByLabel('Architect').selectOption({ index: 1 });
+  // Plan A1: a project must name a capability it serves.
+  await page.getByPlaceholder(/Search a capability this project serves/).fill('Housing');
+  await page.getByRole('button', { name: 'Housing Repairs' }).click();
+  await expect(page.getByRole('button', { name: 'Remove Housing Repairs' })).toBeVisible();
   await page.getByRole('button', { name: 'Start project' }).click();
   await expect(page.getByRole('heading', { name: projectTitle, level: 1 })).toBeVisible();
   await page.getByRole('button', { name: 'Close project' }).click();

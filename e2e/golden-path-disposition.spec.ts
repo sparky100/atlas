@@ -24,8 +24,8 @@ test('disposition: Migrate raises a finding, a project retires the system, the f
   await signUpCreateOrgAndModel(page, 'disposition');
 
   // 1. A system supporting a capability, marked Migrate through the ordinary Attributes editor.
-  await addCapability(page, 'Payroll');
-  await addSystemFromHome(page, { name: 'Legacy Payroll', description: 'The payroll system being moved off.', capabilityName: 'Payroll' });
+  await addCapability(page, 'Employee Pay');
+  await addSystemFromHome(page, { name: 'Legacy Payroll', description: 'The payroll system being moved off.', capabilityName: 'Employee Pay' });
   await page.getByRole('button', { name: '✎ Edit' }).click();
   await page.getByLabel('Planned action').selectOption('migrate');
   await page.getByRole('button', { name: 'Save' }).click();
@@ -47,9 +47,9 @@ test('disposition: Migrate raises a finding, a project retires the system, the f
   await expect(page.getByRole('button', { name: 'Remove Legacy Payroll' })).toBeVisible();
   await page.getByLabel('Architect').selectOption({ index: 1 });
   // Plan A1: a project must name a capability it serves — add the one the system supports.
-  await page.getByPlaceholder(/Search a capability this project serves/).fill('Payroll');
-  await page.getByRole('button', { name: 'Payroll', exact: true }).click();
-  await expect(page.getByRole('button', { name: 'Remove Payroll' })).toBeVisible();
+  await page.getByPlaceholder(/Search a capability this project serves/).fill('Employee Pay');
+  await page.getByRole('button', { name: 'Employee Pay' }).click();
+  await expect(page.getByRole('button', { name: 'Remove Employee Pay' })).toBeVisible();
   await page.getByRole('button', { name: 'Start project' }).click();
   await expect(page.getByRole('heading', { name: 'Move Legacy Payroll to another system', level: 1 })).toBeVisible();
 

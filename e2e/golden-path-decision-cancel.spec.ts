@@ -42,7 +42,7 @@ test('cancel a decision: it stays in the log as cancelled with its reason, its d
   await page.getByLabel('Project title').fill(PROJECT);
   await page.getByLabel('Architect').selectOption({ index: 1 });
   await page.getByPlaceholder(/Search a capability this project serves/).fill('Reporting');
-  await page.getByRole('button', { name: 'Reporting', exact: true }).click();
+  await page.getByRole('button', { name: 'Reporting' }).click();
   await expect(page.getByRole('button', { name: 'Remove Reporting' })).toBeVisible();
   await page.getByRole('button', { name: 'Start project' }).click();
   await expect(page.getByRole('heading', { name: PROJECT, level: 1 })).toBeVisible();
