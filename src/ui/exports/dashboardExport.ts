@@ -213,7 +213,7 @@ function tileShapes(item: ExportTileItem, x: number, y: number, width: number, h
       break;
     }
     case 'quadrant': {
-      // The picture is the four boxes with their counts (a dot cloud does not survive a page); the screen shows every dot.
+      // The picture is the four boxes with their counts (the grid and list do not survive a page); the screen shows the full grid and list.
       shapes.push(title());
       const built = buildQuadrant(quadrantItemsFromResult(item.result));
       const boxW = (inner - 6) / 2;

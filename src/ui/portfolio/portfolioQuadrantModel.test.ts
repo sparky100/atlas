@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { buildQuadrant, dotSizeOf, quadrantOf, techHealthOf, type QuadrantItem } from './portfolioQuadrantModel';
+import { buildQuadrant, quadrantOf, techHealthOf, type QuadrantItem } from './portfolioQuadrantModel';
 
 function item(overrides: Partial<QuadrantItem> = {}): QuadrantItem {
   return { id: 'a', name: 'A', fit: 'good', lifecycle: 'active', exposed: false, cost: '50k_250k', disposition: null, ...overrides };
@@ -53,10 +53,33 @@ describe('buildQuadrant', () => {
   });
 });
 
-describe('dotSizeOf', () => {
-  it('grows with cost and gives an unknown cost the smallest dot', () => {
-    expect(dotSizeOf('over_5m')).toBeGreaterThan(dotSizeOf('1m_5m'));
-    expect(dotSizeOf('under_50k')).toBeGreaterThan(dotSizeOf(null));
-    expect(dotSizeOf('none_included')).toBe(dotSizeOf(null));
+describe('grid and worth a look', () => {
+  it('has eight cells, fit by health, each counted once', () => {
+    const result = buildQuadrant([item({ id: '1' }), item({ id: '2', fit: 'excellent' }), item({ id: '3', fit: 'poor', lifecycle: 'retiring' })]);
+    expect(result.grid).toHaveLength(8);
+    expect(result.grid.reduce((n, c) => n + c.items.length, 0)).toBe(3);
+    const good = result.grid.find((c) => c.fit === 'good' && c.health === 'healthy');
+    expect(good?.items.map((i) => i.id)).toEqual(['1']);
+    expect(good?.quadrant).toBe('invest');
+  });
+
+  it('reports the highest cost band, never a sum, and counts what is not entered and has no planned action', () => {
+    const result = buildQuadrant([item({ id: '1', cost: 'under_50k' }), item({ id: '2', cost: '1m_5m', disposition: 'invest' }), item({ id: '3', cost: null })]);
+    const cell = result.grid.find((c) => c.fit === 'good' && c.health === 'healthy');
+    expect(cell?.highestCost).toBe('1m_5m');
+    expect(cell?.costNotEntered).toBe(1);
+    expect(cell?.noPlannedAction).toBe(2);
+    expect(result.grid.find((c) => c.fit === 'poor' && c.health === 'at_risk')?.highestCost).toBeNull();
+  });
+
+  it('lists at-risk or poor-fit applications, biggest cost first, and leaves out healthy ones that fit', () => {
+    const result = buildQuadrant([
+      item({ id: 'fine', name: 'Fine', cost: 'over_5m' }),
+      item({ id: 'risk', name: 'Risk', lifecycle: 'retiring', cost: '250k_1m' }),
+      item({ id: 'poor', name: 'Poor', fit: 'poor', cost: '1m_5m' }),
+      item({ id: 'both', name: 'Both', fit: 'poor', exposed: true, cost: null }),
+    ]);
+    expect(result.worthALook.map((r) => r.item.id)).toEqual(['poor', 'risk', 'both']);
+    expect(result.worthALook[2]).toMatchObject({ atRisk: true, poorFit: true });
   });
 });
