@@ -369,7 +369,7 @@ export function useCaptureReviewQueue(modelId: UUID, orgId: UUID, jobId: UUID, u
       // real, separate reviewer set regardless of who's applying.
       // Best-effort: the promotion commit above has already landed
       // either way, so a failure here never undoes it.
-      const mergeResult = isChangeBrief ? { merged: false as const, reason: 'not_eligible_intent' } : await autoMergeCaptureChange(supabase, modelId, role, target);
+      const mergeResult = isChangeBrief ? { merged: false as const, reason: 'not_eligible_intent' } : await autoMergeCaptureChange(supabase, queryClient, modelId, role, target);
       setStatus('idle');
       if (isChangeBrief) void queryClient.invalidateQueries({ queryKey: queryKeys.reviewQueueCount(modelId) });
       reload();

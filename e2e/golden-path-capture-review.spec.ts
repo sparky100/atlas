@@ -189,8 +189,11 @@ test('upload a JSON file, bulk-accept every new candidate by keyboard, and apply
 
   await goToModelHome(page);
   await clickNavItem(page, 'Elements');
-  await expect(page.getByText('Billing Platform', { exact: true }).first()).toBeVisible();
-  await expect(page.getByText('Fleet Tracker', { exact: true }).first()).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Elements', level: 1 })).toBeVisible();
+  // Rows are links (the grid's rows are table cells at 1280 and cards at 390),
+  // as `golden-path-bulk-edit.spec.ts` finds them — not bare text.
+  await expect(page.getByRole('link', { name: /Billing Platform/ }).first()).toBeVisible({ timeout: 15_000 });
+  await expect(page.getByRole('link', { name: /Fleet Tracker/ }).first()).toBeVisible({ timeout: 15_000 });
 });
 
 test('reject everything by tap, finish the review with no change, and discard a duplicate draft from the queue', async ({ page }, testInfo) => {
