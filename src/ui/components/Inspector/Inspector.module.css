@@ -1,14 +1,59 @@
-/* Fixed width — resizable is explicitly deferred (Inspector.tsx's own
-   module comment). Matches the old LandscapeFocusPanel's own bordered-
+/* Width comes from the shell's `--inspector-width` (260-640px, set by the
+   drag handle / keyboard, remembered per device). Matches the old LandscapeFocusPanel's own bordered-
    surface treatment (border/radius/background), widened from its
    220px min-width to fit a Selection section's own attribute rows and
    the Filters facets it now also hosts. */
+.shell {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  flex-shrink: 0;
+  width: var(--inspector-width, 300px);
+  max-height: 100%;
+}
+
+/* The drag handle sits in the gap between the canvas and the panel (the
+   rows use a --space-4 gap), 12px wide to be easy to grab, with a thin
+   accent bar on hover/focus/drag — accent here only means "you can drag this". */
+.handle {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: -14px;
+  width: 12px;
+  cursor: col-resize;
+  touch-action: none;
+  border-radius: var(--radius-sm);
+}
+
+.handle::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 50%;
+  width: 3px;
+  margin-left: -1.5px;
+  border-radius: 2px;
+  background: transparent;
+}
+
+.handle:hover::after,
+.handle:focus-visible::after,
+.handle:active::after {
+  background: var(--accent);
+}
+
+.handle:focus-visible {
+  outline: none;
+}
+
 .panel {
   display: flex;
   flex-direction: column;
   gap: var(--space-3);
-  width: 300px;
-  flex-shrink: 0;
+  flex: 1 1 auto;
+  min-height: 0;
   padding: var(--space-3);
   border: var(--border-width) solid var(--border);
   border-radius: var(--radius-md);
@@ -46,6 +91,16 @@
   gap: var(--space-3);
 }
 
+/* The app's own link style (accent, underline on hover) instead of the browser default. */
+.body a {
+  color: var(--accent);
+  text-decoration: none;
+}
+
+.body a:hover {
+  text-decoration: underline;
+}
+
 /* Collapsed: a slim strip with one toggle — "collapsed to an icon strip
    when nothing is focused" (the prompt's own words). Same border/surface
    treatment as `.panel` so it still reads as the same panel, just closed. */
@@ -80,7 +135,11 @@
    phone's capability map about 50px, collapsing every card name to
    nothing. */
 @media (max-width: 768px) {
-  .panel {
+  .shell {
     width: 100%;
+  }
+
+  .handle {
+    display: none;
   }
 }

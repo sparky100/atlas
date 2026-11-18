@@ -1,7 +1,15 @@
 import { ChevronLeft, ChevronRight } from 'lucide-react';
-import type { ReactNode } from 'react';
+import { useRef, type CSSProperties, type KeyboardEvent, type PointerEvent, type ReactNode } from 'react';
 import { Text } from '../Text/Text';
 import styles from './Inspector.module.css';
+import {
+  INSPECTOR_DEFAULT_WIDTH,
+  INSPECTOR_KEY_STEP,
+  INSPECTOR_KEY_STEP_LARGE,
+  INSPECTOR_MIN_WIDTH,
+  inspectorMaxFor,
+} from './inspectorWidth';
+import { useInspectorWidth } from './useInspectorWidth';
 
 export interface InspectorProps {
   /** The resting state with nothing selected — `useInspectorCollapsedPreference`'s own saved value. Ignored (forced open) while `hasSelection` is true — see this component's own module comment. */
@@ -32,7 +40,7 @@ export interface InspectorProps {
  * forcing the panel open — so collapsing while something is selected has
  * no visible effect yet, but takes effect the moment the selection clears.
  *
- * Fixed width (not resizable, see above), sitting beside the canvas as an
+ * Sitting beside the canvas as an
  * ordinary flex sibling — `LandscapePage.module.css`'s own `.canvasRow`
  * already gives the canvas `flex: 1` and leaves this panel to size itself,
  * so collapsing/expanding reflows the canvas for free through the same
@@ -41,28 +49,92 @@ export interface InspectorProps {
  */
 export function Inspector({ collapsed, onToggleCollapsed, hasSelection, children }: InspectorProps) {
   const open = hasSelection || !collapsed;
+  const { width, setWidth, reset } = useInspectorWidth();
+  const drag = useRef<{ startX: number; startWidth: number } | null>(null);
 
   if (!open) {
     return (
       <div className={styles.strip} aria-label="Inspector">
-        <button type="button" className={styles.toggleButton} aria-label="Expand inspector" title="Expand inspector" onClick={onToggleCollapsed}>
+        <button
+          type="button"
+          className={styles.toggleButton}
+          aria-label="Expand inspector"
+          title="Expand inspector"
+          onClick={onToggleCollapsed}
+        >
           <ChevronLeft size={18} aria-hidden="true" />
         </button>
       </div>
     );
   }
 
+  const max = inspectorMaxFor(window.innerWidth);
+
+  const onPointerDown = (e: PointerEvent<HTMLDivElement>) => {
+    drag.current = { startX: e.clientX, startWidth: width };
+    e.currentTarget.setPointerCapture(e.pointerId);
+    e.preventDefault();
+  };
+  const onPointerMove = (e: PointerEvent<HTMLDivElement>) => {
+    if (!drag.current) return;
+    // The panel is on the right, so dragging left makes it wider.
+    setWidth(drag.current.startWidth + (drag.current.startX - e.clientX));
+  };
+  const endDrag = (e: PointerEvent<HTMLDivElement>) => {
+    drag.current = null;
+    if (e.currentTarget.hasPointerCapture(e.pointerId)) e.currentTarget.releasePointerCapture(e.pointerId);
+  };
+  const onKeyDown = (e: KeyboardEvent<HTMLDivElement>) => {
+    const step = e.shiftKey ? INSPECTOR_KEY_STEP_LARGE : INSPECTOR_KEY_STEP;
+    if (e.key === 'ArrowLeft') setWidth(width + step);
+    else if (e.key === 'ArrowRight') setWidth(width - step);
+    else if (e.key === 'Home') setWidth(INSPECTOR_MIN_WIDTH);
+    else if (e.key === 'End') setWidth(max);
+    else if (e.key === 'Enter') reset();
+    else return;
+    e.preventDefault();
+  };
+
   return (
-    <aside className={styles.panel} aria-label="Inspector">
-      <div className={styles.header}>
-        <Text as="h2" size="lg">
-          Inspector
-        </Text>
-        <button type="button" className={styles.toggleButton} aria-label="Collapse inspector" title="Collapse inspector" onClick={onToggleCollapsed}>
-          <ChevronRight size={18} aria-hidden="true" />
-        </button>
-      </div>
-      <div className={styles.body}>{children}</div>
-    </aside>
+    <div className={styles.shell} style={{ '--inspector-width': `${String(width)}px` } as CSSProperties}>
+      {/* WAI-ARIA window splitter: a focusable separator is the interactive pattern; jsx-a11y only knows it as non-interactive. */}
+      {/* eslint-disable-next-line jsx-a11y/no-noninteractive-element-interactions */}
+      <div
+        className={styles.handle}
+        role="separator"
+        aria-orientation="vertical"
+        aria-label="Resize inspector"
+        aria-valuenow={width}
+        aria-valuemin={INSPECTOR_MIN_WIDTH}
+        aria-valuemax={max}
+        title="Drag to resize. Double-click to reset."
+        // eslint-disable-next-line jsx-a11y/no-noninteractive-tabindex -- window splitter, see above
+        tabIndex={0}
+        onPointerDown={onPointerDown}
+        onPointerMove={onPointerMove}
+        onPointerUp={endDrag}
+        onPointerCancel={endDrag}
+        onDoubleClick={reset}
+        onKeyDown={onKeyDown}
+        data-default-width={INSPECTOR_DEFAULT_WIDTH}
+      />
+      <aside className={styles.panel} aria-label="Inspector">
+        <div className={styles.header}>
+          <Text as="h2" size="lg">
+            Inspector
+          </Text>
+          <button
+            type="button"
+            className={styles.toggleButton}
+            aria-label="Collapse inspector"
+            title="Collapse inspector"
+            onClick={onToggleCollapsed}
+          >
+            <ChevronRight size={18} aria-hidden="true" />
+          </button>
+        </div>
+        <div className={styles.body}>{children}</div>
+      </aside>
+    </div>
   );
 }
