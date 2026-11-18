@@ -25,7 +25,9 @@ test('landscape connections overview: counts links between areas', async ({ page
   await expect(page.getByRole('heading', { name: /Landscape/, level: 1 })).toBeVisible();
 
   const narrow = (page.viewportSize()?.width ?? 0) < 768;
-  const connectionsSwitch = page.getByRole('button', { name: 'Connections', exact: true });
+  // Scoped to the layout switch: the Connections section header is also a
+  // button with this name.
+  const connectionsSwitch = page.getByRole('group', { name: 'Landscape layout' }).getByRole('button', { name: 'Connections', exact: true });
   if (narrow) {
     await expect(connectionsSwitch).toHaveCount(0);
   } else {

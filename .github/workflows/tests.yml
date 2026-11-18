@@ -17,6 +17,13 @@ name: Tests
 # to a "larger runner", which is paid.
 on:
   pull_request:
+    # Docs-only and Markdown-only changes can't break a test, so they don't
+    # start a run. (content/ is NOT ignored: the Playwright setup loads the
+    # starter capability maps from there.) Run by hand any time with
+    # Actions -> Tests -> Run workflow.
+    paths-ignore:
+      - '**/*.md'
+      - 'docs/**'
   workflow_dispatch:
 
 permissions:
@@ -38,11 +45,14 @@ jobs:
       - uses: ./.github/actions/setup-node-pnpm
       - run: pnpm lint
       - run: pnpm typecheck
-      - run: pnpm test
+      - name: pnpm test
+        run: pnpm test
+        # Some UI modules read these at import time (src/ui/env.ts). Unit tests
+        # never connect to anything, so placeholders are enough, and they are
+        # not secrets. Locally the same names come from .env.
         env:
-          # Unit tests that import the browser Supabase client only need the variables to exist; nothing here connects.
           VITE_SUPABASE_URL: http://127.0.0.1:54321
-          VITE_SUPABASE_ANON_KEY: ci-placeholder-not-a-real-key
+          VITE_SUPABASE_ANON_KEY: ci-placeholder-not-a-key
       - run: pnpm check:case-collisions
       - run: pnpm build
 
@@ -94,7 +104,20 @@ jobs:
       - name: Run this shard
         # `blob` feeds the merged report; `list` keeps the log readable.
         # The config already keeps a trace and video for failed tests.
-        run: pnpm exec playwright test --shard=${{ matrix.shard }}/8 --reporter=list,blob
+        #
+        # --grep-invert skips the one spec that needs a live language model to
+        # extract capabilities from a spreadsheet. CI has no API key (this
+        # workflow uses no secrets, by design), so it can only time out. It
+        # still runs locally. The other AI-adjacent specs mock the model call
+        # and do run here.
+        #
+        # It also skips the 300 ms route-timing budget spec (E8 acceptance):
+        # a speed budget is meaningless on a shared runner. Simon's decision,
+        # 2026-11-17; it still runs locally.
+        run: >-
+          pnpm exec playwright test --shard=${{ matrix.shard }}/8
+          --reporter=list,blob
+          --grep-invert 'upload a spreadsheet, accept and reject candidates by keyboard|E8 acceptance: route change under 300ms'
         env:
           PLAYWRIGHT_BLOB_OUTPUT_DIR: blob-report
       - name: Upload this shard's results
