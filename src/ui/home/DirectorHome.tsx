@@ -64,6 +64,8 @@ export function DirectorHome({ data, reload, modelId, userId, role, orgSlug, mod
   // capability / By outcome" toggle — plain unpersisted component state
   // (the "route via platforms" precedent), not a `user_preferences` column.
   const [weaknessView, setWeaknessView] = useState<'capability' | 'outcome'>('capability');
+  // Only the most urgent few cards show at first so Work in progress and What's recent stay in view; "Show all" opens the rest.
+  const [showAllTiles, setShowAllTiles] = useState(false);
   const modelHref = `/o/${orgSlug}/m/${modelSlug}`;
   const { whatWeAreDoing } = data;
   const openDecisionCount = whatWeAreDoing.decisionsOutsideProjects.length + whatWeAreDoing.projects.reduce((n, p) => n + p.progress.openDecisions, 0);
@@ -99,9 +101,12 @@ export function DirectorHome({ data, reload, modelId, userId, role, orgSlug, mod
   // ones a director is actually deciding what to do about.
   const weakTiles = data.tiles.filter((t) => isCapabilityTileWeak(t)).sort(compareWeakTiles);
 
+  const shownTiles = showAllTiles ? weakTiles : weakTiles.slice(0, FOCUS_TILES_SHOWN);
+
   return (
     <div className={styles.door}>
-      <section aria-label="Where to focus">
+      <div className={styles.layout}>
+      <section aria-label="Where to focus" className={styles.focusColumn}>
         <div className={styles.sectionHeader}>
           <Text as="h2" size="xl" className={styles.sectionTitle}>
             Where to focus
@@ -154,10 +159,23 @@ export function DirectorHome({ data, reload, modelId, userId, role, orgSlug, mod
               </Text>
             )}
             <div className={styles.tileGrid}>
-              {weakTiles.map((tile) => (
+              {shownTiles.map((tile) => (
                 <CapabilityTile key={tile.capability.element_id} tile={tile} orgSlug={orgSlug} modelSlug={modelSlug} emphasised role={role} inHand={data.inHandByTile.get(tile.capability.element_id) ?? NO_IN_HAND} />
               ))}
             </div>
+            {weakTiles.length > FOCUS_TILES_SHOWN && (
+              <div className={styles.showAll}>
+                <Button
+                  variant="ghost"
+                  onClick={() => {
+                    setShowAllTiles((open) => !open);
+                  }}
+                  aria-expanded={showAllTiles}
+                >
+                  {showAllTiles ? 'Show fewer' : `Show all ${String(weakTiles.length)} →`}
+                </Button>
+              </div>
+            )}
           </>
         )}
         {weaknessView === 'outcome' && (
@@ -165,8 +183,8 @@ export function DirectorHome({ data, reload, modelId, userId, role, orgSlug, mod
         )}
       </section>
 
-      <div className={styles.lowerRow}>
-        <section className={styles.changesColumn} aria-label="Work in progress">
+      <aside className={styles.sideColumn} aria-label="Work in progress and what's recent">
+        <section className={styles.sidePanel} aria-label="Work in progress">
           <div className={styles.sectionHeader}>
             <Text as="h2" size="xl" className={styles.sectionTitle}>
               Work in progress
@@ -177,6 +195,7 @@ export function DirectorHome({ data, reload, modelId, userId, role, orgSlug, mod
             {/* UI-principles §3 (2026-10-04): how a director starts work —
                 a project or a decision. Starting a change is My work's and
                 the Changes page's, not a briefing's. */}
+            <div className={styles.sideActions}>
             {canStartProject(role) && (
               <LinkButton variant="ghost" to={`${modelHref}/projects`}>
                 Start a project
@@ -187,6 +206,7 @@ export function DirectorHome({ data, reload, modelId, userId, role, orgSlug, mod
                 Start a decision
               </LinkButton>
             )}
+            </div>
           </div>
           <GoalsWithoutCapabilityNote modelId={modelId} goalsHref={`${modelHref}/goals`} />
           <PrincipleDeparturesNote modelId={modelId} principlesHref={`${modelHref}/principles`} />
@@ -217,7 +237,7 @@ export function DirectorHome({ data, reload, modelId, userId, role, orgSlug, mod
           )}
         </section>
 
-        <section className={styles.versionsColumn} aria-label="What's recent">
+        <section className={styles.sidePanel} aria-label="What's recent">
           <Text as="h2" size="xl" className={styles.sectionTitle}>
             What's recent
           </Text>
@@ -278,10 +298,14 @@ export function DirectorHome({ data, reload, modelId, userId, role, orgSlug, mod
             </div>
           )}
         </section>
+      </aside>
       </div>
     </div>
   );
 }
+
+/** How many weak capability cards "Where to focus" shows before "Show all". */
+const FOCUS_TILES_SHOWN = 6;
 
 /** How many recent records "What's recent" lists before "+N more". */
 const RECENT_SHOWN = 5;
