@@ -182,14 +182,15 @@ test('upload a JSON file, bulk-accept every new candidate by keyboard, and apply
 
 
   await page.keyboard.press('Control+Enter');
-  await expect(page.getByText(/^Applied \d+ item/)).toBeVisible({ timeout: 15_000 });
+  // The reviewer here is the org's owner, so applying also merges straight into
+  // the live model (`autoMergeCaptureChange.ts`): there is no draft change left
+  // to open, and the confirmation says so.
+  await expect(page.getByText(/^Applied 2 items\. Merged into the live model\./)).toBeVisible({ timeout: 15_000 });
 
   await goToModelHome(page);
-  await page.getByRole('link', { name: 'Changes' }).click();
-  await page.getByRole('link', { name: 'Open →' }).click();
-  await expect(page.getByRole('heading', { name: 'Edits on this change' })).toBeVisible();
-  await expect(page.getByText('Billing Platform', { exact: true })).toBeVisible();
-  await expect(page.getByText('Fleet Tracker', { exact: true })).toBeVisible();
+  await clickNavItem(page, 'Elements');
+  await expect(page.getByText('Billing Platform', { exact: true }).first()).toBeVisible();
+  await expect(page.getByText('Fleet Tracker', { exact: true }).first()).toBeVisible();
 });
 
 test('reject everything by tap, finish the review with no change, and discard a duplicate draft from the queue', async ({ page }, testInfo) => {
