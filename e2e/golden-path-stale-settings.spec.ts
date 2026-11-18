@@ -17,8 +17,9 @@ import { signUpCreateOrgAndModel } from './fixtures/goldenPath';
  * page.reload() failed with ERR_ABORTED and the write could be lost. Call it
  * before the action, then await the result before reloading.
  */
-function nextWriteSaved(page: Page): Promise<unknown> {
-  return page.waitForResponse((r) => r.request().method() !== 'GET' && r.url().includes('/rest/v1/') && r.ok());
+/** Waits for the specific write (the RPC or table named by `target`), not just any write — an unrelated background write finishing first let the test reload mid-save (page.reload ERR_ABORTED on CI). */
+function nextWriteSaved(page: Page, target: string): Promise<unknown> {
+  return page.waitForResponse((r) => r.request().method() !== 'GET' && r.url().includes('/rest/v1/') && r.url().includes(target) && r.ok());
 }
 
 test('stale data: set the months threshold and the email opt-out, both persist', async ({ page }) => {
@@ -31,7 +32,7 @@ test('stale data: set the months threshold and the email opt-out, both persist',
   const months = page.getByLabel('Months before it is out of date');
   await expect(months).toHaveValue('12');
   await months.fill('6');
-  const monthsSaved = nextWriteSaved(page);
+  const monthsSaved = nextWriteSaved(page, 'set_stale_threshold');
   await months.locator('xpath=ancestor::form').getByRole('button', { name: 'Save' }).click();
   await monthsSaved;
   await page.reload();
@@ -41,7 +42,7 @@ test('stale data: set the months threshold and the email opt-out, both persist',
   await page.getByRole('link', { name: 'Profile' }).click();
   const staleEmail = page.getByLabel("Email me when things I own haven't been checked for a while");
   await expect(staleEmail).toBeChecked();
-  const optOutSaved = nextWriteSaved(page);
+  const optOutSaved = nextWriteSaved(page, 'user_preferences');
   await staleEmail.uncheck();
   await optOutSaved;
   await page.reload();
