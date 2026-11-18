@@ -333,6 +333,12 @@ export function CaptureReviewView({ modelId, orgId, jobId, reviewQueueHref }: Ca
         <Text as="p">
           {isChangeBrief && job.targetBranchId ? (applyMessage ?? 'Selected edits were applied to a draft Change.') : `This capture review is closed (${captureJobStatusLabel(job).toLowerCase()}).`}
         </Text>
+        {/* An import's "Applied N items." used to vanish the instant the review closed, so the reviewer never saw it. */}
+        {!(isChangeBrief && job.targetBranchId) && applyMessage !== null && (
+          <Text as="p" size="sm">
+            {applyMessage}
+          </Text>
+        )}
         {isChangeBrief && job.targetBranchId && <LinkButton to={changeHref(job.targetBranchId)} variant="primary">Open draft Change</LinkButton>}
         <LinkButton to={reviewQueueHref} variant="secondary">
           Back to review queue
