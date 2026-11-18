@@ -12,12 +12,13 @@
  *
  * The box is a suggestion, never a recorded planned action: a planned
  * action is a judgement someone owns (ADR-000, disposition amendment), so
- * dots are coloured by the planned action actually recorded and a dot
- * sitting in a box that disagrees with it is visible, not overwritten. An
+ * the list shows the planned action actually recorded next to the box that
+ * suggests otherwise, visible and never overwritten. An
  * application with no fit rating, no lifecycle, or already retired is not
  * placed and is counted, never put in a corner by default.
  */
 import type { AnnualRunCost, Disposition, FitForPurpose } from '../../contracts/delta';
+import { highestAnnualRunCost } from '../../engine/elementRead/annualRunCost';
 
 export type TechHealth = 'healthy' | 'at_risk';
 export type QuadrantKey = 'invest' | 'migrate' | 'tolerate' | 'eliminate';
@@ -68,17 +69,35 @@ export function quadrantOf(fit: FitForPurpose, health: TechHealth): QuadrantKey 
   return health === 'healthy' ? 'tolerate' : 'eliminate';
 }
 
-/** Dot sizes in pixels, by run-cost band: bigger costs more. A missing or "none / included" cost gets the smallest dot, not a made-up size. */
-const COST_DOT_PX: Record<AnnualRunCost, number> = { none_included: 8, under_50k: 10, '50k_250k': 14, '250k_1m': 18, '1m_5m': 24, over_5m: 30 };
-export const COST_DOT_UNKNOWN_PX = 8;
+export const FIT_ROWS: readonly FitForPurpose[] = ['excellent', 'good', 'adequate', 'poor'];
+export const HEALTH_COLUMNS: readonly TechHealth[] = ['at_risk', 'healthy'];
 const COST_ORDER: readonly AnnualRunCost[] = ['over_5m', '1m_5m', '250k_1m', '50k_250k', 'under_50k', 'none_included'];
 
-export function dotSizeOf(cost: AnnualRunCost | null): number {
-  return cost === null ? COST_DOT_UNKNOWN_PX : COST_DOT_PX[cost];
+/** One of the eight cells: a fit rating by a health. Cost is the highest band in the cell and a tally, never a sum (run-cost bands are ordinal, `annualRunCost.ts`). */
+export interface GridCell {
+  fit: FitForPurpose;
+  health: TechHealth;
+  quadrant: QuadrantKey;
+  items: QuadrantItem[];
+  highestCost: AnnualRunCost | null;
+  costNotEntered: number;
+  noPlannedAction: number;
 }
+
+/** An application worth a second look: at risk, or rated a poor fit. */
+export interface WorthALookRow {
+  item: QuadrantItem;
+  atRisk: boolean;
+  poorFit: boolean;
+}
+
+/** How many rows "Worth a look" shows before "See all in the table". */
+export const WORTH_A_LOOK_LIMIT = 6;
 
 export interface QuadrantResult {
   boxes: Record<QuadrantKey, QuadrantItem[]>;
+  grid: GridCell[];
+  worthALook: WorthALookRow[];
   notPlaced: Record<NotPlacedReason, QuadrantItem[]>;
   placedCount: number;
   notPlacedCount: number;
@@ -114,6 +133,18 @@ export function buildQuadrant(items: readonly QuadrantItem[]): QuadrantResult {
     boxes[quadrantOf(item.fit, health)].push(item);
   }
   for (const list of [...Object.values(boxes), ...Object.values(notPlaced)]) list.sort(byCostThenName);
+  const grid = FIT_ROWS.flatMap((fit) =>
+    HEALTH_COLUMNS.map((health): GridCell => {
+      const cellItems = Object.values(boxes).flat().filter((i) => i.fit === fit && techHealthOf(i.lifecycle, i.exposed) === health).sort(byCostThenName);
+      const rollup = highestAnnualRunCost(cellItems.map((i) => i.cost));
+      return { fit, health, quadrant: quadrantOf(fit, health), items: cellItems, highestCost: rollup.band, costNotEntered: rollup.notEntered, noPlannedAction: cellItems.filter((i) => i.disposition === null).length };
+    }),
+  );
+  const worthALook = Object.values(boxes)
+    .flat()
+    .filter((i) => i.fit === 'poor' || techHealthOf(i.lifecycle, i.exposed) === 'at_risk')
+    .sort(byCostThenName)
+    .map((item): WorthALookRow => ({ item, atRisk: techHealthOf(item.lifecycle, item.exposed) === 'at_risk', poorFit: item.fit === 'poor' }));
   const placedCount = QUADRANT_ORDER.reduce((n, key) => n + boxes[key].length, 0);
-  return { boxes, notPlaced, placedCount, notPlacedCount: items.length - placedCount };
+  return { boxes, grid, worthALook, notPlaced, placedCount, notPlacedCount: items.length - placedCount };
 }

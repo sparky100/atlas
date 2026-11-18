@@ -2,94 +2,189 @@
   margin-bottom: var(--space-2);
 }
 
-/* Y label | boxes, with the X axis underneath. Every track can shrink, so it reflows at any width. */
-.frame {
+/* Grid and list side by side when there is room, stacked when there is not: it reflows at any width. */
+.layout {
   display: grid;
-  grid-template-columns: 24px minmax(0, 1fr);
-  grid-template-rows: auto auto;
-  gap: var(--space-1);
-  max-width: 960px;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 420px), 1fr));
+  gap: var(--space-4);
+  align-items: start;
 }
 
-.yAxis {
-  writing-mode: vertical-rl;
-  transform: rotate(180deg);
+.grid {
+  display: grid;
+  grid-template-columns: 64px repeat(2, minmax(0, 1fr));
+  gap: 4px;
+}
+
+/* Each row is its own subgrid so row labels line up with their cells. */
+.row {
+  display: grid;
+  grid-column: 1 / -1;
+  grid-template-columns: subgrid;
+}
+
+.corner {
+  display: block;
+}
+
+.colHead {
   text-align: center;
+  font-size: var(--text-xs-size);
+  color: var(--text-muted);
+  padding-bottom: 2px;
+}
+
+.rowHead {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  padding-right: var(--space-1);
+  font-size: var(--text-xs-size);
+  color: var(--text-muted);
+}
+
+/* Shading is the text colour at --heat percent over the surface: one meaning (run cost), neutral so it never reads as a planned action. */
+.cell {
+  position: relative;
+  min-width: 0;
+  min-height: 84px;
+  padding: var(--space-2);
+  border: var(--border-width) solid var(--border);
+  border-radius: var(--radius-sm);
+  background: color-mix(in srgb, var(--text) calc(var(--heat) * 1%), var(--surface));
+}
+
+.cellEmpty .count {
+  color: var(--text-muted);
+  font-weight: 400;
+}
+
+/* The quadrant lines: between at risk and healthy, and between Good and Adequate. */
+.cellRule {
+  border-right: 2px solid var(--border-strong);
+}
+
+.cellMid {
+  border-bottom: 2px solid var(--border-strong);
+}
+
+.corner2 {
+  position: absolute;
+  top: var(--space-1);
+  right: var(--space-2);
+  font-size: var(--text-xs-size);
+  font-weight: 600;
+  color: var(--text-muted);
+}
+
+.count {
+  font-size: 24px;
+  font-weight: 600;
+  line-height: 1.1;
+}
+
+.unit {
+  font-size: var(--text-xs-size);
+  font-weight: 400;
+}
+
+.sub {
   font-size: var(--text-xs-size);
   color: var(--text-muted);
 }
 
 .xAxis {
-  grid-column: 2;
-  display: grid;
-  grid-template-columns: 1fr auto 1fr;
+  display: flex;
+  justify-content: space-between;
+  margin: var(--space-1) 0 0 68px;
   font-size: var(--text-xs-size);
   color: var(--text-muted);
 }
 
-.xAxis span:first-child {
-  text-align: left;
-}
-
-.xAxis span:last-child {
-  text-align: right;
-}
-
-/* Higher fit on top, at risk on the left, healthy on the right (the order in portfolioQuadrant.ts). */
-.boxes {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: var(--space-2);
-}
-
-.box {
-  min-width: 0;
-  min-height: 140px;
-  padding: var(--space-2);
-  border: var(--border-width) solid var(--border-strong);
-  border-radius: var(--radius-sm);
-  background: var(--surface);
-}
-
-.boxHead {
+.key {
   display: flex;
-  justify-content: space-between;
-  align-items: baseline;
-  gap: var(--space-2);
+  flex-wrap: wrap;
+  gap: var(--space-2) var(--space-4);
+  margin: var(--space-3) 0 0;
+  padding: 0;
+  list-style: none;
+  font-size: var(--text-xs-size);
+  color: var(--text-muted);
 }
 
-.boxName {
+.swatch {
+  display: inline-block;
+  width: 16px;
+  height: 12px;
+  border: var(--border-width) solid var(--border);
+  vertical-align: middle;
+  margin-left: var(--space-1);
+}
+
+.heatLow {
+  background: color-mix(in srgb, var(--text) 6%, var(--surface));
+}
+
+.heatMid {
+  background: color-mix(in srgb, var(--text) 23%, var(--surface));
+}
+
+.heatHigh {
+  background: color-mix(in srgb, var(--text) 40%, var(--surface));
+}
+
+.listTitle {
+  margin: 0 0 var(--space-1);
   font-weight: 600;
 }
 
-.boxCount {
+.tableScroll {
+  overflow-x: auto;
+}
+
+.list {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: var(--text-sm-size);
+}
+
+.list th {
+  text-align: left;
+  font-size: var(--text-xs-size);
+  font-weight: 600;
+  color: var(--text-muted);
+  padding: var(--space-1);
+  border-bottom: var(--border-width) solid var(--border-strong);
+}
+
+.list td {
+  padding: var(--space-1);
+  border-bottom: var(--border-width) solid var(--border);
+  vertical-align: top;
+}
+
+.link {
+  color: var(--text);
+}
+
+.why {
   color: var(--text-muted);
   font-size: var(--text-xs-size);
 }
 
-.caption {
-  color: var(--text-muted);
-  font-size: var(--text-xs-size);
-  margin-bottom: var(--space-2);
+.nowrap {
+  white-space: nowrap;
 }
 
-.dots {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 5px;
+.more {
+  margin-top: var(--space-2);
 }
 
-.dot {
+.keyDot {
   display: inline-block;
   border-radius: 50%;
-  flex: none;
-}
-
-.dot:hover,
-.dot:focus-visible {
-  outline: 2px solid var(--text);
-  outline-offset: 1px;
+  width: 10px;
+  height: 10px;
 }
 
 .dotOk {
@@ -105,41 +200,6 @@
   opacity: 0.5;
 }
 
-.dotSize {
-  background: transparent;
-  border: 1.5px solid var(--text-muted);
-}
-
-.empty {
-  color: var(--text-muted);
-  font-size: var(--text-xs-size);
-}
-
-.key {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: var(--space-2) var(--space-4);
-  margin: var(--space-3) 0 0;
-  padding: 0;
-  list-style: none;
-  font-size: var(--text-xs-size);
-  color: var(--text-muted);
-}
-
-.key li {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--space-1);
-}
-
-.keyDot {
-  display: inline-block;
-  border-radius: 50%;
-  width: 12px;
-  height: 12px;
-}
-
 .notPlaced {
   margin-top: var(--space-3);
 }
@@ -152,13 +212,4 @@
   text-decoration: underline;
   cursor: pointer;
   font: inherit;
-}
-
-@media (max-width: 520px) {
-  .boxes {
-    gap: var(--space-1);
-  }
-  .box {
-    padding: var(--space-1);
-  }
 }
