@@ -6,7 +6,7 @@
  * and the project closes.
  */
 import { expect, test, type Page } from '@playwright/test';
-import { clickNavItem, goToModelHome, signUpCreateOrgAndModel } from './fixtures/goldenPath';
+import { addCapability, clickNavItem, goToModelHome, signUpCreateOrgAndModel } from './fixtures/goldenPath';
 
 const PROJECT = 'Replace BW';
 const DECISION = 'What to replace BW with';
@@ -35,10 +35,15 @@ async function openProject(page: Page): Promise<void> {
 test('cancel a decision: it stays in the log as cancelled with its reason, its draft option is cancelled, and its project can close', async ({ page }) => {
   test.slow();
   await signUpCreateOrgAndModel(page, 'decisioncancel');
+  // Plan A1: a project must name a capability — create one to name.
+  await addCapability(page, 'Reporting');
 
   await clickNavItem(page, 'Projects');
   await page.getByLabel('Project title').fill(PROJECT);
   await page.getByLabel('Architect').selectOption({ index: 1 });
+  await page.getByPlaceholder(/Search a capability this project serves/).fill('Reporting');
+  await page.getByRole('button', { name: 'Reporting' }).click();
+  await expect(page.getByRole('button', { name: 'Remove Reporting' })).toBeVisible();
   await page.getByRole('button', { name: 'Start project' }).click();
   await expect(page.getByRole('heading', { name: PROJECT, level: 1 })).toBeVisible();
 

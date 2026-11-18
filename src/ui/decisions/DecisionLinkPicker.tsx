@@ -1,4 +1,4 @@
-import type { UUID } from '../../contracts/delta';
+import type { ElementType, UUID } from '../../contracts/delta';
 import { moduleDisplayName } from '../elements/moduleDisplayName';
 import { useRelationshipTargetSearch } from '../elements/useRelationshipTargetSearch';
 import { Chip } from '../components/Chip/Chip';
@@ -10,7 +10,8 @@ export interface DecisionLinkPickerProps {
   commitId: UUID;
   modelId: UUID;
   selected: readonly { elementId: UUID; name: string }[];
-  onAdd: (elementId: UUID, name: string) => void;
+  /** `elementType` is the picked result's own type — the decision form ignores it, the project form (plan A1) uses it to require at least one capability. */
+  onAdd: (elementId: UUID, name: string, elementType: ElementType) => void;
   onRemove: (elementId: UUID) => void;
   /** F10: the project form's own wording; defaults to the decision form's. */
   placeholder?: string;
@@ -82,7 +83,7 @@ export function DecisionLinkPicker({ commitId, modelId, selected, onAdd, onRemov
                   type="button"
                   className={styles.resultRow}
                   onClick={() => {
-                    onAdd(result.element_id, name);
+                    onAdd(result.element_id, name, result.element_type);
                   }}
                 >
                   <ElementTypeGlyph type={result.element_type} />

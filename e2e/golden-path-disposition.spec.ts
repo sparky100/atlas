@@ -5,7 +5,7 @@
  * retires the system → the finding clears, and stays clear once merged.
  */
 import { expect, test, type Page } from '@playwright/test';
-import { addSystemFromHome, clickNavItem, goToModelHome, retireElement, signUpCreateOrgAndModel } from './fixtures/goldenPath';
+import { addCapability, addSystemFromHome, clickNavItem, goToModelHome, retireElement, signUpCreateOrgAndModel } from './fixtures/goldenPath';
 
 const SUMMARY = /planned to move or switch off with no open change retiring/;
 
@@ -23,8 +23,9 @@ test('disposition: Migrate raises a finding, a project retires the system, the f
   test.slow();
   await signUpCreateOrgAndModel(page, 'disposition');
 
-  // 1. A system, marked Migrate through the ordinary Attributes editor.
-  await addSystemFromHome(page, { name: 'Legacy Payroll', description: 'The payroll system being moved off.' });
+  // 1. A system supporting a capability, marked Migrate through the ordinary Attributes editor.
+  await addCapability(page, 'Employee Pay');
+  await addSystemFromHome(page, { name: 'Legacy Payroll', description: 'The payroll system being moved off.', capabilityName: 'Employee Pay' });
   await page.getByRole('button', { name: '✎ Edit' }).click();
   await page.getByLabel('Planned action').selectOption('migrate');
   await page.getByRole('button', { name: 'Save' }).click();
@@ -45,6 +46,10 @@ test('disposition: Migrate raises a finding, a project retires the system, the f
   await expect(page.getByLabel('Project title')).toHaveValue('Move Legacy Payroll to another system');
   await expect(page.getByRole('button', { name: 'Remove Legacy Payroll' })).toBeVisible();
   await page.getByLabel('Architect').selectOption({ index: 1 });
+  // Plan A1: a project must name a capability it serves — add the one the system supports.
+  await page.getByPlaceholder(/Search a capability this project serves/).fill('Employee Pay');
+  await page.getByRole('button', { name: 'Employee Pay' }).click();
+  await expect(page.getByRole('button', { name: 'Remove Employee Pay' })).toBeVisible();
   await page.getByRole('button', { name: 'Start project' }).click();
   await expect(page.getByRole('heading', { name: 'Move Legacy Payroll to another system', level: 1 })).toBeVisible();
 

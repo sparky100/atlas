@@ -2,9 +2,36 @@
  * Pure, testable logic for the Projects list and project page (ADR-024
  * §5 "what is derived, never stored", §6 views). No I/O.
  */
-import type { UUID } from '../../contracts/delta';
+import type { ElementType, UUID } from '../../contracts/delta';
 import type { BranchRow, DecisionRow, ProjectRow, ProjectStatus } from '../../db/types';
 import type { ChipTone } from '../components/Chip/Chip';
+
+/**
+ * A declared-scope pick on the Start-a-project form: an element id, the
+ * name frozen at pick time, and the element's type so the form can tell a
+ * capability from a system or container. `elementType` is optional only
+ * because a pick restored from a prefill URL may arrive without it (an
+ * older link, or a hand-edited one); a pick the person adds through the
+ * picker always carries it.
+ */
+export interface ProjectScopeItem {
+  elementId: UUID;
+  name: string;
+  elementType?: ElementType;
+}
+
+/**
+ * Simon's rule (2026-11-18): "a project can't be independent of a
+ * capability." Plan A1: the Start-a-project form requires at least one
+ * capability in its declared scope — a system or container alone is not
+ * enough, because the project has to say which capability it serves. This
+ * is the UI guard only; the database guarantee is a later, optional step.
+ * A pick whose type is unknown is treated as "not a capability", so the
+ * person is asked to name one rather than the form guessing.
+ */
+export function scopeHasCapability(scope: readonly ProjectScopeItem[]): boolean {
+  return scope.some((s) => s.elementType === 'capability');
+}
 
 /** Display order of the Projects list's groups: live work first, finished last. */
 export const PROJECT_STATUS_ORDER: readonly ProjectStatus[] = ['active', 'on_hold', 'closed', 'cancelled'];

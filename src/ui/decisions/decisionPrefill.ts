@@ -1,4 +1,4 @@
-import type { UUID } from '../../contracts/delta';
+import { ELEMENT_TYPES, type ElementType, type UUID } from '../../contracts/delta';
 
 /**
  * Prompt pack F3 PR6's "Start a decision" — what a click from a health
@@ -23,6 +23,13 @@ import type { UUID } from '../../contracts/delta';
 export interface DecisionPrefillLinkedElement {
   id: UUID;
   name: string;
+  /**
+   * The element's type, carried so a prefill that starts a project
+   * (plan A1) can tell whether a capability is already named. Optional:
+   * the decision form never reads it, and a link hand-built without it
+   * still parses. When present it round-trips through the URL params.
+   */
+  type?: ElementType;
 }
 
 export interface DecisionPrefill {
@@ -50,7 +57,7 @@ export function prefillFromCriticalSupportEndFinding(system: { id: UUID; name: s
     title: `Replace ${system.name}?`,
     statement: `${system.name} is critical and past or near its vendor support end — a decision is needed on what replaces it.`,
     sourceFindingKey: 'critical-support-end',
-    linkedElements: [{ id: system.id, name: system.name }],
+    linkedElements: [{ id: system.id, name: system.name, type: 'system' }],
   };
 }
 
@@ -60,7 +67,7 @@ export function prefillFromWeakCapability(capability: { id: UUID; name: string }
     title: `What improves ${capability.name}?`,
     statement: `${capability.name} shows ${toneLabel} — a decision is needed on how to strengthen it.`,
     sourceFindingKey: 'weak-capability',
-    linkedElements: [{ id: capability.id, name: capability.name }],
+    linkedElements: [{ id: capability.id, name: capability.name, type: 'capability' }],
   };
 }
 
@@ -73,8 +80,8 @@ export function prefillFromSystemAtEndOfLife(system: { id: UUID; name: string },
       : `${system.name} is at end of life and supports ${capability.name}, with no replacement recorded — a decision is needed on what replaces it.`,
     sourceFindingKey: 'weak-capability',
     linkedElements: [
-      { id: system.id, name: system.name },
-      { id: capability.id, name: capability.name },
+      { id: system.id, name: system.name, type: 'system' },
+      { id: capability.id, name: capability.name, type: 'capability' },
     ],
   };
 }
@@ -100,7 +107,7 @@ export function prefillFromWeakFitCapabilities(tileCapabilityName: string, capab
     title: `What improves fit under ${tileCapabilityName}?`,
     statement: `${isPlural ? `${String(capabilities.length)} capabilities under ${tileCapabilityName}` : `${names}, under ${tileCapabilityName},`} rated a poor or adequate fit${isPlural ? ` (${names})` : ''} — a decision is needed on how to improve ${isPlural ? 'them' : 'it'}.`,
     sourceFindingKey: 'poor-fit-director',
-    linkedElements: capabilities.map((c) => ({ id: c.id, name: c.name })),
+    linkedElements: capabilities.map((c) => ({ id: c.id, name: c.name, type: 'capability' as const })),
   };
 }
 
@@ -110,7 +117,7 @@ export function prefillFromCriticalExposedFinding(system: { id: UUID; name: stri
     title: `Replace ${system.name}?`,
     statement: `${system.name} is critical and exposed with no planned replacement — a decision is needed on what replaces it.`,
     sourceFindingKey: 'critical-exposed',
-    linkedElements: [{ id: system.id, name: system.name }],
+    linkedElements: [{ id: system.id, name: system.name, type: 'system' }],
   };
 }
 
@@ -120,7 +127,7 @@ export function prefillFromCapabilityNoSupportersFinding(capability: { id: UUID;
     title: `Who supports ${capability.name}?`,
     statement: `${capability.name} has no known supporting system — a decision is needed on how it should be supported.`,
     sourceFindingKey: 'capability-no-supporters',
-    linkedElements: [{ id: capability.id, name: capability.name }],
+    linkedElements: [{ id: capability.id, name: capability.name, type: 'capability' }],
   };
 }
 
@@ -130,7 +137,7 @@ export function prefillFromWeakStage(stage: { id: UUID; name: string }, toneLabe
     title: `What improves ${stage.name}?`,
     statement: `${stage.name} shows ${toneLabel} — a decision is needed on how to strengthen the capabilities that enable it.`,
     sourceFindingKey: 'weak-stage',
-    linkedElements: [{ id: stage.id, name: stage.name }],
+    linkedElements: [{ id: stage.id, name: stage.name, type: 'value_stream' }],
   };
 }
 
@@ -154,6 +161,7 @@ const STATEMENT_PARAM = 'startStatement';
 const FINDING_KEY_PARAM = 'startFindingKey';
 const ELEMENT_ID_PARAM = 'startElementId';
 const ELEMENT_NAME_PARAM = 'startElementName';
+const ELEMENT_TYPE_PARAM = 'startElementType';
 
 /** Appended to a `/decisions` href — `URLSearchParams` handles the encoding, so callers never need to. `linkedElements` is carried as repeated `startElementId`/`startElementName` params, same index order, so an array of any length (including the common one-element case) round-trips through `parseDecisionPrefillFromSearchParams` unchanged. */
 export function decisionPrefillToSearchParams(prefill: DecisionPrefill): URLSearchParams {
@@ -164,6 +172,9 @@ export function decisionPrefillToSearchParams(prefill: DecisionPrefill): URLSear
   for (const element of prefill.linkedElements) {
     params.append(ELEMENT_ID_PARAM, element.id);
     params.append(ELEMENT_NAME_PARAM, element.name);
+    // One type param per element keeps the lists index-aligned; '' stands
+    // for "type not known", so the count always matches the id list.
+    params.append(ELEMENT_TYPE_PARAM, element.type ?? '');
   }
   return params;
 }
@@ -176,7 +187,15 @@ export function parseDecisionPrefillFromSearchParams(params: URLSearchParams): D
   const ids = params.getAll(ELEMENT_ID_PARAM);
   const names = params.getAll(ELEMENT_NAME_PARAM);
   if (title === null || statement === null || sourceFindingKey === null || ids.length === 0 || ids.length !== names.length) return null;
-  const linkedElements: DecisionPrefillLinkedElement[] = ids.map((id, index) => ({ id, name: names[index] ?? '' }));
+  // Types are optional and only used when the whole list is present and
+  // aligned (an older link, or one stripped by hand, carries none).
+  const types = params.getAll(ELEMENT_TYPE_PARAM);
+  const typesAligned = types.length === ids.length;
+  const linkedElements: DecisionPrefillLinkedElement[] = ids.map((id, index) => {
+    const raw = typesAligned ? types[index] : '';
+    const type = ELEMENT_TYPES.find((t) => t === raw);
+    return type ? { id, name: names[index] ?? '', type } : { id, name: names[index] ?? '' };
+  });
   return { title, statement, sourceFindingKey, linkedElements };
 }
 

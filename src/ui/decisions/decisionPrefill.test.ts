@@ -16,7 +16,7 @@ describe('decisionPrefill', () => {
     expect(prefill.title).toContain('SAP PM');
     expect(prefill.statement).toContain('SAP PM');
     expect(prefill.sourceFindingKey).toBe('critical-support-end');
-    expect(prefill.linkedElements).toEqual([{ id: 'sys-1', name: 'SAP PM' }]);
+    expect(prefill.linkedElements).toEqual([{ id: 'sys-1', name: 'SAP PM', type: 'system' }]);
   });
 
   it('builds a weak-capability prefill naming the capability and its own tone label', () => {
@@ -32,7 +32,7 @@ describe('decisionPrefill', () => {
     expect(prefill.title).toContain('Legacy Case System');
     expect(prefill.statement).toContain('Legacy Case System');
     expect(prefill.sourceFindingKey).toBe('critical-exposed');
-    expect(prefill.linkedElements).toEqual([{ id: 'sys-2', name: 'Legacy Case System' }]);
+    expect(prefill.linkedElements).toEqual([{ id: 'sys-2', name: 'Legacy Case System', type: 'system' }]);
   });
 
   it('builds a capability-no-supporters prefill naming the capability', () => {
@@ -41,7 +41,7 @@ describe('decisionPrefill', () => {
     expect(prefill.statement).toContain('Adult Social Care');
     expect(prefill.statement).toContain('no known supporting system');
     expect(prefill.sourceFindingKey).toBe('capability-no-supporters');
-    expect(prefill.linkedElements).toEqual([{ id: 'cap-2', name: 'Adult Social Care' }]);
+    expect(prefill.linkedElements).toEqual([{ id: 'cap-2', name: 'Adult Social Care', type: 'capability' }]);
   });
 
   describe('prefillFromWeakFitCapabilities (F6.1: fit visible to directors)', () => {
@@ -51,7 +51,7 @@ describe('decisionPrefill', () => {
       expect(prefill.statement).toContain('Claims Intake');
       expect(prefill.statement).toContain('Claims');
       expect(prefill.sourceFindingKey).toBe('poor-fit-director');
-      expect(prefill.linkedElements).toEqual([{ id: 'cap-1', name: 'Claims Intake' }]);
+      expect(prefill.linkedElements).toEqual([{ id: 'cap-1', name: 'Claims Intake', type: 'capability' }]);
     });
 
     it('links every poor-fit capability, not just the level-1 tile, for a mixed subtree', () => {
@@ -63,7 +63,7 @@ describe('decisionPrefill', () => {
       expect(prefill.statement).toContain('2 capabilities');
       expect(prefill.statement).toContain('Claims Intake');
       expect(prefill.statement).toContain('Claims Triage');
-      expect(prefill.linkedElements).toEqual(capabilities);
+      expect(prefill.linkedElements).toEqual(capabilities.map((c) => ({ ...c, type: 'capability' })));
     });
   });
 

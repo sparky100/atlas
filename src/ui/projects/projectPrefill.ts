@@ -1,22 +1,24 @@
-import type { UUID } from '../../contracts/delta';
+import type { ElementType, UUID } from '../../contracts/delta';
 import type { DecisionPrefill } from '../decisions/decisionPrefill';
+import type { ProjectScopeItem } from './projectModel';
 
 export interface ProjectFormPrefill {
   title: string;
   purpose: string;
   /** `null` when the start didn't come from a health finding (the element page's own "Start a project…"). */
   sourceFindingKey: string | null;
-  scope: { elementId: UUID; name: string }[];
+  scope: ProjectScopeItem[];
 }
 
-/** F10 step 7: the element page's "Start a project…" — that element as the declared scope, its name as a starting title, no finding key. */
-export function startProjectFromElementHref(projectsHref: string, element: { id: UUID; name: string }): string {
+/** F10 step 7: the element page's "Start a project…" — that element as the declared scope, its name as a starting title, no finding key. The element's type rides along so the form (plan A1) knows whether a capability is already named. */
+export function startProjectFromElementHref(projectsHref: string, element: { id: UUID; name: string; type?: ElementType }): string {
   const params = new URLSearchParams();
   params.set('startTitle', element.name);
   params.set('startStatement', '');
   params.set('startFindingKey', '');
   params.append('startElementId', element.id);
   params.append('startElementName', element.name);
+  params.append('startElementType', element.type ?? '');
   return `${projectsHref}?${params.toString()}`;
 }
 
@@ -32,6 +34,6 @@ export function projectFormFromPrefill(prefill: DecisionPrefill): ProjectFormPre
     title: prefill.title.replace(/\?\s*$/, ''),
     purpose: prefill.statement,
     sourceFindingKey: prefill.sourceFindingKey === '' ? null : prefill.sourceFindingKey,
-    scope: prefill.linkedElements.map((e) => ({ elementId: e.id, name: e.name })),
+    scope: prefill.linkedElements.map((e) => (e.type ? { elementId: e.id, name: e.name, elementType: e.type } : { elementId: e.id, name: e.name })),
   };
 }

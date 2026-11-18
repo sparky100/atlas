@@ -33,6 +33,10 @@ test('roadmap grouped by project: the project\'s change lands under the project,
   await clickNavItem(page, 'Projects');
   await page.getByLabel('Project title').fill('CRM replacement');
   await page.getByLabel('Architect').selectOption({ index: 1 });
+  // Plan A1: a project must name a capability it serves.
+  await page.getByPlaceholder(/Search a capability this project serves/).fill('Customer Contact');
+  await page.getByRole('button', { name: 'Customer Contact' }).click();
+  await expect(page.getByRole('button', { name: 'Remove Customer Contact' })).toBeVisible();
   await page.getByRole('button', { name: 'Start project' }).click();
   await expect(page.getByRole('heading', { name: 'CRM replacement', level: 1 })).toBeVisible();
 
