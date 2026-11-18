@@ -16,6 +16,7 @@ pnpm lint
 pnpm typecheck
 pnpm test                    # unit and property tests, no database required
 pnpm test:integration        # requires `pnpm db:start` first
+                               # refuses to run unless SUPABASE_URL / VITE_SUPABASE_URL are localhost (src/db/assertLocalSupabase.ts); Playwright does the same
 pnpm dev                     # the app, at http://localhost:5173
 pnpm storybook               # every src/ui primitive in isolation, at http://localhost:6006
 pnpm test:e2e                # Playwright, requires `pnpm db:start` and `pnpm build` (playwright.config.ts serves the built app)
