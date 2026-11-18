@@ -32,10 +32,11 @@ test('stale data: set the months threshold and the email opt-out, both persist',
   const months = page.getByLabel('Months before it is out of date');
   await expect(months).toHaveValue('12');
   await months.fill('6');
-  const monthsSaved = nextWriteSaved(page, 'set_stale_threshold');
+  // Saving here reloads the page by itself (OrganisationSettingsPage's onChanged is window.location.reload()),
+  // so a second page.reload() raced it and aborted (ERR_ABORTED on CI). Wait for the app's own reload instead.
+  const reloaded = page.waitForEvent('load');
   await months.locator('xpath=ancestor::form').getByRole('button', { name: 'Save' }).click();
-  await monthsSaved;
-  await page.reload();
+  await reloaded;
   await expect(page.getByLabel('Months before it is out of date')).toHaveValue('6');
 
   await page.getByRole('button', { name: 'Account menu' }).click();
