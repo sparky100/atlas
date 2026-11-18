@@ -83,8 +83,6 @@
   margin: 0;
   padding: var(--space-2) 0 0 0;
   border-top: var(--border-width) solid var(--border);
-  max-height: 260px;
-  overflow-y: auto;
 }
 
 .laneRow {
