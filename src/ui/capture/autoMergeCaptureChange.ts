@@ -1,8 +1,10 @@
+import type { QueryClient } from '@tanstack/react-query';
 import type { UUID } from '../../contracts/delta';
 import { getBranch } from '../../db/branches';
 import type { Client } from '../../db/client';
 import { approveMergeRequest, computeMergeReviewForBranch, getOpenMergeRequestForBranch, mergeApprovedRequest, submitMergeRequest } from '../../db/mergeRequests';
 import type { MemberRole } from '../../db/types';
+import { applyCommitToCache } from '../query/applyCommitToCache';
 
 export type AutoMergeResult = { merged: true } | { merged: false; reason: string };
 
@@ -36,8 +38,13 @@ export type AutoMergeResult = { merged: true } | { merged: false; reason: string
  * having moved on since the branch forked) never undoes it, it just
  * leaves the branch in its ordinary draft-with-commits state for the
  * reviewer to submit by hand, same as before this existed.
+ *
+ * A successful merge moves main's head, so — exactly as `useApproveAndMerge.ts`
+ * does after the same `mergeApprovedRequest` — the new head is seeded into the
+ * query cache; without it the Elements list and every other main view keep
+ * showing the pre-import head until a full reload.
  */
-export async function autoMergeCaptureChange(supabase: Client, modelId: UUID, role: MemberRole | null, targetBranchId: UUID): Promise<AutoMergeResult> {
+export async function autoMergeCaptureChange(supabase: Client, queryClient: QueryClient, modelId: UUID, role: MemberRole | null, targetBranchId: UUID): Promise<AutoMergeResult> {
   if (role !== 'owner' && role !== 'architect') return { merged: false, reason: 'not_eligible_role' };
 
   const branch = await getBranch(supabase, targetBranchId);
@@ -56,6 +63,7 @@ export async function autoMergeCaptureChange(supabase: Client, modelId: UUID, ro
 
     const result = await mergeApprovedRequest(supabase, modelId, request.id, branch, `Merge: ${branch.title ?? branch.name}`);
     if (!result.ok) return { merged: false, reason: result.message };
+    applyCommitToCache(queryClient, modelId, { id: null, kind: 'main' }, result.commitId, result.newHead);
     return { merged: true };
   } catch (e) {
     return { merged: false, reason: e instanceof Error ? e.message : 'Could not automatically merge this change.' };
