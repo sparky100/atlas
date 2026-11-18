@@ -6,6 +6,8 @@ name: Tests
 #   integration  real Supabase + RLS (pnpm test:integration)
 #   e2e          Playwright, both projects (chromium and chromium-390), in shards
 #   e2e-report   merges the shards into one HTML report
+#   tests-passed one summary check: green only if every job above succeeded.
+#                It is the single name to require in a branch ruleset.
 #
 # Security: this needs NO secrets at all. It talks only to a throwaway Supabase
 # started on the runner, so a pull request from a fork can run it safely. It
@@ -17,13 +19,9 @@ name: Tests
 # to a "larger runner", which is paid.
 on:
   pull_request:
-    # Docs-only and Markdown-only changes can't break a test, so they don't
-    # start a run. (content/ is NOT ignored: the Playwright setup loads the
-    # starter capability maps from there.) Run by hand any time with
-    # Actions -> Tests -> Run workflow.
-    paths-ignore:
-      - '**/*.md'
-      - 'docs/**'
+    # No path filter: a required check that never runs would block docs-only
+    # pull requests forever, so every pull request runs the whole workflow.
+    # Run by hand any time with Actions -> Tests -> Run workflow.
   workflow_dispatch:
 
 permissions:
@@ -170,3 +168,24 @@ jobs:
             echo "Download **playwright-html-report** below, unzip it and open \`index.html\`."
             echo "Failed tests also have a trace under **playwright-traces-shard-N**."
           } >> "$GITHUB_STEP_SUMMARY"
+
+  tests-passed:
+    name: Tests passed
+    needs: [checks, integration, e2e, e2e-report]
+    # Runs even when a job above failed or was skipped, so it can fail loudly
+    # instead of being skipped (a skipped required check counts as passing).
+    if: ${{ always() }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Every job must have succeeded
+        env:
+          RESULTS: ${{ join(needs.*.result, ' ') }}
+        run: |
+          echo "Job results: $RESULTS"
+          for r in $RESULTS; do
+            if [ "$r" != "success" ]; then
+              echo "::error::At least one test job did not succeed ($RESULTS)."
+              exit 1
+            fi
+          done
