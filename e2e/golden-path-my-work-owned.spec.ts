@@ -32,6 +32,10 @@ test('My work lists the decisions and projects you own, each opening its own pag
   await page.getByLabel('Project title').fill(projectTitle);
   await page.getByLabel('Architect').selectOption({ index: 1 });
   await page.getByLabel('Target date').fill('2027-03-31');
+  // Plan A1: a project must name a capability it serves.
+  await page.getByPlaceholder(/Search a capability this project serves/).fill('Housing');
+  await page.getByRole('button', { name: 'Housing Repairs' }).click();
+  await expect(page.getByRole('button', { name: 'Remove Housing Repairs' })).toBeVisible();
   await page.getByRole('button', { name: 'Start project' }).click();
   await expect(page.getByRole('heading', { name: projectTitle, level: 1 })).toBeVisible();
 

@@ -14,7 +14,7 @@ import { Text } from '../components/Text/Text';
 import type { DecisionPrefill } from '../decisions/decisionPrefill';
 import { DecisionLinkPicker } from '../decisions/DecisionLinkPicker';
 import { useMembers } from '../orgs/useMembers';
-import { groupProjectsByStatus, projectStatusLabel, projectStatusTone } from './projectModel';
+import { groupProjectsByStatus, projectStatusLabel, projectStatusTone, scopeHasCapability, type ProjectScopeItem } from './projectModel';
 import { ProjectManagerField } from './ProjectManagerField';
 import { NO_PROJECT_MANAGER, projectManagerToInput, type ProjectManagerValue } from './projectManagerValue';
 import { projectFormFromPrefill } from './projectPrefill';
@@ -50,8 +50,10 @@ export function ProjectsView({ modelId, orgId, userId, orgSlug, modelSlug, canCr
   const [manager, setManager] = useState<ProjectManagerValue>(NO_PROJECT_MANAGER);
   const [startDate, setStartDate] = useState('');
   const [targetDate, setTargetDate] = useState('');
-  const [scope, setScope] = useState<{ elementId: UUID; name: string }[]>(() => initial?.scope ?? []);
+  const [scope, setScope] = useState<ProjectScopeItem[]>(() => initial?.scope ?? []);
   const groups = groupProjectsByStatus(projects);
+  // Plan A1 / Simon's rule: a project must name at least one capability.
+  const hasCapability = scopeHasCapability(scope);
 
   return (
     <div>
@@ -64,7 +66,7 @@ export function ProjectsView({ modelId, orgId, userId, orgSlug, modelSlug, canCr
             className={styles.form}
             onSubmit={(e) => {
               e.preventDefault();
-              if (!ownerId) return;
+              if (!ownerId || !hasCapability) return;
               void createProjectWithScope({
                 title,
                 purpose,
@@ -169,16 +171,21 @@ export function ProjectsView({ modelId, orgId, userId, orgSlug, modelSlug, canCr
                 commitId={main.head_commit_id}
                 modelId={modelId}
                 selected={scope}
-                placeholder="Search capabilities or systems this project is about…"
-                onAdd={(elementId, name) => {
-                  setScope((prev) => [...prev, { elementId, name }]);
+                placeholder="Search a capability this project serves (and any systems it touches)…"
+                onAdd={(elementId, name, elementType) => {
+                  setScope((prev) => [...prev, { elementId, name, elementType }]);
                 }}
                 onRemove={(elementId) => {
                   setScope((prev) => prev.filter((s) => s.elementId !== elementId));
                 }}
               />
             )}
-            <Button variant="primary" type="submit" disabled={status === 'creating' || !ownerId || title.trim().length === 0}>
+            {!hasCapability && (
+              <Text as="p" size="sm" tone="muted">
+                Name at least one capability this project serves — a project can’t stand apart from a capability.
+              </Text>
+            )}
+            <Button variant="primary" type="submit" disabled={status === 'creating' || !ownerId || title.trim().length === 0 || !hasCapability}>
               {status === 'creating' ? 'Starting…' : 'Start project'}
             </Button>
           </form>

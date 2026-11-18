@@ -10,6 +10,7 @@ import {
   projectChangeStage,
   projectProgress,
   scopeDifference,
+  scopeHasCapability,
 } from './projectModel';
 
 function branch(overrides: Partial<BranchRow>): BranchRow {
@@ -164,5 +165,31 @@ describe('formatProjectProgress', () => {
   it('reads as plain counts, never a percentage, singular where one', () => {
     expect(formatProjectProgress({ openChanges: 1, mergedChanges: 2, openDecisions: 1, decidedDecisions: 0 })).toBe('1 open change · 2 merged · 1 open decision · 0 decided');
     expect(formatProjectProgress({ openChanges: 0, mergedChanges: 0, openDecisions: 3, decidedDecisions: 1 })).toBe('0 open changes · 0 merged · 3 open decisions · 1 decided');
+  });
+});
+
+describe('scopeHasCapability (plan A1: a project must name a capability)', () => {
+  it('is true when at least one scope pick is a capability', () => {
+    expect(scopeHasCapability([{ elementId: 'cap-1', name: 'Billing', elementType: 'capability' }])).toBe(true);
+    expect(
+      scopeHasCapability([
+        { elementId: 'sys-1', name: 'SAP', elementType: 'system' },
+        { elementId: 'cap-1', name: 'Billing', elementType: 'capability' },
+      ]),
+    ).toBe(true);
+  });
+
+  it('is false for an empty scope, or systems and containers alone', () => {
+    expect(scopeHasCapability([])).toBe(false);
+    expect(
+      scopeHasCapability([
+        { elementId: 'sys-1', name: 'SAP', elementType: 'system' },
+        { elementId: 'c-1', name: 'Module', elementType: 'container' },
+      ]),
+    ).toBe(false);
+  });
+
+  it('treats a pick whose type is unknown as not a capability, so the person is asked to name one', () => {
+    expect(scopeHasCapability([{ elementId: 'x', name: 'From an old prefill link' }])).toBe(false);
   });
 });
