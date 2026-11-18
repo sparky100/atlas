@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { ElementsHeadRow, RelationshipsHeadRow } from '../contracts/rows';
-import { buildCapabilityTiles, commitsSincePreviousTag, computeExposureTone, groupPlannedReplacementsByCapability, type PlannedReplacement } from './modelHome';
+import { buildCapabilityTiles, commitsSincePreviousTag, computeExposureTone, deriveModelCounts, groupPlannedReplacementsByCapability, type PlannedReplacement } from './modelHome';
 
 function system(id: string, lifecycleStatus: string | undefined): ElementsHeadRow {
   return {
@@ -303,5 +303,26 @@ describe('groupPlannedReplacementsByCapability', () => {
 
   it('is empty for an empty input', () => {
     expect(groupPlannedReplacementsByCapability([]).size).toBe(0);
+  });
+});
+
+describe('deriveModelCounts', () => {
+  it('counts the loaded capabilities and systems', () => {
+    const capability = { ...system('cap-1', undefined), element_type: 'capability' as const };
+    const counts = deriveModelCounts([capability, { ...capability, element_id: 'cap-2' }], [system('sys-1', undefined)], []);
+    expect(counts).toEqual({ capabilities: 2, systems: 1, openChanges: 0 });
+  });
+
+  it('counts only change branches still in motion, draft through approved', () => {
+    const branches = [
+      { kind: 'change' as const, status: 'draft' as const },
+      { kind: 'change' as const, status: 'proposed' as const },
+      { kind: 'change' as const, status: 'in_review' as const },
+      { kind: 'change' as const, status: 'approved' as const },
+      { kind: 'change' as const, status: 'merged' as const },
+      { kind: 'change' as const, status: 'rejected' as const },
+      { kind: 'main' as const, status: 'draft' as const },
+    ];
+    expect(deriveModelCounts([], [], branches as never).openChanges).toBe(4);
   });
 });

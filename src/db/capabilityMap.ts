@@ -83,8 +83,8 @@ export async function listSupportsEdgesForAllCapabilities(supabase: Client, comm
  * model with real, unlinked systems would read as `systemsById.size ===
  * 0` there — a different fact ("nothing's linked yet") from this one
  * ("there's nothing to link"). An exact count via `head: true` (no rows
- * returned) is the same shape `loadModelCounts` (src/db/modelHome.ts)
- * already uses for the identical "count of systems at this commit"
+ * returned) is the same shape `countGettingStarted` (src/db/landscape.ts)
+ * uses for the identical "count of systems at this commit"
  * query — this only needs the boolean, not the number.
  */
 export async function hasAnySystem(supabase: Client, commitId: UUID): Promise<boolean> {
