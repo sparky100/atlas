@@ -6,7 +6,7 @@ import { Button } from '../components/Button/Button';
 import { Chip } from '../components/Chip/Chip';
 import { EmptyState } from '../components/EmptyState/EmptyState';
 import { Loading } from '../components/Loading/Loading';
-import { Panel } from '../components/Panel/Panel';
+import { SidePanel } from '../components/SidePanel/SidePanel';
 import { Text } from '../components/Text/Text';
 import { countText, linkableCapabilities, orderGoals, summariseGoals, type GoalSummary } from './goalModel';
 import { useGoals } from './useGoals';
@@ -31,6 +31,8 @@ const EMPTY: GoalInput = { title: '', statement: '', whyNow: '' };
  */
 export function GoalsView({ modelId, orgId, userId, orgSlug, modelSlug, canEdit }: GoalsViewProps) {
   const { loading, goals, links, capabilities, supportsEdges, error, saving, create, edit, setStatus, link, unlink } = useGoals(modelId, orgId, userId);
+  const [adding, setAdding] = useState(false);
+  const [showRetired, setShowRetired] = useState(false);
   const [draft, setDraft] = useState<GoalInput>(EMPTY);
   const [editingId, setEditingId] = useState<UUID | null>(null);
   const [editDraft, setEditDraft] = useState<GoalInput>(EMPTY);
@@ -79,16 +81,35 @@ export function GoalsView({ modelId, orgId, userId, orgSlug, modelSlug, canEdit 
   return (
     <div>
       {canEdit && (
-        <Panel>
-          <Text as="h2" size="lg">
-            Add a goal
-          </Text>
+        <div className={styles.toolbar}>
+          <Button
+            variant="primary"
+            type="button"
+            onClick={() => {
+              setAdding(true);
+            }}
+          >
+            Add goal
+          </Button>
+        </div>
+      )}
+
+      {canEdit && adding && (
+        <SidePanel
+          title="Add a goal"
+          onClose={() => {
+            setAdding(false);
+          }}
+        >
           <form
             className={styles.form}
             onSubmit={(e) => {
               e.preventDefault();
               void create(draft).then((ok) => {
-                if (ok) setDraft(EMPTY);
+                if (ok) {
+                  setDraft(EMPTY);
+                  setAdding(false);
+                }
               });
             }}
           >
@@ -97,14 +118,23 @@ export function GoalsView({ modelId, orgId, userId, orgSlug, modelSlug, canEdit 
               <Button variant="primary" type="submit" disabled={saving}>
                 {saving ? 'Saving…' : 'Add goal'}
               </Button>
+              <Button
+                variant="ghost"
+                type="button"
+                onClick={() => {
+                  setAdding(false);
+                }}
+              >
+                Cancel
+              </Button>
             </div>
+            {error !== null && editingId === null && <Text as="p">{error}</Text>}
           </form>
-          {error !== null && editingId === null && <Text as="p">{error}</Text>}
-        </Panel>
+        </SidePanel>
       )}
 
       {loading && <Loading />}
-      {!loading && goals.length === 0 && <EmptyState>No goals yet. {canEdit ? 'Add the first one above.' : 'An owner or architect can add them.'}</EmptyState>}
+      {!loading && goals.length === 0 && <EmptyState>No goals yet. {canEdit ? 'Choose Add goal above to write the first one.' : 'An owner or architect can add them.'}</EmptyState>}
 
       {active.length > 0 && (
         <section className={styles.group} aria-label="Active goals">
@@ -129,8 +159,18 @@ export function GoalsView({ modelId, orgId, userId, orgSlug, modelSlug, canEdit 
             <Text as="span" tone="muted" size="sm">
               ({retired.length})
             </Text>
+            <Button
+              variant="ghost"
+              type="button"
+              aria-expanded={showRetired}
+              onClick={() => {
+                setShowRetired(!showRetired);
+              }}
+            >
+              {showRetired ? 'Hide' : 'Show'}
+            </Button>
           </div>
-          <ul className={styles.list}>{retired.map(renderCard)}</ul>
+          {showRetired && <ul className={styles.list}>{retired.map(renderCard)}</ul>}
         </section>
       )}
     </div>

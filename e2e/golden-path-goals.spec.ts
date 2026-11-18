@@ -16,9 +16,11 @@ test('goals: add, edit, retire and bring back, and Principles lives beside them'
   await expect(page.getByRole('heading', { name: 'Goals', level: 1 })).toBeVisible();
   await expectNavCurrent(page, 'Goals');
 
-  await page.getByLabel('Title').fill('Cut the time to connect a new customer');
-  await page.getByLabel('What success looks like').fill('New customers are connected within ten days.');
   await page.getByRole('button', { name: 'Add goal' }).click();
+  const addDialog = page.getByRole('dialog', { name: 'Add a goal' });
+  await addDialog.getByLabel('Title').fill('Cut the time to connect a new customer');
+  await addDialog.getByLabel('What success looks like').fill('New customers are connected within ten days.');
+  await addDialog.getByRole('button', { name: 'Add goal' }).click();
 
   const active = page.getByRole('region', { name: 'Active goals' });
   await expect(active.getByRole('heading', { name: 'Cut the time to connect a new customer' })).toBeVisible();
@@ -31,6 +33,7 @@ test('goals: add, edit, retire and bring back, and Principles lives beside them'
 
   await active.getByRole('button', { name: 'Retire Cut the time to connect a new customer' }).click();
   const retired = page.getByRole('region', { name: 'Retired goals' });
+  await retired.getByRole('button', { name: 'Show' }).click();
   await expect(retired.getByRole('heading', { name: 'Cut the time to connect a new customer' })).toBeVisible();
   await expect(retired.getByRole('button', { name: /^Edit / })).toHaveCount(0);
 

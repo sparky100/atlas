@@ -3,7 +3,7 @@ import type { UUID } from '../../contracts/delta';
 import { PRINCIPLE_SET_LIMITS } from '../../contracts/principleSet';
 import { usePlatformAdmin } from '../admin/usePlatformAdmin';
 import { Button } from '../components/Button/Button';
-import { Panel } from '../components/Panel/Panel';
+import { SidePanel } from '../components/SidePanel/SidePanel';
 import { Text } from '../components/Text/Text';
 import { usePrincipleSets } from './usePrincipleSets';
 import styles from './PrinciplesView.module.css';
@@ -28,6 +28,8 @@ export function PrincipleSetsPanel({ modelId, orgId, userId, canEdit, onChanged 
   const { isPlatformAdmin } = usePlatformAdmin(userId);
   const { loading, sets, opened, busy, message, open, close, add, publish } = usePrincipleSets(modelId, orgId, userId, onChanged);
   const [ticked, setTicked] = useState<ReadonlySet<number>>(new Set());
+  const [panel, setPanel] = useState<'sets' | 'publish' | null>(null);
+  const [dismissed, setDismissed] = useState<string | null>(null);
   const [slug, setSlug] = useState('');
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
@@ -45,10 +47,51 @@ export function PrincipleSetsPanel({ modelId, orgId, userId, canEdit, onChanged 
   return (
     <>
       {showStart && (
-        <Panel>
-          <Text as="h2" size="lg">
-            Start from a set
-          </Text>
+        <Button
+          variant="secondary"
+          type="button"
+          onClick={() => {
+            setPanel('sets');
+          }}
+        >
+          Starter sets
+        </Button>
+      )}
+      {isPlatformAdmin && (
+        <Button
+          variant="ghost"
+          type="button"
+          onClick={() => {
+            setPanel('publish');
+          }}
+        >
+          Publish as a set
+        </Button>
+      )}
+
+      {message !== null && message !== dismissed && (
+        <div role="status" className={styles.banner}>
+          <Text as="p">{message}</Text>
+          <Button
+            variant="ghost"
+            type="button"
+            onClick={() => {
+              setDismissed(message);
+            }}
+          >
+            Dismiss
+          </Button>
+        </div>
+      )}
+
+      {showStart && panel === 'sets' && (
+        <SidePanel
+          title="Start from a set"
+          onClose={() => {
+            setPanel(null);
+            close();
+          }}
+        >
           <Text as="p" tone="muted" size="sm">
             A set is a ready-made list of principles. Pick one, tick the principles you want, and they are added to your list as your own to reword or retire. Nothing is added unless you tick it.
           </Text>
@@ -83,7 +126,10 @@ export function PrincipleSetsPanel({ modelId, orgId, userId, canEdit, onChanged 
               onSubmit={(e) => {
                 e.preventDefault();
                 void add([...ticked].sort((a, b) => a - b)).then((ok) => {
-                  if (ok) setTicked(new Set());
+                  if (ok) {
+                    setTicked(new Set());
+                    setPanel(null);
+                  }
                 });
               }}
             >
@@ -124,14 +170,16 @@ export function PrincipleSetsPanel({ modelId, orgId, userId, canEdit, onChanged 
               </div>
             </form>
           )}
-        </Panel>
+        </SidePanel>
       )}
 
-      {isPlatformAdmin && (
-        <Panel>
-          <Text as="h2" size="lg">
-            Publish as a set
-          </Text>
+      {isPlatformAdmin && panel === 'publish' && (
+        <SidePanel
+          title="Publish as a set"
+          onClose={() => {
+            setPanel(null);
+          }}
+        >
           <Text as="p" tone="muted" size="sm">
             Platform admins only. Makes this model's active principles available to every organisation as a starter set. Each publish is a new version; organisations that already added from an earlier one keep their own copies. Make sure nothing in these principles is private to your organisation.
           </Text>
@@ -172,13 +220,7 @@ export function PrincipleSetsPanel({ modelId, orgId, userId, canEdit, onChanged 
               </Button>
             </div>
           </form>
-        </Panel>
-      )}
-
-      {message !== null && (
-        <div role="status">
-          <Text as="p">{message}</Text>
-        </div>
+        </SidePanel>
       )}
     </>
   );

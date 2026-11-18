@@ -15,9 +15,11 @@ test('principles: add, edit, retire and bring back', async ({ page }) => {
   await clickNavItem(page, 'Principles');
   await expect(page.getByRole('heading', { name: 'Principles', level: 1 })).toBeVisible();
 
-  await page.getByLabel('Title').fill('Reuse before buying');
-  await page.getByLabel('The rule').fill('Look at what we already run before we buy something new.');
   await page.getByRole('button', { name: 'Add principle' }).click();
+  const addDialog = page.getByRole('dialog', { name: 'Add a principle' });
+  await addDialog.getByLabel('Title').fill('Reuse before buying');
+  await addDialog.getByLabel('The rule').fill('Look at what we already run before we buy something new.');
+  await addDialog.getByRole('button', { name: 'Add principle' }).click();
 
   const active = page.getByRole('region', { name: 'Active principles' });
   await expect(active.getByRole('heading', { name: 'Reuse before buying' })).toBeVisible();
@@ -30,6 +32,7 @@ test('principles: add, edit, retire and bring back', async ({ page }) => {
 
   await active.getByRole('button', { name: 'Retire Reuse before buying' }).click();
   const retired = page.getByRole('region', { name: 'Retired principles' });
+  await retired.getByRole('button', { name: 'Show' }).click();
   await expect(retired.getByRole('heading', { name: 'Reuse before buying' })).toBeVisible();
   await expect(retired.getByRole('button', { name: /^Edit / })).toHaveCount(0);
 
