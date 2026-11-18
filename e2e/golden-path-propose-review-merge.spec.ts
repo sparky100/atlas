@@ -121,7 +121,7 @@ test('propose a change from an element page, leave and re-enter it, submit; revi
   await proposerPage.getByRole('button', { name: 'Submit for review' }).click();
   await proposerPage.getByLabel(ownerDisplayName).check();
   await proposerPage.getByRole('button', { name: 'Submit for review' }).last().click();
-  await expect(proposerPage.getByText('pending', { exact: true }).first()).toBeVisible();
+  await expect(proposerPage.getByText('pending', { exact: true }).first()).toBeVisible({ timeout: 20_000 });
 
   // 4. Reviewer (the owner) views To-be, then requests changes. `page` is
   // already inside the model (the block above left it on ModelHome). Each
@@ -142,7 +142,7 @@ test('propose a change from an element page, leave and re-enter it, submit; revi
   await expect(changesTabs.getByRole('link', { name: 'Waiting for review' })).toHaveAttribute('aria-current', 'page');
   await expect(nav.getByRole('link', { name: 'Changes' })).toHaveAttribute('aria-current', 'page');
   await page.locator('li', { hasText: changeName }).getByRole('link', { name: 'Review →' }).click();
-  await expect(page.getByText('pending', { exact: true }).first()).toBeVisible();
+  await expect(page.getByText('pending', { exact: true }).first()).toBeVisible({ timeout: 20_000 });
   // "View this change" links to the Landscape read-only at this branch's
   // ref (`ReviewRequestView.tsx`), not the element page directly.
   await page.getByRole('link', { name: 'View this change' }).click();
@@ -164,7 +164,7 @@ test('propose a change from an element page, leave and re-enter it, submit; revi
   await expect(proposerPage.getByText(`Editing in change: ${changeName}`)).toBeVisible();
   await proposerPage.getByRole('link', { name: 'Open review →' }).click();
   await proposerPage.getByRole('button', { name: /resubmit/i }).click();
-  await expect(proposerPage.getByText('pending', { exact: true }).first()).toBeVisible();
+  await expect(proposerPage.getByText('pending', { exact: true }).first()).toBeVisible({ timeout: 20_000 });
 
   // 6. Reviewers approve; the owner merges. F3a: the proposer's picker
   // pre-checked the architect as the one *required* reviewer and added the

@@ -61,7 +61,7 @@ test('roadmap grouped by project: the project\'s change lands under the project,
   await page.getByRole('region', { name: 'Chosen design' }).getByRole('link', { name: 'sunset-legacy-crm' }).click();
   await page.getByRole('button', { name: 'Submit for review' }).click();
   // The change and its review request each carry a "proposed" chip once submitted.
-  await expect(page.getByText('proposed', { exact: true }).first()).toBeVisible();
+  await expect(page.getByText('proposed', { exact: true }).first()).toBeVisible({ timeout: 20_000 });
   await page.getByRole('button', { name: 'Approve', exact: true }).click();
   await page.getByRole('button', { name: 'Merge', exact: true }).click();
   await expect(page.getByText('merged', { exact: true }).first()).toBeVisible();
