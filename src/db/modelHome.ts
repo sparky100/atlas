@@ -17,6 +17,7 @@ import { computeCapabilityRollup } from '../ui/capabilityMap/capabilityRollup';
 import { importanceOf } from '../ui/home/capabilityImportance';
 import { weakFitSupportsEdges, worstFitForPurpose } from '../ui/capabilityMap/metrics';
 import type { Client } from './client';
+import type { BranchRow } from './types';
 import { assertInFilterSize } from './inFilterLimit';
 import { selectAll } from './selectAll';
 
@@ -47,26 +48,46 @@ export interface ModelCounts {
 }
 
 /**
- * The director door's three headline counts. `openChanges` counts change
+ * The director door's three headline counts, derived from lists the door
+ * has already loaded — no extra reads. `openChanges` counts change
  * branches with a status that means "still in motion" — `draft` through
  * `approved`, matching UI-principles §3.1's "changes in flight" list
  * (`proposed | in_review | approved`) plus `draft` (not yet proposed, but
  * still an open piece of work, not a strange omission from a count that's
  * meant to answer "how much is happening right now").
+ *
+ * This replaces `loadModelCounts`, which issued two exact-count HEADs on
+ * `elements_head` and one on `branches` for numbers the same load already
+ * held in full (home-page speed-up: each `elements_head` read costs a
+ * per-row commit visibility check, so a redundant one is not free).
  */
-export async function loadModelCounts(supabase: Client, commitId: UUID, modelId: UUID): Promise<ModelCounts> {
-  const [capabilitiesResult, systemsResult, changesResult] = await Promise.all([
-    supabase.from('elements_head').select('element_id', { count: 'exact', head: true }).eq('commit_id', commitId).eq('element_type', 'capability'),
-    supabase.from('elements_head').select('element_id', { count: 'exact', head: true }).eq('commit_id', commitId).eq('element_type', 'system'),
-    supabase.from('branches').select('id', { count: 'exact', head: true }).eq('model_id', modelId).eq('kind', 'change').in('status', ['draft', 'proposed', 'in_review', 'approved']),
-  ]);
-  if (capabilitiesResult.error) throw new Error(`loadModelCounts: ${capabilitiesResult.error.message}`);
-  if (systemsResult.error) throw new Error(`loadModelCounts: ${systemsResult.error.message}`);
-  if (changesResult.error) throw new Error(`loadModelCounts: ${changesResult.error.message}`);
+export function deriveModelCounts(
+  capabilities: readonly ElementsHeadRow[],
+  systems: readonly ElementsHeadRow[],
+  changeBranches: readonly Pick<BranchRow, 'kind' | 'status'>[],
+): ModelCounts {
+  const openStatuses: readonly string[] = ['draft', 'proposed', 'in_review', 'approved'];
   return {
-    capabilities: capabilitiesResult.count ?? 0,
-    systems: systemsResult.count ?? 0,
-    openChanges: changesResult.count ?? 0,
+    capabilities: capabilities.length,
+    systems: systems.length,
+    openChanges: changeBranches.filter((b) => b.kind === 'change' && openStatuses.includes(b.status)).length,
+  };
+}
+
+/** The capability, system and container heads at a commit in ONE read (the director door needs all three). `element_type` is a fixed three-value enum, never a caller-supplied id list, so `.in()` here is not rule 8's concern. Split client-side; each list keeps the `name`, `element_id` order the per-type reads had. */
+export async function listDirectorElementHeads(supabase: Client, commitId: UUID): Promise<{ capabilities: ElementsHeadRow[]; systems: ElementsHeadRow[]; containers: ElementsHeadRow[] }> {
+  const query = supabase
+    .from('elements_head')
+    .select('element_id, element_type, name, parent_id, attributes, exists_delta_id', { count: 'exact' })
+    .eq('commit_id', commitId)
+    .in('element_type', ['capability', 'system', 'container'])
+    .order('name')
+    .order('element_id');
+  const rows = await selectAll<ElementsHeadRow>(query);
+  return {
+    capabilities: rows.filter((r) => r.element_type === 'capability'),
+    systems: rows.filter((r) => r.element_type === 'system'),
+    containers: rows.filter((r) => r.element_type === 'container'),
   };
 }
 
@@ -195,7 +216,12 @@ export interface PlannedReplacement {
 export async function loadPlannedReplacements(supabase: Client, modelId: UUID): Promise<PlannedReplacement[]> {
   const { data: branchRows, error: branchesError } = await supabase.from('branches').select('id').eq('model_id', modelId).eq('kind', 'change').eq('status', 'approved');
   if (branchesError) throw new Error(`loadPlannedReplacements: ${branchesError.message}`);
-  const branches = branchRows as { id: UUID }[];
+  return loadPlannedReplacementsForBranches(supabase, (branchRows as { id: UUID }[]).map((b) => b.id));
+}
+
+/** `loadPlannedReplacements` for callers that already hold the model's approved change branches (the director door has every change branch from `listChangeBranches`), so the extra `branches` read is skipped. */
+export async function loadPlannedReplacementsForBranches(supabase: Client, approvedBranchIds: readonly UUID[]): Promise<PlannedReplacement[]> {
+  const branches = approvedBranchIds.map((id) => ({ id }));
   if (branches.length === 0) return [];
 
   const replacements: PlannedReplacement[] = [];

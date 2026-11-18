@@ -3,17 +3,16 @@ import type { UUID } from '../../contracts/delta';
 import type { ElementsHeadRow } from '../../contracts/rows';
 import { supportsEdgesInForce } from '../../engine/elementRead/fitAndExposure';
 import { listChangeBranches } from '../../db/branches';
-import { listCapabilitiesForMap } from '../../db/capabilityMap';
 import { listOwnsEdges } from '../../db/elementBrowse';
 import { computeSelfOwnedCapabilityIds, listOpenProjectScopeForModel } from '../../db/healthFindings';
-import { listContainersForLandscape, listSystemsForLandscape } from '../../db/landscape';
 import {
   buildCapabilityTiles,
   commitsSincePreviousTag,
-  loadCommitDepths,
-  loadModelCounts,
-  loadPlannedReplacements,
+  deriveModelCounts,
   listAllSupportsEdges,
+  listDirectorElementHeads,
+  loadCommitDepths,
+  loadPlannedReplacementsForBranches,
   type CapabilityTileData,
   type ModelCounts,
 } from '../../db/modelHome';
@@ -93,26 +92,59 @@ export function useDirectorHome(
         return;
       }
 
-      const [capabilities, supportsEdges, systems, containers, counts, changeBranches, tags, plannedReplacements, ownsEdges, projects, decisions, memberProfiles, projectScope, decisionElementLinks] = await Promise.all([
-        listCapabilitiesForMap(supabase, commitId),
+      // One wave, no serial tail. Everything below starts together; the
+      // reads that depend on another read's result (planned replacements
+      // need the approved change branches; commit depths need the tags;
+      // tag authors' names need the tags and the org's member profiles) are
+      // chained onto that read's own promise instead of awaited after the
+      // wave, so the slowest chain — not the sum of two chains — sets the
+      // time to first paint. Counts come from the lists already loaded
+      // (`deriveModelCounts`), and capabilities, systems and containers come
+      // from one `elements_head` read rather than three plus two count
+      // HEADs: each `elements_head` read pays a per-row commit visibility
+      // check, so a redundant one is not free.
+      const changeBranchesRequest = listChangeBranches(supabase, modelId);
+      const tagsRequest = listTagsForModel(supabase, modelId);
+      // Owner names for "What we're doing" — every org member's profile in
+      // one org-scoped read, never an `.in()` over owner ids (CLAUDE.md
+      // rule 8: that list grows with the model).
+      const memberProfilesRequest = listOrgMemberProfiles(supabase, orgId);
+      const plannedReplacementsRequest = changeBranchesRequest.then((branches) =>
+        loadPlannedReplacementsForBranches(
+          supabase,
+          branches.filter((b) => b.status === 'approved').map((b) => b.id),
+        ),
+      );
+      // One older tag beyond the three shown is enough to compute the
+      // oldest-shown one's own "commits since previous" — newest first, so
+      // index 3 (if it exists) is the tag right before the third shown.
+      const sortedTagsOf = (tags: readonly TagRow[]): TagRow[] => [...tags].sort((a, b) => b.created_at.localeCompare(a.created_at));
+      const depthsRequest = tagsRequest.then((tags) => loadCommitDepths(supabase, sortedTagsOf(tags).slice(0, 4).map((t) => t.commit_id)));
+      // A tagging user is nearly always an org member, so their profile is already in hand; only a missing one (a former member) costs a lookup.
+      const authorProfilesRequest = Promise.all([tagsRequest, memberProfilesRequest]).then(([tags, members]) => {
+        const known = new Set(members.map((p) => p.user_id));
+        const missing = [...new Set(sortedTagsOf(tags).slice(0, 3).map((t) => t.created_by))].filter((id) => !known.has(id));
+        return listProfilesByIds(supabase, missing);
+      });
+
+      const [elementHeads, supportsEdges, changeBranches, tags, plannedReplacements, ownsEdges, projects, decisions, memberProfiles, projectScope, decisionElementLinks, depths, authorProfiles] = await Promise.all([
+        listDirectorElementHeads(supabase, commitId),
         listAllSupportsEdges(supabase, commitId),
-        listSystemsForLandscape(supabase, commitId),
-        listContainersForLandscape(supabase, commitId),
-        loadModelCounts(supabase, commitId, modelId),
-        listChangeBranches(supabase, modelId),
-        listTagsForModel(supabase, modelId),
-        loadPlannedReplacements(supabase, modelId),
+        changeBranchesRequest,
+        tagsRequest,
+        plannedReplacementsRequest,
         listOwnsEdges(supabase, commitId),
         listProjectsForModel(supabase, modelId),
         listDecisionsForModel(supabase, modelId),
-        // Owner names for "What we're doing" — every org member's profile in
-        // one org-scoped read, never an `.in()` over owner ids (CLAUDE.md
-        // rule 8: that list grows with the model).
-        listOrgMemberProfiles(supabase, orgId),
+        memberProfilesRequest,
         // What's addressing each weak tile — both model-scoped, no id list.
         listOpenProjectScopeForModel(supabase, modelId),
         listOpenDecisionElementLinksForModel(supabase, modelId),
+        depthsRequest,
+        authorProfilesRequest,
       ]);
+      const { capabilities, systems, containers } = elementHeads;
+      const counts = deriveModelCounts(capabilities, systems, changeBranches);
 
       // Bug fix: a `supports` edge's own `from_element_id` can be a
       // container just as validly as a system (S1 item 20 — a platform's
@@ -142,16 +174,9 @@ export function useDirectorHome(
       const whatWeAreDoing = buildWhatWeAreDoing(projects, decisions, changeBranches, new Map(memberProfiles.map((p) => [p.user_id, p])), today);
       const inHandByTile = computeTileInHand(tiles, capabilities, projectScope, decisionElementLinks, decisions);
 
-      const recentTags = [...tags].sort((a, b) => b.created_at.localeCompare(a.created_at)).slice(0, 3);
-      // One older tag beyond the three shown is enough to compute the
-      // oldest-shown one's own "commits since previous" — sorted the same
-      // way, so index 3 (if it exists) is the tag right before recentTags[2].
-      const allSortedTags = [...tags].sort((a, b) => b.created_at.localeCompare(a.created_at));
-      const depthLookupCommitIds = allSortedTags.slice(0, 4).map((t) => t.commit_id);
-      const depths = await loadCommitDepths(supabase, depthLookupCommitIds);
-      const authorIds = [...new Set(recentTags.map((t) => t.created_by))];
-      const profiles = await listProfilesByIds(supabase, authorIds);
-      const profileById = new Map<UUID, ProfileRow>(profiles.map((p) => [p.user_id, p]));
+      const allSortedTags = sortedTagsOf(tags);
+      const recentTags = allSortedTags.slice(0, 3);
+      const profileById = new Map<UUID, ProfileRow>([...memberProfiles, ...authorProfiles].map((p) => [p.user_id, p]));
 
       const recentSince = allSortedTags[0] ?? null;
       const recentRecords = buildRecentRecords(decisions, projects, recentSince?.created_at ?? null);
