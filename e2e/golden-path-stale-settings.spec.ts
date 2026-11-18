@@ -7,7 +7,19 @@
  * covered by `src/db/staleNudge.integration.test.ts` and the unit tests.
  */
 import { expect, test } from '@playwright/test';
+import type { Page } from '@playwright/test';
 import { signUpCreateOrgAndModel } from './fixtures/goldenPath';
+
+/**
+ * Starts waiting for the app's next write to Supabase (any non-GET call to
+ * the REST API, which covers table updates and RPCs) to come back OK.
+ * Reloading straight after Save used to cancel that in-flight request, so
+ * page.reload() failed with ERR_ABORTED and the write could be lost. Call it
+ * before the action, then await the result before reloading.
+ */
+function nextWriteSaved(page: Page): Promise<unknown> {
+  return page.waitForResponse((r) => r.request().method() !== 'GET' && r.url().includes('/rest/v1/') && r.ok());
+}
 
 test('stale data: set the months threshold and the email opt-out, both persist', async ({ page }) => {
   const { orgName } = await signUpCreateOrgAndModel(page, 'goldenpath-stale');
@@ -19,7 +31,9 @@ test('stale data: set the months threshold and the email opt-out, both persist',
   const months = page.getByLabel('Months before it is out of date');
   await expect(months).toHaveValue('12');
   await months.fill('6');
+  const monthsSaved = nextWriteSaved(page);
   await months.locator('xpath=ancestor::form').getByRole('button', { name: 'Save' }).click();
+  await monthsSaved;
   await page.reload();
   await expect(page.getByLabel('Months before it is out of date')).toHaveValue('6');
 
@@ -27,7 +41,9 @@ test('stale data: set the months threshold and the email opt-out, both persist',
   await page.getByRole('link', { name: 'Profile' }).click();
   const staleEmail = page.getByLabel("Email me when things I own haven't been checked for a while");
   await expect(staleEmail).toBeChecked();
+  const optOutSaved = nextWriteSaved(page);
   await staleEmail.uncheck();
+  await optOutSaved;
   await page.reload();
   await expect(page.getByLabel("Email me when things I own haven't been checked for a while")).not.toBeChecked();
 
