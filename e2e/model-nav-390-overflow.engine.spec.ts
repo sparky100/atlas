@@ -54,8 +54,30 @@ import { createModel } from '../src/db/models';
 import { createOrganisation } from '../src/db/organisations';
 import { loadEnv } from '../src/db/env';
 
-async function hasHorizontalScroll(page: Page): Promise<boolean> {
-  return page.evaluate(() => document.documentElement.scrollWidth > document.documentElement.clientWidth + 1);
+/**
+ * Empty string when the page fits the viewport; otherwise the first few elements that stick out past its right edge,
+ * so a failure names the culprit instead of just saying "true".
+ */
+async function overflowReport(page: Page): Promise<string> {
+  return page.evaluate(() => {
+    const width = document.documentElement.clientWidth;
+    if (document.documentElement.scrollWidth <= width + 1) return '';
+    const offenders: string[] = [];
+    for (const el of Array.from(document.body.querySelectorAll('*'))) {
+      const right = el.getBoundingClientRect().right;
+      if (right > width + 1 && offenders.length < 6) {
+        const text = el.textContent.trim().slice(0, 40);
+        offenders.push(`<${el.tagName.toLowerCase()} class="${(el.getAttribute('class') ?? '').slice(0, 60)}"> right=${String(Math.round(right))} "${text}"`);
+      }
+    }
+    return `page is ${String(document.documentElement.scrollWidth)}px wide in a ${String(width)}px window; sticking out: ${offenders.join(' | ')}`;
+  });
+}
+
+/** Page content arrives in waves after the heading (banner, search, door), so wait for the page to fit rather than measuring the first frame; a real overflow still fails once the wait runs out. */
+async function expectNoHorizontalScroll(page: Page, where: string): Promise<void> {
+  await page.waitForLoadState('networkidle');
+  await expect.poll(() => overflowReport(page), { message: `horizontal scroll on ${where}`, timeout: 10_000 }).toBe('');
 }
 
 test('model-scoped routes: no horizontal scroll at 390px, including a long branch ref label in the nav chip', async ({ page }) => {
@@ -129,7 +151,7 @@ test('model-scoped routes: no horizontal scroll at 390px, including a long branc
   const branchIdMatch = /\/changes\/([^/?]+)/.exec(page.url());
   if (!branchIdMatch?.[1]) throw new Error(`could not read the branch id out of ${page.url()}`);
   const branchId = branchIdMatch[1];
-  expect(await hasHorizontalScroll(page)).toBe(false);
+  await expectNoHorizontalScroll(page, page.url());
 
   // Every model-scoped route the nav links to, on the long-titled branch
   // ref so the chip carries its full label — main's own "main" chip is
@@ -160,6 +182,6 @@ test('model-scoped routes: no horizontal scroll at 390px, including a long branc
     if (route.path.includes(refQuery)) {
       await expect(page.getByRole('navigation', { name: 'Model navigation' }).getByText(changeTitle)).toBeVisible();
     }
-    expect(await hasHorizontalScroll(page), `horizontal scroll on ${route.path}`).toBe(false);
+    await expectNoHorizontalScroll(page, route.path);
   }
 });
