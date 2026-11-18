@@ -34,8 +34,14 @@ test('goals: Home count and Show goal on the capability map', async ({ page }) =
 
   await clickNavItem(page, 'Capability map');
   await expect(page.getByText('Connect Customers').first()).toBeVisible();
+  // The Filters section is open by default, so only open it when it is shut. Clicking it because "Show goal" had not rendered yet (the goals load a moment after the map) closed it and the control never appeared.
   const showGoal = page.getByLabel('Show goal');
-  if (!(await showGoal.isVisible())) await page.getByRole('button', { name: /Filters/ }).first().click();
+  const expandInspector = page.getByRole('button', { name: 'Expand inspector' });
+  if (await expandInspector.isVisible()) await expandInspector.click();
+  const filters = page.getByRole('button', { name: /Filters/ }).first();
+  await expect(filters).toBeVisible();
+  if ((await filters.getAttribute('aria-expanded')) === 'false') await filters.click();
+  await expect(showGoal).toBeVisible();
   await showGoal.selectOption({ label: 'Cut the time to connect a new customer' });
   await expect(page.getByText(/Serves this goal|serves? this goal/).first()).toBeVisible();
 
