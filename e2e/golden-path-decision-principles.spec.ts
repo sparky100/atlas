@@ -13,9 +13,10 @@ test('a decision follows a principle, then departs from it with a reason; read-o
 
   await goToModelHome(page);
   await clickNavItem(page, 'Principles');
-  await page.getByLabel('Title').fill('Reuse before buying');
-  await page.getByLabel('The rule').fill('Look at what we already run before we buy something new.');
   await page.getByRole('button', { name: 'Add principle' }).click();
+  await page.getByRole('dialog', { name: 'Add a principle' }).getByLabel('Title').fill('Reuse before buying');
+  await page.getByRole('dialog', { name: 'Add a principle' }).getByLabel('The rule').fill('Look at what we already run before we buy something new.');
+  await page.getByRole('dialog', { name: 'Add a principle' }).getByRole('button', { name: 'Add principle' }).click();
   await expect(page.getByRole('region', { name: 'Active principles' }).getByRole('heading', { name: 'Reuse before buying' })).toBeVisible();
 
   await goToModelHome(page);

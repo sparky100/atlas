@@ -6,7 +6,7 @@ import { Button } from '../components/Button/Button';
 import { Chip } from '../components/Chip/Chip';
 import { EmptyState } from '../components/EmptyState/EmptyState';
 import { Loading } from '../components/Loading/Loading';
-import { Panel } from '../components/Panel/Panel';
+import { SidePanel } from '../components/SidePanel/SidePanel';
 import { Text } from '../components/Text/Text';
 import { countText, orderPrinciples, summarisePrinciples, type PrincipleSummary } from './principleModel';
 import { PrincipleSetsPanel } from './PrincipleSetsPanel';
@@ -32,6 +32,8 @@ const EMPTY: PrincipleInput = { title: '', statement: '', why: '' };
  */
 export function PrinciplesView({ modelId, orgId, userId, orgSlug, modelSlug, canEdit }: PrinciplesViewProps) {
   const { loading, principles, links, decisions, error, saving, create, edit, setStatus, reload } = usePrinciples(modelId, orgId, userId);
+  const [adding, setAdding] = useState(false);
+  const [showRetired, setShowRetired] = useState(false);
   const [draft, setDraft] = useState<PrincipleInput>(EMPTY);
   const [editingId, setEditingId] = useState<UUID | null>(null);
   const [editDraft, setEditDraft] = useState<PrincipleInput>(EMPTY);
@@ -43,17 +45,37 @@ export function PrinciplesView({ modelId, orgId, userId, orgSlug, modelSlug, can
 
   return (
     <div>
-      {canEdit && (
-        <Panel>
-          <Text as="h2" size="lg">
-            Add a principle
-          </Text>
+      <div className={styles.toolbar}>
+        {canEdit && (
+          <Button
+            variant="primary"
+            type="button"
+            onClick={() => {
+              setAdding(true);
+            }}
+          >
+            Add principle
+          </Button>
+        )}
+        <PrincipleSetsPanel modelId={modelId} orgId={orgId} userId={userId} canEdit={canEdit} onChanged={reload} />
+      </div>
+
+      {canEdit && adding && (
+        <SidePanel
+          title="Add a principle"
+          onClose={() => {
+            setAdding(false);
+          }}
+        >
           <form
             className={styles.form}
             onSubmit={(e) => {
               e.preventDefault();
               void create(draft).then((ok) => {
-                if (ok) setDraft(EMPTY);
+                if (ok) {
+                  setDraft(EMPTY);
+                  setAdding(false);
+                }
               });
             }}
           >
@@ -62,16 +84,23 @@ export function PrinciplesView({ modelId, orgId, userId, orgSlug, modelSlug, can
               <Button variant="primary" type="submit" disabled={saving}>
                 {saving ? 'Saving…' : 'Add principle'}
               </Button>
+              <Button
+                variant="ghost"
+                type="button"
+                onClick={() => {
+                  setAdding(false);
+                }}
+              >
+                Cancel
+              </Button>
             </div>
+            {error !== null && editingId === null && <Text as="p">{error}</Text>}
           </form>
-          {error !== null && editingId === null && <Text as="p">{error}</Text>}
-        </Panel>
+        </SidePanel>
       )}
 
-      <PrincipleSetsPanel modelId={modelId} orgId={orgId} userId={userId} canEdit={canEdit} onChanged={reload} />
-
       {loading && <Loading />}
-      {!loading && principles.length === 0 && <EmptyState>No principles yet. {canEdit ? 'Add the first one above.' : 'An owner or architect can add them.'}</EmptyState>}
+      {!loading && principles.length === 0 && <EmptyState>No principles yet. {canEdit ? 'Choose Add principle above to write the first one.' : 'An owner or architect can add them.'}</EmptyState>}
 
       {active.length > 0 && (
         <section className={styles.group} aria-label="Active principles">
@@ -125,7 +154,18 @@ export function PrinciplesView({ modelId, orgId, userId, orgSlug, modelSlug, can
             <Text as="span" tone="muted" size="sm">
               ({retired.length})
             </Text>
+            <Button
+              variant="ghost"
+              type="button"
+              aria-expanded={showRetired}
+              onClick={() => {
+                setShowRetired(!showRetired);
+              }}
+            >
+              {showRetired ? 'Hide' : 'Show'}
+            </Button>
           </div>
+          {showRetired && (
           <ul className={styles.list}>
             {retired.map((s) => (
               <PrincipleCard
@@ -147,6 +187,7 @@ export function PrinciplesView({ modelId, orgId, userId, orgSlug, modelSlug, can
               />
             ))}
           </ul>
+          )}
         </section>
       )}
     </div>
