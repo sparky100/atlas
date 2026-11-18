@@ -69,7 +69,7 @@ export function ValueStreamsView({ rows, selectedStageId, onInspectStage, compac
 function StreamRow({ row, selectedStageId, onInspectStage, compact, elementHref, tilesByCapabilityId }: { tilesByCapabilityId: ReadonlyMap<UUID, CapabilityTileData> | undefined; row: ValueStreamRow; selectedStageId: UUID | null | undefined; onInspectStage: ((stageId: UUID) => void) | undefined; compact: boolean | undefined; elementHref: ((id: UUID) => string) | undefined }) {
   const description = attributesRecord(row.stream.attributes).description;
   return (
-    <div className={styles.streamRow}>
+    <div className={[styles.streamRow, compact ? styles.streamRowCompact : null].filter((c) => c !== null).join(' ')}>
       <div className={styles.streamHeader}>
         <Text as="h2" size="lg">
           {row.stream.name}

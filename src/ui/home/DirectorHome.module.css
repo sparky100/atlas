@@ -70,10 +70,50 @@
 /* Handoff 7d: "12 level-1 tiles at full width" is typical, not fixed —
    this reflows to however many level-1 capabilities the map has, per
    computeCapabilityMapTree's own real parent_id structure. */
+/* Cards fill the column and add or drop a column as the window resizes — no fixed count, so it reads the same at 1280, 1920 and a narrow desktop. */
 .tileGrid {
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 280px), 1fr));
   gap: var(--space-3);
+}
+
+.showAll {
+  display: flex;
+  justify-content: center;
+  margin-top: var(--space-3);
+}
+
+/* Focus on the left, Work in progress and What's recent in a column on the right, so neither sits below a long card grid. Under 1000px the column moves above the cards as a two-box strip, and to one box under 640px. */
+.layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) var(--side-column-width);
+  gap: var(--space-6);
+  align-items: start;
+}
+
+.focusColumn {
+  min-width: 0;
+}
+
+.sideColumn {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  min-width: 0;
+}
+
+.sideActions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1) var(--space-2);
+}
+
+.sidePanel {
+  min-width: 0;
+  padding: var(--space-3);
+  border: var(--border-width) solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--surface);
 }
 
 /* The grid item. For an emphasised tile, BlueprintFrame wraps everything
@@ -83,7 +123,15 @@
    another `<a>`). */
 .tileWrapper {
   position: relative;
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-width: 0;
+  box-sizing: border-box;
+  border: var(--border-width) solid var(--border);
   border-radius: var(--radius-sm);
+  background: var(--surface);
+  padding: var(--space-3);
 }
 
 /* "Start a decision" / "Start a project": in flow at the card's bottom
@@ -91,10 +139,12 @@
    content. */
 .tileActions {
   display: flex;
-  flex-direction: column;
-  align-items: flex-end;
-  gap: var(--space-1);
-  margin-top: var(--space-2);
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: var(--space-1) var(--space-3);
+  /* Pinned to the card's bottom so the actions line up across a row of cards. */
+  margin-top: auto;
+  padding-top: var(--space-2);
 }
 
 /* UI-principles §3 (2026-10-04): what's already addressing a weak tile —
@@ -149,27 +199,18 @@
   text-decoration: none;
 }
 
-.tile {
-  min-height: var(--tile-min-height);
-  border: var(--border-width) solid var(--border);
-  border-radius: var(--radius-sm);
-  /* Visual pass item 2: was --space-2 — the tile name, exposing-systems
-     list, footer line and chips were sitting close to snug against the
-     border. */
-  padding: var(--space-3);
-  box-sizing: border-box;
-}
-
+.tile,
 .tileEmphasised {
-  min-height: var(--tile-min-height-emphasised);
+  /* The card's own border and padding now live on .tileWrapper, so the issue rows and actions sit inside the same frame. */
+  padding: 0 0 var(--space-1);
 }
 
 .statusBar {
   display: block;
   height: var(--status-bar-height);
-  width: 100%;
-  border-radius: var(--radius-sm);
-  margin-bottom: var(--space-1);
+  /* A coloured top edge across the whole card. */
+  margin: calc(-1 * var(--space-3)) calc(-1 * var(--space-3)) var(--space-2);
+  border-radius: var(--radius-sm) var(--radius-sm) 0 0;
 }
 
 .statusBar[data-tone='ok'] {
@@ -222,17 +263,6 @@
   background: currentColor;
 }
 
-.lowerRow {
-  display: grid;
-  grid-template-columns: 1fr var(--side-column-width);
-  gap: var(--space-6);
-  align-items: start;
-}
-
-.changesColumn {
-  min-width: 0;
-}
-
 /* "What we're doing" (UI-principles §3, 2026-10-04): one row per project
    in hand or open decision, hairline-separated like the table it replaced. */
 .workList {
@@ -259,10 +289,6 @@
 
 .subsectionTitle {
   margin: var(--space-4) 0 0;
-}
-
-.versionsColumn {
-  min-width: 0;
 }
 
 .versionPlates {
@@ -308,13 +334,25 @@
   opacity: 0.55;
 }
 
-@media (max-width: 768px) {
-  .tileGrid,
-  .emptyTiles {
+@media (max-width: 1000px) {
+  .layout {
     grid-template-columns: 1fr;
   }
 
-  .lowerRow {
+  .sideColumn {
+    order: -1;
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    align-items: start;
+  }
+
+  .emptyTiles {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 640px) {
+  .sideColumn {
     grid-template-columns: 1fr;
   }
 }
