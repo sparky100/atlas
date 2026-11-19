@@ -43,6 +43,7 @@ import { buildProjectPackMarkdown, projectPackFilename } from '../exports/projec
 import { downloadBlob, exportDate } from '../exports/viewExport';
 import { buildProjectJourney } from './projectJourney';
 import { projectNextStep } from './projectNextStep';
+import { suggestDecisionTitle } from '../decisions/optionSuggestions';
 import { ProjectBeforeAfter } from './ProjectBeforeAfter';
 import { ProjectStep } from './ProjectStep';
 import { changesSummary, decisionsSummary, evidenceSummary, scopeSummary } from './projectStepSummary';
@@ -99,6 +100,8 @@ export function ProjectView({ data, modelName, orgId, modelId, orgSlug, modelSlu
   const difference = scopeDifference(scopeIds, touchedIds, data.reachedIds);
   const progress = projectProgress(changes, decisions);
   const firstDecision = originatingDecision(decisions);
+  const scopeNamesOfType = (types: readonly string[]) => scopeIds.filter((id) => types.includes(elementsById.get(id)?.element_type ?? '')).map((id) => elementName(id));
+  const suggestedTitle = suggestDecisionTitle(scopeNamesOfType(['system', 'container']), scopeNamesOfType(['capability']));
   const canDecide = canStartDecision(role) && userId !== null;
   const canDraft = canCreateChangeBranch(role) && userId !== null && Boolean(main?.head_commit_id);
   const nextStep = projectNextStep({
@@ -145,7 +148,7 @@ export function ProjectView({ data, modelName, orgId, modelId, orgSlug, modelSlu
           <Text as="p" size="sm" tone="muted">
             {nextStep.body}
           </Text>
-          {nextStep.action.kind === 'start-decision' && userId !== null && <NewDecisionForm project={project} userId={userId} scopeIds={scopeIds} base={base} />}
+          {nextStep.action.kind === 'start-decision' && userId !== null && <NewDecisionForm project={project} userId={userId} scopeIds={scopeIds} suggestedTitle={suggestedTitle} base={base} />}
           {nextStep.action.kind === 'start-change' && userId !== null && main?.head_commit_id && <NewChangeForm project={project} userId={userId} mainHeadCommitId={main.head_commit_id} base={base} />}
           {nextStep.action.kind === 'open-decision' && (
             <Link to={`${base}/decisions/${nextStep.action.id}`}>{nextStep.action.label}</Link>
@@ -304,7 +307,7 @@ export function ProjectView({ data, modelName, orgId, modelId, orgSlug, modelSlu
               ))}
             </ul>
           )}
-          {isOpen && canDecide && !cardHostsDecisionForm && <NewDecisionForm project={project} userId={userId} scopeIds={scopeIds} base={base} />}
+          {isOpen && canDecide && !cardHostsDecisionForm && <NewDecisionForm project={project} userId={userId} scopeIds={scopeIds} suggestedTitle={suggestedTitle} base={base} />}
           {constrainingDecisions.length > 0 && (
             <>
               <Text as="h3" size="md">
@@ -507,9 +510,9 @@ function ChangeLine({ change, href }: { change: BranchRow; href: string }) {
  * decision's context, the project's declared scope is what it concerns, and the
  * decision page opens in edit mode so the wording can be shaped straight away.
  */
-function NewDecisionForm({ project, userId, scopeIds, base }: { project: ProjectRow; userId: UUID; scopeIds: readonly UUID[]; base: string }) {
+function NewDecisionForm({ project, userId, scopeIds, suggestedTitle, base }: { project: ProjectRow; userId: UUID; scopeIds: readonly UUID[]; suggestedTitle: string; base: string }) {
   const navigate = useNavigate();
-  const [title, setTitle] = useState('');
+  const [title, setTitle] = useState(suggestedTitle);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   return (

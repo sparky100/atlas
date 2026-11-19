@@ -2,6 +2,8 @@ import { Loading } from '../components/Loading/Loading';
 import { useQueryClient } from '@tanstack/react-query';
 import { useEffect, useState } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router';
+import { suggestOptions } from './optionSuggestions';
+import { useEstateSuggestions } from './useEstateSuggestions';
 import type { UUID } from '../../contracts/delta';
 import { Button } from '../components/Button/Button';
 import { Chip } from '../components/Chip/Chip';
@@ -125,6 +127,7 @@ export function DecisionView({ modelId, decisionId, orgId, orgSlug, modelSlug, r
         .filter((b) => b.id !== readyState.decision.baseline_branch_id)
         .map((b) => ({ branchId: b.id, baseCommitId: b.base_commit_id, headCommitId: b.head_commit_id, label: intentHeaderLine(b) }))
     : [];
+  const estateSupporters = useEstateSuggestions(main?.head_commit_id ?? null, concernedCapabilityIds);
   const comparison = useDecisionComparison(modelId, main?.head_commit_id ?? null, concernedCapabilityIds, otherConcernElementIds, comparisonOptions);
 
   // Choosing or cancelling in place changes how many decisions are proposed — the Decisions nav badge re-reads.
@@ -499,6 +502,34 @@ export function DecisionView({ modelId, decisionId, orgId, orgSlug, modelSlug, r
             </div>
           )}
 
+          {canAddOption && estateSupporters !== null && concernedCapabilityIds.length > 0 && (
+            <div data-testid="option-suggestions">
+              <Text as="p" size="sm" tone="muted">
+                Starting points, read from what Atlas holds (no AI). They are only suggestions: add one, change it, or ignore them.
+              </Text>
+              <ul className={styles.suggestionList}>
+                {suggestOptions(
+                  concernedCapabilityIds.map((id) => linkedElementsById.get(id)?.name ?? ''),
+                  estateSupporters,
+                ).map((suggestion) => (
+                  <li key={suggestion.title}>
+                    <Button
+                      variant="ghost"
+                      onClick={() => {
+                        setAddingOption(true);
+                        setOptionTitle(suggestion.title);
+                      }}
+                    >
+                      {suggestion.title}
+                    </Button>{' '}
+                    <Text as="span" size="xs" tone="muted">
+                      {suggestion.reason}
+                    </Text>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
           {canAddOption && !addingOption && (
             <Button
               variant="secondary"
