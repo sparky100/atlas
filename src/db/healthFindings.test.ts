@@ -96,6 +96,36 @@ describe('findSystemsWithoutCapability', () => {
     const unlinked = [system('sap-unlinked', { kind: 'platform' })];
     expect(findSystemsWithoutCapability(unlinked, [], []).map((s) => s.element_id)).toEqual(['sap-unlinked']);
   });
+
+  // A2: "no capability link recorded" is not "no business use found".
+  it('a platform with no link of its own is not flagged when a capability-serving system flows to it', () => {
+    const systems = [system('crm'), system('esb', { kind: 'platform' })];
+    const edges = [relationship('r1', 'supports', 'crm', 'connect-customer')];
+    const flows = [relationship('f1', 'flows_to', 'crm', 'esb')];
+    expect(findSystemsWithoutCapability(systems, edges, [], flows)).toEqual([]);
+    expect(findSystemsWithoutCapability(systems, edges, [], []).map((s) => s.element_id)).toEqual(['esb']);
+  });
+
+  it('a platform is not flagged when a serving system routes a flow via one of its modules', () => {
+    const systems = [system('crm'), system('billing'), system('esb', { kind: 'platform' })];
+    const containers = [container('esb-api', 'esb')];
+    const edges = [relationship('r1', 'supports', 'crm', 'cap-1'), relationship('r2', 'supports', 'billing', 'cap-1')];
+    const flows = [relationship('f1', 'flows_to', 'crm', 'billing', { via: 'esb-api' })];
+    expect(findSystemsWithoutCapability(systems, edges, containers, flows)).toEqual([]);
+  });
+
+  it('a platform used only by another unlinked system is still flagged', () => {
+    const systems = [system('old-app'), system('esb', { kind: 'platform' })];
+    const flows = [relationship('f1', 'flows_to', 'old-app', 'esb')];
+    expect(findSystemsWithoutCapability(systems, [], [], flows).map((s) => s.element_id).sort()).toEqual(['esb', 'old-app']);
+  });
+
+  it('an ordinary system is not rescued by a flow — only platforms follow dependencies', () => {
+    const systems = [system('crm'), system('report')];
+    const edges = [relationship('r1', 'supports', 'crm', 'cap-1')];
+    const flows = [relationship('f1', 'flows_to', 'crm', 'report')];
+    expect(findSystemsWithoutCapability(systems, edges, [], flows).map((s) => s.element_id)).toEqual(['report']);
+  });
 });
 
 describe('findPlatformSupportsThatShouldMoveToModule', () => {

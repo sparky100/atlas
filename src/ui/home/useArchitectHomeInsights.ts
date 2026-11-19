@@ -241,7 +241,7 @@ export function useArchitectHomeInsights(modelId: UUID, userId: UUID | null): Ar
           data: {
             recentCommits,
             duplicatesCount: duplicateCandidates.candidates.length,
-            systemsWithoutCapability: findSystemsWithoutCapability(liveSystems, liveSupports, liveContainers),
+            systemsWithoutCapability: findSystemsWithoutCapability(liveSystems, liveSupports, liveContainers, liveUsesAndFlowsTo),
             platformSupportsThatShouldMoveToModule: findPlatformSupportsThatShouldMoveToModule(liveSystems, liveSupports, liveContainers),
             flowsToPlatformInsteadOfModule: findFlowsToPlatformInsteadOfModule(liveUsesAndFlowsTo, usesAndFlowsToEndpointsById),
             capabilitiesWithoutOwner: findCapabilitiesWithoutOwner(capabilities, liveSupports, ownsEdges),

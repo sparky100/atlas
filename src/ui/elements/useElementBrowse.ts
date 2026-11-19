@@ -384,7 +384,8 @@ export function useElementBrowse(
       if (filter === 'unlinked-systems') {
         const systems = elements.filter((e) => e.element_type === 'system');
         const containers = elements.filter((e) => e.element_type === 'container');
-        ids = new Set(findSystemsWithoutCapability(systems, supportsEdges, containers).map((e) => e.element_id));
+        const usesAndFlowsToEdges = await b.getUsesAndFlowsToEdges();
+        ids = new Set(findSystemsWithoutCapability(systems, supportsEdges, containers, usesAndFlowsToEdges).map((e) => e.element_id));
       } else if (filter === 'platform-supports-move-to-module') {
         const systems = elements.filter((e) => e.element_type === 'system');
         const containers = elements.filter((e) => e.element_type === 'container');

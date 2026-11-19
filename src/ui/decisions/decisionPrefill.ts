@@ -147,6 +147,20 @@ export function prefillFromWeakStage(stage: { id: UUID; name: string }, toneLabe
  * Migrate or Eliminate with no open change retiring it. Phrased for its
  * one entry point, "Start a project" — the work, not a question.
  */
+/**
+ * A2: the "system not linked to a capability" finding. Retirement is an
+ * option to investigate, not a conclusion — the statement says only that no
+ * capability link is recorded, not that the system has no business use.
+ */
+export function prefillFromSystemWithoutCapability(system: { id: UUID; name: string }): DecisionPrefill {
+  return {
+    title: `Keep, link or retire ${system.name}?`,
+    statement: `${system.name} has no capability link recorded. A decision is needed on whether it supports a capability that should be linked, or whether retiring it should be investigated. No business use has been ruled in or out.`,
+    sourceFindingKey: 'unlinked-systems',
+    linkedElements: [{ id: system.id, name: system.name, type: 'system' }],
+  };
+}
+
 export function prefillFromOutgoingDisposition(element: { id: UUID; name: string }, disposition: 'migrate' | 'eliminate'): DecisionPrefill {
   return {
     title: disposition === 'migrate' ? `Move ${element.name} to another system` : `Switch off ${element.name}`,

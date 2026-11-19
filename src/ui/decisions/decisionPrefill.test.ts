@@ -7,6 +7,7 @@ import { startDecisionFromElementHref,
   prefillFromCriticalSupportEndFinding,
   prefillFromWeakFitCapabilities,
   prefillFromSystemAtEndOfLife,
+  prefillFromSystemWithoutCapability,
   prefillFromWeakCapability,
 } from './decisionPrefill';
 
@@ -124,5 +125,16 @@ describe('startDecisionFromElementHref', () => {
     const [path, query] = href.split('?');
     expect(path).toBe('/o/acme/m/main/decisions');
     expect(parseDecisionPrefillFromSearchParams(new URLSearchParams(query))).toEqual({ title: 'What should we do about Legacy CRM?', statement: '', sourceFindingKey: '', linkedElements: [{ id: 'el-1', name: 'Legacy CRM' }] });
+  });
+});
+
+describe('prefillFromSystemWithoutCapability (A2)', () => {
+  it('frames retirement as an option to investigate, not a conclusion', () => {
+    const prefill = prefillFromSystemWithoutCapability({ id: 'sys-1', name: 'Quote Tool' });
+    expect(prefill.sourceFindingKey).toBe('unlinked-systems');
+    expect(prefill.title).toBe('Keep, link or retire Quote Tool?');
+    expect(prefill.statement).toContain('no capability link recorded');
+    expect(prefill.statement).toContain('No business use has been ruled in or out');
+    expect(prefill.linkedElements).toEqual([{ id: 'sys-1', name: 'Quote Tool', type: 'system' }]);
   });
 });

@@ -41,7 +41,7 @@ export function computeFindings({ snapshot, facts, retiredByOpenChanges, now, st
   const usesAndFlows = snapshot.relationships.filter((r) => r.relationship_type === 'uses' || r.relationship_type === 'flows_to');
   const level1 = computeCapabilityMapTree(capabilities).l1.map((column) => column.capability);
   const out = new Map<string, readonly ElementsHeadRow[]>();
-  out.set('unlinked-systems', findSystemsWithoutCapability(systems, supports, containers));
+  out.set('unlinked-systems', findSystemsWithoutCapability(systems, supports, containers, usesAndFlows));
   out.set('platform-supports-move-to-module', findPlatformSupportsThatShouldMoveToModule(systems, supports, containers));
   out.set('unowned-capabilities', findCapabilitiesWithoutOwner(capabilities, supports, owns));
   out.set('stale-attributes', computeStaleAttributesFinding(facts, elements, now, staleAfterMonths).staleElements);
