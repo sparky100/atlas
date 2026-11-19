@@ -40,6 +40,8 @@ export interface JourneyInput {
   decisionCount: number;
   /** Decisions already chosen (accepted). */
   chosenCount: number;
+  /** Optional: a proposed project is still waiting for an owner or architect to accept it. */
+  projectStatus?: string;
 }
 
 const plural = (n: number, one: string, many: string): string => (n === 1 ? one : many);
@@ -50,7 +52,7 @@ function purposeExcerpt(purpose: string): string {
 }
 
 export function buildProjectJourney(input: JourneyInput): JourneyStep[] {
-  const { purpose, capabilities, changeCount, decisionCount, chosenCount } = input;
+  const { purpose, capabilities, changeCount, decisionCount, chosenCount, projectStatus } = input;
   const hasPurpose = purpose.trim() !== '';
   const hasCapability = capabilities.length > 0;
   const supported = capabilities.filter((c) => c.supporters.length > 0);
@@ -88,6 +90,8 @@ export function buildProjectJourney(input: JourneyInput): JourneyStep[] {
           : `${String(decisionCount)} ${plural(decisionCount, 'decision', 'decisions')} open, none chosen yet.`,
   };
 
+  // A proposal is not yet work in hand: say so on the last step, where the strip ends.
+  if (projectStatus === 'proposed') choose.detail = `${choose.detail} This project is a proposal until an owner or architect accepts it.`;
   const steps = [requirement, touches, met, choose];
   const firstTodo = steps.findIndex((s) => s.state === 'todo');
   if (firstTodo >= 0) steps[firstTodo] = { ...steps[firstTodo], state: 'next' } as JourneyStep;

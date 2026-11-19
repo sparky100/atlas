@@ -125,6 +125,7 @@ export function ProjectView({ data, modelName, orgId, modelId, orgSlug, modelSlu
             changeCount: changes.length,
             decisionCount: decisions.length,
             chosenCount: decisions.filter((d) => d.status === 'accepted').length,
+            projectStatus: project.status,
           }).map((step) => (
             <li key={step.key} className={styles.journeyStep} data-state={step.state}>
               <Text as="span" size="xs" tone="muted">

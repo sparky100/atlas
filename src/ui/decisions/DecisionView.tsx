@@ -609,6 +609,11 @@ export function DecisionView({ modelId, decisionId, orgId, orgSlug, modelSlug, r
                           {visibleGroups.map((group) => (
                             <WhatChangesRowGroup key={group.groupLabel} group={group} optionBranchIds={optionBranchIds} />
                           ))}
+                          {/* The unchanged rows join this same table once opened, so their columns line up with the headings above. */}
+                          {whatChangesExpanded &&
+                            groupConsecutiveByLabel(collapsed).map((group) => (
+                              <WhatChangesRowGroup key={`unchanged-${group.groupLabel}`} group={group} optionBranchIds={optionBranchIds} />
+                            ))}
                         </tbody>
                       </table>
                     </div>
@@ -625,7 +630,7 @@ export function DecisionView({ modelId, decisionId, orgId, orgSlug, modelSlug, r
                       >
                         {collapsed.length} row{collapsed.length === 1 ? '' : 's'} unchanged in all options {whatChangesExpanded ? '▲' : '▼'}
                       </button>
-                      {whatChangesExpanded && (
+                      {whatChangesExpanded && visible.length === 0 && (
                         <div className={styles.tableWrap}>
                           <table className={styles.comparisonTable}>
                             <tbody>
