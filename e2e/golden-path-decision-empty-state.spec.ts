@@ -38,6 +38,12 @@ test('two like-for-like options with no commits of their own show the empty-stat
   // muted placeholder, never a blank cell or a fabricated summary.
   await expect(page.getByText('No changes recorded yet')).toHaveCount(2);
 
+  // Each option says it is a change and offers the way in to edit it.
+  const grid = page.getByTestId('decision-criteria-grid');
+  await expect(grid.getByText('A change', { exact: true })).toHaveCount(2);
+  await expect(grid.getByRole('button', { name: 'Edit this change' })).toHaveCount(2);
+  await expect(grid.getByText('Use Edit this change to draft it.')).toHaveCount(2);
+
   // The What-changes table itself: with nothing declared as a concern and
   // nothing changed on either option (not even the always-present
   // boundary-crossings row), every row collapses and the table's own
