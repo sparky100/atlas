@@ -1,12 +1,14 @@
 import { useNavigate } from 'react-router';
 import type { UUID } from '../../contracts/delta';
-import type { BeforeAfterColumn } from './projectBeforeAfterModel';
-import { layoutProjectDiagram, type DiagramNode } from './projectDiagramLayout';
+import { splitBySystemScope, type BeforeAfterColumn } from './projectBeforeAfterModel';
+import { DIAGRAM_LABEL_MAX_CHARS, layoutProjectDiagram, type DiagramNode } from './projectDiagramLayout';
 import styles from './ProjectDiagram.module.css';
 
 export interface ProjectDiagramProps {
   capability: { id: UUID; name: string };
   column: BeforeAfterColumn;
+  /** The systems the project's scope names; others that share the capability are not drawn. */
+  scopeSystemIds: ReadonlySet<UUID>;
   base: string;
 }
 
@@ -15,7 +17,7 @@ function classes(...names: (string | false | undefined)[]): string {
 }
 
 function shortLabel(text: string): string {
-  return text.length > 36 ? `${text.slice(0, 35)}…` : text;
+  return text.length > DIAGRAM_LABEL_MAX_CHARS ? `${text.slice(0, DIAGRAM_LABEL_MAX_CHARS - 1)}…` : text;
 }
 
 function curve(x1: number, y1: number, x2: number, y2: number): string {
@@ -36,11 +38,14 @@ function NodeBox({ node, href, onOpen }: { node: DiagramNode; href: string; onOp
       }}
     >
       <rect className={classes(styles.node, styles[node.kind], node.mark === 'new' && styles.markNew, node.mark === 'ends' && styles.markEnds)} x={node.x} y={node.y} width={node.width} height={node.height} rx={6} />
-      <text className={styles.nodeName} x={node.x + 10} y={node.y + (node.caption ? 20 : 29)}>
-        {node.name.length > 28 ? `${node.name.slice(0, 27)}…` : node.name}
-      </text>
+      <title>{label}</title>
+      {node.lines.map((line, i) => (
+        <text key={line} className={styles.nodeName} x={node.x + 10} y={node.y + 22 + i * 16}>
+          {line}
+        </text>
+      ))}
       {node.caption && (
-        <text className={styles.nodeCaption} x={node.x + 10} y={node.y + 38}>
+        <text className={styles.nodeCaption} x={node.x + 10} y={node.y + 22 + node.lines.length * 16}>
           {node.caption}
         </text>
       )}
@@ -56,8 +61,10 @@ function NodeBox({ node, href, onOpen }: { node: DiagramNode; href: string; onOp
  * a dashed line, never colour alone. Wide diagrams scroll sideways inside
  * their own box; the lists beside it carry the same facts for a small screen.
  */
-export function ProjectDiagram({ capability, column, base }: ProjectDiagramProps) {
+export function ProjectDiagram({ capability, column: fullColumn, scopeSystemIds, base }: ProjectDiagramProps) {
   const navigate = useNavigate();
+  const { inProject, alsoSupports } = splitBySystemScope(fullColumn.systems, scopeSystemIds);
+  const column = { ...fullColumn, systems: inProject };
   const layout = layoutProjectDiagram(capability, column);
   const hrefOf = (n: DiagramNode) => `${base}/e/${n.elementId}`;
   const open = (href: string) => {
@@ -87,6 +94,12 @@ export function ProjectDiagram({ capability, column, base }: ProjectDiagramProps
           })}
         </svg>
       </div>
+      {inProject.length === 0 && <p className={styles.hint}>No system is named in this project yet, so none is drawn.</p>}
+      {alsoSupports.length > 0 && (
+        <p className={styles.hint} data-testid="diagram-also-supports">
+          Not drawn, because this project does not name {alsoSupports.length === 1 ? 'it' : 'them'}: {alsoSupports.map((s) => s.name).join(', ')} also {alsoSupports.length === 1 ? 'supports' : 'support'} this capability.
+        </p>
+      )}
       <p className={styles.hint}>Wide picture: scroll sideways. The List view carries the same facts.</p>
     </figure>
   );

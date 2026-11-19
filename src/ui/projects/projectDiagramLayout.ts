@@ -16,12 +16,17 @@
 import type { UUID } from '../../contracts/delta';
 import type { BeforeAfterColumn, BeforeAfterMark } from './projectBeforeAfterModel';
 
-export const DIAGRAM_NODE_WIDTH = 210;
+export const DIAGRAM_NODE_WIDTH = 240;
 export const DIAGRAM_NODE_HEIGHT = 48;
 const ROW_GAP = 20;
 const CAP_GAP = 90;
-/** Wide enough that a line's label sits on the line without running into the app box. */
-const APP_GAP = 270;
+/** Room for a line's label to sit on the line without running into the app box: grows with the longest label. */
+const MIN_APP_GAP = 270;
+const MAX_APP_GAP = 480;
+const LABEL_CHAR_WIDTH = 6.2;
+/** Longest a label is drawn in full; anything longer is cut in the picture (the List view has it whole). */
+export const DIAGRAM_LABEL_MAX_CHARS = 64;
+const NAME_LINE_CHARS = 26;
 /** One row of a system's box per connection, so every line leaves at its own height and its label has a row to itself. */
 const LINE_PITCH = 18;
 
@@ -33,6 +38,8 @@ export interface DiagramNode {
   elementId: UUID;
   kind: DiagramNodeKind;
   name: string;
+  /** The name broken onto at most two lines, so a long name is not clipped. */
+  lines: string[];
   /** `New`, `Ends` or `External` as words, or `null`. */
   caption: string | null;
   mark: BeforeAfterMark;
@@ -72,6 +79,25 @@ function captionOf(mark: BeforeAfterMark, isExternal: boolean): string | null {
   return parts.length === 0 ? null : parts.join(' · ');
 }
 
+/** Break a name at spaces onto at most two lines; the second is cut with an ellipsis only if it is still too long. */
+export function wrapName(name: string, limit: number = NAME_LINE_CHARS): string[] {
+  if (name.length <= limit) return [name];
+  const words = name.split(' ');
+  let first = '';
+  let at = 0;
+  while (at < words.length && `${first} ${words[at] ?? ''}`.trim().length <= limit) {
+    first = `${first} ${words[at] ?? ''}`.trim();
+    at += 1;
+  }
+  if (first === '') return [`${name.slice(0, limit - 1)}…`];
+  const rest = words.slice(at).join(' ');
+  return rest.length <= limit ? [first, rest] : [first, `${rest.slice(0, limit - 1).trimEnd()}…`];
+}
+
+function boxHeight(lines: readonly string[], caption: string | null, minimum: number): number {
+  return Math.max(minimum, 14 + lines.length * 16 + (caption ? 16 : 0) + 8);
+}
+
 /** Tops of a column of boxes of the given heights, centred on a column of the given total height. */
 function stackTops(heights: readonly number[], totalHeight: number): number[] {
   const used = heights.reduce((sum, h) => sum + h, 0) + Math.max(0, heights.length - 1) * ROW_GAP;
@@ -105,25 +131,49 @@ export function layoutProjectDiagram(capability: { id: UUID; name: string }, col
     }
   }
 
-  const sysHeights = column.systems.map((s) => Math.max(DIAGRAM_NODE_HEIGHT, s.connections.length * LINE_PITCH + 14));
-  const appHeights = appOrder.map(() => DIAGRAM_NODE_HEIGHT);
-  const height = Math.max(DIAGRAM_NODE_HEIGHT, columnHeight(sysHeights), columnHeight(appHeights));
+  // Order the apps by where their lines leave the systems, so lines run
+  // downhill together and cross as little as the shared apps allow.
+  const rows = new Map<UUID, number[]>();
+  let row = 0;
+  for (const system of column.systems) {
+    for (const c of system.connections) {
+      rows.set(c.appId, [...(rows.get(c.appId) ?? []), row]);
+      row += 1;
+    }
+  }
+  const centre = (id: UUID) => {
+    const r = rows.get(id) ?? [0];
+    return r.reduce((sum, n) => sum + n, 0) / r.length;
+  };
+  appOrder.sort((a, b) => centre(a.id) - centre(b.id) || a.name.localeCompare(b.name));
+  appOrder.forEach((a, i) => appIndex.set(a.id, i));
+
+  const longestLabel = Math.min(DIAGRAM_LABEL_MAX_CHARS, Math.max(0, ...column.systems.flatMap((s) => s.connections.map((c) => c.label.length + (c.mark === 'same' ? 0 : 7)))));
+  const appGap = Math.min(MAX_APP_GAP, Math.max(MIN_APP_GAP, Math.ceil(longestLabel * LABEL_CHAR_WIDTH) + 36));
+
+  const linesOf = (name: string) => wrapName(name);
+  const sysCaptions = column.systems.map((s) => captionOf(s.mark, false));
+  const appCaptions = appOrder.map((a) => captionOf(a.mark, a.isExternal));
+  const sysHeights = column.systems.map((s, i) => Math.max(boxHeight(linesOf(s.name), sysCaptions[i] ?? null, DIAGRAM_NODE_HEIGHT), s.connections.length * LINE_PITCH + 14));
+  const appHeights = appOrder.map((a, i) => boxHeight(linesOf(a.name), appCaptions[i] ?? null, DIAGRAM_NODE_HEIGHT));
+  const capHeight = boxHeight(linesOf(capability.name), null, DIAGRAM_NODE_HEIGHT);
+  const height = Math.max(capHeight, columnHeight(sysHeights), columnHeight(appHeights));
   const capX = 0;
   const sysX = DIAGRAM_NODE_WIDTH + CAP_GAP;
-  const appX = sysX + DIAGRAM_NODE_WIDTH + APP_GAP;
+  const appX = sysX + DIAGRAM_NODE_WIDTH + appGap;
   const width = appX + DIAGRAM_NODE_WIDTH;
 
   const nodes: DiagramNode[] = [];
-  const capTop = (height - DIAGRAM_NODE_HEIGHT) / 2;
+  const capTop = (height - capHeight) / 2;
   const capKey = `capability:${capability.id}`;
-  nodes.push({ key: capKey, elementId: capability.id, kind: 'capability', name: capability.name, caption: null, mark: 'same', x: capX, y: capTop, width: DIAGRAM_NODE_WIDTH, height: DIAGRAM_NODE_HEIGHT });
+  nodes.push({ key: capKey, elementId: capability.id, kind: 'capability', name: capability.name, lines: linesOf(capability.name), caption: null, mark: 'same', x: capX, y: capTop, width: DIAGRAM_NODE_WIDTH, height: capHeight });
 
   const sysTops = stackTops(sysHeights, height);
   const sysKeyOf = new Map<UUID, string>();
   column.systems.forEach((s, i) => {
     const key = `system:${s.id}`;
     sysKeyOf.set(s.id, key);
-    nodes.push({ key, elementId: s.id, kind: 'system', name: s.name, caption: captionOf(s.mark, false), mark: s.mark, x: sysX, y: sysTops[i] ?? 0, width: DIAGRAM_NODE_WIDTH, height: sysHeights[i] ?? DIAGRAM_NODE_HEIGHT });
+    nodes.push({ key, elementId: s.id, kind: 'system', name: s.name, lines: linesOf(s.name), caption: captionOf(s.mark, false), mark: s.mark, x: sysX, y: sysTops[i] ?? 0, width: DIAGRAM_NODE_WIDTH, height: sysHeights[i] ?? DIAGRAM_NODE_HEIGHT });
   });
 
   const appTops = stackTops(appHeights, height);
@@ -131,7 +181,7 @@ export function layoutProjectDiagram(capability: { id: UUID; name: string }, col
   appOrder.forEach((a, i) => {
     const key = `app:${a.id}`;
     appKeyOf.set(a.id, key);
-    nodes.push({ key, elementId: a.id, kind: 'app', name: a.name, caption: captionOf(a.mark, a.isExternal), mark: a.mark, x: appX, y: appTops[i] ?? 0, width: DIAGRAM_NODE_WIDTH, height: DIAGRAM_NODE_HEIGHT });
+    nodes.push({ key, elementId: a.id, kind: 'app', name: a.name, lines: linesOf(a.name), caption: captionOf(a.mark, a.isExternal), mark: a.mark, x: appX, y: appTops[i] ?? 0, width: DIAGRAM_NODE_WIDTH, height: appHeights[i] ?? DIAGRAM_NODE_HEIGHT });
   });
 
   const byKey = new Map(nodes.map((n) => [n.key, n]));

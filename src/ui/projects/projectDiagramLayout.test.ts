@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { BeforeAfterColumn } from './projectBeforeAfterModel';
-import { DIAGRAM_NODE_HEIGHT, layoutProjectDiagram } from './projectDiagramLayout';
+import { DIAGRAM_NODE_HEIGHT, layoutProjectDiagram, wrapName } from './projectDiagramLayout';
 
 const id = (n: number) => `00000000-0000-4000-8000-${String(n).padStart(12, '0')}`;
 function must<T>(value: T | undefined): T {
@@ -90,5 +90,42 @@ describe('layoutProjectDiagram', () => {
     const pair = layout.edges.filter((e) => e.label === 'sends ⇢' || e.label === 'reads ⇠').filter((e) => e.toKey === `app:${id(20)}` && e.fromKey === `system:${id(10)}`);
     expect(pair).toHaveLength(2);
     expect(must(pair[0]).labelY).not.toBe(must(pair[1]).labelY);
+  });
+
+  it('breaks a long name onto two lines instead of clipping it, and grows the box to fit', () => {
+    expect(wrapName('Billing')).toEqual(['Billing']);
+    expect(wrapName('SAP S/4HANA Utilities · Finance (FI/CO)')).toEqual(['SAP S/4HANA Utilities ·', 'Finance (FI/CO)']);
+    const col: BeforeAfterColumn = { changeId: null, title: 'Today', systems: [{ id: id(10), name: 'UoS Charging Statement Manager Service', mark: 'ends', connections: [] }] };
+    const node = must(layoutProjectDiagram(CAP, col).nodes.find((n) => n.kind === 'system'));
+    expect(node.lines).toHaveLength(2);
+    expect(node.height).toBeGreaterThan(DIAGRAM_NODE_HEIGHT);
+  });
+
+  it('leaves room for a long label rather than cutting it short', () => {
+    const base = layoutProjectDiagram(CAP, column());
+    const col = column();
+    must(col.systems[0]).connections[0] = { key: 'a|x', appId: id(20), appName: 'Billing', isExternal: false, label: 'sends registered metering points to the settlement platform ⇢', mark: 'same' };
+    expect(layoutProjectDiagram(CAP, col).width).toBeGreaterThan(base.width);
+  });
+
+  it('orders the apps by where their lines leave, so lines do not cross needlessly', () => {
+    const col: BeforeAfterColumn = {
+      changeId: null,
+      title: 'Today',
+      systems: [
+        {
+          id: id(10),
+          name: 'A',
+          mark: 'same',
+          connections: [
+            { key: 'z', appId: id(30), appName: 'Zed', isExternal: false, label: 'first ⇢', mark: 'same' },
+            { key: 'a', appId: id(31), appName: 'Alpha', isExternal: false, label: 'second ⇢', mark: 'same' },
+          ],
+        },
+      ],
+    };
+    const apps = layoutProjectDiagram(CAP, col).nodes.filter((n) => n.kind === 'app');
+    expect(apps.map((n) => n.name)).toEqual(['Zed', 'Alpha']);
+    expect(must(apps[0]).y).toBeLessThan(must(apps[1]).y);
   });
 });

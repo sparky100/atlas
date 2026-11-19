@@ -3,7 +3,7 @@ import { useState } from 'react';
 import { Link, useNavigate } from 'react-router';
 import type { UUID } from '../../contracts/delta';
 import { createChangeBranch } from '../../db/branches';
-import { createDecision } from '../../db/decisions';
+import { createDecision, createDecisionLink } from '../../db/decisions';
 import { createEvidence } from '../../db/evidence';
 import { addProjectLink, removeProjectLink, setProjectStatus, updateProject } from '../../db/projects';
 import type { BranchIntent, BranchRow, DecisionRow, MemberRole, ProjectRow } from '../../db/types';
@@ -91,6 +91,10 @@ export function ProjectView({ data, modelName, orgId, modelId, orgSlug, modelSlu
 
   const scopeIds = links.filter((l) => l.linked_type === 'element').map((l) => l.linked_id);
   const touchedIds = touched.map((t) => t.elementId);
+  const scopeSystemIds = new Set(scopeIds.filter((id) => {
+    const type = data.elementsById.get(id)?.element_type;
+    return type === 'system' || type === 'container';
+  }));
   const difference = scopeDifference(scopeIds, touchedIds, data.reachedIds);
   const progress = projectProgress(changes, decisions);
   const firstDecision = originatingDecision(decisions);
@@ -142,7 +146,7 @@ export function ProjectView({ data, modelName, orgId, modelId, orgSlug, modelSlu
         </ol>
       </Panel>
 
-      <ProjectBeforeAfter modelId={modelId} projectId={project.id} mainHeadCommitId={main?.head_commit_id ?? null} changes={changes} capabilities={data.journeyCapabilities.map((c) => ({ id: c.id, name: c.name }))} base={base} />
+      <ProjectBeforeAfter modelId={modelId} projectId={project.id} mainHeadCommitId={main?.head_commit_id ?? null} changes={changes} capabilities={data.journeyCapabilities.map((c) => ({ id: c.id, name: c.name }))} scopeSystemIds={scopeSystemIds} base={base} />
 
       {(scopeIds.length > 0 || canEdit) && (
         <Panel>
@@ -264,7 +268,7 @@ export function ProjectView({ data, modelName, orgId, modelId, orgSlug, modelSlu
               ))}
             </ul>
           )}
-          {isOpen && canStartDecision(role) && userId !== null && <NewDecisionForm project={project} userId={userId} base={base} />}
+          {isOpen && canStartDecision(role) && userId !== null && <NewDecisionForm project={project} userId={userId} scopeIds={scopeIds} base={base} />}
           {constrainingDecisions.length > 0 && (
             <>
               <Text as="h3" size="md">
@@ -460,8 +464,14 @@ function ChangeLine({ change, href }: { change: BranchRow; href: string }) {
   );
 }
 
-/** Step 4: "New decision" from the project page — created inside the project (`decisions.project_id`), owned by the person starting it; the rest is filled in on the decision page. */
-function NewDecisionForm({ project, userId, base }: { project: ProjectRow; userId: UUID; base: string }) {
+/**
+ * Step 4: "New decision" from the project page — created inside the project
+ * (`decisions.project_id`), owned by the person starting it. It starts from
+ * where the person came from (Simon, 2026-11-19): the project's purpose is the
+ * decision's context, the project's declared scope is what it concerns, and the
+ * decision page opens in edit mode so the wording can be shaped straight away.
+ */
+function NewDecisionForm({ project, userId, scopeIds, base }: { project: ProjectRow; userId: UUID; scopeIds: readonly UUID[]; base: string }) {
   const navigate = useNavigate();
   const [title, setTitle] = useState('');
   const [busy, setBusy] = useState(false);
@@ -474,13 +484,19 @@ function NewDecisionForm({ project, userId, base }: { project: ProjectRow; userI
         if (title.trim().length === 0) return;
         setBusy(true);
         setError(null);
-        void createDecision(supabase, { id: crypto.randomUUID(), orgId: project.org_id, modelId: project.model_id, title: title.trim(), statement: '', ownerId: userId, createdBy: userId, projectId: project.id })
+        void createDecision(supabase, { id: crypto.randomUUID(), orgId: project.org_id, modelId: project.model_id, title: title.trim(), statement: project.purpose.trim(), ownerId: userId, createdBy: userId, projectId: project.id })
           .then(async (d) => {
             // Every decision starts with its "Stay as we are" baseline; if this fails the decision page offers "Add the baseline".
             await addBaseline({ orgId: project.org_id, modelId: project.model_id, decisionId: d.id, userId, projectId: project.id }).catch((err: unknown) => {
               reportError('Could not add the baseline to the new decision.', err);
             });
-            void navigate(`${base}/decisions/${d.id}`);
+            // What the project is about is what the decision concerns. A link that fails is skipped: the decision page lets the person add it.
+            for (const elementId of scopeIds) {
+              await createDecisionLink(supabase, { decisionId: d.id, linkedType: 'element', linkedId: elementId, createdBy: userId }).catch((err: unknown) => {
+                reportError('Could not link the project scope to the new decision.', err);
+              });
+            }
+            void navigate(`${base}/decisions/${d.id}?edit=1`);
           })
           .catch((err: unknown) => {
             setError('Could not start this decision.');

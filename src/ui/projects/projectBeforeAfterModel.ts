@@ -155,3 +155,16 @@ export function buildProjectBeforeAfter(today: Head, changes: readonly BeforeAft
     })
     .sort((a, b) => a.name.localeCompare(b.name));
 }
+
+/**
+ * Simon, 2026-11-19: a capability's supporters are not all this project's. A
+ * system is "in this project" when its scope names it, or when a drafted
+ * change adds it or ends it. The rest only share the capability, and are shown
+ * apart so they are not read as being changed.
+ */
+export function splitBySystemScope(systems: readonly BeforeAfterSystem[], scopeSystemIds: ReadonlySet<UUID>): { inProject: BeforeAfterSystem[]; alsoSupports: BeforeAfterSystem[] } {
+  const inProject: BeforeAfterSystem[] = [];
+  const alsoSupports: BeforeAfterSystem[] = [];
+  for (const system of systems) (scopeSystemIds.has(system.id) || system.mark !== 'same' ? inProject : alsoSupports).push(system);
+  return { inProject, alsoSupports };
+}
