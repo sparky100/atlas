@@ -25,6 +25,7 @@ test('disposition: Migrate raises a finding, a project retires the system, the f
 
   // 1. A system supporting a capability, marked Migrate through the ordinary Attributes editor.
   await addCapability(page, 'Employee Pay');
+  await goToModelHome(page);
   await addSystemFromHome(page, { name: 'Legacy Payroll', description: 'The payroll system being moved off.', capabilityName: 'Employee Pay' });
   await page.getByRole('button', { name: '✎ Edit' }).click();
   await page.getByLabel('Planned action').selectOption('migrate');
