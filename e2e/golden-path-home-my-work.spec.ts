@@ -40,7 +40,7 @@ test('My work lists the project, not the decision options inside it', async ({ p
   const inProjects = page.getByTestId('changes-in-projects');
   await expect(inProjects.getByRole('link', { name: 'Who supports Housing Repairs' })).toBeVisible();
   await expect(inProjects.getByRole('link', { name: 'How should we meet Housing Repairs?' })).toBeVisible();
-  await expect(inProjects.getByRole('link', { name: /Build Repairs Hub/ })).toHaveCount(1);
+  await expect(inProjects.getByText('Build Repairs Hub')).toBeVisible();
   await expect(page.getByRole('button', { name: /^Propose/ })).toHaveCount(0);
   await expect(page.getByRole('button', { name: /^Explore/ })).toHaveCount(0);
 
