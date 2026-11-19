@@ -1,6 +1,6 @@
 import { Loading } from '../components/Loading/Loading';
 import { useMemo, useState } from 'react';
-import { useParams } from 'react-router';
+import { Link, useParams } from 'react-router';
 import { AppHeader } from '../components/AppHeader/AppHeader';
 import { Breadcrumb } from '../components/Breadcrumb/Breadcrumb';
 import { Button } from '../components/Button/Button';
@@ -9,7 +9,7 @@ import { ModelNav } from '../components/ModelNav/ModelNav';
 import navStyles from '../components/ModelNav/ModelNav.module.css';
 import { Text } from '../components/Text/Text';
 import { useAuth } from '../auth/useAuth';
-import { impactedLaneKeys } from '../decisions/decisionOptionImpact';
+import { impactedLaneKeys, scopeLaneKeys } from '../decisions/decisionOptionImpact';
 import { useDecision } from '../decisions/useDecision';
 import { EMPTY_LANDSCAPE_FILTERS } from '../landscape/landscapeFilter';
 import { LandscapeCanvas } from '../landscape/LandscapeCanvas';
@@ -62,10 +62,23 @@ export function DecisionOptionLandscapePage() {
     () => (displayInput ? listLandscapeLaneOptions([...displayInput.systemsById.values()], displayInput.supportsEdges, displayInput.l1AncestorByCapabilityId, [...displayInput.actorsById.values()]) : []),
     [displayInput],
   );
-  const impacted = useMemo(
+  const touched = useMemo(
     () => (displayInput?.diff ? impactedLaneKeys(displayInput.diff, [...displayInput.systemsById.values()], displayInput.supportsEdges, displayInput.l1AncestorByCapabilityId) : null),
     [displayInput],
   );
+  // No edits yet: nothing is touched, so every lane would be hidden and only the unplaced people would show.
+  // Show the decision's own scope as it is today instead, or every lane when the decision names none.
+  const noEditsYet = touched !== null && touched.size === 0;
+  const scopeIds = useMemo(() => {
+    if (decisionState.status !== 'ready') return new Set<string>();
+    return new Set(decisionState.links.filter((l) => l.linked_type === 'element').map((l) => l.linked_id));
+  }, [decisionState]);
+  const impacted = useMemo(() => {
+    if (!displayInput || touched === null) return null;
+    if (!noEditsYet) return touched;
+    const scope = scopeLaneKeys(scopeIds, [...displayInput.systemsById.values()], displayInput.supportsEdges, displayInput.l1AncestorByCapabilityId);
+    return scope.size > 0 ? scope : null;
+  }, [displayInput, touched, noEditsYet, scopeIds]);
   const hiddenCount = impacted ? laneOptions.filter((o) => !impacted.has(o.key)).length : 0;
   const laneDisplay = useMemo<LandscapeLaneDisplayOptions>(() => {
     if (showAllLanes || !impacted) return EMPTY_LANE_DISPLAY;
@@ -122,6 +135,14 @@ export function DecisionOptionLandscapePage() {
               </Button>
             )}
           </div>
+          {noEditsYet && (
+            <div data-testid="option-diagram-no-edits">
+              <Text as="p" tone="muted">
+                No changes yet. This shows what the decision concerns as it is today.{' '}
+                <Link to={`/o/${orgSlug ?? ''}/m/${model.slug}/changes/${branchId ?? ''}`}>Draft the obvious edits →</Link>
+              </Text>
+            </div>
+          )}
           <DiffLegend />
 
           {state.status === 'loading' && <Loading />}

@@ -10,12 +10,12 @@ import { Panel } from '../components/Panel/Panel';
 import { Text } from '../components/Text/Text';
 import { describeLifecycleMismatch } from '../../engine/elementRead/lifecycleDateMismatch';
 import type { ElementsHeadRow } from '../../contracts/rows';
-import type { MemberRole } from '../../db/types';
+import type { BranchRow, MemberRole } from '../../db/types';
 import type { BoundaryCrossing, ExternalInterfaceCrossing, ExternalOrganisationAccess, PlatformFlowEndpoint, UnlabeledVerbRelationship } from '../../db/healthFindings';
 import { formatDate, formatRelativeTime } from '../time';
 import { formatProjectProgress, projectStatusLabel, projectStatusTone } from '../projects/projectModel';
 import { branchStatusTone } from '../changes/branchStatus';
-import { buildMyWorkRows, myWorkDetail } from './myWork';
+import { buildMyWorkRows, decisionOptions, myWorkDetail, projectChildren } from './myWork';
 import {
   decisionPrefillToSearchParams,
   prefillFromCriticalExposedFinding,
@@ -194,6 +194,9 @@ export function ArchitectHome({ data, modelId, mainCommitIdHint, insights, role,
   // "Loading…" instead, rather than an empty/misleadingly-clear state.
   const insightsData = insights.status === 'ready' ? insights.data : null;
   const myWorkRows = buildMyWorkRows(data.myOpenBranches, data.allDecisions, data.allProjects, data.optionLinks);
+  // Three sections, in this order, nothing listed twice (Simon, 2026-11-19): projects (with their decisions and changes inside), decisions outside a project, changes outside both.
+  const ownedDecisionsOutside = data.myOwnedWork.decisions.filter(({ projectTitle }) => projectTitle === null);
+  const standaloneChangeRows = myWorkRows.filter((row) => row.kind === 'change');
   const modelHref = `/o/${orgSlug}/m/${modelSlug}`;
   const elementHref = (elementId: string) => `/o/${orgSlug}/m/${modelSlug}/e/${elementId}`;
   // A commit's diff against its own parent (Sprint U4-1 B2) — main's genesis
@@ -716,35 +719,6 @@ export function ArchitectHome({ data, modelId, mainCommitIdHint, insights, role,
               column stacks last) reaches them before the health findings. */}
           <Panel>
             <Text as="h2" size="xl" className={styles.sectionTitle}>
-              My decisions
-            </Text>
-            {data.myOwnedWork.decisions.length === 0 ? (
-              <EmptyState>No open decisions of yours.</EmptyState>
-            ) : (
-              <ul className={styles.branchList} aria-label="My decisions">
-                {data.myOwnedWork.decisions.map(({ decision, overdue, projectTitle }) => (
-                  <li key={decision.id} className={styles.ownedRow}>
-                    <div className={styles.branchRow}>
-                      <Link to={`${modelHref}/decisions/${decision.id}`}>
-                        <Text as="span" size="sm">
-                          {decision.title}
-                        </Text>
-                      </Link>
-                      {overdue && <Chip tone="warn">overdue</Chip>}
-                    </div>
-                    {(decision.needed_by !== null || projectTitle !== null) && (
-                      <Text as="p" tone="muted" size="xs">
-                        {[decision.needed_by !== null ? `needed by ${formatDate(decision.needed_by)}` : null, projectTitle !== null ? `in ${projectTitle}` : null].filter((part): part is string => part !== null).join(' · ')}
-                      </Text>
-                    )}
-                  </li>
-                ))}
-              </ul>
-            )}
-          </Panel>
-
-          <Panel>
-            <Text as="h2" size="xl" className={styles.sectionTitle}>
               My projects
             </Text>
             {data.myOwnedWork.projects.length === 0 ? (
@@ -769,6 +743,64 @@ export function ArchitectHome({ data, modelId, mainCommitIdHint, insights, role,
                     <Text as="p" tone="muted" size="xs">
                       {project.target_date !== null ? `target ${formatDate(project.target_date)} · ` : ''}
                       {formatProjectProgress(progress)}
+                    </Text>
+                    <ProjectChildren modelHref={modelHref} children={projectChildren(project.id, data.allOpenBranches, data.allDecisions, data.optionLinks)} />
+                  </li>
+                ))}
+              </ul>
+            )}
+          </Panel>
+
+          <Panel>
+            <Text as="h2" size="xl" className={styles.sectionTitle}>
+              My decisions
+            </Text>
+            {ownedDecisionsOutside.length === 0 ? (
+              <EmptyState>No open decisions of yours.</EmptyState>
+            ) : (
+              <ul className={styles.branchList} aria-label="My decisions">
+                {ownedDecisionsOutside.map(({ decision, overdue, projectTitle }) => (
+                  <li key={decision.id} className={styles.ownedRow}>
+                    <div className={styles.branchRow}>
+                      <Link to={`${modelHref}/decisions/${decision.id}`}>
+                        <Text as="span" size="sm">
+                          {decision.title}
+                        </Text>
+                      </Link>
+                      {overdue && <Chip tone="warn">overdue</Chip>}
+                    </div>
+                    {(decision.needed_by !== null || projectTitle !== null) && (
+                      <Text as="p" tone="muted" size="xs">
+                        {[decision.needed_by !== null ? `needed by ${formatDate(decision.needed_by)}` : null, projectTitle !== null ? `in ${projectTitle}` : null].filter((part): part is string => part !== null).join(' · ')}
+                      </Text>
+                    )}
+                    <OptionList modelHref={modelHref} options={decisionOptions(decision.id, data.allOpenBranches, data.optionLinks)} />
+                  </li>
+                ))}
+              </ul>
+            )}
+          </Panel>
+
+          <Panel>
+            <Text as="h2" size="xl" className={styles.sectionTitle}>
+              My changes
+            </Text>
+            {standaloneChangeRows.length === 0 ? (
+              <EmptyState>No open changes of yours outside a decision or project.</EmptyState>
+            ) : (
+              <ul className={styles.branchList} data-testid="my-work-list">
+                {standaloneChangeRows.map((row) => (
+                  <li key={row.key} className={styles.ownedRow}>
+                    <div className={styles.branchRow}>
+                      <Link to={`${modelHref}/${row.target.kind === 'project' ? 'projects' : row.target.kind === 'decision' ? 'decisions' : 'changes'}/${row.target.id}`}>
+                        <Text as="span" size="sm">
+                          {row.title}
+                        </Text>
+                      </Link>
+                      {row.status !== null && <Chip tone={branchStatusTone(row.status)}>{row.status}</Chip>}
+                    </div>
+                    <Text as="p" tone="muted" size="xs">
+                      {myWorkDetail(row)}
                     </Text>
                   </li>
                 ))}
@@ -834,33 +866,6 @@ export function ArchitectHome({ data, modelId, mainCommitIdHint, insights, role,
         <div className={styles.side}>
           <Panel>
             <Text as="h2" size="xl" className={styles.sectionTitle}>
-              My work
-            </Text>
-            {myWorkRows.length === 0 ? (
-              <EmptyState>No open work of your own right now.</EmptyState>
-            ) : (
-              <ul className={styles.branchList} data-testid="my-work-list">
-                {myWorkRows.map((row) => (
-                  <li key={row.key} className={styles.ownedRow}>
-                    <div className={styles.branchRow}>
-                      <Link to={`${modelHref}/${row.target.kind === 'project' ? 'projects' : row.target.kind === 'decision' ? 'decisions' : 'changes'}/${row.target.id}`}>
-                        <Text as="span" size="sm">
-                          {row.title}
-                        </Text>
-                      </Link>
-                      {row.status !== null && <Chip tone={branchStatusTone(row.status)}>{row.status}</Chip>}
-                    </div>
-                    <Text as="p" tone="muted" size="xs">
-                      {myWorkDetail(row)}
-                    </Text>
-                  </li>
-                ))}
-              </ul>
-            )}
-          </Panel>
-
-          <Panel>
-            <Text as="h2" size="xl" className={styles.sectionTitle}>
               Recent activity
             </Text>
             {/* E8 item (4): loads after first paint, same as Health findings above. */}
@@ -886,5 +891,57 @@ export function ArchitectHome({ data, modelId, mainCommitIdHint, insights, role,
         </div>
       </div>
     </div>
+  );
+}
+
+/** The option changes of one decision, each a link, one level below it. */
+function OptionList({ modelHref, options }: { modelHref: string; options: BranchRow[] }) {
+  if (options.length === 0) return null;
+  return (
+    <ul className={styles.branchList} aria-label="Options">
+      {options.map((c) => (
+        <li key={c.id}>
+          <Link to={`${modelHref}/changes/${c.id}`}>
+            <Text as="span" size="xs">
+              {c.title ?? c.name}
+            </Text>
+          </Link>
+        </li>
+      ))}
+    </ul>
+  );
+}
+
+/** What sits inside a project: its decisions (each with its option changes beneath), and changes linked straight to the project at the same level as the decisions. */
+function ProjectChildren({ modelHref, children }: { modelHref: string; children: ReturnType<typeof projectChildren> }) {
+  if (children.decisions.length === 0 && children.changes.length === 0) return null;
+  return (
+    <ul className={styles.branchList} aria-label="Inside this project">
+      {children.decisions.map(({ decision, options }) => (
+        <li key={decision.id}>
+          <Text as="span" size="xs" tone="muted">
+            Decision:{' '}
+          </Text>
+          <Link to={`${modelHref}/decisions/${decision.id}`}>
+            <Text as="span" size="xs">
+              {decision.title}
+            </Text>
+          </Link>
+          <OptionList modelHref={modelHref} options={options} />
+        </li>
+      ))}
+      {children.changes.map((c) => (
+        <li key={c.id}>
+          <Text as="span" size="xs" tone="muted">
+            Change:{' '}
+          </Text>
+          <Link to={`${modelHref}/changes/${c.id}`}>
+            <Text as="span" size="xs">
+              {c.title ?? c.name}
+            </Text>
+          </Link>
+        </li>
+      ))}
+    </ul>
   );
 }

@@ -6,7 +6,7 @@
  * kind that stands alone.
  */
 import { expect, test } from '@playwright/test';
-import { addCapability, goToModelHome, signUpCreateOrgAndModel } from './fixtures/goldenPath';
+import { addCapability, clickNavItem, goToModelHome, signUpCreateOrgAndModel } from './fixtures/goldenPath';
 
 test('My work lists the project, not the decision options inside it', async ({ page }) => {
   test.slow();
@@ -28,12 +28,27 @@ test('My work lists the project, not the decision options inside it', async ({ p
   await goToModelHome(page);
   // The visit to Overview above is remembered, so switch back to My work.
   await page.getByRole('button', { name: 'My work', exact: true }).click();
-  const list = page.getByTestId('my-work-list');
-  await expect(page.getByRole('heading', { name: 'My work' })).toBeVisible();
-  await expect(list.getByRole('link', { name: 'Who supports Housing Repairs' })).toBeVisible();
-  await expect(list.getByText('Project · ')).toBeVisible();
-  await expect(list.getByRole('link', { name: 'Build Repairs Hub' })).toHaveCount(0);
-  await expect(list.getByRole('link', { name: 'Stay as we are' })).toHaveCount(0);
+  // The project is listed once, under My projects; its decision and option are not listed again on their own.
+  const projects = page.getByRole('list', { name: 'My projects' });
+  await expect(projects.getByRole('link', { name: 'Who supports Housing Repairs' })).toHaveCount(1);
+  // The hierarchy is project, decision, change: the decision sits inside the project and its option inside the decision.
+  const inside = projects.getByRole('list', { name: 'Inside this project' });
+  await expect(inside.getByRole('link', { name: 'How should we meet Housing Repairs?' })).toHaveCount(1);
+  await expect(inside.getByRole('list', { name: 'Options' }).getByRole('link', { name: 'Build Repairs Hub' })).toHaveCount(1);
+  await expect(page.getByRole('link', { name: 'Build Repairs Hub' })).toHaveCount(1);
+  await expect(page.getByRole('list', { name: 'My decisions' })).toHaveCount(0);
+  // Projects come before decisions on the page.
+  const order = await page.getByRole('heading', { level: 2 }).allTextContents();
+  expect(order.indexOf('My projects')).toBeGreaterThanOrEqual(0);
+  expect(order.indexOf('My projects')).toBeLessThan(order.indexOf('My decisions'));
+
+  // The Work overview lists the same open items: the project, not its decision or option.
+  await clickNavItem(page, 'Work');
+  await expect(page.getByRole('heading', { name: 'Work', level: 1 })).toBeVisible();
+  const projectsCard = page.getByTestId('work-card-projects');
+  await expect(projectsCard.getByRole('link', { name: 'Who supports Housing Repairs' })).toBeVisible();
+  await expect(page.getByTestId('work-card-decisions').getByRole('link', { name: 'How should we meet Housing Repairs?' })).toHaveCount(0);
+  await expect(page.getByTestId('work-card-changes').getByRole('link', { name: 'Build Repairs Hub' })).toHaveCount(0);
 
   const overflow = await page.evaluate(() => document.documentElement.scrollWidth > document.documentElement.clientWidth + 1);
   expect(overflow).toBe(false);
