@@ -73,20 +73,21 @@ function relationshipCreateDelta(id: UUID, relationshipId: UUID, relationshipTyp
 
 /**
  * `SystemAttributes` keys `ContainerAttributes` has no field for at all
- * (`vendor`, `externalOrganisation`, `kind`, `supportEndsAt`) — real facts
+ * (`vendor`, `externalOrganisation`, `kind`) — real facts
  * that simply don't carry over, surfaced here rather than silently dropped
  * (CLAUDE.md rule 7). Every other `SystemAttributes` field (`description`,
- * `isExternal`, `introduced`, `plannedEnd`, `criticality`, `annualRunCost`,
+ * `isExternal`, `introduced`, `plannedEnd`, `supportEndsAt`, `criticality`, `annualRunCost`,
  * `hostingModel`, `hostingProvider`, `domain`, `lifecycleStatus`, `version`)
  * has a same-named `ContainerAttributes` field and carries straight over.
  */
-const SYSTEM_ONLY_ATTRIBUTE_KEYS = ['vendor', 'externalOrganisation', 'kind', 'supportEndsAt'] as const satisfies readonly (keyof SystemAttributes)[];
+const SYSTEM_ONLY_ATTRIBUTE_KEYS = ['vendor', 'externalOrganisation', 'kind'] as const satisfies readonly (keyof SystemAttributes)[];
 
 function containerAttributesFromSystem(systemAttributes: SystemAttributes): { attributes: ContainerAttributes; droppedAttributeKeys: string[] } {
   const attributes: ContainerAttributes = { isExternal: systemAttributes.isExternal };
   if (systemAttributes.description !== undefined) attributes.description = systemAttributes.description;
   if (systemAttributes.introduced !== undefined) attributes.introduced = systemAttributes.introduced;
   if (systemAttributes.plannedEnd !== undefined) attributes.plannedEnd = systemAttributes.plannedEnd;
+  if (systemAttributes.supportEndsAt !== undefined) attributes.supportEndsAt = systemAttributes.supportEndsAt;
   if (systemAttributes.criticality !== undefined) attributes.criticality = systemAttributes.criticality;
   // The system's own avoidable run cost is the same software's avoidable
   // run cost after conversion — it carries over as the module's own value
