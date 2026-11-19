@@ -14,7 +14,7 @@
 import { assertRealId } from './assertRealId';
 import type { Client } from './client';
 import { selectAll } from './selectAll';
-import type { DecisionArgumentRow, DecisionLinkedType, DecisionLinkRow, DecisionRow } from './types';
+import type { DecisionArgumentRow, DecisionPackRow, DecisionLinkedType, DecisionLinkRow, DecisionRow } from './types';
 import type { UUID } from '../contracts/delta';
 
 export interface CreateDecisionInput {
@@ -262,4 +262,25 @@ export async function countProposedDecisions(supabase: Client, modelId: UUID): P
   const { count, error } = await supabase.from('decisions').select('id', { count: 'exact', head: true }).eq('model_id', modelId).eq('status', 'proposed');
   if (error) throw new Error(`countProposedDecisions: ${error.message}`);
   return count ?? 0;
+}
+
+/**
+ * Freeze the decision's write-up as the next numbered pack
+ * (`decision_packs`, `20261119140000_decision_packs.sql`). Insert-only: RLS lets
+ * only owners and architects insert, and a trigger sets the org, version, status
+ * and who froze it from the decision itself, never from the caller.
+ */
+export async function freezeDecisionPack(supabase: Client, decisionId: UUID, bodyMarkdown: string, commitId: UUID | null): Promise<DecisionPackRow> {
+  // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment -- untyped client; see branches.ts's module comment.
+  const { data, error } = await supabase.from('decision_packs').insert({ decision_id: decisionId, body_markdown: bodyMarkdown, commit_id: commitId }).select('*').single();
+  if (error) throw new Error(`freezeDecisionPack: ${error.message}`);
+  return data as DecisionPackRow;
+}
+
+/** Every frozen pack of a decision, newest version first. */
+export async function listDecisionPacks(supabase: Client, decisionId: UUID): Promise<DecisionPackRow[]> {
+  assertRealId('listDecisionPacks', 'decision_id', decisionId);
+  const { data, error } = await supabase.from('decision_packs').select('*').eq('decision_id', decisionId).order('version', { ascending: false });
+  if (error) throw new Error(`listDecisionPacks: ${error.message}`);
+  return data as DecisionPackRow[];
 }

@@ -20,6 +20,7 @@ import { useMembers } from '../orgs/useMembers';
 import type { AlsoAffectedElement } from './alsoAffected';
 import { DecisionCriteriaGrid, type DecisionCriteriaOption } from './DecisionCriteriaGrid';
 import { DecisionGoLive } from './DecisionGoLive';
+import { DecisionPacks } from './DecisionPacks';
 import { DecisionLinkPicker } from './DecisionLinkPicker';
 import { DecisionPrinciplesPanel } from '../principles/DecisionPrinciplesPanel';
 import { adrPrincipleItems } from '../principles/decisionPrinciples';
@@ -148,8 +149,8 @@ export function DecisionView({ modelId, decisionId, orgId, orgSlug, modelSlug, r
   // renders visible, never the collapsed "unchanged" group, matching the
   // table's own display exactly. Assembled by `decisionAdrInput.ts`, which
   // the project pack (F13 step 2) shares.
-  async function copyAdrMarkdown() {
-    const markdown = exportDecisionAsAdrMarkdown(
+  function buildAdrMarkdown(): string {
+    return exportDecisionAsAdrMarkdown(
       buildDecisionAdrExportInput({
         decision,
         links,
@@ -163,6 +164,10 @@ export function DecisionView({ modelId, decisionId, orgId, orgSlug, modelSlug, r
         ownerName,
       }),
     );
+  }
+
+  async function copyAdrMarkdown() {
+    const markdown = buildAdrMarkdown();
     try {
       await navigator.clipboard.writeText(markdown);
       setAdrCopied(true);
@@ -649,6 +654,8 @@ export function DecisionView({ modelId, decisionId, orgId, orgSlug, modelSlug, r
           )}
         </Panel>
       )}
+
+      <DecisionPacks decisionId={decision.id} canFreeze={canChooseDecisionOption(role)} commitId={main?.head_commit_id ?? null} buildMarkdown={buildAdrMarkdown} />
 
       <Panel>
         <Text as="h2" size="lg">

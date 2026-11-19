@@ -29,6 +29,8 @@ import { createComment, listCommentsForAnchor } from './comments';
 import {
   cancelDecision,
   chooseDecisionOption,
+  freezeDecisionPack,
+  listDecisionPacks,
   countProposedDecisions,
   createDecision,
   createDecisionLink,
@@ -504,6 +506,38 @@ describe('decisions/decision_links/decision_arguments/assumptions/evidence again
     it('returns an empty list for an element with no decisions at all, and for an empty input list', async () => {
       expect(await listDecisionsLinkingElements(alice.client, [randomUUID()])).toEqual([]);
       expect(await listDecisionsLinkingElements(alice.client, [])).toEqual([]);
+    });
+  });
+  describe('frozen decision packs (Phase B3)', () => {
+    it('freezes numbered versions that round-trip, are never changeable, and are closed to other organisations', async () => {
+      const decision = await createDecision(alice.client, { id: randomUUID(), orgId, modelId, title: 'Pack me', statement: 'context', ownerId: alice.id, createdBy: alice.id });
+      const first = await freezeDecisionPack(alice.client, decision.id, '# ADR: Pack me\n\nFirst.', null);
+      const second = await freezeDecisionPack(alice.client, decision.id, '# ADR: Pack me\n\nSecond.', null);
+      expect([first.version, second.version]).toEqual([1, 2]);
+      expect(first.decision_status).toBe('proposed');
+      const packs = await listDecisionPacks(alice.client, decision.id);
+      expect(packs.map((p) => p.version)).toEqual([2, 1]);
+      expect(packs[1]?.body_markdown).toBe('# ADR: Pack me\n\nFirst.');
+
+      // No client can change or remove a pack, or write one around the function.
+      const edited = await alice.client.from('decision_packs').update({ body_markdown: 'changed' }).eq('id', first.id).select('id');
+      expect(edited.error !== null || edited.data.length === 0).toBe(true);
+      const removed = await alice.client.from('decision_packs').delete().eq('id', first.id).select('id');
+      expect(removed.error !== null || removed.data.length === 0).toBe(true);
+      expect((await listDecisionPacks(alice.client, decision.id)).find((p) => p.id === first.id)?.body_markdown).toBe('# ADR: Pack me\n\nFirst.');
+
+      // A signed-in user from a different organisation can neither freeze nor read.
+      const mallory = await createSignedInUser('decisions-mallory');
+      try {
+        const otherOrg = randomUUID();
+        await createOrganisation(mallory.client, { id: otherOrg, name: 'Other Org', slug: `packs-other-${otherOrg.slice(0, 8)}`, createdBy: mallory.id });
+        await expect(freezeDecisionPack(mallory.client, decision.id, 'sneaky', null)).rejects.toThrow(/not found/);
+        expect(await listDecisionPacks(mallory.client, decision.id)).toEqual([]);
+      } finally {
+        await service.auth.admin.deleteUser(mallory.id);
+      }
+
+      await expect(freezeDecisionPack(alice.client, decision.id, '   ', null)).rejects.toThrow(/required/);
     });
   });
 });

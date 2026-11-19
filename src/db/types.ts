@@ -457,6 +457,20 @@ export interface DecisionRow {
   created_at: string;
 }
 
+/** A frozen, versioned copy of a decision write-up (Phase B3). Insert-only; written only by `atlas.freeze_decision_pack`. */
+export interface DecisionPackRow {
+  id: UUID;
+  org_id: UUID;
+  decision_id: UUID;
+  version: number;
+  decision_status: string;
+  /** The live model's head commit the pack was written against. */
+  commit_id: UUID | null;
+  body_markdown: string;
+  frozen_by: UUID;
+  frozen_at: string;
+}
+
 /** The literal shape of a row in `decision_arguments` — a decision's own pro/con list. Written only by `atlas.choose_decision_option` (PR5); no open insert grant exists until then. */
 export interface DecisionArgumentRow {
   id: UUID;
