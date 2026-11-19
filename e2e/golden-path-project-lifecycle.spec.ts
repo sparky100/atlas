@@ -42,6 +42,7 @@ test('project lifecycle: start from a finding, decide inside it, deliver the cho
   const nextStep = page.getByTestId('project-next-step');
   await expect(nextStep.getByRole('heading', { name: 'What to do next' })).toBeVisible();
   await expect(nextStep.getByText('Work out the options')).toBeVisible();
+  await expect(nextStep.getByLabel('New decision title')).toHaveValue('How should we meet Housing Repairs?');
   await nextStep.getByLabel('New decision title').fill('Which system supports repairs?');
   await page.getByRole('button', { name: 'Start decision' }).click();
   await expect(page.getByRole('heading', { name: 'Which system supports repairs?' })).toBeVisible();
@@ -49,6 +50,12 @@ test('project lifecycle: start from a finding, decide inside it, deliver the cho
   // It starts from where the person came from: the project's purpose is the context, the project's capability is what it concerns, and the edit form is already open.
   await expect(page.getByPlaceholder('What needs deciding, and why now')).not.toHaveValue('');
   await expect(page.getByRole('link', { name: 'Housing Repairs' }).first()).toBeVisible();
+  await page.getByRole('button', { name: 'Cancel', exact: true }).click();
+  // Starting points read from the model (no AI): the person adds one, edits it, or ignores them.
+  const suggestions = page.getByTestId('option-suggestions');
+  await expect(suggestions.getByText('no AI', { exact: false })).toBeVisible();
+  await suggestions.getByRole('button', { name: 'Build it ourselves' }).click();
+  await expect(page.getByLabel("What's this option?")).toHaveValue('Build it ourselves');
   await page.getByRole('button', { name: 'Cancel', exact: true }).click();
 
   // 3. Two options, one rating, choose the first.
