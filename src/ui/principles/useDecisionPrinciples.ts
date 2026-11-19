@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import type { UUID } from '../../contracts/delta';
 import { isValidStanceReason, type DecisionPrincipleRow, type PrincipleRow, type PrincipleStance } from '../../contracts/principles';
 import { linkPrincipleToDecision, listPrinciplesForDecision, listPrinciplesForModel, unlinkPrincipleFromDecision } from '../../db/principles';
+import { withPendingStances, type PendingStances } from './decisionPrinciples';
 import { reportError } from '../errors/errorBannerStore';
 import { supabase } from '../supabaseClient';
 
@@ -24,7 +25,7 @@ export function useDecisionPrinciples(modelId: UUID, decisionId: UUID, userId: U
   const [principles, setPrinciples] = useState<PrincipleRow[]>([]);
   const [links, setLinks] = useState<DecisionPrincipleRow[]>([]);
   const [error, setError] = useState<string | null>(null);
-  const [pending, setPending] = useState<ReadonlyMap<string, { stance: PrincipleStance | null; reason: string }>>(new Map());
+  const [pending, setPending] = useState<PendingStances>(new Map());
   const [reloadToken] = useState(0);
 
   useEffect(() => {
@@ -86,15 +87,7 @@ export function useDecisionPrinciples(modelId: UUID, decisionId: UUID, userId: U
   );
 
   const savingIds = useMemo<ReadonlySet<string>>(() => new Set(pending.keys()), [pending]);
-  const shownLinks = useMemo(() => {
-    if (pending.size === 0) return links;
-    const kept = links.filter((l) => !pending.has(l.principle_id));
-    const added: DecisionPrincipleRow[] = [];
-    for (const [principleId, { stance, reason }] of pending) {
-      if (stance !== null) added.push({ decision_id: decisionId, principle_id: principleId, stance, reason, created_by: userId ?? '', created_at: '' });
-    }
-    return [...kept, ...added];
-  }, [links, pending, decisionId, userId]);
+  const shownLinks = useMemo(() => withPendingStances(links, pending, decisionId, userId ?? ''), [links, pending, decisionId, userId]);
 
   return { loading, principles, links: shownLinks, error, savingIds, setStance };
 }

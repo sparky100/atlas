@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { DecisionPrincipleRow, PrincipleRow } from '../../contracts/principles';
-import { adrPrincipleItems, countDecisionsDeparting, decisionPrincipleLines } from './decisionPrinciples';
+import { adrPrincipleItems, countDecisionsDeparting, decisionPrincipleLines, withPendingStances } from './decisionPrinciples';
 
 const principle = (id: string, title: string, status: 'active' | 'retired' = 'active'): PrincipleRow => ({ id, org_id: 'o', model_id: 'm', title, statement: 'S', why: '', status, created_by: 'u', created_at: '', retired_by: null, retired_at: null, from_set_slug: null, from_set_name: null, from_set_version: null });
 const link = (decision: string, p: string, stance: 'follows' | 'departs', reason = ''): DecisionPrincipleRow => ({ decision_id: decision, principle_id: p, stance, reason, created_by: 'u', created_at: '' });
@@ -34,5 +34,29 @@ describe('countDecisionsDeparting', () => {
     const decisions = [{ id: 'd1', status: 'proposed' }, { id: 'd2', status: 'accepted' }, { id: 'd3', status: 'rejected' }];
     const links = [link('d1', 'a', 'departs', 'x'), link('d1', 'b', 'departs', 'y'), link('d2', 'a', 'follows'), link('d3', 'a', 'departs', 'z'), link('other', 'a', 'departs', 'w')];
     expect(countDecisionsDeparting(links, decisions)).toBe(1);
+  });
+});
+
+describe('withPendingStances', () => {
+  const saved: DecisionPrincipleRow = { decision_id: 'd', principle_id: 'p1', stance: 'follows', reason: '', created_by: 'u', created_at: '2026-11-19T00:00:00Z' };
+
+  it('returns the saved links when nothing is saving', () => {
+    expect(withPendingStances([saved], new Map(), 'd', 'u')).toEqual([saved]);
+  });
+
+  it('shows a stance being saved as already chosen, replacing the saved one', () => {
+    const shown = withPendingStances([saved], new Map([['p1', { stance: 'departs' as const, reason: 'Does not fit.' }]]), 'd', 'u');
+    expect(shown).toHaveLength(1);
+    expect(shown[0]).toMatchObject({ principle_id: 'p1', stance: 'departs', reason: 'Does not fit.' });
+  });
+
+  it('shows a view being taken back as already gone', () => {
+    expect(withPendingStances([saved], new Map([['p1', { stance: null, reason: '' }]]), 'd', 'u')).toEqual([]);
+  });
+
+  it('shows a new stance on a principle with no saved link, and leaves the others alone', () => {
+    const other = { ...saved, principle_id: 'p2' };
+    const shown = withPendingStances([other], new Map([['p1', { stance: 'follows' as const, reason: '' }]]), 'd', 'u');
+    expect(shown.map((l) => l.principle_id).sort()).toEqual(['p1', 'p2']);
   });
 });

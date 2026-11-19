@@ -3,6 +3,23 @@
  */
 import type { DecisionPrincipleRow, PrincipleRow, PrincipleStance } from '../../contracts/principles';
 
+/** A stance being saved now: `null` means the person is taking their view back. */
+export type PendingStances = ReadonlyMap<string, { stance: PrincipleStance | null; reason: string }>;
+
+/**
+ * The saved links with any stance still being saved shown as already chosen, so a click never looks undone
+ * while it saves. Once the save and the read-back finish, the pending entry is dropped and the saved link takes over.
+ */
+export function withPendingStances(links: readonly DecisionPrincipleRow[], pending: PendingStances, decisionId: string, userId: string): DecisionPrincipleRow[] {
+  if (pending.size === 0) return [...links];
+  const kept = links.filter((l) => !pending.has(l.principle_id));
+  const added: DecisionPrincipleRow[] = [];
+  for (const [principleId, { stance, reason }] of pending) {
+    if (stance !== null) added.push({ decision_id: decisionId, principle_id: principleId, stance, reason, created_by: userId, created_at: '' });
+  }
+  return [...kept, ...added];
+}
+
 export interface DecisionPrincipleLine {
   principle: PrincipleRow;
   /** `null` while the decision takes no view on this principle. */
