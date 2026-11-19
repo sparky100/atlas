@@ -106,6 +106,10 @@ test('project lifecycle: start from a finding, decide inside it, deliver the cho
   // 7. Nothing is open any more: close the project.
   await goToModelHome(page);
   await openProject(page);
+  // Nothing is open, so the Changes step starts collapsed; open it to see the merged change.
+  const changesToggle = page.getByRole('button', { name: /^Changes/ });
+  await expect(changesToggle).toHaveAttribute('aria-expanded', 'false');
+  await changesToggle.click();
   await expect(page.getByRole('region', { name: 'Merged' }).getByRole('link', { name: 'Build Repairs Hub' })).toBeVisible();
   await page.getByRole('button', { name: 'Close project' }).click();
   await expect(page.getByText('Closed', { exact: true }).first()).toBeVisible();
