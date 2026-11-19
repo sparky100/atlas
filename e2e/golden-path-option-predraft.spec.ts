@@ -24,7 +24,13 @@ test('an empty option offers to retire the system the decision concerns', async 
   await page.getByRole('button', { name: '+ Add an option' }).click();
   await page.getByPlaceholder("What's this option? (e.g. Replace with Workday)").fill('Buy a new quoting product');
   await page.getByRole('button', { name: 'Add option' }).click();
-  await page.getByRole('link', { name: 'Buy a new quoting product' }).first().click();
+  await expect(page.getByText('Buy a new quoting product').first()).toBeVisible();
+
+  // With no edits, the option's diagram says so and offers the way back to drafting them.
+  await page.getByRole('link', { name: 'View diagram →' }).first().click();
+  await expect(page.getByTestId('option-diagram-no-edits')).toContainText('No changes yet');
+  await expect(page.getByTestId('option-diagram-no-edits').getByRole('link', { name: 'Draft the obvious edits →' })).toBeVisible();
+  await page.getByTestId('option-diagram-no-edits').getByRole('link', { name: 'Draft the obvious edits →' }).click();
 
   const card = page.getByTestId('option-draft-card');
   await expect(card.getByRole('link', { name: 'Retire Quote Tool and replace it with a new system' })).toBeVisible();
