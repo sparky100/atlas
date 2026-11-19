@@ -38,8 +38,11 @@ test('project lifecycle: start from a finding, decide inside it, deliver the cho
   const scopePanel = page.locator('section, div').filter({ has: page.getByRole('heading', { name: 'Declared scope' }) }).last();
   await expect(scopePanel.getByRole('link', { name: 'Housing Repairs' })).toBeVisible();
 
-  // 2. A decision inside the project.
-  await page.getByLabel('New decision title').fill('Which system supports repairs?');
+  // 2. The page says what to do next, and the decision form is right there in that card.
+  const nextStep = page.getByTestId('project-next-step');
+  await expect(nextStep.getByRole('heading', { name: 'What to do next' })).toBeVisible();
+  await expect(nextStep.getByText('Work out the options')).toBeVisible();
+  await nextStep.getByLabel('New decision title').fill('Which system supports repairs?');
   await page.getByRole('button', { name: 'Start decision' }).click();
   await expect(page.getByRole('heading', { name: 'Which system supports repairs?' })).toBeVisible();
   await expect(page.getByRole('link', { name: PROJECT_TITLE })).toBeVisible();

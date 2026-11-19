@@ -42,6 +42,7 @@ import { markdownToPdfBytes } from '../exports/markdownPdf';
 import { buildProjectPackMarkdown, projectPackFilename } from '../exports/projectPack';
 import { downloadBlob, exportDate } from '../exports/viewExport';
 import { buildProjectJourney } from './projectJourney';
+import { projectNextStep } from './projectNextStep';
 import { ProjectBeforeAfter } from './ProjectBeforeAfter';
 import { ProjectStep } from './ProjectStep';
 import { changesSummary, decisionsSummary, evidenceSummary, scopeSummary } from './projectStepSummary';
@@ -98,6 +99,21 @@ export function ProjectView({ data, modelName, orgId, modelId, orgSlug, modelSlu
   const difference = scopeDifference(scopeIds, touchedIds, data.reachedIds);
   const progress = projectProgress(changes, decisions);
   const firstDecision = originatingDecision(decisions);
+  const canDecide = canStartDecision(role) && userId !== null;
+  const canDraft = canCreateChangeBranch(role) && userId !== null && Boolean(main?.head_commit_id);
+  const nextStep = projectNextStep({
+    isOpen,
+    purpose: project.purpose,
+    hasCapability: data.scopeHasCapability,
+    decisions,
+    changes,
+    canStartDecision: canDecide,
+    canCreateChange: canCreateChangeBranch(role) && userId !== null,
+    canDraftChange: Boolean(main?.head_commit_id),
+  });
+  // The card hosts the form for its step, so the same form is not drawn twice further down.
+  const cardHostsDecisionForm = nextStep?.action.kind === 'start-decision';
+  const cardHostsChangeForm = nextStep?.action.kind === 'start-change';
 
   return (
     <div className={styles.page}>
@@ -115,6 +131,26 @@ export function ProjectView({ data, modelName, orgId, modelId, orgSlug, modelSlu
             {project.status === 'closed' ? 'Closed' : 'Cancelled'} by {nameOfUser(project.closed_by)} on {project.closed_at?.slice(0, 10) ?? ''}
             {project.close_reason !== null ? ` — ${project.close_reason}` : ''}.
           </Text>
+        </Panel>
+      )}
+
+      {nextStep !== null && (
+        <Panel data-testid="project-next-step">
+          <Text as="h2" size="lg">
+            What to do next
+          </Text>
+          <Text as="p" size="md">
+            {nextStep.title}
+          </Text>
+          <Text as="p" size="sm" tone="muted">
+            {nextStep.body}
+          </Text>
+          {nextStep.action.kind === 'start-decision' && userId !== null && <NewDecisionForm project={project} userId={userId} scopeIds={scopeIds} base={base} />}
+          {nextStep.action.kind === 'start-change' && userId !== null && main?.head_commit_id && <NewChangeForm project={project} userId={userId} mainHeadCommitId={main.head_commit_id} base={base} />}
+          {nextStep.action.kind === 'open-decision' && (
+            <Link to={`${base}/decisions/${nextStep.action.id}`}>{nextStep.action.label}</Link>
+          )}
+          {nextStep.action.kind === 'open-change' && <Link to={`${base}/changes/${nextStep.action.id}`}>{nextStep.action.label}</Link>}
         </Panel>
       )}
 
@@ -268,7 +304,7 @@ export function ProjectView({ data, modelName, orgId, modelId, orgSlug, modelSlu
               ))}
             </ul>
           )}
-          {isOpen && canStartDecision(role) && userId !== null && <NewDecisionForm project={project} userId={userId} scopeIds={scopeIds} base={base} />}
+          {isOpen && canDecide && !cardHostsDecisionForm && <NewDecisionForm project={project} userId={userId} scopeIds={scopeIds} base={base} />}
           {constrainingDecisions.length > 0 && (
             <>
               <Text as="h3" size="md">
@@ -303,7 +339,7 @@ export function ProjectView({ data, modelName, orgId, modelId, orgSlug, modelSlu
               </ul>
             </section>
           ))}
-          {isOpen && canCreateChangeBranch(role) && userId !== null && main?.head_commit_id && <NewChangeForm project={project} userId={userId} mainHeadCommitId={main.head_commit_id} base={base} />}
+          {isOpen && canDraft && main?.head_commit_id && !cardHostsChangeForm && <NewChangeForm project={project} userId={userId} mainHeadCommitId={main.head_commit_id} base={base} />}
           </ProjectStep>
         </Panel>
       )}
