@@ -42,5 +42,7 @@ export const queryKeys = {
   /** The Changes nav badge: how many changes are still open (`countOpenChangeBranches`). */
   openChangeCount: (modelId: UUID | null) => ['changes', 'openCount', modelId] as const,
   /** The Decisions nav badge: how many decisions are still proposed (`countProposedDecisions`). */
+  /** A decision's frozen packs (`listDecisionPacks`). */
+  decisionPacks: (decisionId: UUID) => ['decisions', 'packs', decisionId] as const,
   proposedDecisionCount: (modelId: UUID | null) => ['decisions', 'proposedCount', modelId] as const,
 };
