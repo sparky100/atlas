@@ -313,6 +313,37 @@ describe('decisions/decision_links/decision_arguments/assumptions/evidence again
       expect(editAfterChooseError).not.toBeNull();
     });
 
+    it('records what would make us reconsider, and a review date; both are optional and cannot be edited afterwards', async () => {
+      const main = await getMainBranch(alice.client, modelId);
+      if (!main?.head_commit_id) throw new Error('main branch not found');
+      const decision = await createDecision(alice.client, { id: randomUUID(), orgId, modelId, title: 'Reconsider record', statement: 'context', ownerId: alice.id, createdBy: alice.id });
+      const option = await createChangeBranch(alice.client, { id: randomUUID(), orgId, modelId, name: `reconsider-option-${randomUUID().slice(0, 8)}`, createdBy: alice.id, intent: 'explore', mainHeadCommitId: main.head_commit_id });
+      await createDecisionLink(alice.client, { decisionId: decision.id, linkedType: 'branch', linkedId: option.id, createdBy: alice.id });
+      expect(decision.reconsider_if).toBeNull();
+      expect(decision.review_by).toBeNull();
+
+      await expect(chooseDecisionOption(alice.client, decision.id, option.id, 'Cheapest.', { reconsiderIf: 'Price rises', reviewBy: '2020-01-01' })).rejects.toThrow(/past/);
+
+      const reviewBy = new Date(Date.now() + 90 * 86_400_000).toISOString().slice(0, 10);
+      const accepted = await chooseDecisionOption(alice.client, decision.id, option.id, 'Cheapest.', { reconsiderIf: '  Vendor price rises or support is extended  ', reviewBy });
+      expect(accepted).toMatchObject({ status: 'accepted', reconsider_if: 'Vendor price rises or support is extended', review_by: reviewBy });
+
+      // Not in the column update grant: even the owner cannot rewrite them directly.
+      const { error: rewriteError } = await alice.client.from('decisions').update({ reconsider_if: 'edited later' }).eq('id', decision.id);
+      expect(rewriteError).not.toBeNull();
+    });
+
+    it('a signed-in user from a different organisation cannot choose an option on this decision', async () => {
+      const main = await getMainBranch(alice.client, modelId);
+      if (!main?.head_commit_id) throw new Error('main branch not found');
+      const decision = await createDecision(alice.client, { id: randomUUID(), orgId, modelId, title: 'Cross-org check', statement: 'context', ownerId: alice.id, createdBy: alice.id });
+      const option = await createChangeBranch(alice.client, { id: randomUUID(), orgId, modelId, name: `xorg-option-${randomUUID().slice(0, 8)}`, createdBy: alice.id, intent: 'explore', mainHeadCommitId: main.head_commit_id });
+      await createDecisionLink(alice.client, { decisionId: decision.id, linkedType: 'branch', linkedId: option.id, createdBy: alice.id });
+      const outsider = await createSignedInUser('decisions-outsider');
+      await expect(chooseDecisionOption(outsider.client, decision.id, option.id, 'I am not a member', { reconsiderIf: 'x' })).rejects.toThrow();
+      await service.auth.admin.deleteUser(outsider.id);
+    });
+
     it('refuses a non-owner/architect caller, a branch not linked to the decision, and a branch that is not a draft explore-intent option', async () => {
       const main = await getMainBranch(alice.client, modelId);
       if (!main?.head_commit_id) throw new Error('main branch not found');

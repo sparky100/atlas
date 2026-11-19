@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import type { ElementsHeadRow, FactsRow, Json, RelationshipsHeadRow } from '../contracts/rows';
 import {
   findOutgoingWithoutRetiringChange,
+  findDecisionsDueForReview,
   findProjectsWithoutCapability,
   deriveCapabilitiesForScope,
   type ElementProjectScope,
@@ -1050,5 +1051,19 @@ describe('deriveCapabilitiesForScope (A1b)', () => {
       relationship('r4', 'supports', 'sys-1', 'sys-x'), // target is a system, not a capability → skipped
     ];
     expect(deriveCapabilitiesForScope(['sys-1', 'cap-a'], supports, byId)).toEqual([]);
+  });
+});
+
+describe('findDecisionsDueForReview', () => {
+  const d = (id: string, over: Partial<{ title: string; status: string; review_by: string | null; reconsider_if: string | null }> = {}) => ({ id, title: id, status: 'accepted', review_by: null, reconsider_if: null, ...over });
+
+  it('lists accepted decisions whose review date is today or earlier, oldest first', () => {
+    const found = findDecisionsDueForReview([d('late', { review_by: '2026-11-01' }), d('today', { review_by: '2026-11-19', reconsider_if: 'Price rises' }), d('future', { review_by: '2026-12-01' })], '2026-11-19');
+    expect(found.map((f) => f.decisionId)).toEqual(['late', 'today']);
+    expect(found[1]?.reconsiderIf).toBe('Price rises');
+  });
+
+  it('ignores a decision with no review date, and one that is not accepted', () => {
+    expect(findDecisionsDueForReview([d('none'), d('open', { status: 'proposed', review_by: '2026-01-01' }), d('cancelled', { status: 'rejected', review_by: '2026-01-01' }), d('old', { status: 'superseded', review_by: '2026-01-01' })], '2026-11-19')).toEqual([]);
   });
 });

@@ -444,6 +444,10 @@ export interface DecisionRow {
   decided_at: string | null;
   /** Why it was cancelled — set together with `status: 'rejected'` (shown as "Cancelled") by `atlas.cancel_decision`, `null` otherwise (and on any row rejected before that function existed). */
   cancel_reason: string | null;
+  /** What would make the decision be revisited, in plain statements. Set only when an option is chosen; `null` when none was given. */
+  reconsider_if: string | null;
+  /** Optional date to look at the decision again. Set only when an option is chosen. */
+  review_by: string | null;
   /** The chosen option's branch, once accepted (PR5). */
   branch_id: UUID | null;
   superseded_decision_id: UUID | null;

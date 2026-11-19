@@ -940,3 +940,24 @@ export function findCapabilitiesWithNoSupporters(
 }
 
 export { STALE_AFTER_MONTHS };
+
+/** Phase B ("what would make us reconsider"): a chosen decision whose review date has come. */
+export interface DecisionDueForReview {
+  decisionId: UUID;
+  title: string;
+  reviewBy: string;
+  reconsiderIf: string | null;
+}
+
+/**
+ * Accepted decisions whose own `review_by` date is today or earlier (ISO
+ * `YYYY-MM-DD`, compared as strings). A decision with no review date never
+ * appears, and a superseded or cancelled one is no longer in force, so only
+ * `accepted` counts. Oldest review date first, then title, so the order is
+ * stable. Pure over the decisions already loaded for the model.
+ */
+export function findDecisionsDueForReview(decisions: readonly { id: UUID; title: string; status: string; review_by: string | null; reconsider_if: string | null }[], today: string): DecisionDueForReview[] {
+  return decisions
+    .flatMap((d) => (d.status === 'accepted' && d.review_by !== null && d.review_by <= today ? [{ decisionId: d.id, title: d.title, reviewBy: d.review_by, reconsiderIf: d.reconsider_if }] : []))
+    .sort((a, b) => a.reviewBy.localeCompare(b.reviewBy) || a.title.localeCompare(b.title));
+}

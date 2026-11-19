@@ -31,8 +31,8 @@ export interface UseDecisionOptionsResult {
    * one atomic call.
    */
   addOption: (input: AddOptionInput) => Promise<boolean>;
-  /** F3's own "Choose" — `atlas.choose_decision_option` in one call (`src/db/decisions.ts`'s `chooseDecisionOption`). */
-  chooseOption: (decisionId: UUID, branchId: UUID, reasons: string) => Promise<boolean>;
+  /** F3's own "Choose" — `atlas.choose_decision_option` in one call (`src/db/decisions.ts`'s `chooseDecisionOption`). Optionally records what would make the choice be reconsidered, and a review date. */
+  chooseOption: (decisionId: UUID, branchId: UUID, reasons: string, reconsider?: { reconsiderIf: string; reviewBy: string }) => Promise<boolean>;
 }
 
 /**
@@ -104,7 +104,7 @@ export function useDecisionOptions(
   );
 
   const chooseOption = useCallback(
-    async (decisionId: UUID, branchId: UUID, reasons: string): Promise<boolean> => {
+    async (decisionId: UUID, branchId: UUID, reasons: string, reconsider?: { reconsiderIf: string; reviewBy: string }): Promise<boolean> => {
       if (reasons.trim().length === 0) {
         setError('Reasons are required.');
         return false;
@@ -112,7 +112,10 @@ export function useDecisionOptions(
       setError(null);
       setStatus('choosing');
       try {
-        const decision = await chooseDecisionOption(supabase, decisionId, branchId, reasons.trim());
+        const decision = await chooseDecisionOption(supabase, decisionId, branchId, reasons.trim(), {
+          ...(reconsider !== undefined && reconsider.reconsiderIf.trim().length > 0 ? { reconsiderIf: reconsider.reconsiderIf.trim() } : {}),
+          ...(reconsider !== undefined && reconsider.reviewBy.length > 0 ? { reviewBy: reconsider.reviewBy } : {}),
+        });
         applyDecisionUpdate(decision);
         await refreshOptionsAndArguments();
         return true;

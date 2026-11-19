@@ -95,6 +95,8 @@ export function DecisionView({ modelId, decisionId, orgId, orgSlug, modelSlug, r
   const [optionTitle, setOptionTitle] = useState('');
   const [choosingBranchId, setChoosingBranchId] = useState<UUID | null>(null);
   const [reasons, setReasons] = useState('');
+  const [reconsiderIf, setReconsiderIf] = useState('');
+  const [reviewBy, setReviewBy] = useState('');
   const [adrCopied, setAdrCopied] = useState(false);
   const [whatChangesExpanded, setWhatChangesExpanded] = useState(false);
 
@@ -236,6 +238,46 @@ export function DecisionView({ modelId, decisionId, orgId, orgSlug, modelSlug, r
         </div>
       </Panel>
 
+      {decision.status === 'accepted' && (
+        <Panel>
+          <Text as="h2" size="lg">
+            What we chose, why, and what would make us reconsider
+          </Text>
+          <div className={styles.field}>
+            <Text as="h3" size="sm" tone="muted">
+              What we chose
+            </Text>
+            <Text as="p">{chosenBranch !== undefined ? (chosenBranch.title ?? chosenBranch.name) : 'An option that is no longer linked to this decision.'}</Text>
+            {decision.decided_at !== null && (
+              <Text as="p" size="sm" tone="muted">
+                Decided {decision.decided_at.slice(0, 10)}
+              </Text>
+            )}
+          </div>
+          <div className={styles.field}>
+            <Text as="h3" size="sm" tone="muted">
+              Why
+            </Text>
+            <Text as="p" tone={args.some((a) => a.stance === 'for') ? 'default' : 'muted'}>
+              {args.find((a) => a.stance === 'for')?.body ?? 'No reasons recorded.'}
+            </Text>
+          </div>
+          <div className={styles.field}>
+            <Text as="h3" size="sm" tone="muted">
+              What would make us reconsider
+            </Text>
+            <Text as="p" tone={decision.reconsider_if ? 'default' : 'muted'}>
+              {decision.reconsider_if ?? 'Nothing was recorded when this was chosen.'}
+            </Text>
+            {decision.review_by !== null && (
+              <Text as="p" size="sm" tone="muted">
+                To be looked at again by {decision.review_by}
+              </Text>
+            )}
+          </div>
+        </Panel>
+      )}
+
       <Panel>
         <Text as="h2" size="lg">
           Concerns
@@ -357,13 +399,40 @@ export function DecisionView({ modelId, decisionId, orgId, orgSlug, modelSlug, r
                   setReasons(e.target.value);
                 }}
               />
+              <Text as="label" size="sm" tone="muted">
+                What would make us reconsider (optional)
+              </Text>
+              <textarea
+                className={styles.textarea}
+                placeholder="For example: the vendor price rises, support is extended, or the migration slips past March"
+                value={reconsiderIf}
+                onChange={(e) => {
+                  setReconsiderIf(e.target.value);
+                }}
+              />
+              <label>
+                <Text as="span" size="sm" tone="muted">
+                  Look at this decision again by (optional)
+                </Text>
+                <input
+                  type="date"
+                  value={reviewBy}
+                  onChange={(e) => {
+                    setReviewBy(e.target.value);
+                  }}
+                />
+              </label>
               <div className={styles.addOptionForm}>
                 <Button
                   variant="primary"
                   disabled={optionsState.status === 'choosing' || reasons.trim().length === 0}
                   onClick={() => {
-                    void optionsState.chooseOption(decisionId, choosingBranchId, reasons).then((chosen) => {
-                      if (chosen) setChoosingBranchId(null);
+                    void optionsState.chooseOption(decisionId, choosingBranchId, reasons, { reconsiderIf, reviewBy }).then((chosen) => {
+                      if (chosen) {
+                        setChoosingBranchId(null);
+                        setReconsiderIf('');
+                        setReviewBy('');
+                      }
                     });
                   }}
                 >

@@ -4,6 +4,7 @@ import type { CommitRow, ElementsHeadRow } from '../../contracts/rows';
 import { fromDeltaRow } from '../../contracts/rows';
 import { getMainBranch } from '../../db/branches';
 import { listCapabilitiesForMap } from '../../db/capabilityMap';
+import { listDecisionsForModel } from '../../db/decisions';
 import { listDuplicateCandidates } from '../../db/duplicates';
 import { getElementsByIds } from '../../db/elements';
 import {
@@ -14,9 +15,11 @@ import {
   findCriticalExposedSystems,
   findCriticalSystemsPastOrNearSupportEnd,
   findOutgoingWithoutRetiringChange,
+  findDecisionsDueForReview,
   findProjectsWithoutCapability,
   listOpenProjectScopeForModel,
   loadElementsRetiredByOpenChanges,
+  type DecisionDueForReview,
   type ElementProjectScope,
   type ProjectWithoutCapability,
   findAiAgentsActingAloneWithoutTechnicalOwner,
@@ -110,6 +113,8 @@ export interface ArchitectHomeInsightsData {
   projectByElementId: Map<UUID, ElementProjectScope>;
   /** A1b: open projects whose declared scope names no capability (`findProjectsWithoutCapability`) — the gap A1a's form guard now prevents at creation. */
   projectsWithoutCapability: ProjectWithoutCapability[];
+  /** Phase B: chosen decisions whose review date has come (`findDecisionsDueForReview`). */
+  decisionsDueForReview: DecisionDueForReview[];
   /** S1 item 11a's own first Assurance finding: a `uses`/`flows_to` edge crossing the enterprise/external boundary (`isExternal`/`externalOrganisation`, not IT/OT domain) with no data classification. */
   externalInterfacesMissingClassification: ExternalInterfaceCrossing[];
   /** S1 item 11a's own second Assurance row: purely informational — every external actor `uses` edge, naming the organisation and which system it reaches. No classification requirement (see that finding's own doc comment for why). */
@@ -148,7 +153,7 @@ export function useArchitectHomeInsights(modelId: UUID, userId: UUID | null): Ar
         return;
       }
 
-      const [commits, capabilities, systems, allElements, supportsEdges, ownsEdges, replacesEdges, facts, usesAndFlowsToEdges, usesAndFlowsToEndpoints, actors, duplicateCandidates, retiringElementIds, projectScope] = await Promise.all([
+      const [commits, capabilities, systems, allElements, supportsEdges, ownsEdges, replacesEdges, facts, usesAndFlowsToEdges, usesAndFlowsToEndpoints, actors, duplicateCandidates, retiringElementIds, projectScope, modelDecisions] = await Promise.all([
         // S1 item 6: "recent activity" now groups consecutive same-subject
         // commits into one line and prefers others' activity when trimming
         // to five displayed items (groupRecentActivity.ts) — both can
@@ -182,6 +187,7 @@ export function useArchitectHomeInsights(modelId: UUID, userId: UUID | null): Ar
         // F11: what open changes retire, and which open projects claim which elements.
         loadElementsRetiredByOpenChanges(supabase, modelId),
         listOpenProjectScopeForModel(supabase, modelId),
+        listDecisionsForModel(supabase, modelId),
       ]);
 
       const usesAndFlowsToEndpointsById = new Map([...usesAndFlowsToEndpoints, ...actors].map((el) => [el.element_id, el]));
@@ -267,6 +273,7 @@ export function useArchitectHomeInsights(modelId: UUID, userId: UUID | null): Ar
             outgoingWithoutRetiringChange: findOutgoingWithoutRetiringChange([...systems, ...containers], retiringElementIds, new Map(systems.map((el) => [el.element_id, el]))),
             projectByElementId: new Map(projectScope.map((scope) => [scope.elementId, scope])),
             projectsWithoutCapability: findProjectsWithoutCapability(projectScope, elementsById),
+            decisionsDueForReview: findDecisionsDueForReview(modelDecisions, `${String(today.getFullYear())}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`),
             externalInterfacesMissingClassification: findExternalInterfacesMissingClassification(liveUsesAndFlowsTo, usesAndFlowsToEndpointsById),
             externalOrganisationAccess: findExternalOrganisationAccess(liveUsesAndFlowsTo, usesAndFlowsToEndpointsById),
           },

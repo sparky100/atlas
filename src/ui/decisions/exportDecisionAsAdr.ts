@@ -161,6 +161,13 @@ export function exportDecisionAsAdrMarkdown(input: DecisionAdrExportInput): stri
       lines.push('');
       lines.push(reasons);
     }
+    if (decision.reconsider_if && decision.reconsider_if.trim().length > 0) {
+      lines.push('');
+      lines.push(`Reconsider if: ${decision.reconsider_if}${decision.review_by ? ` (look again by ${decision.review_by})` : ''}`);
+    } else if (decision.review_by) {
+      lines.push('');
+      lines.push(`Look again by ${decision.review_by}.`);
+    }
   } else if (decision.status === 'rejected') {
     lines.push(decision.cancel_reason ? `Cancelled without choosing an option: ${decision.cancel_reason}` : 'Cancelled without choosing an option.');
   } else {
