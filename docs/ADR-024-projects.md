@@ -41,7 +41,7 @@ Three things need deciding that neither ADR-001 nor ADR-013/022 answers:
 | `owner_id` | `uuid not null → auth.users` | the architect: who is accountable for delivering it — distinct from any decision's own owner (shown as "Architect" in the UI) |
 | `project_manager_id` | `uuid` (no FK, no index — see `20261115130000_project_manager.sql`) | optional: the project manager, when they are an Atlas user |
 | `project_manager_name` | `text`, 1–200 characters | optional: the project manager as a plain name, when they are not an Atlas user; at most one of the two is set |
-| `status` | `text not null default 'active'`, check in `('active','on_hold','closed','cancelled')` | RPC-only past creation (§4) |
+| `status` | `text not null default 'active'`, check in `('proposed','active','on_hold','closed','cancelled')` (`proposed` only at creation, B2) | RPC-only past creation (§4) |
 | `start_date` | `date` nullable | |
 | `target_date` | `date` nullable | when the project as a whole is meant to be done — distinct from each change's own `branches.target_date` |
 | `source_finding_key` | `text` nullable | which health-finding check "Start a project" traced back to — same stable-string-key stance as `decisions.source_finding_key` (ADR-022) |
@@ -171,3 +171,5 @@ Agreed with the human on 2026-10-07. The change page's "Other open changes touch
 - **Field-level history** for project fields (see accepted risk above).
 - **Project pack export** (one document of scope, decision log, target state and evidence) — planned as part of the export work, not this ADR's first build.
 - **Assumptions/evidence authoring UI** — already deferred by ADR-022; the project page's evidence section needs at least "add a link/document", so this becomes a prerequisite of that section, tracked in the plan.
+
+**Amended — proposed projects (2026-11-19, migration `20261119150000_project_proposed_status.sql`):** a project may be created `proposed` (insert policy allows `active` or `proposed`). While proposed it is open: it can be edited and take decisions, changes and scope (policies and `atlas.assert_project_accepts_members` accept it). `atlas.set_project_status` is replaced: `proposed → active` only for an org owner or architect (never the proposer alone); `proposed → cancelled` declines it, with a reason and still subject to P4; `proposed → on_hold` or `closed` is refused; nothing returns to `proposed`. Proposed projects are not counted as work in hand and are left off the Roadmap. No new table or function. Reason: Simon's Phase B2, so a person (and later an agent) can put forward a project without it counting as committed work.

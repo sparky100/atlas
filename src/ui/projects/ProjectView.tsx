@@ -20,7 +20,7 @@ import { projectManagerFromRow, projectManagerToInput, type ProjectManagerValue 
 import { DecisionLinkPicker } from '../decisions/DecisionLinkPicker';
 import { decisionStatusLabel, decisionStatusTone } from '../decisions/decisionStatus';
 import { reportError } from '../errors/errorBannerStore';
-import { canCreateChangeBranch, canEditProject, canStartDecision } from '../orgs/roleGates';
+import { canAcceptProject, canCreateChangeBranch, canEditProject, canStartDecision } from '../orgs/roleGates';
 import { useMembers } from '../orgs/useMembers';
 import { supabase } from '../supabaseClient';
 import {
@@ -34,6 +34,7 @@ import {
   projectStatusLabel,
   projectStatusTone,
   scopeDifference,
+  projectIsOpen,
 } from './projectModel';
 import { loadProjectPack } from '../exports/loadProjectPack';
 import { markdownToPdfBytes } from '../exports/markdownPdf';
@@ -72,7 +73,7 @@ export function ProjectView({ data, modelName, orgId, modelId, orgSlug, modelSlu
   const { members } = useMembers(orgId);
   const { branch: main } = useMainBranch(modelId);
   const canEdit = canEditProject(role, project, userId);
-  const isOpen = project.status === 'active' || project.status === 'on_hold';
+  const isOpen = projectIsOpen(project.status);
   const base = `/o/${orgSlug}/m/${modelSlug}`;
   const nameOfUser = (id: UUID | null) => {
     if (id === null) return 'Nobody';
@@ -98,7 +99,7 @@ export function ProjectView({ data, modelName, orgId, modelId, orgSlug, modelSlu
 
       {canEdit && <ProjectEditPanel project={project} members={members.map((m) => ({ id: m.member.user_id, label: profileLabel(m.profile) }))} onSaved={reload} />}
 
-      {canEdit && <ProjectStatusPanel project={project} changes={changes} decisions={decisions} base={base} onChanged={reload} />}
+      {canEdit && <ProjectStatusPanel project={project} changes={changes} decisions={decisions} base={base} canAccept={canAcceptProject(role)} onChanged={reload} />}
 
       {!isOpen && (
         <Panel>
@@ -402,6 +403,11 @@ function ProjectHeader({ project, ownerName, managerName, progress }: { project:
           </Text>
         )}
       </div>
+      {project.status === 'proposed' && (
+        <Text as="p" size="sm">
+          This is a proposal. It is not yet work in hand, and does not appear on the roadmap, until an owner or architect accepts it.
+        </Text>
+      )}
       {project.purpose !== '' && <Text as="p">{project.purpose}</Text>}
       <Text as="p" tone="muted" size="sm">
         {formatProjectProgress(progress)}
@@ -737,7 +743,7 @@ function ProjectEditPanel({ project, members, onSaved }: { project: ProjectRow; 
  * each linking to its own page where its own existing action ends it — the
  * project never cancels anything itself.
  */
-function ProjectStatusPanel({ project, changes, decisions, base, onChanged }: { project: ProjectRow; changes: BranchRow[]; decisions: DecisionRow[]; base: string; onChanged: () => void }) {
+function ProjectStatusPanel({ project, changes, decisions, base, canAccept, onChanged }: { project: ProjectRow; changes: BranchRow[]; decisions: DecisionRow[]; base: string; canAccept: boolean; onChanged: () => void }) {
   const [reason, setReason] = useState('');
   const [mode, setMode] = useState<'idle' | 'cancelling'>('idle');
   const [error, setError] = useState<string | null>(null);
@@ -769,6 +775,21 @@ function ProjectStatusPanel({ project, changes, decisions, base, onChanged }: { 
         Status
       </Text>
       <div className={styles.meta}>
+        {project.status === 'proposed' && canAccept && (
+          <Button
+            variant="primary"
+            onClick={() => {
+              run('active');
+            }}
+          >
+            Accept proposal
+          </Button>
+        )}
+        {project.status === 'proposed' && !canAccept && (
+          <Text as="p" size="sm" tone="muted">
+            Waiting for an owner or architect to accept this proposal.
+          </Text>
+        )}
         {project.status === 'active' && (
           <Button
             onClick={() => {
@@ -787,7 +808,7 @@ function ProjectStatusPanel({ project, changes, decisions, base, onChanged }: { 
             Resume
           </Button>
         )}
-        {!blocked && (
+        {!blocked && project.status !== 'proposed' && (
           <Button
             variant="primary"
             onClick={() => {
@@ -803,7 +824,7 @@ function ProjectStatusPanel({ project, changes, decisions, base, onChanged }: { 
               setMode('cancelling');
             }}
           >
-            Cancel project…
+            {project.status === 'proposed' ? 'Decline proposal…' : 'Cancel project…'}
           </Button>
         )}
       </div>
@@ -819,10 +840,10 @@ function ProjectStatusPanel({ project, changes, decisions, base, onChanged }: { 
             run('cancelled', reason.trim());
           }}
         >
-          <input className={styles.input} type="text" aria-label="Why is this project being cancelled?" placeholder="Why is this project being cancelled?" value={reason} onChange={(e) => { setReason(e.target.value); }} />
+          <input className={styles.input} type="text" aria-label="Why is this project being cancelled?" placeholder={project.status === 'proposed' ? 'Why is this proposal being declined?' : 'Why is this project being cancelled?'} value={reason} onChange={(e) => { setReason(e.target.value); }} />
           <div className={styles.meta}>
             <Button variant="primary" type="submit">
-              Cancel project
+              {project.status === 'proposed' ? 'Decline proposal' : 'Cancel project'}
             </Button>
             <Button
               onClick={() => {

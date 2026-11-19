@@ -108,8 +108,8 @@ export const listDecisions = defineTool({
 
 export const listProjects = defineTool({
   name: 'list_projects',
-  description: 'List projects: title, purpose, status (active, on hold, closed, cancelled), start and target dates.',
-  schema: z.strictObject({ status: z.enum(['active', 'on_hold', 'closed', 'cancelled']).optional(), limit: limitInput }),
+  description: 'List projects: title, purpose, status (proposed, active, on hold, closed, cancelled), start and target dates.',
+  schema: z.strictObject({ status: z.enum(['proposed', 'active', 'on_hold', 'closed', 'cancelled']).optional(), limit: limitInput }),
   run: async (ctx, input) => {
     const all = (await ctx.projects()).filter((p) => input.status === undefined || p.status === input.status);
     const shown = all.slice(0, input.limit).map((p) => ({
