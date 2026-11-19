@@ -99,6 +99,8 @@ test('project lifecycle: start from a finding, decide inside it, deliver the cho
   await expect(page.getByText('Touched by this project\'s changes, not in scope')).toBeVisible();
   // The system now also appears in the before/after panel, so match the first link on the page.
   await expect(page.getByRole('link', { name: 'Repairs Hub', exact: true }).first()).toBeVisible();
+  // The card follows the work: the choice is made and the design is open, so the next step is review.
+  await expect(page.getByTestId('project-next-step').getByText('Take the change through review')).toBeVisible();
   // Closing is refused while the design is open — and the page says what's open.
   await expect(page.getByRole('button', { name: 'Close project' })).toHaveCount(0);
   await expect(page.getByText('To close or cancel this project, first finish or cancel what is still open in it:')).toBeVisible();
@@ -125,9 +127,12 @@ test('project lifecycle: start from a finding, decide inside it, deliver the cho
   await expect(changesToggle).toHaveAttribute('aria-expanded', 'false');
   await changesToggle.click();
   await expect(page.getByRole('region', { name: 'Merged' }).getByRole('link', { name: 'Build Repairs Hub' })).toBeVisible();
+  await expect(page.getByTestId('project-next-step').getByText('Close the project', { exact: true })).toBeVisible();
   await page.getByRole('button', { name: 'Close project' }).click();
   await expect(page.getByText('Closed', { exact: true }).first()).toBeVisible();
   await expect(page.getByRole('button', { name: '✎ Edit project' })).toHaveCount(0);
+  // A closed project has no next step.
+  await expect(page.getByTestId('project-next-step')).toHaveCount(0);
 
   // No horizontal overflow on the project page (meaningful at 390).
   const overflow = await page.evaluate(() => document.documentElement.scrollWidth > document.documentElement.clientWidth + 1);
