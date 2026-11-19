@@ -195,9 +195,10 @@ describe('validateImportRow', () => {
     if (!result.ok) expect(result.error).toContain('"planned_end"');
   });
 
-  it('rejects support_ends_at on a module row', () => {
+  it('accepts support_ends_at on a module row (a module carries its own vendor support end)', () => {
     const result = validateImportRow({ name: 'PM', platform: 'SAP', support_ends_at: '2027-12-31' }, 2);
-    expect(result.ok).toBe(false);
+    expect(result.ok).toBe(true);
+    if (result.ok) expect(result.row.attributes).toMatchObject({ supportEndsAt: '2027-12-31' });
   });
 
   it('accepts the two AI columns (owner-approved importer exception) and rejects values outside their choices', () => {

@@ -67,7 +67,10 @@ function RoadmapRow({ bar, events, range, todayPct, showPast, orgSlug, modelSlug
       </Link>
       <div className={styles.track}>
         {showPast && todayPct !== undefined && <div className={styles.pastBand} style={{ width: `${String(todayPct)}%` }} aria-hidden="true" />}
-        <div className={styles.lifecycleBar} data-tone={bar.lifecycleStatus === 'retiring' || bar.lifecycleStatus === 'retired' ? 'warn' : 'neutral'} style={{ left: `${String(left)}%`, width: `${String(Math.max(width, 0.5))}%` }} />
+        {/* A bar means "until its planned end". With no end planned there is nothing to draw: a grey bar running to the edge of the window was clutter, saying only that the system continues (Simon, 2026-11-19). The row, its caption, support-end tick and change markers still show. */}
+        {bar.plannedEnd !== undefined && (
+          <div className={styles.lifecycleBar} data-tone={bar.lifecycleStatus === 'retiring' || bar.lifecycleStatus === 'retired' ? 'warn' : 'neutral'} style={{ left: `${String(left)}%`, width: `${String(Math.max(width, 0.5))}%` }} />
+        )}
         {todayPct !== undefined && <div className={styles.todayLine} style={{ left: `${String(todayPct)}%` }} title="Today" aria-hidden="true" />}
         {supportEnd !== undefined && <div className={styles.supportEndTick} data-edge={supportEnd.edge} style={{ left: `${String(supportEnd.pct)}%` }} title={`${supportEnd.edge === 'before' ? 'Vendor support ended' : 'Vendor support ends'} ${bar.supportEndsAt ?? ''}`} />}
         {events.map(({ event, branch }, index) => {
