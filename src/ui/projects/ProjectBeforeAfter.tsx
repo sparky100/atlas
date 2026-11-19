@@ -153,9 +153,9 @@ export function ProjectBeforeAfter({ modelId, projectId, mainHeadCommitId, chang
             </div>
           ) : (
             <div className={styles.diagrams}>
-              <ProjectDiagram capability={capability} column={capability.today} base={base} />
+              <ProjectDiagram capability={capability} column={capability.today} scopeSystemIds={scopeSystemIds} base={base} />
               {capability.after.map((column) => (
-                <ProjectDiagram key={column.changeId} capability={capability} column={column} base={base} />
+                <ProjectDiagram key={column.changeId} capability={capability} column={column} scopeSystemIds={scopeSystemIds} base={base} />
               ))}
             </div>
           )}

@@ -53,7 +53,9 @@ test('project journey: requirement, what it touches, how it might be met from th
   await beforeAfter.getByRole('button', { name: 'Diagram' }).click();
   const diagram = beforeAfter.getByTestId('project-diagram').first();
   await expect(diagram).toBeVisible();
-  await expect(diagram.getByRole('link', { name: 'Quote Tool', exact: true })).toBeVisible();
+  // Quote Tool shares the capability but the project does not name it, so it is not drawn, and the picture says so.
+  await expect(diagram.getByRole('link', { name: 'Quote Tool', exact: true })).toHaveCount(0);
+  await expect(beforeAfter.getByTestId('diagram-also-supports').first()).toContainText('Quote Tool');
   await beforeAfter.getByRole('button', { name: 'List' }).click();
   await expect(beforeAfter.getByTestId('project-diagram')).toHaveCount(0);
 
