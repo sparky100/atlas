@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { DecisionApprovalRow } from '../../db/types';
 import { DECISION_APPROVAL_LENSES } from '../../db/types';
-import { lensesOpenTo, packIsStale, packSignOff, packSignOffSummary } from './packSignOff';
+import { lensProgress, lensesOpenTo, packIsStale, packSignOff, packSignOffSummary } from './packSignOff';
 
 function row(over: Partial<DecisionApprovalRow>): DecisionApprovalRow {
   return { id: 'a', org_id: 'o', decision_id: 'd', pack_id: 'p2', lens: 'architecture', verdict: 'approve', comment: '', decided_by: 'u1', decided_at: '2026-11-19T10:00:00Z', ...over };
@@ -38,5 +38,15 @@ describe('packIsStale', () => {
     expect(packIsStale(undefined, 'x')).toBe(false);
     expect(packIsStale('# ADR\n', '# ADR')).toBe(false);
     expect(packIsStale('# ADR', '# ADR changed')).toBe(true);
+  });
+});
+
+describe('lensProgress', () => {
+  it('shows each capacity as approved, declined or not heard from, counting only that pack', () => {
+    const approvals = [row({ lens: 'architecture' }), row({ id: 'b', lens: 'security', verdict: 'decline' }), row({ id: 'c', lens: 'security' }), row({ id: 'd', lens: 'data', pack_id: 'p1' })];
+    const progress = lensProgress('p2', approvals, DECISION_APPROVAL_LENSES);
+    const byLens = Object.fromEntries(progress.map((p) => [p.lens, p.state]));
+    expect(byLens).toMatchObject({ architecture: 'approved', security: 'declined', data: 'none', delivery: 'none' });
+    expect(progress).toHaveLength(DECISION_APPROVAL_LENSES.length);
   });
 });

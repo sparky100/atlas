@@ -38,3 +38,13 @@
   flex-wrap: wrap;
   gap: var(--space-2);
 }
+
+/* Review progress by capacity: a wrapping row of short labels, each with its state in words (never colour alone). */
+.lensProgress {
+  list-style: none;
+  margin: var(--space-2) 0 0;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1) var(--space-3);
+}
