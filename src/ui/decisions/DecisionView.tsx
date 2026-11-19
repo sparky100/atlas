@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router';
 import { suggestOptions } from './optionSuggestions';
 import { findingLabel } from './findingLabels';
+import { aiMarkLine } from './aiMarks';
 import { useEstateSuggestions } from './useEstateSuggestions';
 import type { UUID } from '../../contracts/delta';
 import { Button } from '../components/Button/Button';
@@ -254,6 +255,13 @@ export function DecisionView({ modelId, decisionId, orgId, orgSlug, modelSlug, r
           <Text as="p" tone={decision.statement ? 'default' : 'muted'}>
             {decision.statement || 'No context recorded.'}
           </Text>
+          {aiMarkLine(decision) !== null && (
+            <div data-testid="decision-ai-mark">
+              <Text as="p" tone="muted" size="sm">
+                AI helped with this: {aiMarkLine(decision)}
+              </Text>
+            </div>
+          )}
           {findingLabel(decision.source_finding_key) !== null && (
             <div data-testid="decision-source-finding">
 <Text as="p" tone="muted" size="sm">
@@ -951,6 +959,7 @@ function DecisionEdit({ decision, members, onSaved, startOpen }: { decision: Dec
           void updateDecision(supabase, decision.id, {
             title: title.trim(),
             statement: statement.trim(),
+            ...(decision.ai_draft_agent !== null && statement.trim() !== decision.statement.trim() ? { aiDraftEdited: true } : {}),
             ownerId,
             neededBy: neededBy === '' ? null : neededBy,
             lensMapUrl: lensMapUrl.trim() === '' ? null : lensMapUrl.trim(),

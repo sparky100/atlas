@@ -1,4 +1,5 @@
 import type { UUID } from '../../contracts/delta';
+import { aiMarkLine } from './aiMarks';
 import type { BranchRow, DecisionRow } from '../../db/types';
 import { intentHeaderLine } from '../changes/branchIntent';
 import { decisionStatusLabel } from './decisionStatus';
@@ -110,6 +111,11 @@ export function exportDecisionAsAdrMarkdown(input: DecisionAdrExportInput): stri
   lines.push('## Context');
   lines.push('');
   lines.push(decision.statement.trim().length > 0 ? decision.statement : 'No context recorded.');
+  const aiLine = aiMarkLine(decision);
+  if (aiLine !== null) {
+    lines.push('');
+    lines.push(`*${aiLine}*`);
+  }
 
   if (concerns.length > 0) {
     lines.push('');

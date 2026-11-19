@@ -31,6 +31,8 @@ export interface CreateDecisionInput {
   lensMapUrl?: string;
   /** ADR-024: start the decision inside this project (its decision log). */
   projectId?: UUID | null;
+  /** The agent drafted part of the context (Simon, 2026-11-19: AI help is always indicated). Set at creation only. */
+  aiDraft?: { agent: 'designer'; draftedAt: string; edited: boolean };
   createdBy: UUID;
 }
 
@@ -46,6 +48,7 @@ export async function createDecision(supabase: Client, input: CreateDecisionInpu
     source_finding_key: input.sourceFindingKey ?? null,
     lens_map_url: input.lensMapUrl ?? null,
     project_id: input.projectId ?? null,
+    ...(input.aiDraft ? { ai_draft_agent: input.aiDraft.agent, ai_drafted_at: input.aiDraft.draftedAt, ai_draft_edited: input.aiDraft.edited } : {}),
     created_by: input.createdBy,
   };
   // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment -- untyped client; see branches.ts's module comment.
@@ -239,6 +242,8 @@ export interface UpdateDecisionInput {
   stayReason?: string;
   /** Which option branch is the baseline; must already be linked to the decision (a trigger checks). */
   baselineBranchId?: UUID | null;
+  /** A person edited an agent-drafted context; only ever set to true. */
+  aiDraftEdited?: boolean;
 }
 
 /**
@@ -258,6 +263,7 @@ export async function updateDecision(supabase: Client, decisionId: UUID, input: 
   if (input.stayRisk !== undefined) patch.stay_risk = input.stayRisk;
   if (input.stayReason !== undefined) patch.stay_reason = input.stayReason;
   if (input.baselineBranchId !== undefined) patch.baseline_branch_id = input.baselineBranchId;
+  if (input.aiDraftEdited !== undefined) patch.ai_draft_edited = input.aiDraftEdited;
   const { data, error } = await supabase.from('decisions').update(patch).eq('id', decisionId).select('*');
   if (error) throw new Error(`updateDecision: ${error.message}`);
   const row = (data as DecisionRow[])[0];

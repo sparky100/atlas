@@ -22,6 +22,8 @@ export interface CreateDecisionInput {
   neededBy: string;
   sourceFindingKey?: string;
   lensMapUrl?: string;
+  /** The Designer drafted part of the context: recorded so the decision says so. */
+  aiDraft?: { agent: 'designer'; draftedAt: string; edited: boolean };
   /** The capability/system(s) this decision concerns — "context/owner/needed-by/capability+systems" (F3's own creation-form field list). Linked in the same action, after the decision row exists (`decision_links_insert`'s own RLS needs a real `decision_id` to check against). */
   links: CreateDecisionLinkInput[];
 }
@@ -96,6 +98,7 @@ export function useDecisions(modelId: UUID, orgId: UUID, userId: UUID | null): U
           ...(input.neededBy.trim().length > 0 ? { neededBy: input.neededBy.trim() } : {}),
           ...(input.sourceFindingKey ? { sourceFindingKey: input.sourceFindingKey } : {}),
           ...(input.lensMapUrl && input.lensMapUrl.trim().length > 0 ? { lensMapUrl: input.lensMapUrl.trim() } : {}),
+          ...(input.aiDraft ? { aiDraft: input.aiDraft } : {}),
           createdBy: userId,
         });
         // Links are a second, independent insert per link — decisions_links'
