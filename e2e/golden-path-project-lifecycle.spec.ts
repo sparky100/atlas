@@ -38,6 +38,9 @@ test('project lifecycle: start from a finding, decide inside it, deliver the cho
   const scopePanel = page.locator('section, div').filter({ has: page.getByRole('heading', { name: 'Declared scope' }) }).last();
   await expect(scopePanel.getByRole('link', { name: 'Housing Repairs' })).toBeVisible();
 
+  // The project remembers which finding it started from, and says so.
+  await expect(page.getByTestId('project-source-finding')).toContainText('Started from a health finding: a capability nothing supports.');
+
   // 2. The page says what to do next, and the decision form is right there in that card.
   const nextStep = page.getByTestId('project-next-step');
   await expect(nextStep.getByRole('heading', { name: 'What to do next' })).toBeVisible();
@@ -47,6 +50,7 @@ test('project lifecycle: start from a finding, decide inside it, deliver the cho
   await page.getByRole('button', { name: 'Start decision' }).click();
   await expect(page.getByRole('heading', { name: 'Which system supports repairs?' })).toBeVisible();
   await expect(page.getByRole('link', { name: PROJECT_TITLE })).toBeVisible();
+  await expect(page.getByTestId('decision-source-finding')).toContainText('Started from a health finding: a capability nothing supports.');
   // It starts from where the person came from: the project's purpose is the context, the project's capability is what it concerns, and the edit form is already open.
   await expect(page.getByPlaceholder('What needs deciding, and why now')).not.toHaveValue('');
   await expect(page.getByRole('link', { name: 'Housing Repairs' }).first()).toBeVisible();

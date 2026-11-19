@@ -3,6 +3,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { useEffect, useState } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router';
 import { suggestOptions } from './optionSuggestions';
+import { findingLabel } from './findingLabels';
 import { useEstateSuggestions } from './useEstateSuggestions';
 import type { UUID } from '../../contracts/delta';
 import { Button } from '../components/Button/Button';
@@ -253,6 +254,13 @@ export function DecisionView({ modelId, decisionId, orgId, orgSlug, modelSlug, r
           <Text as="p" tone={decision.statement ? 'default' : 'muted'}>
             {decision.statement || 'No context recorded.'}
           </Text>
+          {findingLabel(decision.source_finding_key) !== null && (
+            <div data-testid="decision-source-finding">
+<Text as="p" tone="muted" size="sm">
+              Started from a health finding: {findingLabel(decision.source_finding_key)}.
+            </Text>
+</div>
+          )}
         </div>
       </Panel>
 
