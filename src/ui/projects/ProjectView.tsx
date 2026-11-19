@@ -116,6 +116,37 @@ export function ProjectView({ data, modelName, orgId, modelId, orgSlug, modelSlu
           <Text as="p" tone="muted" size="sm">
             The capabilities and systems this project is about.
           </Text>
+          {isOpen && canEdit && !data.scopeHasCapability && (
+            <div className={styles.needsCapability}>
+              <Text as="p" size="sm">
+                This project names no capability. A project can&apos;t stand apart from a capability — name at least one it serves.
+              </Text>
+              {data.derivedCapabilityCandidates.length > 0 && (
+                <>
+                  <Text as="p" tone="muted" size="sm">
+                    From the systems already in scope:
+                  </Text>
+                  <div className={styles.capabilityChoices}>
+                    {data.derivedCapabilityCandidates.map((cap) => (
+                      <Button
+                        key={cap.id}
+                        variant="secondary"
+                        aria-label={`Add ${cap.name} to scope`}
+                        onClick={() => {
+                          if (!userId || scopeIds.includes(cap.id)) return;
+                          void addProjectLink(supabase, { projectId: project.id, linkedType: 'element', linkedId: cap.id, createdBy: userId }).then(reload, (e: unknown) => {
+                            reportError('Could not add this capability to the scope.', e);
+                          });
+                        }}
+                      >
+                        Add {cap.name}
+                      </Button>
+                    ))}
+                  </div>
+                </>
+              )}
+            </div>
+          )}
           {scopeIds.length > 0 && (
             <ul className={styles.list}>
               {scopeIds.map((id) => (
