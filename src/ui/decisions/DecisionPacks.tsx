@@ -57,7 +57,10 @@ export function DecisionPacks({ decisionId, canFreeze, canSign, userId, commitId
       setComment('');
       await queryClient.invalidateQueries({ queryKey: queryKeys.decisionApprovals(decisionId) });
     } catch (e) {
-      reportError("Couldn't record the sign-off", e);
+      const message = e instanceof Error ? e.message : '';
+      if (message.includes('cannot sign it')) reportError('You froze this pack, so someone else has to sign it.', e);
+      else if (message.includes('not the latest')) reportError('A newer version of this pack exists, so this one can no longer be signed.', e);
+      else reportError("Couldn't record the sign-off", e);
     } finally {
       setBusy(false);
     }
