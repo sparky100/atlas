@@ -537,7 +537,7 @@ describe('decisions/decision_links/decision_arguments/assumptions/evidence again
         await service.auth.admin.deleteUser(mallory.id);
       }
 
-      await expect(freezeDecisionPack(alice.client, decision.id, '   ', null)).rejects.toThrow(/required/);
+      await expect(freezeDecisionPack(alice.client, decision.id, '   ', null)).rejects.toThrow(/check constraint/);
     });
   });
 });
