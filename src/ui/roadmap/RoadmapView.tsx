@@ -104,7 +104,7 @@ function ProjectPlanRow({ bar, range, todayPct }: { bar: RoadmapProjectBar; rang
   return (
     <div className={styles.row} data-project-id={bar.projectId}>
       <Link to={bar.href} className={styles.rowName} title={bar.title}>
-        <Text as="span" size="sm">
+        <Text as="span" size="sm" className={styles.rowNameWrap}>
           {bar.title}
         </Text>
         <Text as="span" size="xs" tone="muted" className={styles.rowCaption}>

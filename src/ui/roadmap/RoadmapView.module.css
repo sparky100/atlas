@@ -73,6 +73,15 @@
   text-decoration: none;
 }
 
+/* A project's title is the point of its bar, so it wraps (to two lines) instead of being cut off. */
+.rowNameWrap {
+  white-space: normal;
+  overflow-wrap: anywhere;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+}
+
 .rowName:hover {
   text-decoration: underline;
 }
@@ -98,10 +107,15 @@
 
 .supportEndTick {
   position: absolute;
-  top: 0;
-  bottom: 0;
-  width: 2px;
-  background: var(--status-warn);
+  top: -4px;
+  bottom: -4px;
+  width: 4px;
+  margin-left: -2px;
+  border-radius: 1px;
+  background: var(--status-danger);
+  /* A halo in the page colour keeps the mark visible on top of an amber or grey bar. */
+  box-shadow: 0 0 0 2px var(--surface);
+  z-index: 1;
 }
 
 /* A faint vertical "today" line — orientation across the whole timeline, not a data fact. Rendered per-row so it descends through every track. */
@@ -200,13 +214,15 @@
 /* Support end outside the window: pinned to the edge as a wider mark so it is still seen — out of support already (left) or beyond the window (right). */
 .supportEndTick[data-edge='before'],
 .supportEndTick[data-edge='after'] {
-  width: 4px;
+  width: 6px;
 }
 
 .supportEndTick[data-edge='before'] {
   left: 0;
+  margin-left: 0;
 }
 
 .supportEndTick[data-edge='after'] {
-  transform: translateX(-4px);
+  margin-left: 0;
+  transform: translateX(-6px);
 }
