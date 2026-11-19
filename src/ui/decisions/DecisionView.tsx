@@ -338,7 +338,7 @@ export function DecisionView({ modelId, decisionId, orgId, orgSlug, modelSlug, r
         principles={principlesState.principles}
         links={principlesState.links}
         editable={canLinkDecisionPrinciples(role, decision)}
-        saving={principlesState.saving}
+        savingIds={principlesState.savingIds}
         error={principlesState.error}
         principlesHref={`/o/${orgSlug}/m/${modelSlug}/principles`}
         onSetStance={principlesState.setStance}

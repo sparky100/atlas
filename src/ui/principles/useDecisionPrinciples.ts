@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import type { UUID } from '../../contracts/delta';
 import { isValidStanceReason, type DecisionPrincipleRow, type PrincipleRow, type PrincipleStance } from '../../contracts/principles';
 import { linkPrincipleToDecision, listPrinciplesForDecision, listPrinciplesForModel, unlinkPrincipleFromDecision } from '../../db/principles';
@@ -8,10 +8,12 @@ import { supabase } from '../supabaseClient';
 export interface UseDecisionPrinciplesResult {
   loading: boolean;
   principles: PrincipleRow[];
+  /** The saved links, with any stance being saved shown as already chosen so a click never looks undone while it saves. */
   links: DecisionPrincipleRow[];
   /** A short, plain-English message for the panel, or `null`. */
   error: string | null;
-  saving: boolean;
+  /** The principles whose stance is saving now. Only their own cards lock; the rest of the panel stays as it was. */
+  savingIds: ReadonlySet<string>;
   /** Takes a view on a principle: `follows`, `departs` (with a reason), or `null` to take none. Returns whether it saved. */
   setStance: (principleId: UUID, stance: PrincipleStance | null, reason: string) => Promise<boolean>;
 }
@@ -22,8 +24,8 @@ export function useDecisionPrinciples(modelId: UUID, decisionId: UUID, userId: U
   const [principles, setPrinciples] = useState<PrincipleRow[]>([]);
   const [links, setLinks] = useState<DecisionPrincipleRow[]>([]);
   const [error, setError] = useState<string | null>(null);
-  const [saving, setSaving] = useState(false);
-  const [reloadToken, setReloadToken] = useState(0);
+  const [pending, setPending] = useState<ReadonlyMap<string, { stance: PrincipleStance | null; reason: string }>>(new Map());
+  const [reloadToken] = useState(0);
 
   useEffect(() => {
     let cancelled = false;
@@ -56,7 +58,7 @@ export function useDecisionPrinciples(modelId: UUID, decisionId: UUID, userId: U
         return false;
       }
       setError(null);
-      setSaving(true);
+      setPending((prev) => new Map(prev).set(principleId, { stance, reason: reason.trim() }));
       try {
         // A link has no update path (a decision's stance is a record), so a change is take-back-then-add.
         if (links.some((l) => l.principle_id === principleId)) await unlinkPrincipleFromDecision(supabase, decisionId, principleId);
@@ -67,12 +69,32 @@ export function useDecisionPrinciples(modelId: UUID, decisionId: UUID, userId: U
         reportError('Could not save this principle stance.', e);
         return false;
       } finally {
-        setSaving(false);
-        setReloadToken((t) => t + 1);
+        // Read the saved links back first, then drop the "already chosen" overlay, so the choice never blinks off in between.
+        try {
+          setLinks(await listPrinciplesForDecision(supabase, decisionId));
+        } catch (e) {
+          reportError("Couldn't reload the principles.", e);
+        }
+        setPending((prev) => {
+          const next = new Map(prev);
+          next.delete(principleId);
+          return next;
+        });
       }
     },
     [decisionId, links, userId],
   );
 
-  return { loading, principles, links, error, saving, setStance };
+  const savingIds = useMemo<ReadonlySet<string>>(() => new Set(pending.keys()), [pending]);
+  const shownLinks = useMemo(() => {
+    if (pending.size === 0) return links;
+    const kept = links.filter((l) => !pending.has(l.principle_id));
+    const added: DecisionPrincipleRow[] = [];
+    for (const [principleId, { stance, reason }] of pending) {
+      if (stance !== null) added.push({ decision_id: decisionId, principle_id: principleId, stance, reason, created_by: userId ?? '', created_at: '' });
+    }
+    return [...kept, ...added];
+  }, [links, pending, decisionId, userId]);
+
+  return { loading, principles, links: shownLinks, error, savingIds, setStance };
 }
