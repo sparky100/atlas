@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { computeRoadmapAxisTicks, computeRoadmapForwardRange, computeRoadmapTimelineRange, isWithinRange, roadmapPastStart, computeRoadmapWindow, defaultRoadmapWindowStart, horizonDurationMonths, percentAt, percentAtIso, shiftRoadmapWindowStart, supportEndPlacement, thinAxisTicksToFit, todayPercent } from './roadmapTimelineScale';
+import { computeRoadmapAxisTicks, computeRoadmapForwardRange, computeRoadmapTimelineRange, isWithinRange, roadmapPastStart, computeRoadmapWindow, defaultRoadmapWindowStart, horizonDurationMonths, percentAt, percentAtIso, shiftRoadmapWindowStart, supportEndPlacement, thinAxisTicksToFit, todayPercent, unsupportedRunPlacement } from './roadmapTimelineScale';
 
 const NOW = new Date('2026-06-15T00:00:00Z');
 
@@ -224,5 +224,33 @@ describe('supportEndPlacement (vendor support end is visible on every roadmap)',
   it('has no marker without a usable date', () => {
     expect(supportEndPlacement(undefined, range)).toBeUndefined();
     expect(supportEndPlacement('not-a-date', range)).toBeUndefined();
+  });
+});
+
+describe('unsupportedRunPlacement', () => {
+  const range = { start: new Date('2026-06-01T00:00:00Z'), end: new Date('2027-06-01T00:00:00Z') };
+  const now = new Date('2026-11-19T12:00:00Z');
+
+  it('runs from the support end to the right edge when support has ended and no end is planned', () => {
+    const run = unsupportedRunPlacement('2026-09-01', undefined, range, now);
+    expect(run?.startPct).toBeGreaterThan(0);
+    expect(run?.startPct).toBeLessThan(100);
+  });
+
+  it('starts at the left edge when support ended before the window', () => {
+    expect(unsupportedRunPlacement('2020-03-01', undefined, range, now)).toEqual({ startPct: 0 });
+  });
+
+  it('draws nothing while support has not yet ended, so a future tick stays a plain tick', () => {
+    expect(unsupportedRunPlacement('2027-01-01', undefined, range, now)).toBeUndefined();
+  });
+
+  it('draws nothing when an end is planned, because the bar already runs to it', () => {
+    expect(unsupportedRunPlacement('2026-01-01', '2028-01-01', range, now)).toBeUndefined();
+  });
+
+  it('draws nothing without a usable support end date', () => {
+    expect(unsupportedRunPlacement(undefined, undefined, range, now)).toBeUndefined();
+    expect(unsupportedRunPlacement('not-a-date', undefined, range, now)).toBeUndefined();
   });
 });

@@ -148,6 +148,23 @@ export function supportEndPlacement(value: string | undefined, range: RoadmapTim
   return { pct: percentAt(date, range), edge: 'in' };
 }
 
+/**
+ * An open "unsupported" run (Simon, 2026-11-19): a system whose vendor support
+ * has already ended and that has no planned end is still live without support.
+ * The run starts at the support end (or the left edge, if that is before the
+ * window) and goes to the right edge. Nothing is drawn while support has not
+ * yet ended (the tick says enough), when an end is planned (the bar already
+ * runs to it), or with no usable support end date. It exists only because of a
+ * vendor support end date, so the "roadmaps show changes and support ends only"
+ * rule still holds.
+ */
+export function unsupportedRunPlacement(supportEndsAt: string | undefined, plannedEnd: string | undefined, range: RoadmapTimelineRange, now: Date): { startPct: number } | undefined {
+  if (plannedEnd !== undefined) return undefined;
+  const date = parseDate(supportEndsAt);
+  if (date === null || date.getTime() > now.getTime() || date.getTime() > range.end.getTime()) return undefined;
+  return { startPct: date.getTime() < range.start.getTime() ? 0 : percentAt(date, range) };
+}
+
 export type RoadmapHorizon = '1y' | '3y' | 'all';
 
 /** How many months a fixed horizon covers; `null` for `'all'` (the full date span). */
