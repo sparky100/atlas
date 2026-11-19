@@ -168,7 +168,7 @@ export function RoadmapPage() {
           {state.status === 'ready' && (
             <>
               <RoadmapFilterBar filters={filters} onFiltersChange={setFilters} mode={mode} onModeChange={setMode} groupBy={groupBy} onGroupByChange={setGroupBy} granularity={granularity} onGranularityChange={setGranularity} horizon={horizon} onHorizonChange={setHorizon} onNudge={nudge} showPast={showPast} onShowPastChange={setShowPast} earlierDisabled={(windowStart ?? earliestStart).getTime() <= earliestStart.getTime()} onResetToday={resetToday} capabilitiesById={state.data.capabilitiesById} ownerActorsById={state.data.ownerActorsById} />
-              <RoadmapView groupsLabel={groupBy === 'valueStream' ? 'Value streams' : groupBy === 'project' ? 'Projects' : 'Capability domains'} groups={groups} branchEvents={state.data.branchEvents} mode={mode} filters={filters} granularity={granularity} horizon={horizon} windowStart={windowStart} showPast={showPast} orgSlug={organisation?.slug ?? ''} modelSlug={model.slug} />
+              <RoadmapView groupsLabel={groupBy === 'valueStream' ? 'Value streams' : groupBy === 'project' ? 'Projects' : 'Capability domains'} groups={groups} branchEvents={state.data.branchEvents} mode={mode} filters={filters} granularity={granularity} horizon={horizon} windowStart={windowStart} showPast={showPast} orgSlug={organisation?.slug ?? ''} modelSlug={model.slug} unplacedProjects={groupBy === 'capability' ? (roadmapData?.unplacedProjects ?? []) : []} />
             </>
           )}
         </main>

@@ -14,6 +14,8 @@ import { reportError } from '../errors/errorBannerStore';
 import { isRoadmapEligibleBranch } from './roadmapEligibility';
 import { groupBarsByProject, groupBarsByValueStream, groupRoadmapLifecycleBars, type RoadmapGroup, type RoadmapProjectRef } from './roadmapLifecycleRows';
 import { listProjectsForModel } from '../../db/projects';
+import { listOpenProjectScopeForModel } from '../../db/healthFindings';
+import { attachProjectBars, type RoadmapUnplacedProject } from './roadmapProjectBars';
 import { systemsAndModulesFor } from './roadmapModules';
 import { supabase } from '../supabaseClient';
 
@@ -36,6 +38,8 @@ export interface RoadmapData {
   capabilitiesById: Map<UUID, ElementsHeadRow>;
   /** Every actor referenced as an `owns` edge's own `from` — the owner filter facet's own labels. */
   ownerActorsById: Map<UUID, ElementsHeadRow>;
+  /** Plan A3: open projects with no place on the capability plan (no dates, or no capability yet) — listed under it, never hidden. */
+  unplacedProjects: RoadmapUnplacedProject[];
 }
 
 export type RoadmapState = { status: 'loading' } | { status: 'error'; message: string } | { status: 'refNotFound' } | { status: 'ready'; data: RoadmapData };
@@ -88,9 +92,11 @@ export function useRoadmap(
       const valueStreamsById = new Map(allElements.filter((e) => e.element_type === 'value_stream').map((e) => [e.element_id, e]));
 
       const [supportsEdges, ownsEdges, changeBranches, enablesEdges, mainBranch, projects] = await Promise.all([listSupportsEdgesForCapabilities(supabase, commitId, capabilityIds), listOwnsEdges(supabase, commitId), listChangeBranches(supabase, modelId), listAllEnablesEdges(supabase, commitId), getMainBranch(supabase, modelId), listProjectsForModel(supabase, modelId)]);
+      const projectScope = await listOpenProjectScopeForModel(supabase, modelId);
 
       const elementHref = (id: UUID): string => `/o/${orgSlug}/m/${modelSlug}/e/${id}`;
-      const groups = groupRoadmapLifecycleBars(systemsAndModules, supportsEdges, ownsEdges, capabilitiesById, elementHref);
+      const systemGroups = groupRoadmapLifecycleBars(systemsAndModules, supportsEdges, ownsEdges, capabilitiesById, elementHref);
+      const { groups, unplaced: unplacedProjects } = attachProjectBars(systemGroups, { projects, scope: projectScope, capabilitiesById, elementHref, projectHref: (id) => `/o/${orgSlug}/m/${modelSlug}/projects/${id}` });
       const valueStreamGroups = groupBarsByValueStream(systemsAndModules, supportsEdges, ownsEdges, capabilitiesById, valueStreamsById, enablesEdges, elementHref);
 
       const ownerActorIds = [...new Set(ownsEdges.map((edge) => edge.from_element_id))];
@@ -109,7 +115,7 @@ export function useRoadmap(
       const projectsById = new Map<UUID, RoadmapProjectRef>(projects.map((p) => [p.id, { id: p.id, title: p.title, href: `/o/${orgSlug}/m/${modelSlug}/projects/${p.id}` }]));
       const projectGroups = groupBarsByProject(systemsAndModules, supportsEdges, ownsEdges, capabilitiesById, allBranchEvents, projectsById);
 
-      if (!cancelled) setState({ status: 'ready', data: { commitId, groups, valueStreamGroups, projectGroups, branchEvents: allBranchEvents, capabilitiesById, ownerActorsById } });
+      if (!cancelled) setState({ status: 'ready', data: { commitId, groups, valueStreamGroups, projectGroups, branchEvents: allBranchEvents, capabilitiesById, ownerActorsById, unplacedProjects } });
     }
 
     load().catch((e: unknown) => {

@@ -30,6 +30,7 @@ import { attributesRecord } from '../elements/attributesRecord';
 import { l1AncestorOf } from '../elements/capabilityDepth';
 import type { LifecycleTagProps } from '../components/LifecycleTag/LifecycleTag';
 import { lifecycleTagFor } from '../components/LifecycleTag/lifecycleTagFor';
+import type { RoadmapProjectBar } from './roadmapProjectBars';
 
 /** A value no real element id can ever equal (UUIDs never start with `$`) — the same sentinel shape `layout.ts`'s own `UNASSIGNED_LANE_KEY` uses, rather than a type-level union with `UUID` (itself a plain `string` alias, so TS can't distinguish a literal from it anyway). */
 export const UNASSIGNED_GROUP_KEY = '$unassigned';
@@ -63,6 +64,8 @@ export interface RoadmapGroup {
   /** The group header's element-page link, or `null` for `UNASSIGNED_GROUP_KEY` (which has no page). */
   href: string | null;
   bars: RoadmapLifecycleBar[];
+  /** Plan A3: open projects serving this capability domain, drawn above the systems — only ever set on the "By capability" grouping (`attachProjectBars`). */
+  projectBars?: RoadmapProjectBar[];
 }
 
 type ElementHref = (id: UUID) => string;
