@@ -9,7 +9,7 @@ import { Text } from '../components/Text/Text';
 import { reportError } from '../errors/errorBannerStore';
 import { queryKeys } from '../query/keys';
 import { supabase } from '../supabaseClient';
-import { LENS_LABELS, lensesOpenTo, packIsStale, packSignOff, packSignOffSummary } from './packSignOff';
+import { LENS_LABELS, lensProgress, lensesOpenTo, packIsStale, packSignOff, packSignOffSummary } from './packSignOff';
 import styles from './DecisionPacks.module.css';
 
 export interface DecisionPacksProps {
@@ -95,6 +95,15 @@ export function DecisionPacks({ decisionId, canFreeze, canSign, userId, commitId
                   </summary>
                   <pre className={styles.body}>{pack.body_markdown}</pre>
                 </details>
+                {isLatest && (
+                  <ul className={styles.lensProgress} aria-label={`Capacities heard from on version ${String(pack.version)}`}>
+                    {lensProgress(pack.id, approvals ?? [], DECISION_APPROVAL_LENSES).map((p) => (
+                      <li key={p.lens} data-state={p.state}>
+                        {LENS_LABELS[p.lens]}: {p.state === 'approved' ? 'approved' : p.state === 'declined' ? 'declined' : 'not heard from'}
+                      </li>
+                    ))}
+                  </ul>
+                )}
                 {own.length > 0 && (
                   <ul className={styles.signOffs} aria-label={`Sign-offs on version ${String(pack.version)}`}>
                     {own.map((a) => (

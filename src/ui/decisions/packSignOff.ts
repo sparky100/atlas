@@ -44,3 +44,22 @@ export function lensesOpenTo(userId: string | null, packId: string, approvals: r
 export function packIsStale(latestBody: string | undefined, liveMarkdown: string): boolean {
   return latestBody !== undefined && latestBody.trim() !== liveMarkdown.trim();
 }
+
+export interface LensProgress {
+  lens: DecisionApprovalLens;
+  /** approved: at least one approve and no decline; declined: any decline; none: nobody has signed as this capacity yet. */
+  state: 'approved' | 'declined' | 'none';
+}
+
+/**
+ * The per-capacity view of one pack version: review progress, not a sign-off
+ * rule (no capacity is required; Simon chose labels over required lenses).
+ * Only sign-offs on THAT pack count.
+ */
+export function lensProgress(packId: string, approvals: readonly DecisionApprovalRow[], all: readonly DecisionApprovalLens[]): LensProgress[] {
+  return all.map((lens) => {
+    const own = approvals.filter((a) => a.pack_id === packId && a.lens === lens);
+    const state = own.some((a) => a.verdict === 'decline') ? 'declined' : own.length > 0 ? 'approved' : 'none';
+    return { lens, state };
+  });
+}
