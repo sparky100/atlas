@@ -418,6 +418,17 @@ export function ArchitectHome({ data, modelId, mainCommitIdHint, insights, role,
       browseLabel: 'Review projects →',
       singleItemAction: (item: HealthFindingItem): FindingCardAction => ({ href: `/o/${orgSlug}/m/${modelSlug}/projects/${item.id}`, label: `Open ${item.label} →` }),
     },
+    {
+      // Phase B: a decision recorded a date to look at it again, and that date has come. The reconsider-if statements sit on the decision itself.
+      key: 'decisions-due-for-review',
+      count: insightsData.decisionsDueForReview.length,
+      summary: `${String(insightsData.decisionsDueForReview.length)} ${plural(insightsData.decisionsDueForReview.length, 'decision', 'decisions')} due to be looked at again`,
+      items: insightsData.decisionsDueForReview.map((d) => ({ id: d.decisionId, label: d.title })),
+      severity: 'medium',
+      browseHref: `/o/${orgSlug}/m/${modelSlug}/decisions`,
+      browseLabel: 'Review decisions →',
+      singleItemAction: (item: HealthFindingItem): FindingCardAction => ({ href: `/o/${orgSlug}/m/${modelSlug}/decisions/${item.id}`, label: `Open ${item.label} →` }),
+    },
       ];
   const { active: activeHealthChecks, clear: clearHealthChecks } = partitionHealthChecks(healthChecks);
   // Item 3: informational findings never sit in the grid — they render as

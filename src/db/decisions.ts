@@ -206,9 +206,9 @@ export async function listDecisionsLinkingElements(supabase: Client, elementIds:
  * link on this decision, `explore`-intent, `draft` — the RPC validates all
  * three itself, this is not re-checked client-side.
  */
-export async function chooseDecisionOption(supabase: Client, decisionId: UUID, chosenBranchId: UUID, reasons: string): Promise<DecisionRow> {
+export async function chooseDecisionOption(supabase: Client, decisionId: UUID, chosenBranchId: UUID, reasons: string, reconsider?: { reconsiderIf?: string; reviewBy?: string }): Promise<DecisionRow> {
   // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment -- untyped client; see branches.ts's module comment.
-  const { data, error } = await supabase.schema('atlas').rpc('choose_decision_option', { p_decision_id: decisionId, p_chosen_branch_id: chosenBranchId, p_reasons: reasons });
+  const { data, error } = await supabase.schema('atlas').rpc('choose_decision_option', { p_decision_id: decisionId, p_chosen_branch_id: chosenBranchId, p_reasons: reasons, p_reconsider_if: reconsider?.reconsiderIf ?? null, p_review_by: reconsider?.reviewBy ?? null });
   if (error) throw new Error(`chooseDecisionOption: ${error.message}`);
   return data as DecisionRow;
 }

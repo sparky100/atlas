@@ -59,7 +59,7 @@ export const EVAL_CHANGE = {
 } as BranchRow;
 export const EVAL_DECISION = {
   id: uid(961), org_id: uid(900), model_id: uid(901), title: 'Choose the next billing platform', statement: 'The Billing Engine loses vendor support at the end of 2026.', status: 'proposed', owner_id: uid(902), needed_by: '2026-12-15',
-  source_finding_key: null, lens_map_url: null, decided_by: null, decided_at: null, cancel_reason: null, branch_id: null, superseded_decision_id: null, project_id: null, created_by: uid(902), created_at: '',
+  source_finding_key: null, lens_map_url: null, decided_by: null, decided_at: null, cancel_reason: null, reconsider_if: null, review_by: null, branch_id: null, superseded_decision_id: null, project_id: null, created_by: uid(902), created_at: '',
 } as DecisionRow;
 export const EVAL_PROJECT = {
   id: uid(962), org_id: uid(900), model_id: uid(901), title: 'Legacy retirement', purpose: 'Switch off the systems that are past support.', owner_id: uid(902), status: 'active', start_date: '2026-06-01', target_date: '2027-06-30',

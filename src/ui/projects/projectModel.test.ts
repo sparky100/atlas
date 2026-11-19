@@ -55,7 +55,7 @@ function decision(overrides: Partial<DecisionRow>): DecisionRow {
     decided_by: null,
     decided_at: null,
     cancel_reason: null,
-    branch_id: null,
+    reconsider_if: null, review_by: null, branch_id: null,
     superseded_decision_id: null,
     project_id: 'p',
     created_by: 'u',

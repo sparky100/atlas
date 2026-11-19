@@ -17,7 +17,7 @@ function makeDecision(overrides: Partial<DecisionRow> = {}): DecisionRow {
     decided_by: null,
     decided_at: null,
     cancel_reason: null,
-    branch_id: null,
+    reconsider_if: null, review_by: null, branch_id: null,
     superseded_decision_id: null,
     project_id: null,
     created_by: 'user-1',
@@ -139,6 +139,15 @@ describe('exportDecisionAsAdrMarkdown', () => {
     });
     expect(markdown).toContain('Chosen option: **Option B**.');
     expect(markdown.trim().endsWith('Chosen option: **Option B**.')).toBe(true);
+  });
+
+  it('writes what would make the decision be reconsidered, with the review date, only when recorded', () => {
+    const chosen = makeBranch({ id: 'branch-b', title: 'Option B', intent: 'propose' });
+    const base = { ownerName: 'Alice', concerns: [], options: [{ branch: chosen, isChosen: true, ratings: [] }], whatChangesRows: [], reasons: 'Cheapest.' };
+    const withIt = exportDecisionAsAdrMarkdown({ ...base, decision: makeDecision({ status: 'accepted', branch_id: 'branch-b', reconsider_if: 'Vendor price rises', review_by: '2027-03-01' }) });
+    expect(withIt).toContain('Reconsider if: Vendor price rises (look again by 2027-03-01)');
+    const without = exportDecisionAsAdrMarkdown({ ...base, decision: makeDecision({ status: 'accepted', branch_id: 'branch-b' }) });
+    expect(without).not.toContain('Reconsider if');
   });
 
   it('renders the What-changes evidence rows, naming each option by its own label, with the "Current (main)" value first', () => {

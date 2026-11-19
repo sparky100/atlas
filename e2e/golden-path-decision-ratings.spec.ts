@@ -98,12 +98,16 @@ test('rate decision options on judgement criteria, leave some unrated, choose on
   // the old separate Options list into these headers).
   await optionAHeader.getByRole('button', { name: 'Choose' }).click();
   await page.getByPlaceholder('The reasons this option was chosen over the others').fill('Option 1 is cheaper and ready sooner.');
+  await page.getByPlaceholder(/the vendor price rises/).fill('The vendor price rises or support is extended.');
   await page.getByRole('button', { name: 'Confirm choice' }).click();
   await expect(page.getByText('accepted', { exact: true })).toBeVisible();
 
   // The decision shows the chosen option and the rationale recorded at Choose time.
   await expect(optionAHeader).toContainText('chosen');
   await expect(page.getByText('Option 1 is cheaper and ready sooner.')).toBeVisible();
+  // And what would make them reconsider, recorded at the same moment.
+  await expect(page.getByRole('heading', { name: 'What would make us reconsider' })).toBeVisible();
+  await expect(page.getByText('The vendor price rises or support is extended.')).toBeVisible();
 
   // The page never blanked during Choose — the marker set above is still
   // on the same DOM node.

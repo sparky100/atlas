@@ -95,6 +95,8 @@ export function DecisionView({ modelId, decisionId, orgId, orgSlug, modelSlug, r
   const [optionTitle, setOptionTitle] = useState('');
   const [choosingBranchId, setChoosingBranchId] = useState<UUID | null>(null);
   const [reasons, setReasons] = useState('');
+  const [reconsiderIf, setReconsiderIf] = useState('');
+  const [reviewBy, setReviewBy] = useState('');
   const [adrCopied, setAdrCopied] = useState(false);
   const [whatChangesExpanded, setWhatChangesExpanded] = useState(false);
 
@@ -234,6 +236,21 @@ export function DecisionView({ modelId, decisionId, orgId, orgSlug, modelSlug, r
             {decision.statement || 'No context recorded.'}
           </Text>
         </div>
+        {decision.status === 'accepted' && (
+          <div className={styles.field}>
+            <Text as="h2" size="lg">
+              What would make us reconsider
+            </Text>
+            <Text as="p" tone={decision.reconsider_if ? 'default' : 'muted'}>
+              {decision.reconsider_if ?? 'Nothing was recorded when this was chosen.'}
+            </Text>
+            {decision.review_by !== null && (
+              <Text as="p" size="sm" tone="muted">
+                To be looked at again by {decision.review_by}
+              </Text>
+            )}
+          </div>
+        )}
       </Panel>
 
       <Panel>
@@ -357,13 +374,40 @@ export function DecisionView({ modelId, decisionId, orgId, orgSlug, modelSlug, r
                   setReasons(e.target.value);
                 }}
               />
+              <Text as="label" size="sm" tone="muted">
+                What would make us reconsider (optional)
+              </Text>
+              <textarea
+                className={styles.textarea}
+                placeholder="For example: the vendor price rises, support is extended, or the migration slips past March"
+                value={reconsiderIf}
+                onChange={(e) => {
+                  setReconsiderIf(e.target.value);
+                }}
+              />
+              <label>
+                <Text as="span" size="sm" tone="muted">
+                  Look at this decision again by (optional)
+                </Text>
+                <input
+                  type="date"
+                  value={reviewBy}
+                  onChange={(e) => {
+                    setReviewBy(e.target.value);
+                  }}
+                />
+              </label>
               <div className={styles.addOptionForm}>
                 <Button
                   variant="primary"
                   disabled={optionsState.status === 'choosing' || reasons.trim().length === 0}
                   onClick={() => {
-                    void optionsState.chooseOption(decisionId, choosingBranchId, reasons).then((chosen) => {
-                      if (chosen) setChoosingBranchId(null);
+                    void optionsState.chooseOption(decisionId, choosingBranchId, reasons, { reconsiderIf, reviewBy }).then((chosen) => {
+                      if (chosen) {
+                        setChoosingBranchId(null);
+                        setReconsiderIf('');
+                        setReviewBy('');
+                      }
                     });
                   }}
                 >
