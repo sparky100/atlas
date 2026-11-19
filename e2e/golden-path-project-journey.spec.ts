@@ -46,6 +46,14 @@ test('project journey: requirement, what it touches, how it might be met from th
   await expect(beforeAfter.getByRole('link', { name: 'Quote Tool', exact: true })).toBeVisible();
   await expect(beforeAfter.getByText('No change has been drafted yet', { exact: false })).toBeVisible();
 
+  // The same facts as a connected picture: capability, supporting systems, connected apps.
+  await beforeAfter.getByRole('button', { name: 'Diagram' }).click();
+  const diagram = beforeAfter.getByTestId('project-diagram').first();
+  await expect(diagram).toBeVisible();
+  await expect(diagram.getByRole('link', { name: 'Quote Tool', exact: true })).toBeVisible();
+  await beforeAfter.getByRole('button', { name: 'List' }).click();
+  await expect(beforeAfter.getByTestId('project-diagram')).toHaveCount(0);
+
   // Nothing we run supports this one: said plainly, not an error.
   await goToModelHome(page);
   await startProject(page, 'Fault response', 'Respond to supply faults faster.', 'Handle a fault');
