@@ -15,6 +15,8 @@ import { profileLabel } from '../comments/profileLabel';
 import type { DecisionRow } from '../../db/types';
 import type { DecisionPrefill } from './decisionPrefill';
 import { DecisionLinkPicker } from './DecisionLinkPicker';
+import { DesignerPanel } from './DesignerPanel';
+import { designerInputFromPrefill } from './designerRequest';
 import { groupDecisionsList } from './decisionsListGroups';
 import { decisionStatusLabel, decisionStatusTone } from './decisionStatus';
 import { useDecisions } from './useDecisions';
@@ -30,6 +32,8 @@ export interface DecisionsViewProps {
   canCreate: boolean;
   /** Prompt pack F3 PR6: "Start a decision" from a health finding or a weak-capability tile — `null` for the ordinary bare `/decisions` visit, which opens the form blank exactly as before this PR. */
   prefill: DecisionPrefill | null;
+  /** Phase D: true only for an owner or architect in an organisation with Ask Atlas on, agents on and an AI key saved. Absent means the Designer is not offered. */
+  designerAvailable?: boolean;
 }
 
 /**
@@ -39,8 +43,9 @@ export interface DecisionsViewProps {
  * Mirrors `ChangesView.tsx`'s own shape: a create form gated by role,
  * loading/empty states, a list of rows linking onward.
  */
-export function DecisionsView({ modelId, orgId, userId, orgSlug, modelSlug, canCreate, prefill }: DecisionsViewProps) {
+export function DecisionsView({ modelId, orgId, userId, orgSlug, modelSlug, canCreate, prefill, designerAvailable = false }: DecisionsViewProps) {
   const navigate = useNavigate();
+  const designerInput = designerAvailable ? designerInputFromPrefill(prefill) : null;
   const { status, decisions, error, createDecisionWithLinks } = useDecisions(modelId, orgId, userId);
   const { branch: main } = useMainBranch(modelId);
   const { members } = useMembers(orgId);
@@ -110,6 +115,15 @@ export function DecisionsView({ modelId, orgId, userId, orgSlug, modelSlug, canC
                 setStatement(e.target.value);
               }}
             />
+            {designerInput !== null && (
+              <DesignerPanel
+                modelId={modelId}
+                input={designerInput}
+                onUse={(text) => {
+                  setStatement((prev) => (prev.trim() === '' ? text : `${prev.trim()}\n\nDesigner's draft options:\n${text}`));
+                }}
+              />
+            )}
             <div className={styles.formRow}>
               <Text as="label" size="sm" tone="muted">
                 Owner

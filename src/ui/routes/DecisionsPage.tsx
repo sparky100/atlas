@@ -9,6 +9,7 @@ import { Text } from '../components/Text/Text';
 import { WORK_COPY } from '../work/workCopy';
 import { parseDecisionPrefillFromSearchParams } from '../decisions/decisionPrefill';
 import { DecisionsView } from '../decisions/DecisionsView';
+import { canOfferDesigner } from '../decisions/designerRequest';
 import { useAuth } from '../auth/useAuth';
 import { EditingBranchBanner } from '../branches/EditingBranchBanner/EditingBranchBanner';
 import { useBranchLabel } from '../branches/useBranchLabel';
@@ -73,7 +74,7 @@ export function DecisionsPage() {
             </Text>
           </div>
           <PageIntro>{WORK_COPY.decision}</PageIntro>
-          <DecisionsView modelId={model.id} orgId={organisation?.id ?? ''} userId={userId} orgSlug={orgSlug ?? ''} modelSlug={model.slug} canCreate={canCreate} prefill={prefill} />
+          <DecisionsView modelId={model.id} orgId={organisation?.id ?? ''} userId={userId} orgSlug={orgSlug ?? ''} modelSlug={model.slug} canCreate={canCreate} prefill={prefill} designerAvailable={canOfferDesigner({ role, assistantEnabled: organisation?.ai_assistant_enabled === true, agentsEnabled: organisation?.ai_agents_enabled === true, keySet: organisation?.ai_agent_key_set === true })} />
         </main>
       </div>
     </div>

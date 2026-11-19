@@ -18,7 +18,7 @@ export interface AgentsPanelProps {
   onChanged: (organisation: OrganisationRow) => void;
 }
 
-/** Phase D step 1: the organisation's own AI key for agents, and the switch. No agent is released yet; this prepares the organisation. */
+/** Phase D: the organisation's own AI key for agents, and the switch. */
 export function AgentsPanel({ organisation, canManage, onToggleAgents, saving, onChanged }: AgentsPanelProps) {
   const [key, setKey] = useState('');
   const [busy, setBusy] = useState(false);
@@ -46,7 +46,7 @@ export function AgentsPanel({ organisation, canManage, onToggleAgents, saving, o
   return (
     <>
       <Text as="p" tone="muted" size="sm">
-        Agents will draft and review on your organisation's own AI key, because they use a lot of AI time. Ask Atlas, document import and help keep using Atlas's own key and are not affected. No agent has been released yet: saving a key and turning agents on prepares your organisation and does nothing else today. The key is stored securely, is never shown again, and can be replaced or removed here. Removing it turns agents off.
+        Agents draft on your organisation's own AI key, because they use a lot of AI time. The first is the Designer, which owners and architects can run from a decision started from a finding. Ask Atlas, document import and help keep using Atlas's own key and are not affected. The key is stored securely, is never shown again, and can be replaced or removed here. Removing it turns agents off.
       </Text>
       <Text as="p" size="sm">
         AI key: <Chip tone="neutral">{keySet ? 'Set' : 'Not set'}</Chip>
