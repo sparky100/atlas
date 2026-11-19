@@ -25,7 +25,7 @@ test('a decision follows a principle, then departs from it with a reason; read-o
   await page.getByRole('button', { name: 'Start decision' }).click();
   await expect(page.getByRole('heading', { name: 'What replaces the old CRM' })).toBeVisible();
 
-  await expect(page.getByRole('heading', { name: 'Principles', level: 2 })).toBeVisible();
+  await expect(page.getByRole('button', { name: /^Principles/ })).toBeVisible();
   await expect(page.getByRole('heading', { name: 'Reuse before buying' })).toBeVisible();
 
   // click(), not check(): the radio is controlled and only reflects the stance once it has been saved and reloaded, so check()'s immediate state assertion would fail; the toBeChecked() below retries until the save lands.
