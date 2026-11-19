@@ -1,7 +1,7 @@
 import { Loading } from '../components/Loading/Loading';
 import { useQueryClient } from '@tanstack/react-query';
 import { useEffect, useState } from 'react';
-import { Link, useNavigate } from 'react-router';
+import { Link, useNavigate, useSearchParams } from 'react-router';
 import type { UUID } from '../../contracts/delta';
 import { Button } from '../components/Button/Button';
 import { Chip } from '../components/Chip/Chip';
@@ -84,6 +84,9 @@ export function DecisionView({ modelId, decisionId, orgId, orgSlug, modelSlug, r
   const { members } = useMembers(orgId);
   const optionsState = useDecisionOptions(applyNewOption, applyDecisionUpdate, refreshOptionsAndArguments);
   const navigate = useNavigate();
+  // `?edit=1` (from "Start decision" on a project) opens the decision's own edit form straight away.
+  const [searchParams] = useSearchParams();
+  const startEditing = searchParams.get('edit') === '1';
   const { setRef } = useSelectedRef();
   // Lifted up from `DecisionCriteriaGrid.tsx` (decision-side-completion
   // item 6) — the ADR export below needs every option's own ratings too,
@@ -212,6 +215,7 @@ export function DecisionView({ modelId, decisionId, orgId, orgSlug, modelSlug, r
           decision={decision}
           members={members.map((m) => ({ id: m.member.user_id, label: profileLabel(m.profile) }))}
           onSaved={applyDecisionUpdate}
+          startOpen={startEditing}
         />
       )}
       <DecisionCancel
@@ -870,8 +874,8 @@ function DecisionCancel({
  * creator or an org owner/architect, while proposed; closed once decided or
  * cancelled, like everything else on the decision.
  */
-function DecisionEdit({ decision, members, onSaved }: { decision: DecisionRow; members: { id: UUID; label: string }[]; onSaved: (updated: DecisionRow) => void }) {
-  const [open, setOpen] = useState(false);
+function DecisionEdit({ decision, members, onSaved, startOpen }: { decision: DecisionRow; members: { id: UUID; label: string }[]; onSaved: (updated: DecisionRow) => void; startOpen: boolean }) {
+  const [open, setOpen] = useState(startOpen);
   const [title, setTitle] = useState(decision.title);
   const [statement, setStatement] = useState(decision.statement);
   const [ownerId, setOwnerId] = useState(decision.owner_id);

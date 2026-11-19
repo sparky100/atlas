@@ -43,6 +43,10 @@ test('project lifecycle: start from a finding, decide inside it, deliver the cho
   await page.getByRole('button', { name: 'Start decision' }).click();
   await expect(page.getByRole('heading', { name: 'Which system supports repairs?' })).toBeVisible();
   await expect(page.getByRole('link', { name: PROJECT_TITLE })).toBeVisible();
+  // It starts from where the person came from: the project's purpose is the context, the project's capability is what it concerns, and the edit form is already open.
+  await expect(page.getByPlaceholder('What needs deciding, and why now')).not.toHaveValue('');
+  await expect(page.getByRole('link', { name: 'Housing Repairs' }).first()).toBeVisible();
+  await page.getByRole('button', { name: 'Cancel', exact: true }).click();
 
   // 3. Two options, one rating, choose the first.
   for (const [, title] of [
