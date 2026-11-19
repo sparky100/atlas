@@ -309,7 +309,7 @@ A report that uses a health-finding filter cannot be saved yet; the page says so
 
 ### Draft options with the Designer
 
-When you start a decision from a finding (for example **Keep, link or retire?** on a system with no capability link), owners and architects in an organisation that has agents switched on see **Draft options with the Designer**. It reads what Atlas holds about that system and drafts a short set of options as plain text, always including **Stay as we are**, and never treating retirement as a conclusion. Run cost is left out unless an owner shares it.
+When you start a decision from a finding (for example **Keep, link or retire?** on a system with no capability link), owners and architects in an organisation that has agents switched on see **Draft options with the Designer**. It reads what Atlas holds about that system and drafts a short set of options as plain text, always including **Stay as we are**, and never treating retirement as a conclusion. Run cost is left out unless an owner shares it. If the button isn't there, the form says why in one line: it is for owners and architects, or Ask Atlas is off, or agents aren't allowed, or no AI key is saved, with a link to organisation settings when you can change it.
 
 - The draft appears in a box you can edit. **Add to the context above** puts your edited text into the decision's context; nothing is recorded until you press **Start decision**, and the Designer never changes the model or approves anything.
 - It says which records it was based on. If it cites none, it says so: check it carefully.

@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { DESIGNER_MAX_FINDING_CHARS } from '../../tools/designPrompt';
 import { prefillFromSystemWithoutCapability } from './decisionPrefill';
-import { canOfferDesigner, designerCostLine, designerInputFromPrefill } from './designerRequest';
+import { canOfferDesigner, designerCostLine, designerInputFromPrefill, designerUnavailableReason } from './designerRequest';
 
 const ID = '00000000-0000-4000-8000-000000000001';
 
@@ -46,5 +46,23 @@ describe('designerCostLine', () => {
   });
   it('says 1 lookup in the singular', () => {
     expect(designerCostLine({ inputTokens: 1, outputTokens: 1, lookups: 1 })).toContain('with 1 lookup,');
+  });
+});
+
+describe('designerUnavailableReason', () => {
+  const on = { assistantEnabled: true, agentsEnabled: true, keySet: true };
+  it('is null when the Designer is offered', () => {
+    expect(designerUnavailableReason({ role: 'owner', ...on })).toBeNull();
+  });
+  it('tells a contributor or viewer it is for owners and architects, with nothing to fix', () => {
+    const reason = designerUnavailableReason({ role: 'contributor', ...on });
+    expect(reason?.text).toMatch(/owners and architects/);
+    expect(reason?.canFix).toBe(false);
+  });
+  it('names the first thing an owner or architect can switch on, in order', () => {
+    expect(designerUnavailableReason({ role: 'owner', ...on, assistantEnabled: false })?.text).toMatch(/Ask Atlas/);
+    expect(designerUnavailableReason({ role: 'architect', ...on, agentsEnabled: false })?.text).toMatch(/AI agents/);
+    expect(designerUnavailableReason({ role: 'owner', ...on, keySet: false })?.text).toMatch(/AI key/);
+    expect(designerUnavailableReason({ role: 'owner', ...on, keySet: false })?.canFix).toBe(true);
   });
 });
