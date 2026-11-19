@@ -92,6 +92,11 @@ export function DecisionCriteriaGrid({ decisionId, options, canRate, userId, nee
 
   if (options.length === 0) return null;
 
+  /** An option is a change; while it is still a draft and the person may work on changes they can open it for editing, chosen or not. The chosen option keeps its own "Work on this as a change" action. */
+  function canEditOption(o: DecisionCriteriaOption): boolean {
+    return canWorkOnChange && o.status === 'draft' && !o.isChosen;
+  }
+
   function ratingFor(branchId: UUID, criterion: DecisionCriterionKey): DecisionOptionRatingRow | undefined {
     return ratings.find((r) => r.branch_id === branchId && r.criterion === criterion);
   }
@@ -128,6 +133,9 @@ export function DecisionCriteriaGrid({ decisionId, options, canRate, userId, nee
                       {o.isChosen && <Chip tone="ok">chosen</Chip>}
                       <Chip tone={branchStatusTone(o.status)}>{o.status}</Chip>
                     </div>
+                    <Text as="span" size="sm" tone="muted">
+                      A change
+                    </Text>
                     <Link to={`/o/${orgSlug}/m/${modelSlug}/changes/${o.branchId}`}>
                       <Text as="span" size="md">
                         {stripExploringPrefix(o.label)}
@@ -136,12 +144,27 @@ export function DecisionCriteriaGrid({ decisionId, options, canRate, userId, nee
                     <Text as="p" size="sm" tone={o.summary === null ? 'muted' : 'default'}>
                       {o.summary ?? 'No changes recorded yet'}
                     </Text>
+                    {o.summary === null && canEditOption(o) && (
+                      <Text as="p" size="sm" tone="muted">
+                        Use Edit this change to draft it.
+                      </Text>
+                    )}
                     <div className={styles.optionHeaderActions}>
                       <Link to={`/o/${orgSlug}/m/${modelSlug}/decisions/${decisionId}/options/${o.branchId}/landscape`}>
                         <Text as="span" size="sm">
                           View diagram →
                         </Text>
                       </Link>
+                      {canEditOption(o) && (
+                        <Button
+                          variant="secondary"
+                          onClick={() => {
+                            onWorkOnThisChange(o.branchId);
+                          }}
+                        >
+                          Edit this change
+                        </Button>
+                      )}
                       {o.canChoose && (
                         <Button
                           variant="secondary"
