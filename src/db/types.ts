@@ -330,6 +330,8 @@ export interface LlmProxyRequestRow {
   output_tokens: number | null;
   status: LlmProxyRequestStatus;
   latency_ms: number | null;
+  /** Which key paid: `org` is the organisation's own (agents), `app` the platform's (everything else). */
+  key_source: 'app' | 'org';
   created_at: string;
 }
 

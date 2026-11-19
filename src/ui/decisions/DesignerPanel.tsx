@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import type { UUID } from '../../contracts/delta';
 import { runDesigner, type DesignerDraft } from '../../db/designAgent';
+import { designerCostLine } from './designerRequest';
 import { supabase } from '../supabaseClient';
 import { Button } from '../components/Button/Button';
 import { Text } from '../components/Text/Text';
@@ -23,7 +24,7 @@ export function DesignerPanel({ modelId, input, onUse }: DesignerPanelProps) {
   const [state, setState] = useState<'idle' | 'running' | 'failed' | 'drafted'>('idle');
   const [message, setMessage] = useState('');
   const [draft, setDraft] = useState('');
-  const [meta, setMeta] = useState<Pick<DesignerDraft, 'citedNames' | 'grounded'> | null>(null);
+  const [meta, setMeta] = useState<Pick<DesignerDraft, 'citedNames' | 'grounded' | 'usage'> | null>(null);
 
   async function run() {
     setState('running');
@@ -31,7 +32,7 @@ export function DesignerPanel({ modelId, input, onUse }: DesignerPanelProps) {
     try {
       const result = await runDesigner(supabase, { modelId, ...input });
       setDraft(result.text);
-      setMeta({ citedNames: result.citedNames, grounded: result.grounded });
+      setMeta({ citedNames: result.citedNames, grounded: result.grounded, usage: result.usage });
       setState('drafted');
     } catch (e) {
       setMessage(e instanceof Error ? e.message : 'The Designer could not draft options. Try again.');
@@ -70,6 +71,13 @@ export function DesignerPanel({ modelId, input, onUse }: DesignerPanelProps) {
           <Text as="p" tone="muted" size="sm">
             {meta?.grounded === true ? `Based on: ${meta.citedNames.join(', ')}.` : 'Not tied to specific records Atlas holds, so check it carefully.'}
           </Text>
+          {meta !== null && (
+            <div data-testid="designer-cost">
+              <Text as="p" tone="muted" size="sm">
+                {designerCostLine(meta.usage)}
+              </Text>
+            </div>
+          )}
           <Button
             type="button"
             variant="secondary"

@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { DESIGNER_MAX_FINDING_CHARS } from '../../tools/designPrompt';
 import { prefillFromSystemWithoutCapability } from './decisionPrefill';
-import { canOfferDesigner, designerInputFromPrefill } from './designerRequest';
+import { canOfferDesigner, designerCostLine, designerInputFromPrefill } from './designerRequest';
 
 const ID = '00000000-0000-4000-8000-000000000001';
 
@@ -35,5 +35,16 @@ describe('canOfferDesigner', () => {
     expect(canOfferDesigner({ role: 'owner', ...on, assistantEnabled: false })).toBe(false);
     expect(canOfferDesigner({ role: 'owner', ...on, agentsEnabled: false })).toBe(false);
     expect(canOfferDesigner({ role: 'owner', ...on, keySet: false })).toBe(false);
+  });
+});
+
+describe('designerCostLine', () => {
+  it('states tokens and lookups in words, with no money figure', () => {
+    const line = designerCostLine({ inputTokens: 12345, outputTokens: 678, lookups: 4 });
+    expect(line).toBe("This run used 12,345 tokens in and 678 out, with 4 lookups, on your organisation's AI key.");
+    expect(line).not.toMatch(/[£$€]/);
+  });
+  it('says 1 lookup in the singular', () => {
+    expect(designerCostLine({ inputTokens: 1, outputTokens: 1, lookups: 1 })).toContain('with 1 lookup,');
   });
 });

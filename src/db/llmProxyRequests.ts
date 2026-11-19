@@ -15,3 +15,39 @@ export async function listLlmProxyUsage(supabase: Client, orgId: UUID): Promise<
   if (error) throw new Error(`listLlmProxyUsage: ${error.message}`);
   return (data as LlmProxyRequestRow[] | null) ?? [];
 }
+
+export interface AgentUse {
+  runs: number;
+  inputTokens: number;
+  outputTokens: number;
+}
+
+/** Pure: totals for the rows an owner sees on the Agents card. Only successful calls on the organisation's own key count. */
+export function summariseAgentUse(rows: readonly Pick<LlmProxyRequestRow, 'key_source' | 'status' | 'input_tokens' | 'output_tokens' | 'created_at'>[], since: Date): AgentUse {
+  const use: AgentUse = { runs: 0, inputTokens: 0, outputTokens: 0 };
+  for (const row of rows) {
+    if (row.key_source !== 'org' || row.status !== 'ok' || new Date(row.created_at) < since) continue;
+    use.runs += 1;
+    use.inputTokens += row.input_tokens ?? 0;
+    use.outputTokens += row.output_tokens ?? 0;
+  }
+  return use;
+}
+
+/** The first moment of the current calendar month, UTC. */
+export function startOfMonthUtc(now: Date): Date {
+  return new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1));
+}
+
+/** Calls made on the organisation's own key this month (member-scoped by RLS). One call is one model turn, so a Designer run is several. */
+export async function agentUseThisMonth(supabase: Client, orgId: UUID, now: Date = new Date()): Promise<AgentUse> {
+  const since = startOfMonthUtc(now);
+  const { data, error } = await supabase
+    .from('llm_proxy_requests')
+    .select('key_source, status, input_tokens, output_tokens, created_at')
+    .eq('org_id', orgId)
+    .eq('key_source', 'org')
+    .gte('created_at', since.toISOString());
+  if (error) throw new Error(`agentUseThisMonth: ${error.message}`);
+  return summariseAgentUse(data, since);
+}

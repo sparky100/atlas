@@ -1,4 +1,5 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
+import { agentUseThisMonth, type AgentUse } from '../../db/llmProxyRequests';
 import { getOrganisationById } from '../../db/organisations';
 import { removeOrgAiKey, saveOrgAiKey } from '../../db/orgAiKey';
 import type { OrganisationRow } from '../../db/types';
@@ -23,6 +24,21 @@ export function AgentsPanel({ organisation, canManage, onToggleAgents, saving, o
   const [key, setKey] = useState('');
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
+  const [use, setUse] = useState<AgentUse | null>(null);
+
+  // What agents have used on this organisation's own key this month. A read of the call log (counts only, never content); if it cannot be read the line is simply absent.
+  useEffect(() => {
+    let live = true;
+    agentUseThisMonth(supabase, organisation.id).then(
+      (u) => {
+        if (live) setUse(u);
+      },
+      () => undefined,
+    );
+    return () => {
+      live = false;
+    };
+  }, [organisation.id]);
 
   async function run(action: () => Promise<void>, failure: string) {
     setBusy(true);
@@ -51,6 +67,11 @@ export function AgentsPanel({ organisation, canManage, onToggleAgents, saving, o
       <Text as="p" size="sm">
         AI key: <Chip tone="neutral">{keySet ? 'Set' : 'Not set'}</Chip>
       </Text>
+      {use !== null && (
+        <Text as="p" size="sm" tone="muted">
+          This month on your key: {use.runs.toLocaleString('en-GB')} AI {use.runs === 1 ? 'call' : 'calls'}, {use.inputTokens.toLocaleString('en-GB')} tokens in and {use.outputTokens.toLocaleString('en-GB')} out. One Designer draft makes several calls.
+        </Text>
+      )}
       {canManage && (
         <form
           className={styles.form}

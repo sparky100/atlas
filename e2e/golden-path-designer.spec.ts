@@ -82,6 +82,7 @@ test('the Designer drafts options from a finding, editable, and only when agents
   const draft = page.getByLabel("Designer's draft (edit before you use it)");
   await expect(draft).toHaveValue(/Stay as we are/);
   await expect(page.getByText('Based on: Quote Tool.')).toBeVisible();
+  await expect(page.getByTestId('designer-cost')).toContainText('This run used 10 tokens in and 5 out, with 0 lookups');
   expect(runs).toBe(1);
   expect(sent.elementId).toBe(systemId);
   expect(sent.finding).toContain('no capability link recorded');

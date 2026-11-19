@@ -519,13 +519,15 @@ interface LogRequestInput {
   latencyMs: number;
   inputTokens?: number;
   outputTokens?: number;
+  /** Which key paid: the organisation's own (`org`, agents) or the platform's (`app`). */
+  keySource?: 'app' | 'org';
 }
 
 async function logRequest(input: LogRequestInput): Promise<void> {
-  const { serviceClient, orgId, model, status, latencyMs, inputTokens, outputTokens } = input;
+  const { serviceClient, orgId, model, status, latencyMs, inputTokens, outputTokens, keySource } = input;
   const { error } = await serviceClient
     .from('llm_proxy_requests')
-    .insert({ id: crypto.randomUUID(), org_id: orgId, model, status, latency_ms: latencyMs, input_tokens: inputTokens ?? null, output_tokens: outputTokens ?? null });
+    .insert({ id: crypto.randomUUID(), org_id: orgId, model, status, latency_ms: latencyMs, input_tokens: inputTokens ?? null, output_tokens: outputTokens ?? null, key_source: keySource ?? 'app' });
   // Logging is best-effort observability, not the authorization check
   // (that's the membership read below) — a failure here must never turn
   // an otherwise-successful proxy call into an error response.
@@ -600,6 +602,7 @@ Deno.serve(async (req: Request) => {
       orgApiKey = savedKey;
     }
 
+    const keySource: 'app' | 'org' = orgApiKey !== null ? 'org' : 'app';
     const config = await loadConfig(supabaseUrl, serviceRoleKey);
     const { model, rateLimitPerHour } = config;
     const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000).toISOString();
@@ -610,13 +613,13 @@ Deno.serve(async (req: Request) => {
       .gte('created_at', oneHourAgo);
     if (countError) console.error('[llm-proxy] rate-limit count failed', countError.message);
     if (!countError && (count ?? 0) >= rateLimitPerHour) {
-      await logRequest({ serviceClient, orgId, model, status: 'rate_limited', latencyMs: Date.now() - startedAt });
+      await logRequest({ serviceClient, orgId, model, status: 'rate_limited', latencyMs: Date.now() - startedAt, keySource });
       return jsonResponse({ status: 'error', message: `Rate limit exceeded for this organisation (${String(rateLimitPerHour)} requests/hour).` }, 429);
     }
 
     const apiKey = orgApiKey ?? config.apiKey;
     if (!apiKey) {
-      await logRequest({ serviceClient, orgId, model, status: 'error', latencyMs: Date.now() - startedAt });
+      await logRequest({ serviceClient, orgId, model, status: 'error', latencyMs: Date.now() - startedAt, keySource });
       return jsonResponse({ status: 'error', message: 'LLM proxy is not configured — no API key in platform_config\'s "llm" row or ANTHROPIC_API_KEY. See docs/EDGE-FUNCTIONS.md.' }, 503);
     }
 
@@ -630,7 +633,7 @@ Deno.serve(async (req: Request) => {
       // fire-and-forget `.then()` when that global isn't present (e.g. a
       // local test runner), since a best-effort audit log must never block
       // or fail the response itself (`logRequest`'s own comment).
-      const logAfterStream = passthrough.logged.then((outcome) => logRequest({ serviceClient, orgId, model, status: outcome.status, latencyMs: Date.now() - startedAt, inputTokens: outcome.inputTokens, outputTokens: outcome.outputTokens }));
+      const logAfterStream = passthrough.logged.then((outcome) => logRequest({ serviceClient, orgId, model, status: outcome.status, latencyMs: Date.now() - startedAt, inputTokens: outcome.inputTokens, outputTokens: outcome.outputTokens, keySource }));
       const runtime = (globalThis as { EdgeRuntime?: { waitUntil: (p: Promise<unknown>) => void } }).EdgeRuntime;
       if (runtime) runtime.waitUntil(logAfterStream);
       return passthrough.response;
@@ -640,11 +643,11 @@ Deno.serve(async (req: Request) => {
     const latencyMs = Date.now() - startedAt;
 
     if (!result.ok) {
-      await logRequest({ serviceClient, orgId, model, status: 'error', latencyMs });
+      await logRequest({ serviceClient, orgId, model, status: 'error', latencyMs, keySource });
       return jsonResponse({ status: 'error', message: result.text }, result.status);
     }
 
-    await logRequest({ serviceClient, orgId, model, status: 'ok', latencyMs, inputTokens: result.inputTokens, outputTokens: result.outputTokens });
+    await logRequest({ serviceClient, orgId, model, status: 'ok', latencyMs, inputTokens: result.inputTokens, outputTokens: result.outputTokens, keySource });
     return jsonResponse(
       {
         status: 'ok',

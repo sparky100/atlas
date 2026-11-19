@@ -11,6 +11,8 @@ export interface DesignerDraft {
   /** Names of the elements the draft cites (each one a tool actually returned). */
   citedNames: string[];
   grounded: boolean;
+  /** What the run used, shown to the person who asked. Tokens, not money: Atlas holds no price list. */
+  usage: { inputTokens: number; outputTokens: number; lookups: number };
 }
 
 export class DesignerError extends Error {
@@ -23,7 +25,7 @@ export class DesignerError extends Error {
 interface DesignerBody {
   status?: string;
   message?: string;
-  result?: { answer?: string; citations?: string[]; citationNames?: Record<string, string>; grounded?: boolean };
+  result?: { answer?: string; citations?: string[]; citationNames?: Record<string, string>; grounded?: boolean; inputTokens?: number; outputTokens?: number; toolUses?: unknown[] };
 }
 
 /** Pure: the one place the function's reply is read, so the page never shows a raw provider message. */
@@ -32,7 +34,13 @@ export function interpretDesignerReply(body: unknown): DesignerDraft {
   if (r.status === 'done' && typeof r.result?.answer === 'string' && r.result.answer.trim() !== '') {
     const names = r.result.citationNames ?? {};
     const citedNames = (r.result.citations ?? []).map((id) => names[id]).filter((n): n is string => typeof n === 'string' && n !== '');
-    return { text: r.result.answer.trim(), citedNames, grounded: r.result.grounded === true };
+    const count = (n: unknown) => (typeof n === 'number' && Number.isFinite(n) && n >= 0 ? Math.round(n) : 0);
+    return {
+      text: r.result.answer.trim(),
+      citedNames,
+      grounded: r.result.grounded === true,
+      usage: { inputTokens: count(r.result.inputTokens), outputTokens: count(r.result.outputTokens), lookups: Array.isArray(r.result.toolUses) ? r.result.toolUses.length : 0 },
+    };
   }
   if (r.status === 'done') throw new DesignerError('The Designer gave no draft. Try again.');
   if (r.status === 'empty_model') throw new DesignerError('This model has no committed content yet, so there is nothing to base a draft on.');

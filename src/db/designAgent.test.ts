@@ -3,8 +3,13 @@ import { DesignerError, interpretDesignerReply } from './designAgent';
 
 describe('interpretDesignerReply', () => {
   it('returns the draft with the names of what it cites', () => {
-    const draft = interpretDesignerReply({ status: 'done', result: { answer: ' 1. Stay as we are. ', citations: ['a', 'b'], citationNames: { a: 'Quote Tool' }, grounded: true } });
-    expect(draft).toEqual({ text: '1. Stay as we are.', citedNames: ['Quote Tool'], grounded: true });
+    const draft = interpretDesignerReply({ status: 'done', result: { answer: ' 1. Stay as we are. ', citations: ['a', 'b'], citationNames: { a: 'Quote Tool' }, grounded: true, inputTokens: 1200, outputTokens: 340, toolUses: [{}, {}, {}] } });
+    expect(draft).toEqual({ text: '1. Stay as we are.', citedNames: ['Quote Tool'], grounded: true, usage: { inputTokens: 1200, outputTokens: 340, lookups: 3 } });
+  });
+
+  it('reads missing or odd usage as zero rather than showing nonsense', () => {
+    const draft = interpretDesignerReply({ status: 'done', result: { answer: 'x', inputTokens: -5, outputTokens: 'lots', toolUses: 'none' } });
+    expect(draft.usage).toEqual({ inputTokens: 0, outputTokens: 0, lookups: 0 });
   });
 
   it('marks a draft with no verified citation as not grounded', () => {
