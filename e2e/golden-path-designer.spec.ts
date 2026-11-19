@@ -107,3 +107,47 @@ test('the Designer drafts options from a finding, editable, and only when agents
   await expect(page.getByTestId('decision-ai-mark')).toContainText('AI helped with this: Drafted by the Designer on');
   await expect(page.getByTestId('decision-ai-mark')).toContainText('then edited by a person');
 });
+
+test('the Designer is offered, or explained, when a decision is started from inside a project', async ({ page }) => {
+  test.slow();
+  await signUpCreateOrgAndModel(page, 'designerproject');
+  await addCapability(page, 'Housing Repairs');
+  await goToModelHome(page);
+  await page.getByRole('button', { name: 'Overview', exact: true }).click();
+  await page.getByRole('link', { name: 'Start a project →' }).click();
+  await page.getByLabel('Architect').selectOption({ index: 1 });
+  await page.getByRole('button', { name: 'Start project' }).click();
+  const nextStep = page.getByTestId('project-next-step');
+  await expect(nextStep.getByLabel('New decision title')).toBeVisible();
+
+  // Agents are off: the form says why instead of going quiet.
+  await expect(nextStep.getByRole('button', { name: 'Draft options with the Designer' })).toHaveCount(0);
+  await expect(nextStep.getByTestId('designer-unavailable')).toContainText('Turn on Ask Atlas');
+
+  await page.route('**/rest/v1/organisations*', async (route) => {
+    const response = await route.fetch();
+    const body = (await response.json()) as unknown;
+    const patch = (row: Record<string, unknown>) => ({ ...row, ai_assistant_enabled: true, ai_agents_enabled: true, ai_agent_key_set: true });
+    await route.fulfill({ response, json: Array.isArray(body) ? body.map((r) => patch(r as Record<string, unknown>)) : patch(body as Record<string, unknown>) });
+  });
+  await page.route('**/functions/v1/design-agent', async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        status: 'done',
+        stamp: { modelId: '00000000-0000-4000-8000-000000000001', modelName: 'Estate', ref: 'main', commitId: '00000000-0000-4000-8000-000000000002' },
+        result: { status: 'answered', answer: '1. Stay as we are.\n2. Build it ourselves.', citations: [], citationNames: {}, grounded: false, unverifiedRemoved: 0, toolUses: [], rounds: 1, inputTokens: 10, outputTokens: 5 },
+      }),
+    });
+  });
+  await page.reload();
+  await page.getByRole('button', { name: 'Draft options with the Designer' }).click();
+  await expect(page.getByLabel("Designer's draft (edit before you use it)")).toHaveValue(/Stay as we are/);
+  await page.getByRole('button', { name: 'Add to the context above' }).click();
+  await page.getByRole('button', { name: 'Start decision' }).click();
+  await expect(page.getByTestId('decision-ai-mark')).toContainText('AI helped with this: Drafted by the Designer on');
+
+  const overflow = await page.evaluate(() => document.documentElement.scrollWidth > document.documentElement.clientWidth + 1);
+  expect(overflow).toBe(false);
+});

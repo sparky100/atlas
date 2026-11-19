@@ -47,6 +47,8 @@ import { projectNextStep } from './projectNextStep';
 import { findingLabel } from '../decisions/findingLabels';
 import { suggestDecisionTitle } from '../decisions/optionSuggestions';
 import { ProjectBeforeAfter } from './ProjectBeforeAfter';
+import { DesignerPanel } from '../decisions/DesignerPanel';
+import { DESIGNER_MAX_FINDING_CHARS } from '../../tools/designPrompt';
 import { ProjectStep } from './ProjectStep';
 import { changesSummary, decisionsSummary, evidenceSummary, scopeSummary } from './projectStepSummary';
 import type { ProjectData } from './useProject';
@@ -66,6 +68,10 @@ export interface ProjectViewProps {
   /** ISO `YYYY-MM-DD` — "overdue" is relative to this; injected so the page and its tests agree on today. */
   today: string;
   reload: () => void;
+  /** Phase D: true only for an owner or architect in an organisation with Ask Atlas on, agents on and a key saved. */
+  designerAvailable?: boolean;
+  /** Why the Designer is not offered, shown beside the decision form. */
+  designerUnavailable?: { text: string; canFix: boolean } | null;
 }
 
 /**
@@ -76,7 +82,7 @@ export interface ProjectViewProps {
  * may close) is enforced in the database; the UI only offers what the
  * person can do and explains refusals in plain words.
  */
-export function ProjectView({ data, modelName, orgId, modelId, orgSlug, modelSlug, userId, role, today, reload }: ProjectViewProps) {
+export function ProjectView({ data, modelName, orgId, modelId, orgSlug, modelSlug, userId, role, today, reload, designerAvailable = false, designerUnavailable = null }: ProjectViewProps) {
   const { project, decisions, constrainingDecisions, changes, links, evidence, touched, elementsById } = data;
   const { members } = useMembers(orgId);
   const { branch: main } = useMainBranch(modelId);
@@ -150,7 +156,7 @@ export function ProjectView({ data, modelName, orgId, modelId, orgSlug, modelSlu
           <Text as="p" size="sm" tone="muted">
             {nextStep.body}
           </Text>
-          {nextStep.action.kind === 'start-decision' && userId !== null && <NewDecisionForm project={project} userId={userId} scopeIds={scopeIds} suggestedTitle={suggestedTitle} base={base} />}
+          {nextStep.action.kind === 'start-decision' && userId !== null && <NewDecisionForm project={project} userId={userId} scopeIds={scopeIds} suggestedTitle={suggestedTitle} base={base} designerAvailable={designerAvailable} designerUnavailable={designerUnavailable} orgSlug={orgSlug} />}
           {nextStep.action.kind === 'start-change' && userId !== null && main?.head_commit_id && <NewChangeForm project={project} userId={userId} mainHeadCommitId={main.head_commit_id} base={base} />}
           {nextStep.action.kind === 'open-decision' && (
             <Link to={`${base}/decisions/${nextStep.action.id}`}>{nextStep.action.label}</Link>
@@ -309,7 +315,7 @@ export function ProjectView({ data, modelName, orgId, modelId, orgSlug, modelSlu
               ))}
             </ul>
           )}
-          {isOpen && canDecide && !cardHostsDecisionForm && <NewDecisionForm project={project} userId={userId} scopeIds={scopeIds} suggestedTitle={suggestedTitle} base={base} />}
+          {isOpen && canDecide && !cardHostsDecisionForm && <NewDecisionForm project={project} userId={userId} scopeIds={scopeIds} suggestedTitle={suggestedTitle} base={base} designerAvailable={designerAvailable} designerUnavailable={designerUnavailable} orgSlug={orgSlug} />}
           {constrainingDecisions.length > 0 && (
             <>
               <Text as="h3" size="md">
@@ -519,11 +525,34 @@ function ChangeLine({ change, href }: { change: BranchRow; href: string }) {
  * decision's context, the project's declared scope is what it concerns, and the
  * decision page opens in edit mode so the wording can be shaped straight away.
  */
-function NewDecisionForm({ project, userId, scopeIds, suggestedTitle, base }: { project: ProjectRow; userId: UUID; scopeIds: readonly UUID[]; suggestedTitle: string; base: string }) {
+function NewDecisionForm({
+  project,
+  userId,
+  scopeIds,
+  suggestedTitle,
+  base,
+  designerAvailable,
+  designerUnavailable,
+  orgSlug,
+}: {
+  project: ProjectRow;
+  userId: UUID;
+  scopeIds: readonly UUID[];
+  suggestedTitle: string;
+  base: string;
+  designerAvailable: boolean;
+  designerUnavailable: { text: string; canFix: boolean } | null;
+  orgSlug: string;
+}) {
   const navigate = useNavigate();
   const [title, setTitle] = useState(suggestedTitle);
+  // The Designer drafts options from what the project is about, the same panel the Decisions page offers (Simon, 2026-11-19: it must appear here too). Its draft is added to the context and the decision records that an agent helped.
+  const [statement, setStatement] = useState(project.purpose.trim());
+  const [aiDraft, setAiDraft] = useState<{ draftedAt: string; edited: boolean } | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const firstScope = scopeIds[0];
+  const finding = (project.purpose.trim() !== '' ? project.purpose : project.title).trim().slice(0, DESIGNER_MAX_FINDING_CHARS);
   return (
     <form
       className={styles.inlineForm}
@@ -532,7 +561,7 @@ function NewDecisionForm({ project, userId, scopeIds, suggestedTitle, base }: { 
         if (title.trim().length === 0) return;
         setBusy(true);
         setError(null);
-        void createDecision(supabase, { id: crypto.randomUUID(), orgId: project.org_id, modelId: project.model_id, title: title.trim(), statement: project.purpose.trim(), ownerId: userId, ...(project.source_finding_key !== null ? { sourceFindingKey: project.source_finding_key } : {}), createdBy: userId, projectId: project.id })
+        void createDecision(supabase, { id: crypto.randomUUID(), orgId: project.org_id, modelId: project.model_id, title: title.trim(), statement, ownerId: userId, ...(aiDraft !== null ? { aiDraft: { agent: 'designer' as const, draftedAt: aiDraft.draftedAt, edited: aiDraft.edited } } : {}), ...(project.source_finding_key !== null ? { sourceFindingKey: project.source_finding_key } : {}), createdBy: userId, projectId: project.id })
           .then(async (d) => {
             // Every decision starts with its "Stay as we are" baseline; if this fails the decision page offers "Add the baseline".
             await addBaseline({ orgId: project.org_id, modelId: project.model_id, decisionId: d.id, userId, projectId: project.id }).catch((err: unknown) => {
@@ -565,6 +594,23 @@ function NewDecisionForm({ project, userId, scopeIds, suggestedTitle, base }: { 
           setTitle(e.target.value);
         }}
       />
+      {designerAvailable && firstScope !== undefined && (
+        <DesignerPanel
+          modelId={project.model_id}
+          input={{ elementId: firstScope, finding }}
+          onUse={(text, info) => {
+            setAiDraft({ draftedAt: info.draftedAt, edited: info.edited });
+            setStatement((prev) => (prev.trim() === '' ? text : `${prev.trim()}\n\nDesigner's draft options:\n${text}`));
+          }}
+        />
+      )}
+      {!designerAvailable && designerUnavailable !== null && firstScope !== undefined && (
+        <div data-testid="designer-unavailable">
+          <Text as="p" tone="muted" size="sm">
+            {designerUnavailable.text} {designerUnavailable.canFix && <Link to={`/o/${orgSlug}/settings`}>Open organisation settings</Link>}
+          </Text>
+        </div>
+      )}
       <Button type="submit" disabled={busy || title.trim().length === 0}>
         {busy ? 'Starting…' : 'Start decision'}
       </Button>
