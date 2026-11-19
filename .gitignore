@@ -21,6 +21,7 @@ supabase/.branches/
 supabase/functions/capture-run/index.ts
 supabase/functions/ask-model/index.ts
 supabase/functions/org-ai-key/index.ts
+supabase/functions/design-agent/index.ts
 supabase/functions/api/index.ts
 supabase/functions/connector-fetch/index.ts
 

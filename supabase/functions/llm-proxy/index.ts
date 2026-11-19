@@ -580,6 +580,26 @@ Deno.serve(async (req: Request) => {
     const proxyRequest = normalizeRequest(body);
     if (proxyRequest instanceof Response) return proxyRequest;
 
+    // Agents run on the organisation's OWN key (Phase D, Simon 2026-11-19), never the platform key.
+    // `useOrgKey: true` is allowed only when every switch is on (assistant, agents, a saved key) and
+    // the caller is an owner or architect of the organisation. Otherwise it is refused outright: it
+    // never falls back to the platform key, so an organisation without a key cannot spend ours.
+    let orgApiKey: string | null = null;
+    if (bodyRecord.useOrgKey === true) {
+      const refuse = () => jsonResponse({ status: 'error', message: 'Agents are not available for this organisation: an owner needs to switch them on and save an AI key, and only an owner or architect can run them.' }, 403);
+      const { data: userData, error: userError } = await callerClient.auth.getUser();
+      if (userError || !userData.user) return refuse();
+      const { data: own, error: ownError } = await callerClient.from('members').select('role').eq('org_id', orgId).eq('user_id', userData.user.id).maybeSingle();
+      const role = (own as { role?: string } | null)?.role;
+      if (ownError || (role !== 'owner' && role !== 'architect')) return refuse();
+      const { data: orgRow, error: orgError } = await serviceClient.from('organisations').select('ai_assistant_enabled, ai_agents_enabled, ai_agent_key_set').eq('id', orgId).maybeSingle();
+      const flags = orgRow as { ai_assistant_enabled?: boolean; ai_agents_enabled?: boolean; ai_agent_key_set?: boolean } | null;
+      if (orgError || flags?.ai_assistant_enabled !== true || flags.ai_agents_enabled !== true || flags.ai_agent_key_set !== true) return refuse();
+      const { data: savedKey, error: keyError } = await serviceClient.schema('atlas').rpc('org_ai_api_key', { p_org: orgId });
+      if (keyError || typeof savedKey !== 'string' || savedKey === '') return refuse();
+      orgApiKey = savedKey;
+    }
+
     const config = await loadConfig(supabaseUrl, serviceRoleKey);
     const { model, rateLimitPerHour } = config;
     const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000).toISOString();
@@ -594,13 +614,14 @@ Deno.serve(async (req: Request) => {
       return jsonResponse({ status: 'error', message: `Rate limit exceeded for this organisation (${String(rateLimitPerHour)} requests/hour).` }, 429);
     }
 
-    if (!config.apiKey) {
+    const apiKey = orgApiKey ?? config.apiKey;
+    if (!apiKey) {
       await logRequest({ serviceClient, orgId, model, status: 'error', latencyMs: Date.now() - startedAt });
       return jsonResponse({ status: 'error', message: 'LLM proxy is not configured — no API key in platform_config\'s "llm" row or ANTHROPIC_API_KEY. See docs/EDGE-FUNCTIONS.md.' }, 503);
     }
 
     if (proxyRequest.streamToClient) {
-      const passthrough = callAnthropicStreamingPassthrough(proxyRequest, config.apiKey, model);
+      const passthrough = callAnthropicStreamingPassthrough(proxyRequest, apiKey, model);
       // The response streams to the browser immediately; the audit-log row
       // (`logRequest`, same table/shape every other path writes) is written
       // once `passthrough.logged` resolves, after this function has already
@@ -615,7 +636,7 @@ Deno.serve(async (req: Request) => {
       return passthrough.response;
     }
 
-    const result = await callAnthropic(proxyRequest, config.apiKey, model);
+    const result = await callAnthropic(proxyRequest, apiKey, model);
     const latencyMs = Date.now() - startedAt;
 
     if (!result.ok) {
