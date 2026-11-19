@@ -118,6 +118,8 @@ export function DecisionView({ modelId, decisionId, orgId, orgSlug, modelSlug, r
     ? branchLinks
         .map((l) => readyState.linkedBranchesById.get(l.linked_id))
         .filter((b): b is NonNullable<typeof b> => b !== undefined)
+        // The "Stay as we are" baseline records no change, so it is not a column of "What changes": the Current column already is staying as we are.
+        .filter((b) => b.id !== readyState.decision.baseline_branch_id)
         .map((b) => ({ branchId: b.id, baseCommitId: b.base_commit_id, headCommitId: b.head_commit_id, label: intentHeaderLine(b) }))
     : [];
   const comparison = useDecisionComparison(modelId, main?.head_commit_id ?? null, concernedCapabilityIds, otherConcernElementIds, comparisonOptions);
