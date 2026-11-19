@@ -91,6 +91,10 @@ export function ProjectView({ data, modelName, orgId, modelId, orgSlug, modelSlu
 
   const scopeIds = links.filter((l) => l.linked_type === 'element').map((l) => l.linked_id);
   const touchedIds = touched.map((t) => t.elementId);
+  const scopeSystemIds = new Set(scopeIds.filter((id) => {
+    const type = data.elementsById.get(id)?.element_type;
+    return type === 'system' || type === 'container';
+  }));
   const difference = scopeDifference(scopeIds, touchedIds, data.reachedIds);
   const progress = projectProgress(changes, decisions);
   const firstDecision = originatingDecision(decisions);
@@ -142,7 +146,7 @@ export function ProjectView({ data, modelName, orgId, modelId, orgSlug, modelSlu
         </ol>
       </Panel>
 
-      <ProjectBeforeAfter modelId={modelId} projectId={project.id} mainHeadCommitId={main?.head_commit_id ?? null} changes={changes} capabilities={data.journeyCapabilities.map((c) => ({ id: c.id, name: c.name }))} base={base} />
+      <ProjectBeforeAfter modelId={modelId} projectId={project.id} mainHeadCommitId={main?.head_commit_id ?? null} changes={changes} capabilities={data.journeyCapabilities.map((c) => ({ id: c.id, name: c.name }))} scopeSystemIds={scopeSystemIds} base={base} />
 
       {(scopeIds.length > 0 || canEdit) && (
         <Panel>
