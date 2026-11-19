@@ -36,7 +36,7 @@ export interface ApiHandlerDeps {
   listModels: (orgId: UUID) => Promise<(ApiModel & { orgId: UUID })[]>;
   /** Head commit of the model's main line, or `null` when it has none. */
   mainCommit: (modelId: UUID) => Promise<UUID | null>;
-  createContext: (model: { id: UUID; name: string }, commitId: UUID) => ToolContext;
+  createContext: (model: { id: UUID; name: string }, commitId: UUID, orgId: UUID) => Promise<ToolContext> | ToolContext;
 }
 
 export interface ApiRequest {
@@ -111,7 +111,7 @@ export async function handleApiRequest(deps: ApiHandlerDeps, req: ApiRequest): P
   if (!model) return notFound('No model with that id or slug in your organisation.');
   const commitId = await deps.mainCommit(model.id);
   if (commitId === null) return fail(404, 'empty_model', 'This model has no data yet.');
-  const ctx = deps.createContext({ id: model.id, name: model.name }, commitId);
+  const ctx = await deps.createContext({ id: model.id, name: model.name }, commitId, auth.orgId);
   const modelMeta: ApiMeta = { api_version: API_VERSION, model: { id: model.id, name: model.name }, commit_id: commitId };
 
   if (sub === undefined) {

@@ -256,11 +256,11 @@ export function OrganisationSettingsView({ organisation, role, userId, onChanged
               }}
             />
             <Text as="span" size="sm">
-              Also share annual run cost with Ask Atlas
+              Also share annual run cost with AI
             </Text>
           </label>
           <Text as="p" tone="muted" size="sm">
-            Off by default. Run cost is commercially sensitive, so Ask Atlas and connected AI apps cannot see it, filter by it or compare on it until an owner turns this on. It is shared as a band (for example “£100k–£500k”), never an exact figure.
+            Off by default. Run cost is commercially sensitive, so Ask Atlas, connected AI apps and the read-only API cannot see it, filter by it or compare on it until an owner turns this on. It is shared as a band (for example “£100k–£500k”), never an exact figure.
           </Text>
           {!canManage && (
             <Text as="p" tone="muted" size="sm">

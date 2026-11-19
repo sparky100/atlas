@@ -218,3 +218,18 @@ describe('source', () => {
     }
   });
 });
+
+describe('run cost', () => {
+  it("hands the key's organisation to createContext, so the cost choice is made per organisation", async () => {
+    const seen: string[] = [];
+    const d = deps({
+      createContext: (_model, _commit, orgId) => {
+        seen.push(orgId);
+        return estateContext();
+      },
+    });
+    const res = await get(d, `/v1/models/${MODEL}/elements`);
+    expect(res.status).toBe(200);
+    expect(seen).toEqual([ORG]);
+  });
+});
