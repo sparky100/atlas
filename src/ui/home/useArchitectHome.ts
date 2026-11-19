@@ -1,12 +1,12 @@
 import { useEffect, useState } from 'react';
 import type { UUID } from '../../contracts/delta';
 import { getMainBranch, listChangeBranches } from '../../db/branches';
-import { listDecisionsForModel } from '../../db/decisions';
+import { listDecisionOptionLinksForModel, listDecisionsForModel, type DecisionOptionLink } from '../../db/decisions';
 import { listOpenMergeRequestsForModel } from '../../db/mergeRequests';
 import { getReviewPeriodDays } from '../../db/organisations';
 import { isReviewOverdue } from '../../contracts/thresholds';
 import { listProjectsForModel } from '../../db/projects';
-import type { BranchRow, MergeRequestRow } from '../../db/types';
+import type { BranchRow, DecisionRow, MergeRequestRow, ProjectRow } from '../../db/types';
 import { reportError } from '../errors/errorBannerStore';
 import { supabase } from '../supabaseClient';
 import { buildMyOwnedWork, type MyOwnedWork } from './whatWeAreDoing';
@@ -19,6 +19,11 @@ export interface ArchitectHomeData {
   /** The review period used for `overdueReviews`, in days; `null` when the queue is empty (not read). */
   reviewPeriodDays: number | null;
   myOpenBranches: BranchRow[];
+  /** The option links of the model's decisions — tells a decision's option from a change on its own (`buildMyWorkRows`). */
+  optionLinks: DecisionOptionLink[];
+  /** The model's decisions and projects, for naming what a change sits under. */
+  allDecisions: DecisionRow[];
+  allProjects: ProjectRow[];
   /** The open decisions and in-hand projects this user owns (UI-principles §3, 2026-10-04) — `buildMyOwnedWork`. */
   myOwnedWork: MyOwnedWork;
 }
@@ -63,11 +68,12 @@ export function useArchitectHome(modelId: UUID, userId: UUID | null): ArchitectH
         return;
       }
 
-      const [reviewQueue, changeBranches, decisions, projects] = await Promise.all([
+      const [reviewQueue, changeBranches, decisions, projects, optionLinks] = await Promise.all([
         listOpenMergeRequestsForModel(supabase, modelId),
         listChangeBranches(supabase, modelId),
         listDecisionsForModel(supabase, modelId),
         listProjectsForModel(supabase, modelId),
+        listDecisionOptionLinksForModel(supabase, modelId),
       ]);
       const myOpenBranches = changeBranches.filter((b) => b.created_by === viewerId && MY_OPEN_STATUSES.includes(b.status));
       const myOwnedWork = buildMyOwnedWork(projects, decisions, changeBranches, viewerId, new Date().toISOString().slice(0, 10));
@@ -80,7 +86,7 @@ export function useArchitectHome(modelId: UUID, userId: UUID | null): ArchitectH
       if (!cancelled) {
         setState({
           status: 'ready',
-          data: { reviewQueueCount: reviewQueue.length, oldestReviewItem: reviewQueue[0] ?? null, overdueReviews, reviewPeriodDays, myOpenBranches, myOwnedWork },
+          data: { reviewQueueCount: reviewQueue.length, oldestReviewItem: reviewQueue[0] ?? null, overdueReviews, reviewPeriodDays, myOpenBranches, optionLinks, allDecisions: decisions, allProjects: projects, myOwnedWork },
         });
       }
     }

@@ -121,7 +121,7 @@ test('front doors and browse: both doors render for a seeded model, switching pe
 
   // The org's creator is its owner, so the default door is architect
   // (UI-principles §3: "Owners and Architects get the architect door").
-  await expect(page.getByRole('heading', { name: 'My changes' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'My work' })).toBeVisible();
 
   // Switching to the director door renders the weakness grid (Handoff 7d):
   // the exposed capability's own tile, naming the retiring system that

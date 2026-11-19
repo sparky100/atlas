@@ -15,6 +15,7 @@ import type { BoundaryCrossing, ExternalInterfaceCrossing, ExternalOrganisationA
 import { formatDate, formatRelativeTime } from '../time';
 import { formatProjectProgress, projectStatusLabel, projectStatusTone } from '../projects/projectModel';
 import { branchStatusTone } from '../changes/branchStatus';
+import { buildMyWorkRows, myWorkDetail } from './myWork';
 import {
   decisionPrefillToSearchParams,
   prefillFromCriticalExposedFinding,
@@ -185,6 +186,7 @@ export function ArchitectHome({ data, modelId, mainCommitIdHint, insights, role,
   // empty in that case, and the panels that show them render a muted
   // "Loading…" instead, rather than an empty/misleadingly-clear state.
   const insightsData = insights.status === 'ready' ? insights.data : null;
+  const myWorkRows = buildMyWorkRows(data.myOpenBranches, data.allDecisions, data.allProjects, data.optionLinks);
   const modelHref = `/o/${orgSlug}/m/${modelSlug}`;
   const elementHref = (elementId: string) => `/o/${orgSlug}/m/${modelSlug}/e/${elementId}`;
   // A commit's diff against its own parent (Sprint U4-1 B2) — main's genesis
@@ -815,20 +817,25 @@ export function ArchitectHome({ data, modelId, mainCommitIdHint, insights, role,
         <div className={styles.side}>
           <Panel>
             <Text as="h2" size="xl" className={styles.sectionTitle}>
-              My changes
+              My work
             </Text>
-            {data.myOpenBranches.length === 0 ? (
-              <EmptyState>No open changes of your own right now.</EmptyState>
+            {myWorkRows.length === 0 ? (
+              <EmptyState>No open work of your own right now.</EmptyState>
             ) : (
-              <ul className={styles.branchList}>
-                {data.myOpenBranches.map((branch) => (
-                  <li key={branch.id} className={styles.branchRow}>
-                    <Link to={`/o/${orgSlug}/m/${modelSlug}/changes/${branch.id}`}>
-                      <Text as="span" size="sm">
-                        {branch.title ?? branch.name}
-                      </Text>
-                    </Link>
-                    <Chip tone={branchStatusTone(branch.status)}>{branch.status}</Chip>
+              <ul className={styles.branchList} data-testid="my-work-list">
+                {myWorkRows.map((row) => (
+                  <li key={row.key} className={styles.ownedRow}>
+                    <div className={styles.branchRow}>
+                      <Link to={`${modelHref}/${row.target.kind === 'project' ? 'projects' : row.target.kind === 'decision' ? 'decisions' : 'changes'}/${row.target.id}`}>
+                        <Text as="span" size="sm">
+                          {row.title}
+                        </Text>
+                      </Link>
+                      {row.status !== null && <Chip tone={branchStatusTone(row.status)}>{row.status}</Chip>}
+                    </div>
+                    <Text as="p" tone="muted" size="xs">
+                      {myWorkDetail(row)}
+                    </Text>
                   </li>
                 ))}
               </ul>
