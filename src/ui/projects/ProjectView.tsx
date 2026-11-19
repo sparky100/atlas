@@ -36,6 +36,7 @@ import {
   projectStatusTone,
   scopeDifference,
   projectIsOpen,
+  PROPOSED_PROJECT_EXPLAINER,
 } from './projectModel';
 import { loadProjectPack } from '../exports/loadProjectPack';
 import { markdownToPdfBytes } from '../exports/markdownPdf';
@@ -451,7 +452,7 @@ function ProjectHeader({ project, ownerName, managerName, progress }: { project:
       </div>
       {project.status === 'proposed' && (
         <Text as="p" size="sm">
-          This is a proposal. It is not yet work in hand, and does not appear on the roadmap, until an owner or architect accepts it.
+          This is a proposal. {PROPOSED_PROJECT_EXPLAINER}
         </Text>
       )}
       {project.purpose !== '' && <Text as="p">{project.purpose}</Text>}

@@ -14,7 +14,7 @@ import { Text } from '../components/Text/Text';
 import type { DecisionPrefill } from '../decisions/decisionPrefill';
 import { DecisionLinkPicker } from '../decisions/DecisionLinkPicker';
 import { useMembers } from '../orgs/useMembers';
-import { groupProjectsByStatus, projectStatusLabel, projectStatusTone, scopeHasCapability, type ProjectScopeItem } from './projectModel';
+import { groupProjectsByStatus, PROPOSED_PROJECT_EXPLAINER, projectStatusLabel, projectStatusTone, scopeHasCapability, type ProjectScopeItem } from './projectModel';
 import { ProjectManagerField } from './ProjectManagerField';
 import { NO_PROJECT_MANAGER, projectManagerToInput, type ProjectManagerValue } from './projectManagerValue';
 import { projectFormFromPrefill } from './projectPrefill';
@@ -206,11 +206,9 @@ export function ProjectsView({ modelId, orgId, userId, orgSlug, modelSlug, canCr
                 Start as a proposal
               </Text>
             </label>
-            {asProposal && (
-              <Text as="p" size="sm" tone="muted">
-                A proposal does not count as work in hand until someone with the right role accepts it.
-              </Text>
-            )}
+            <Text as="p" size="sm" tone="muted">
+              {PROPOSED_PROJECT_EXPLAINER}
+            </Text>
             <Button variant="primary" type="submit" disabled={status === 'creating' || !ownerId || title.trim().length === 0 || !hasCapability}>
               {status === 'creating' ? 'Starting…' : asProposal ? 'Propose project' : 'Start project'}
             </Button>
@@ -231,6 +229,11 @@ export function ProjectsView({ modelId, orgId, userId, orgSlug, modelSlug, canCr
               ({group.projects.length})
             </Text>
           </div>
+          {group.status === 'proposed' && (
+            <Text as="p" size="sm" tone="muted">
+              {PROPOSED_PROJECT_EXPLAINER}
+            </Text>
+          )}
           <ul className={styles.list}>
             {group.projects.map((project) => (
               <ProjectRowItem key={project.id} project={project} orgSlug={orgSlug} modelSlug={modelSlug} />
