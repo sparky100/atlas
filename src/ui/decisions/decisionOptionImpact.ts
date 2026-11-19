@@ -68,3 +68,25 @@ export function impactedLaneKeys(
   }
   return impacted;
 }
+
+/**
+ * Lane keys for the decision's own scope, shown while an option has no edits yet so the diagram is the
+ * affected capability and systems as they are today, not every lane hidden. A system in scope counts,
+ * and so does any system that supports a capability in scope. `scopeElementIds` is what the decision
+ * concerns (capabilities and systems); the other inputs are the same landscape data as `impactedLaneKeys`.
+ */
+export function scopeLaneKeys(
+  scopeElementIds: ReadonlySet<UUID>,
+  systems: readonly ElementsHeadRow[],
+  supportsEdges: readonly RelationshipsHeadRow[],
+  l1AncestorByCapabilityId: ReadonlyMap<UUID, ElementsHeadRow>,
+): Set<string> {
+  const inScope = new Set<UUID>();
+  for (const s of systems) if (scopeElementIds.has(s.element_id)) inScope.add(s.element_id);
+  for (const e of supportsEdges) if (scopeElementIds.has(e.to_element_id)) inScope.add(e.from_element_id);
+  const grouping = groupSystemsByLane(systems, supportsEdges, l1AncestorByCapabilityId);
+  const laneKeysById = laneKeysBySystemId(grouping);
+  const keys = new Set<string>();
+  for (const id of inScope) for (const key of laneKeysById.get(id) ?? []) keys.add(key);
+  return keys;
+}

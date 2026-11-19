@@ -7,7 +7,8 @@
 }
 
 .grid {
-  width: 100%;
+  /* Left-aligned: the table is as wide as its columns, so spare width stays on the right rather than stretching each option to half the page. */
+  width: auto;
   border-collapse: collapse;
 }
 
@@ -35,7 +36,9 @@
 }
 
 .grid th:not(.criterionHeaderCell) {
+  width: 320px;
   min-width: 220px;
+  max-width: 360px;
 }
 
 .optionHeader {
