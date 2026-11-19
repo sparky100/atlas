@@ -34,4 +34,9 @@ describe('buildProjectJourney (plan B1)', () => {
     expect(steps[0]?.detail.length).toBeLessThanOrEqual(90);
     expect(steps[0]?.detail.endsWith('…')).toBe(true);
   });
+
+  it('says on the last step that a proposed project is waiting to be accepted, and only then', () => {
+    expect(buildProjectJourney({ ...base, projectStatus: 'proposed' })[3]?.detail).toBe('1 of 1 decision chosen. This project is a proposal until an owner or architect accepts it.');
+    expect(buildProjectJourney({ ...base, projectStatus: 'active' })[3]?.detail).toBe('1 of 1 decision chosen.');
+  });
 });
