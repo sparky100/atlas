@@ -19,6 +19,8 @@ export interface ArchitectHomeData {
   /** The review period used for `overdueReviews`, in days; `null` when the queue is empty (not read). */
   reviewPeriodDays: number | null;
   myOpenBranches: BranchRow[];
+  /** Every open change in the model, to list what sits inside each project. */
+  allOpenBranches: BranchRow[];
   /** The option links of the model's decisions — tells a decision's option from a change on its own (`buildMyWorkRows`). */
   optionLinks: DecisionOptionLink[];
   /** The model's decisions and projects, for naming what a change sits under. */
@@ -75,6 +77,7 @@ export function useArchitectHome(modelId: UUID, userId: UUID | null): ArchitectH
         listProjectsForModel(supabase, modelId),
         listDecisionOptionLinksForModel(supabase, modelId),
       ]);
+      const allOpenBranches = changeBranches.filter((b) => MY_OPEN_STATUSES.includes(b.status));
       const myOpenBranches = changeBranches.filter((b) => b.created_by === viewerId && MY_OPEN_STATUSES.includes(b.status));
       const myOwnedWork = buildMyOwnedWork(projects, decisions, changeBranches, viewerId, new Date().toISOString().slice(0, 10));
 
@@ -86,7 +89,7 @@ export function useArchitectHome(modelId: UUID, userId: UUID | null): ArchitectH
       if (!cancelled) {
         setState({
           status: 'ready',
-          data: { reviewQueueCount: reviewQueue.length, oldestReviewItem: reviewQueue[0] ?? null, overdueReviews, reviewPeriodDays, myOpenBranches, optionLinks, allDecisions: decisions, allProjects: projects, myOwnedWork },
+          data: { reviewQueueCount: reviewQueue.length, oldestReviewItem: reviewQueue[0] ?? null, overdueReviews, reviewPeriodDays, myOpenBranches, allOpenBranches, optionLinks, allDecisions: decisions, allProjects: projects, myOwnedWork },
         });
       }
     }

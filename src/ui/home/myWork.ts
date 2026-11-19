@@ -63,3 +63,39 @@ export function myWorkDetail(row: MyWorkRow): string {
   if (row.kind === 'decision') return `Decision · ${String(n)} option${n === 1 ? '' : 's'} of yours, waiting to be chosen`;
   return 'Change on its own: not part of a project or decision';
 }
+
+export interface DecisionWithOptions {
+  decision: DecisionRow;
+  /** The open changes that are this decision's options. */
+  options: BranchRow[];
+}
+
+const byBranchTitle = (a: BranchRow, b: BranchRow) => (a.title ?? a.name).localeCompare(b.title ?? b.name);
+
+/** The open option changes inside one decision. */
+export function decisionOptions(decisionId: UUID, openBranches: readonly BranchRow[], optionLinks: readonly DecisionOptionLink[]): BranchRow[] {
+  const ids = new Set(optionLinks.filter((l) => l.decisionId === decisionId).map((l) => l.branchId));
+  return openBranches.filter((b) => ids.has(b.id)).sort(byBranchTitle);
+}
+
+/**
+ * The hierarchy Project → Decision → Change (Simon, 2026-11-19). A project
+ * holds its open decisions, each with its option changes underneath. A change
+ * linked straight to the project, not through a decision, sits beside the
+ * decisions, one level down from the project.
+ */
+export function projectChildren(
+  projectId: UUID,
+  openBranches: readonly BranchRow[],
+  decisions: readonly DecisionRow[],
+  optionLinks: readonly DecisionOptionLink[],
+): { decisions: DecisionWithOptions[]; changes: BranchRow[] } {
+  const optionIds = new Set(optionLinks.map((l) => l.branchId));
+  return {
+    decisions: decisions
+      .filter((d) => d.project_id === projectId && d.status === 'proposed')
+      .sort((a, b) => a.title.localeCompare(b.title))
+      .map((decision) => ({ decision, options: decisionOptions(decision.id, openBranches, optionLinks) })),
+    changes: openBranches.filter((b) => b.project_id === projectId && !optionIds.has(b.id)).sort(byBranchTitle),
+  };
+}
