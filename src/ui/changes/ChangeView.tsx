@@ -20,6 +20,7 @@ import { canApproveOrMergeRequest, canCancelChange } from '../orgs/useMembership
 import { BranchRebasePanel } from '../reviews/BranchRebasePanel';
 import { supabase } from '../supabaseClient';
 import { refQueryParam } from '../../db/ref';
+import { OptionDraftCard } from './OptionDraftCard';
 import { dateFieldLabelForIntent, intentReviewWeight, isDateRequiredForIntent } from './branchIntent';
 import { branchStatusTone } from './branchStatus';
 import { deriveChangeStep } from './changeStepper';
@@ -531,6 +532,7 @@ export function ChangeView({ orgId, modelId, branchId, orgSlug, modelSlug, role,
               <Text as="p" tone="muted" size="sm">
                 Open a system, make your edit and save it. It will appear here, together with what it affects.
               </Text>
+              <OptionDraftCard branch={branch} mainHeadCommitId={branch.head_commit_id} orgSlug={orgSlug} modelSlug={modelSlug} />
               <LinkButton to={editInLandscapeHref} variant={isSelected ? 'primary' : 'secondary'}>
                 {isSelected ? 'Carry on editing' : 'Open the landscape to edit'}
               </LinkButton>
