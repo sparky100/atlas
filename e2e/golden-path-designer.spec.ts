@@ -33,6 +33,8 @@ test('the Designer drafts options from a finding, editable, and only when agents
 
   await goToModelHome(page);
   await expect(healthPanel(page).getByText('Loading…')).toHaveCount(0);
+  // From the findings themselves: the Designer is mentioned, and with agents off it says why.
+  await expect(page.getByTestId('designer-hint')).toContainText('Turn on Ask Atlas');
   await healthPanel(page).getByRole('link', { name: 'Keep, link or retire? →' }).click();
   await expect(page.getByPlaceholder('Title (e.g. What replaces SAP PM?)')).toHaveValue('Keep, link or retire Quote Tool?');
 

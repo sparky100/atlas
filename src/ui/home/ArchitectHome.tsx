@@ -29,6 +29,8 @@ import { GoalsWithoutCapabilityNote } from '../goals/GoalsWithoutCapabilityNote'
 import { PrincipleDeparturesNote } from '../principles/PrincipleDeparturesNote';
 import { attributesRecord } from '../elements/attributesRecord';
 import { canStartProject } from '../orgs/roleGates';
+import { useOrganisationBySlug } from '../orgs/useOrganisationBySlug';
+import { canOfferDesigner, designerUnavailableReason } from '../decisions/designerRequest';
 import { selectRecentActivity, splitActivitySubjects, type GroupedActivityItem } from './groupRecentActivity';
 import { checksClearLabel, partitionHealthChecks, type HealthCheck } from './healthChecks';
 import { MissingFactsStat } from '../gaps/MissingFactsStat';
@@ -180,6 +182,11 @@ function resolveCardAction(check: HealthCheck): FindingCardAction | null {
  *    second, parallel layout.
  */
 export function ArchitectHome({ data, modelId, mainCommitIdHint, insights, role, orgSlug, modelSlug, onShowOverview }: ArchitectHomeProps) {
+  // The Designer lives one click on, in a decision started from a finding. Say so here, so it can be found from where the findings are (Simon, 2026-11-19).
+  const { organisation } = useOrganisationBySlug(orgSlug);
+  const designerArgs = { role, assistantEnabled: organisation?.ai_assistant_enabled === true, agentsEnabled: organisation?.ai_agents_enabled === true, keySet: organisation?.ai_agent_key_set === true };
+  const designerOffered = canOfferDesigner(designerArgs);
+  const designerWhyNot = designerUnavailableReason(designerArgs);
   const now = new Date();
   // E8 item (4): `null` while Health findings/Recent activity are still
   // loading (or failed) — every array below built from it defaults to
@@ -783,6 +790,16 @@ export function ArchitectHome({ data, modelId, mainCommitIdHint, insights, role,
             </Link>
             {/* UI-principles §3: where capabilities are weak is Overview's to show, not repeated here. */}
             <HomeViewLink onClick={onShowOverview}>Where capabilities are weak is on Overview →</HomeViewLink>
+            {canStartDecision(role) && organisation !== null && (
+              <div data-testid="designer-hint">
+                <Text as="p" tone="muted" size="sm">
+                  {designerOffered
+                    ? 'The Designer can draft options for a finding: choose "Start a decision →" on it, then "Draft options with the Designer".'
+                    : (designerWhyNot?.text ?? '')}{' '}
+                  {!designerOffered && designerWhyNot?.canFix === true && <Link to={`/o/${orgSlug}/settings`}>Open organisation settings</Link>}
+                </Text>
+              </div>
+            )}
 
             {/* E8 item (4): Health findings load after first paint
                 (`useArchitectHomeInsights.ts`) — everything below reads
