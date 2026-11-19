@@ -31,6 +31,29 @@ These are not style preferences. Violating one is a defect, whatever else the ch
    - **No change may introduce a Supabase advisor finding.** Run the Supabase security and performance advisors (`get_advisors`) before and after every migration, and again before release. The set of findings afterwards must be the same as or smaller than before: a new ERROR, WARN or INFO (for example a function callable by `anon`, a table without a policy, a mutable `search_path`, a `SECURITY DEFINER` view) blocks the change until it is fixed, never waived or left for later. Report the before and after counts in the sprint summary. New functions therefore set `search_path`, revoke `anon` and `public` execute, and new tables enable RLS with a policy in the same migration.
    - A feature that changes who can see or change data (RLS, grants, edge function auth, API keys, SSO) says so plainly in its PR, with the test that proves the boundary.
 
+## Vision and UX expectations
+
+Atlas is for business users as well as architects. Every feature must help a person complete an understandable task inside the existing journey. "Built but not reachable by a user" means it does not exist. This section is binding on every contributor, human or AI, including coding agents.
+
+**The vision in short.** Atlas is a clear path from a business need to a decision people can explain. Capability is the organising unit, and outcome is the measure of value. The route is: need, estate check, a small set of options (staying as we are is always one), challenge, then a versioned proposal that people approve. Estate checks narrow options and show uncertainty; they never eliminate one automatically. People approve decisions and live-model changes, not every step, and drafts stay editable throughout. AI agents support the task and must be clearly marked (for example "Drafted by the Designer, edited by a person"); the user never coordinates agents. When data is shared with AI, an API or MCP, start from what must not be shared (cost first).
+
+**Where it is written down.** The full vision and the delivery plan are kept outside this public repository (the vision stays private until Simon says otherwise). Ask Simon for them before work on a new phase. Keep the plan updated after each PR, and keep the vision current whenever a decision changes direction. A change that does not fit the vision is raised, not merged.
+
+**The 12 UX and delivery rules (Simon, 2026-11-19).**
+
+1. Define the user task before implementing: who, where they start, what they want, what success is, with a realistic example.
+2. Inspect the existing journey: entry points, screens, permissions, actions, what comes before and after. Reuse existing patterns.
+3. Describe the complete interaction before coding: what the user sees, does, what changes, where they go next. Make routine design choices without asking.
+4. Make every handoff work. One step's output must be usable by the next. "Draft options" must produce options the user can edit and compare, with no copying or reconstruction.
+5. Keep the business question visible. Lead with need, outcome, options, evidence and decision, in plain task labels.
+6. Maintain continuity: preserve work, explain what is saved, show progress, allow cancellation, make recovery easy.
+7. Make states and permissions truthful. Distinguish suggested, saved, reviewed, chosen, approved and implemented, and say who can take a restricted action. Never imply completion because one component or one reviewer finished.
+8. Keep complexity proportionate. Add a page, status, setting or concept only for a demonstrated problem. AI supports the task without the user coordinating agents.
+9. Verify the whole journey before reporting completion: start from Home, use realistic data and the right permissions, check desktop and mobile, and include empty, unavailable, failed and interrupted states.
+10. Separate functional evidence from usability evidence. Automated tests do not show discoverability or comprehension, and mocked AI tests do not show real AI quality.
+11. Report completion against the task: what the user can now complete, what was tested, what is manual or missing. Say implemented, merged, deployed and accepted separately. Update the plan and user guide.
+12. Treat repeated UX corrections as a signal to review the whole journey before adding another local fix.
+
 ## Code layout
 
 ```
