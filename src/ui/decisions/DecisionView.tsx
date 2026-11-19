@@ -23,6 +23,7 @@ import { canAddDecisionConcern, canCancelDecision, canChooseDecisionOption, canC
 import { useMembers } from '../orgs/useMembers';
 import type { AlsoAffectedElement } from './alsoAffected';
 import { DecisionBaselineCard } from './DecisionBaselineCard';
+import { CollapsibleSection } from '../components/CollapsibleSection/CollapsibleSection';
 import { DecisionCriteriaGrid, type DecisionCriteriaOption } from './DecisionCriteriaGrid';
 import { DecisionGoLive } from './DecisionGoLive';
 import { DecisionPacks } from './DecisionPacks';
@@ -248,10 +249,8 @@ export function DecisionView({ modelId, decisionId, orgId, orgSlug, modelSlug, r
       />
 
       <Panel>
+        <CollapsibleSection title="Context">
         <div className={styles.field}>
-          <Text as="h2" size="lg">
-            Context
-          </Text>
           <Text as="p" tone={decision.statement ? 'default' : 'muted'}>
             {decision.statement || 'No context recorded.'}
           </Text>
@@ -270,6 +269,7 @@ export function DecisionView({ modelId, decisionId, orgId, orgSlug, modelSlug, r
 </div>
           )}
         </div>
+        </CollapsibleSection>
       </Panel>
 
       {decision.status === 'accepted' && (
@@ -313,9 +313,7 @@ export function DecisionView({ modelId, decisionId, orgId, orgSlug, modelSlug, r
       )}
 
       <Panel>
-        <Text as="h2" size="lg">
-          Concerns
-        </Text>
+        <CollapsibleSection title="Concerns" meta={`(${String(elementLinks.length)})`}>
         {elementLinks.length === 0 ? null : (
           <ul className={styles.linkList}>
             {elementLinks.map((link) => {
@@ -361,23 +359,12 @@ export function DecisionView({ modelId, decisionId, orgId, orgSlug, modelSlug, r
             onRemove={() => undefined}
           />
         )}
+        </CollapsibleSection>
       </Panel>
-
-      <DecisionPrinciplesPanel
-        principles={principlesState.principles}
-        links={principlesState.links}
-        editable={canLinkDecisionPrinciples(role, decision)}
-        savingIds={principlesState.savingIds}
-        error={principlesState.error}
-        principlesHref={`/o/${orgSlug}/m/${modelSlug}/principles`}
-        onSetStance={principlesState.setStance}
-      />
 
       {(branchLinks.length > 0 || canAddOption) && (
         <Panel>
-          <Text as="h2" size="lg">
-            Options
-          </Text>
+          <CollapsibleSection title="Options" meta={`(${String(branchLinks.length)})`}>
           {baselineBranch !== undefined && (
             <DecisionBaselineCard
               key={`${decision.stay_risk}\u0000${decision.stay_reason}`}
@@ -592,6 +579,7 @@ export function DecisionView({ modelId, decisionId, orgId, orgSlug, modelSlug, r
             </div>
           )}
           {optionsState.error !== null && <Text as="p">{optionsState.error}</Text>}
+          </CollapsibleSection>
         </Panel>
       )}
 
@@ -609,11 +597,7 @@ export function DecisionView({ modelId, decisionId, orgId, orgSlug, modelSlug, r
 
       {comparisonOptions.length > 0 && (
         <Panel>
-          <div className={styles.meta}>
-            <Text as="h2" size="lg">
-              What changes
-            </Text>
-          </div>
+          <CollapsibleSection title="What changes" meta="per option">
 
           {comparison.status === 'loading' && (
             <Text as="p" tone="muted" size="sm">
@@ -723,8 +707,20 @@ export function DecisionView({ modelId, decisionId, orgId, orgSlug, modelSlug, r
                 </>
               );
             })()}
+          </CollapsibleSection>
         </Panel>
       )}
+
+      <DecisionPrinciplesPanel
+        principles={principlesState.principles}
+        links={principlesState.links}
+        editable={canLinkDecisionPrinciples(role, decision)}
+        savingIds={principlesState.savingIds}
+        error={principlesState.error}
+        principlesHref={`/o/${orgSlug}/m/${modelSlug}/principles`}
+        onSetStance={principlesState.setStance}
+      />
+
 
       {args.length > 0 && (
         <Panel>
