@@ -1,16 +1,21 @@
-import { useQuery } from '@tanstack/react-query';
-import { Link } from 'react-router';
-import type { UUID } from '../../contracts/delta';
-import { loadProjectHeads } from '../../db/projectHeads';
-import type { BranchRow } from '../../db/types';
-import { Chip } from '../components/Chip/Chip';
-import { Panel } from '../components/Panel/Panel';
-import { Text } from '../components/Text/Text';
-import { supabase } from '../supabaseClient';
-import { buildProjectBeforeAfter, type BeforeAfterColumn, type BeforeAfterMark } from './projectBeforeAfterModel';
-import styles from './ProjectBeforeAfter.module.css';
+import { useQuery } from "@tanstack/react-query";
+import { Link } from "react-router";
+import type { UUID } from "../../contracts/delta";
+import { loadProjectHeads } from "../../db/projectHeads";
+import type { BranchRow } from "../../db/types";
+import { Chip } from "../components/Chip/Chip";
+import { ProjectStep } from "./ProjectStep";
+import { Panel } from "../components/Panel/Panel";
+import { Text } from "../components/Text/Text";
+import { supabase } from "../supabaseClient";
+import {
+  buildProjectBeforeAfter,
+  type BeforeAfterColumn,
+  type BeforeAfterMark,
+} from "./projectBeforeAfterModel";
+import styles from "./ProjectBeforeAfter.module.css";
 
-const OPEN_STATUSES = new Set(['draft', 'proposed', 'in_review', 'approved']);
+const OPEN_STATUSES = new Set(["draft", "proposed", "in_review", "approved"]);
 
 export interface ProjectBeforeAfterProps {
   modelId: UUID;
@@ -25,7 +30,7 @@ export interface ProjectBeforeAfterProps {
 }
 
 function markLabel(mark: BeforeAfterMark): string | null {
-  return mark === 'new' ? 'New' : mark === 'ends' ? 'Ends' : null;
+  return mark === "new" ? "New" : mark === "ends" ? "Ends" : null;
 }
 
 function Column({ column, base }: { column: BeforeAfterColumn; base: string }) {
@@ -44,7 +49,11 @@ function Column({ column, base }: { column: BeforeAfterColumn; base: string }) {
             <li key={system.id} className={styles.system}>
               <span className={styles.systemName}>
                 <Link to={`${base}/e/${system.id}`}>{system.name}</Link>
-                {markLabel(system.mark) !== null && <Chip tone={system.mark === 'new' ? 'ok' : 'warn'}>{markLabel(system.mark)}</Chip>}
+                {markLabel(system.mark) !== null && (
+                  <Chip tone={system.mark === "new" ? "ok" : "warn"}>
+                    {markLabel(system.mark)}
+                  </Chip>
+                )}
                 <Link to={`${base}/context/${system.id}?ref=main`}>
                   <Text as="span" size="xs">
                     Context
@@ -60,10 +69,15 @@ function Column({ column, base }: { column: BeforeAfterColumn; base: string }) {
                   {system.connections.map((c) => (
                     <li key={`${c.key}-${c.mark}`}>
                       <Text as="span" size="sm">
-                        {c.label} <Link to={`${base}/e/${c.appId}`}>{c.appName}</Link>
-                        {c.isExternal ? ' (external)' : ''}
-                      </Text>{' '}
-                      {markLabel(c.mark) !== null && <Chip tone={c.mark === 'new' ? 'ok' : 'warn'}>{markLabel(c.mark)}</Chip>}
+                        {c.label}{" "}
+                        <Link to={`${base}/e/${c.appId}`}>{c.appName}</Link>
+                        {c.isExternal ? " (external)" : ""}
+                      </Text>{" "}
+                      {markLabel(c.mark) !== null && (
+                        <Chip tone={c.mark === "new" ? "ok" : "warn"}>
+                          {markLabel(c.mark)}
+                        </Chip>
+                      )}
                     </li>
                   ))}
                 </ul>
@@ -82,15 +96,35 @@ function Column({ column, base }: { column: BeforeAfterColumn; base: string }) {
  * after each drafted change, with each system's connected apps and
  * integrations. Derived from the commit history on load, nothing stored.
  */
-export function ProjectBeforeAfter({ modelId, projectId, mainHeadCommitId, changes, capabilities, base }: ProjectBeforeAfterProps) {
+export function ProjectBeforeAfter({
+  modelId,
+  projectId,
+  mainHeadCommitId,
+  changes,
+  capabilities,
+  base,
+}: ProjectBeforeAfterProps) {
   const openChanges = changes.filter((c) => OPEN_STATUSES.has(c.status));
-  const changeKey = openChanges.map((c) => `${c.id}:${c.head_commit_id}`).join(',');
+  const changeKey = openChanges
+    .map((c) => `${c.id}:${c.head_commit_id}`)
+    .join(",");
   const { data } = useQuery({
-    queryKey: ['projects', 'beforeAfter', projectId, mainHeadCommitId, changeKey],
+    queryKey: [
+      "projects",
+      "beforeAfter",
+      projectId,
+      mainHeadCommitId,
+      changeKey,
+    ],
     enabled: mainHeadCommitId !== null && capabilities.length > 0,
     queryFn: async () => {
       if (mainHeadCommitId === null) return null;
-      const heads = await loadProjectHeads(supabase, modelId, mainHeadCommitId, openChanges);
+      const heads = await loadProjectHeads(
+        supabase,
+        modelId,
+        mainHeadCommitId,
+        openChanges,
+      );
       return buildProjectBeforeAfter(heads.today, heads.changes, capabilities);
     },
   });
@@ -99,30 +133,42 @@ export function ProjectBeforeAfter({ modelId, projectId, mainHeadCommitId, chang
 
   return (
     <Panel data-testid="project-before-after">
-      <Text as="h2" size="lg">
-        What this changes, capability by capability
-      </Text>
-      <Text as="p" size="sm" tone="muted">
-        For each capability this project serves: what supports it today, and what would support it after each drafted change, with the apps and integrations each system connects to. Read from the model, not stored.
-      </Text>
-      {data.map((capability) => (
-        <section key={capability.id} className={styles.capability} aria-label={capability.name}>
-          <Text as="h3" size="md">
-            <Link to={`${base}/e/${capability.id}`}>{capability.name}</Link>
-          </Text>
-          <div className={styles.columns}>
-            <Column column={capability.today} base={base} />
-            {capability.after.map((column) => (
-              <Column key={column.changeId} column={column} base={base} />
-            ))}
-          </div>
-          {capability.after.length === 0 && (
-            <Text as="p" size="sm" tone="muted">
-              No change has been drafted yet, so there is no “after” to compare.
+      <ProjectStep
+        stepKey="before-after"
+        projectId={projectId}
+        title="What this changes, capability by capability"
+        summary={`${String(data.length)} ${data.length === 1 ? "capability" : "capabilities"}`}
+        defaultOpen
+      >
+        <Text as="p" size="sm" tone="muted">
+          For each capability this project serves: what supports it today, and
+          what would support it after each drafted change, with the apps and
+          integrations each system connects to. Read from the model, not stored.
+        </Text>
+        {data.map((capability) => (
+          <section
+            key={capability.id}
+            className={styles.capability}
+            aria-label={capability.name}
+          >
+            <Text as="h3" size="md">
+              <Link to={`${base}/e/${capability.id}`}>{capability.name}</Link>
             </Text>
-          )}
-        </section>
-      ))}
+            <div className={styles.columns}>
+              <Column column={capability.today} base={base} />
+              {capability.after.map((column) => (
+                <Column key={column.changeId} column={column} base={base} />
+              ))}
+            </div>
+            {capability.after.length === 0 && (
+              <Text as="p" size="sm" tone="muted">
+                No change has been drafted yet, so there is no “after” to
+                compare.
+              </Text>
+            )}
+          </section>
+        ))}
+      </ProjectStep>
     </Panel>
   );
 }
