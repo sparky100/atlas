@@ -74,7 +74,8 @@ describe('decision_option_marks against a real local Supabase', () => {
   it('round-trips a mark, then records who edited the option', async () => {
     const { decisionId, branchId } = await seed();
     const saved = await insertOptionMark(alice.client, { ...mark(decisionId, branchId), createdBy: alice.id });
-    expect(saved).toEqual(mark(decisionId, branchId));
+    // Postgres returns the timestamp as +00:00, not Z: compare the instant, not the text.
+    expect({ ...saved, draftedAt: new Date(saved.draftedAt).toISOString() }).toEqual(mark(decisionId, branchId));
     const edited = await markOptionEdited(alice.client, { decisionId, branchId, editedBy: alice.id, editedAt: '2026-11-20T09:05:00.000Z' });
     expect(edited).toMatchObject({ editedBy: alice.id, suggestedTitle: 'Configure it' });
     expect(await listOptionMarksForDecision(alice.client, decisionId)).toHaveLength(1);
