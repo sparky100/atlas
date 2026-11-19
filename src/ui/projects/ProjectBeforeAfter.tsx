@@ -1,13 +1,16 @@
 import { useQuery } from '@tanstack/react-query';
+import { useState } from 'react';
 import { Link } from 'react-router';
 import type { UUID } from '../../contracts/delta';
 import { loadProjectHeads } from '../../db/projectHeads';
 import type { BranchRow } from '../../db/types';
+import { Button } from '../components/Button/Button';
 import { Chip } from '../components/Chip/Chip';
 import { Panel } from '../components/Panel/Panel';
 import { Text } from '../components/Text/Text';
 import { supabase } from '../supabaseClient';
 import { buildProjectBeforeAfter, type BeforeAfterColumn, type BeforeAfterMark } from './projectBeforeAfterModel';
+import { ProjectDiagram } from './ProjectDiagram';
 import styles from './ProjectBeforeAfter.module.css';
 
 const OPEN_STATUSES = new Set(['draft', 'proposed', 'in_review', 'approved']);
@@ -83,6 +86,7 @@ function Column({ column, base }: { column: BeforeAfterColumn; base: string }) {
  * integrations. Derived from the commit history on load, nothing stored.
  */
 export function ProjectBeforeAfter({ modelId, projectId, mainHeadCommitId, changes, capabilities, base }: ProjectBeforeAfterProps) {
+  const [view, setView] = useState<'list' | 'diagram'>('list');
   const openChanges = changes.filter((c) => OPEN_STATUSES.has(c.status));
   const changeKey = openChanges.map((c) => `${c.id}:${c.head_commit_id}`).join(',');
   const { data } = useQuery({
@@ -105,17 +109,34 @@ export function ProjectBeforeAfter({ modelId, projectId, mainHeadCommitId, chang
       <Text as="p" size="sm" tone="muted">
         For each capability this project serves: what supports it today, and what would support it after each drafted change, with the apps and integrations each system connects to. Read from the model, not stored.
       </Text>
+      <div className={styles.toggle} role="group" aria-label="Show this as">
+        <Button variant={view === 'list' ? 'primary' : 'secondary'} type="button" aria-pressed={view === 'list'} onClick={() => { setView('list'); }}>
+          List
+        </Button>
+        <Button variant={view === 'diagram' ? 'primary' : 'secondary'} type="button" aria-pressed={view === 'diagram'} onClick={() => { setView('diagram'); }}>
+          Diagram
+        </Button>
+      </div>
       {data.map((capability) => (
         <section key={capability.id} className={styles.capability} aria-label={capability.name}>
           <Text as="h3" size="md">
             <Link to={`${base}/e/${capability.id}`}>{capability.name}</Link>
           </Text>
-          <div className={styles.columns}>
-            <Column column={capability.today} base={base} />
-            {capability.after.map((column) => (
-              <Column key={column.changeId} column={column} base={base} />
-            ))}
-          </div>
+          {view === 'list' ? (
+            <div className={styles.columns}>
+              <Column column={capability.today} base={base} />
+              {capability.after.map((column) => (
+                <Column key={column.changeId} column={column} base={base} />
+              ))}
+            </div>
+          ) : (
+            <div className={styles.diagrams}>
+              <ProjectDiagram capability={capability} column={capability.today} base={base} />
+              {capability.after.map((column) => (
+                <ProjectDiagram key={column.changeId} capability={capability} column={column} base={base} />
+              ))}
+            </div>
+          )}
           {capability.after.length === 0 && (
             <Text as="p" size="sm" tone="muted">
               No change has been drafted yet, so there is no “after” to compare.
