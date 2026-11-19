@@ -10,7 +10,7 @@ import { Panel } from '../components/Panel/Panel';
 import { ProjectStep } from './ProjectStep';
 import { Text } from '../components/Text/Text';
 import { supabase } from '../supabaseClient';
-import { buildProjectBeforeAfter, type BeforeAfterColumn, type BeforeAfterMark } from './projectBeforeAfterModel';
+import { buildProjectBeforeAfter, splitBySystemScope, type BeforeAfterColumn, type BeforeAfterMark, type BeforeAfterSystem } from './projectBeforeAfterModel';
 import { ProjectDiagram } from './ProjectDiagram';
 import styles from './ProjectBeforeAfter.module.css';
 
@@ -25,6 +25,8 @@ export interface ProjectBeforeAfterProps {
   changes: readonly BranchRow[];
   /** The capabilities in the project's declared scope. */
   capabilities: readonly { id: UUID; name: string }[];
+  /** The systems the project's declared scope names. */
+  scopeSystemIds: ReadonlySet<UUID>;
   base: string;
 }
 
@@ -32,49 +34,70 @@ function markLabel(mark: BeforeAfterMark): string | null {
   return mark === 'new' ? 'New' : mark === 'ends' ? 'Ends' : null;
 }
 
-function Column({ column, base }: { column: BeforeAfterColumn; base: string }) {
+function SystemList({ systems, base }: { systems: readonly BeforeAfterSystem[]; base: string }) {
+  return (
+    <ul className={styles.systems}>
+      {systems.map((system) => (
+        <li key={system.id} className={styles.system}>
+          <span className={styles.systemName}>
+            <Link to={`${base}/e/${system.id}`}>{system.name}</Link>
+            {markLabel(system.mark) !== null && <Chip tone={system.mark === 'new' ? 'ok' : 'warn'}>{markLabel(system.mark)}</Chip>}
+            <Link to={`${base}/context/${system.id}?ref=main`}>
+              <Text as="span" size="xs">
+                Context
+              </Text>
+            </Link>
+          </span>
+          {system.connections.length === 0 ? (
+            <Text as="p" size="xs" tone="muted">
+              No connected apps or integrations recorded.
+            </Text>
+          ) : (
+            <ul className={styles.connections}>
+              {system.connections.map((c) => (
+                <li key={`${c.key}-${c.mark}`}>
+                  <Text as="span" size="sm">
+                    {c.label} <Link to={`${base}/e/${c.appId}`}>{c.appName}</Link>
+                    {c.isExternal ? ' (external)' : ''}
+                  </Text>{' '}
+                  {markLabel(c.mark) !== null && <Chip tone={c.mark === 'new' ? 'ok' : 'warn'}>{markLabel(c.mark)}</Chip>}
+                </li>
+              ))}
+            </ul>
+          )}
+        </li>
+      ))}
+    </ul>
+  );
+}
+
+function Column({ column, base, scopeSystemIds }: { column: BeforeAfterColumn; base: string; scopeSystemIds: ReadonlySet<UUID> }) {
+  const { inProject, alsoSupports } = splitBySystemScope(column.systems, scopeSystemIds);
   return (
     <div className={styles.column}>
       <Text as="h4" size="md">
         {column.title}
       </Text>
-      {column.systems.length === 0 ? (
+      {column.systems.length === 0 && (
         <Text as="p" size="sm" tone="muted">
           Nothing we run supports this. A buy or build option is needed.
         </Text>
-      ) : (
-        <ul className={styles.systems}>
-          {column.systems.map((system) => (
-            <li key={system.id} className={styles.system}>
-              <span className={styles.systemName}>
-                <Link to={`${base}/e/${system.id}`}>{system.name}</Link>
-                {markLabel(system.mark) !== null && <Chip tone={system.mark === 'new' ? 'ok' : 'warn'}>{markLabel(system.mark)}</Chip>}
-                <Link to={`${base}/context/${system.id}?ref=main`}>
-                  <Text as="span" size="xs">
-                    Context
-                  </Text>
-                </Link>
-              </span>
-              {system.connections.length === 0 ? (
-                <Text as="p" size="xs" tone="muted">
-                  No connected apps or integrations recorded.
-                </Text>
-              ) : (
-                <ul className={styles.connections}>
-                  {system.connections.map((c) => (
-                    <li key={`${c.key}-${c.mark}`}>
-                      <Text as="span" size="sm">
-                        {c.label} <Link to={`${base}/e/${c.appId}`}>{c.appName}</Link>
-                        {c.isExternal ? ' (external)' : ''}
-                      </Text>{' '}
-                      {markLabel(c.mark) !== null && <Chip tone={c.mark === 'new' ? 'ok' : 'warn'}>{markLabel(c.mark)}</Chip>}
-                    </li>
-                  ))}
-                </ul>
-              )}
-            </li>
-          ))}
-        </ul>
+      )}
+      {column.systems.length > 0 && inProject.length === 0 && (
+        <Text as="p" size="sm" tone="muted">
+          No system is named in this project yet.
+        </Text>
+      )}
+      {inProject.length > 0 && <SystemList systems={inProject} base={base} />}
+      {alsoSupports.length > 0 && (
+        <details className={styles.also} data-testid="also-supports">
+          <summary>
+            <Text as="span" size="sm" tone="muted">
+              Also supports this capability, not in this project ({alsoSupports.length})
+            </Text>
+          </summary>
+          <SystemList systems={alsoSupports} base={base} />
+        </details>
       )}
     </div>
   );
@@ -86,7 +109,7 @@ function Column({ column, base }: { column: BeforeAfterColumn; base: string }) {
  * after each drafted change, with each system's connected apps and
  * integrations. Derived from the commit history on load, nothing stored.
  */
-export function ProjectBeforeAfter({ modelId, projectId, mainHeadCommitId, changes, capabilities, base }: ProjectBeforeAfterProps) {
+export function ProjectBeforeAfter({ modelId, projectId, mainHeadCommitId, changes, capabilities, scopeSystemIds, base }: ProjectBeforeAfterProps) {
   const [view, setView] = useState<'list' | 'diagram'>('list');
   const openChanges = changes.filter((c) => OPEN_STATUSES.has(c.status));
   const changeKey = openChanges.map((c) => `${c.id}:${c.head_commit_id}`).join(',');
@@ -123,16 +146,16 @@ export function ProjectBeforeAfter({ modelId, projectId, mainHeadCommitId, chang
           </Text>
           {view === 'list' ? (
             <div className={styles.columns}>
-              <Column column={capability.today} base={base} />
+              <Column column={capability.today} base={base} scopeSystemIds={scopeSystemIds} />
               {capability.after.map((column) => (
-                <Column key={column.changeId} column={column} base={base} />
+                <Column key={column.changeId} column={column} base={base} scopeSystemIds={scopeSystemIds} />
               ))}
             </div>
           ) : (
             <div className={styles.diagrams}>
-              <ProjectDiagram capability={capability} column={capability.today} base={base} />
+              <ProjectDiagram capability={capability} column={capability.today} scopeSystemIds={scopeSystemIds} base={base} />
               {capability.after.map((column) => (
-                <ProjectDiagram key={column.changeId} capability={capability} column={column} base={base} />
+                <ProjectDiagram key={column.changeId} capability={capability} column={column} scopeSystemIds={scopeSystemIds} base={base} />
               ))}
             </div>
           )}

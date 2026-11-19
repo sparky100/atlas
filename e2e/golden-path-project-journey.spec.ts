@@ -43,6 +43,9 @@ test('project journey: requirement, what it touches, how it might be met from th
   // Before and after, per capability: what supports it today, and no change to compare yet.
   const beforeAfter = page.getByTestId('project-before-after');
   await expect(beforeAfter.getByRole('heading', { name: 'What this changes, capability by capability' })).toBeVisible();
+  // The project names no system, so Quote Tool is shown apart as sharing the capability, not as part of the project.
+  await expect(beforeAfter.getByText('No system is named in this project yet.')).toBeVisible();
+  await beforeAfter.getByTestId('also-supports').getByText('Also supports this capability, not in this project (1)').click();
   await expect(beforeAfter.getByRole('link', { name: 'Quote Tool', exact: true })).toBeVisible();
   await expect(beforeAfter.getByText('No change has been drafted yet', { exact: false })).toBeVisible();
 
@@ -50,7 +53,9 @@ test('project journey: requirement, what it touches, how it might be met from th
   await beforeAfter.getByRole('button', { name: 'Diagram' }).click();
   const diagram = beforeAfter.getByTestId('project-diagram').first();
   await expect(diagram).toBeVisible();
-  await expect(diagram.getByRole('link', { name: 'Quote Tool', exact: true })).toBeVisible();
+  // Quote Tool shares the capability but the project does not name it, so it is not drawn, and the picture says so.
+  await expect(diagram.getByRole('link', { name: 'Quote Tool', exact: true })).toHaveCount(0);
+  await expect(beforeAfter.getByTestId('diagram-also-supports').first()).toContainText('Quote Tool');
   await beforeAfter.getByRole('button', { name: 'List' }).click();
   await expect(beforeAfter.getByTestId('project-diagram')).toHaveCount(0);
 

@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { ElementType, RelationshipType } from '../../contracts/delta';
 import { emptyHead, type Head } from '../../engine/deltas';
-import { buildProjectBeforeAfter } from './projectBeforeAfterModel';
+import { buildProjectBeforeAfter, splitBySystemScope } from './projectBeforeAfterModel';
 
 const NOW = new Date('2026-11-19T00:00:00Z');
 
@@ -67,5 +67,19 @@ describe('buildProjectBeforeAfter', () => {
     const system = capability?.after[0]?.systems[0];
     expect(system?.mark).toBe('same');
     expect(system?.connections.map((c) => [c.appName, c.mark])).toEqual([['Bank Feed', 'new'], ['CRM', 'ends']]);
+  });
+});
+
+describe('splitBySystemScope', () => {
+  const sys = (id: string, mark: 'same' | 'new' | 'ends' = 'same') => ({ id, name: id, mark, connections: [] });
+  it('keeps scope systems and changed systems in the project, and sets other supporters apart', () => {
+    const { inProject, alsoSupports } = splitBySystemScope([sys('a'), sys('b'), sys('c', 'new'), sys('d', 'ends')], new Set(['a']));
+    expect(inProject.map((s) => s.id)).toEqual(['a', 'c', 'd']);
+    expect(alsoSupports.map((s) => s.id)).toEqual(['b']);
+  });
+  it('treats every supporter as "also supports" when no system is in scope', () => {
+    const { inProject, alsoSupports } = splitBySystemScope([sys('a'), sys('b')], new Set());
+    expect(inProject).toEqual([]);
+    expect(alsoSupports).toHaveLength(2);
   });
 });
