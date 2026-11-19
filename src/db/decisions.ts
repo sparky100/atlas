@@ -150,6 +150,32 @@ export async function listOpenDecisionElementLinksForModel(supabase: Client, mod
   });
 }
 
+/** One option change a decision offers (`decision_links.linked_type = 'branch'`). */
+export interface DecisionOptionLink {
+  decisionId: UUID;
+  branchId: UUID;
+}
+
+/**
+ * Every option link of the model's decisions, whatever their status, through
+ * one inner embed on `decisions.model_id` — no id list (CLAUDE.md rule 8).
+ * Home's "My work" reads it to tell a decision's option changes (shown under
+ * the decision) from a change that stands alone.
+ */
+export async function listDecisionOptionLinksForModel(supabase: Client, modelId: UUID): Promise<DecisionOptionLink[]> {
+  assertRealId('listDecisionOptionLinksForModel', 'model_id', modelId);
+  const rows = await selectAll<{ decision_id: UUID; linked_id: UUID }>(
+    supabase
+      .from('decision_links')
+      .select('decision_id, linked_id, linked_type, decisions!inner(id, model_id)', { count: 'exact' })
+      .eq('linked_type', 'branch')
+      .eq('decisions.model_id', modelId)
+      .order('decision_id')
+      .order('linked_id'),
+  );
+  return rows.map((r) => ({ decisionId: r.decision_id, branchId: r.linked_id }));
+}
+
 /**
  * F3 PR6's "why is this here": every decision that names one of the given
  * elements as something it concerns (`linked_type='element'`). `elementIds`
