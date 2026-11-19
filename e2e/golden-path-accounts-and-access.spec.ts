@@ -23,6 +23,7 @@
 import { randomUUID } from 'node:crypto';
 import { expect, test } from '@playwright/test';
 import { acceptInviteViaSignUp, inviteMemberFromHome, signUpCreateOrgAndModel } from './fixtures/goldenPath';
+import { expandAllSettingsSections } from './fixtures/settings';
 
 test('accounts and access: invite, accept, assign a role, then share a model read-only with a second organisation', async ({ page, browser }) => {
   const prefix = 'goldenpath-accounts';
@@ -75,6 +76,7 @@ test('accounts and access: invite, accept, assign a role, then share a model rea
   await page.getByRole('link', { name: modelName }).click();
   await page.getByRole('button', { name: 'Model actions' }).click();
   await page.getByRole('link', { name: 'Model settings' }).click();
+  await expandAllSettingsSections(page);
   await expect(page.getByRole('heading', { name: 'Share with another organisation' })).toBeVisible();
   await page.getByLabel('Organisation slug').fill(secondOrgSlug);
   await page.locator('form').filter({ has: page.getByLabel('Organisation slug') }).getByRole('button', { name: 'Share', exact: true }).click();

@@ -77,10 +77,7 @@ export function EntraSignInPanel({ orgId }: { orgId: UUID }) {
   }, [orgId]);
 
   return (
-    <div>
-      <Text as="h2" size="lg">
-        Microsoft sign-in
-      </Text>
+    <>
       <Text as="p" tone="muted" size="sm">
         Let your people sign in with their work Microsoft account. Enter your company's Microsoft tenant ID (in the Azure portal: Microsoft Entra ID, then Overview, then Tenant ID). Anyone who signs in from that tenant joins this organisation as a Viewer; you can change their role afterwards. Your IT administrator needs to approve Atlas once for your company.
       </Text>
@@ -125,6 +122,6 @@ export function EntraSignInPanel({ orgId }: { orgId: UUID }) {
         )}
       </form>
       {message !== null && <Text as="p">{message}</Text>}
-    </div>
+    </>
   );
 }

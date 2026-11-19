@@ -11,6 +11,7 @@ import { createSupabaseClient } from '../src/db/client';
 import { createModel } from '../src/db/models';
 import { loadEnv } from '../src/db/env';
 import { bootstrapChangeBranchFixture } from './fixtures/changeBranchFixture';
+import { expandAllSettingsSections } from './fixtures/settings';
 
 test('archive a model, see it move to the collapsed Archived section, restore it as the owner', async ({ page, browser }) => {
   const env = loadEnv();
@@ -44,6 +45,7 @@ test('archive a model, see it move to the collapsed Archived section, restore it
   await page.getByRole('button', { name: 'Model actions' }).click();
   await page.getByRole('link', { name: 'Model settings' }).click();
   await expect(page.getByRole('heading', { name: 'Model settings' })).toBeVisible();
+  await expandAllSettingsSections(page);
 
   // 2. Rename — saving reloads the page (ModelSettingsPage.tsx's own
   // onChanged), so the real proof is the input's own value on the fresh
@@ -52,6 +54,7 @@ test('archive a model, see it move to the collapsed Archived section, restore it
   await page.getByLabel('Name', { exact: true }).fill(newName);
   await page.getByRole('button', { name: 'Save' }).click();
   await expect(page.getByRole('heading', { name: 'Model settings' })).toBeVisible({ timeout: 15_000 });
+  await expandAllSettingsSections(page);
   await expect(page.getByLabel('Name', { exact: true })).toHaveValue(newName);
 
   // 3. Archive — another round trip + reload.
@@ -84,6 +87,7 @@ test('archive a model, see it move to the collapsed Archived section, restore it
   // 7. The owner restores it — back in the ordinary list.
   await page.getByRole('button', { name: 'Restore model' }).click();
   await expect(page.getByRole('heading', { name: 'Model settings' })).toBeVisible({ timeout: 15_000 });
+  await expandAllSettingsSections(page);
   await expect(page.getByText('Archived', { exact: true })).toHaveCount(0);
   await page.goto(`/o/${orgSlug}`);
   await expect(page.getByText(newName)).toBeVisible();

@@ -4,7 +4,8 @@ import type { UUID } from '../../contracts/delta';
 import { useAuth } from '../auth/useAuth';
 import { Button } from '../components/Button/Button';
 import { Chip } from '../components/Chip/Chip';
-import { Panel } from '../components/Panel/Panel';
+import { SettingsSection, SettingsSections } from '../components/SettingsSection/SettingsSection';
+import { useSettingsSectionsState } from '../components/SettingsSection/useSettingsSectionsState';
 import { Text } from '../components/Text/Text';
 import { TypedNameConfirm } from '../components/TypedNameConfirm/TypedNameConfirm';
 import type { ModelRow, MemberRole } from '../../db/types';
@@ -66,13 +67,12 @@ export function ModelSettingsView({ model, role, orgId, orgSlug, onChanged }: Mo
   const descriptionId = useId();
   const targetOrgSlugId = useId();
   const tagSelectId = useId();
+  const sectionIds = ['model', ...(canShare ? ['share'] : []), ...(canCopy ? ['copy'] : []), ...(isPlatformAdmin ? ['sample'] : []), ...(canArchiveModel(role) ? ['archive'] : []), ...(canDeleteModel(role) && isArchived ? ['delete'] : [])];
+  const sectionsState = useSettingsSectionsState(`model-${model.id}`, 'model');
 
   return (
-    <div className={styles.panels}>
-      <Panel>
-        <Text as="h2" size="lg">
-          Model
-        </Text>
+    <SettingsSections state={sectionsState} ids={sectionIds}>
+      <SettingsSection id="model" title="Model" summary={isArchived ? `${model.name} · archived` : model.name}>
         {isArchived && (
           <div className={styles.archivedNotice}>
             <Chip tone="neutral">Archived</Chip>
@@ -139,13 +139,10 @@ export function ModelSettingsView({ model, role, orgId, orgSlug, onChanged }: Mo
           )}
         </form>
         {error !== null && <Text as="p">{error}</Text>}
-      </Panel>
+      </SettingsSection>
 
       {canCopy && (
-        <Panel>
-          <Text as="h2" size="lg">
-            Copy this model
-          </Text>
+        <SettingsSection id="copy" title="Copy this model">
           <Text as="p" tone="muted" size="sm">
             Makes a new, separate model in this organisation from how this one stands today: every element and relationship, who said what and how sure they were, names and codes, and the organisation's shared reports and dashboards. It starts with a single "Copied from {model.name}" entry in History. Earlier history, open changes, decisions, projects, comments, private reports and shares are not copied. This model is not touched.
           </Text>
@@ -182,14 +179,11 @@ export function ModelSettingsView({ model, role, orgId, orgSlug, onChanged }: Mo
               Copied {copying.copied.elements} elements and {copying.copied.relationships} relationships. <Link to={`/o/${orgSlug}/m/${copying.copied.model.slug}/start`}>Open {copying.copied.model.name}</Link>
             </Text>
           )}
-        </Panel>
+        </SettingsSection>
       )}
 
       {isPlatformAdmin && (
-        <Panel>
-          <Text as="h2" size="lg">
-            Publish as a sample model
-          </Text>
+        <SettingsSection id="sample" title="Publish as a sample model" summary="Platform admins only">
           <Text as="p" tone="muted" size="sm">
             Platform admins only. Makes how this model stands today available to every organisation as a "Start with a sample model" choice on an empty model list. Each publish is a new version; people who already added an earlier one keep their own copy. Names of people and links out are left out. Make sure nothing in this model is private.
           </Text>
@@ -224,14 +218,11 @@ export function ModelSettingsView({ model, role, orgId, orgSlug, onChanged }: Mo
               Published version {publishing.published.version} with {publishing.published.elements} elements and {publishing.published.relationships} relationships.
             </Text>
           )}
-        </Panel>
+        </SettingsSection>
       )}
 
       {canArchiveModel(role) && (
-        <Panel>
-          <Text as="h2" size="lg">
-            {isArchived ? 'Restore' : 'Archive'}
-          </Text>
+        <SettingsSection id="archive" title={isArchived ? 'Restore' : 'Archive'} summary={isArchived ? 'Archived' : 'Active'}>
           {!isArchived && (
             <>
               <Text as="p" tone="muted" size="sm">
@@ -264,14 +255,11 @@ export function ModelSettingsView({ model, role, orgId, orgSlug, onChanged }: Mo
               Only an owner can restore an archived model.
             </Text>
           )}
-        </Panel>
+        </SettingsSection>
       )}
 
       {canDeleteModel(role) && isArchived && (
-        <Panel>
-          <Text as="h2" size="lg">
-            Delete
-          </Text>
+        <SettingsSection id="delete" title="Delete model" summary="Archived models only" danger>
           <Text as="p" tone="muted" size="sm">
             Permanently deletes this model and everything in it — every edit, comment and version. This cannot be undone.
           </Text>
@@ -292,14 +280,11 @@ export function ModelSettingsView({ model, role, orgId, orgSlug, onChanged }: Mo
           />
           {deleteResult === 'not_archived' && <Text as="p">Archive this model first.</Text>}
           {deleteResult === 'not_found' && <Text as="p">This model no longer exists.</Text>}
-        </Panel>
+        </SettingsSection>
       )}
 
       {canShare && (
-        <Panel>
-          <Text as="h2" size="lg">
-            Share with another organisation
-          </Text>
+        <SettingsSection id="share" title="Share with another organisation">
           <Text as="p" tone="muted" size="sm">
             Grants read-only access to this model's current main, or to one specific tagged version — never edit access, and never visible to the other organisation unless you share it here.
           </Text>
@@ -379,8 +364,8 @@ export function ModelSettingsView({ model, role, orgId, orgSlug, onChanged }: Mo
               ))}
             </ul>
           )}
-        </Panel>
+        </SettingsSection>
       )}
-    </div>
+    </SettingsSections>
   );
 }
