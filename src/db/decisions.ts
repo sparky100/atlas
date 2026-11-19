@@ -14,7 +14,7 @@
 import { assertRealId } from './assertRealId';
 import type { Client } from './client';
 import { selectAll } from './selectAll';
-import type { DecisionArgumentRow, DecisionPackRow, DecisionLinkedType, DecisionLinkRow, DecisionRow } from './types';
+import type { DecisionApprovalLens, DecisionApprovalRow, DecisionApprovalVerdict, DecisionArgumentRow, DecisionPackRow, DecisionLinkedType, DecisionLinkRow, DecisionRow } from './types';
 import type { UUID } from '../contracts/delta';
 
 export interface CreateDecisionInput {
@@ -291,4 +291,26 @@ export async function listDecisionPacks(supabase: Client, decisionId: UUID): Pro
   const { data, error } = await supabase.from('decision_packs').select('*').eq('decision_id', decisionId).order('version', { ascending: false });
   if (error) throw new Error(`listDecisionPacks: ${error.message}`);
   return data as DecisionPackRow[];
+}
+
+/**
+ * Record one person's verdict on one exact frozen pack, as one lens
+ * (`decision_approvals`, `20261119190000_decision_approvals.sql`). Insert-only.
+ * The database refuses a pack that is not the latest version, the person who
+ * froze it signing it, and the same lens signed twice by one person.
+ */
+export async function recordDecisionApproval(supabase: Client, input: { packId: UUID; lens: DecisionApprovalLens; verdict: DecisionApprovalVerdict; comment?: string }): Promise<DecisionApprovalRow> {
+  assertRealId('recordDecisionApproval', 'pack_id', input.packId);
+  // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment -- untyped client; see branches.ts's module comment.
+  const { data, error } = await supabase.from('decision_approvals').insert({ pack_id: input.packId, lens: input.lens, verdict: input.verdict, comment: input.comment ?? '' }).select('*').single();
+  if (error) throw new Error(`recordDecisionApproval: ${error.message}`);
+  return data as DecisionApprovalRow;
+}
+
+/** Every sign-off on a decision's packs, newest first. */
+export async function listDecisionApprovals(supabase: Client, decisionId: UUID): Promise<DecisionApprovalRow[]> {
+  assertRealId('listDecisionApprovals', 'decision_id', decisionId);
+  const { data, error } = await supabase.from('decision_approvals').select('*').eq('decision_id', decisionId).order('decided_at', { ascending: false });
+  if (error) throw new Error(`listDecisionApprovals: ${error.message}`);
+  return data as DecisionApprovalRow[];
 }

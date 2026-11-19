@@ -30,7 +30,9 @@ import {
   cancelDecision,
   chooseDecisionOption,
   freezeDecisionPack,
+  listDecisionApprovals,
   listDecisionPacks,
+  recordDecisionApproval,
   countProposedDecisions,
   createDecision,
   createDecisionLink,
@@ -565,6 +567,63 @@ describe('decisions/decision_links/decision_arguments/assumptions/evidence again
       }
 
       await expect(freezeDecisionPack(alice.client, decision.id, '   ', null)).rejects.toThrow(/check constraint/);
+    });
+  });
+  describe('sign-off on a frozen pack (Phase C2)', () => {
+    it('binds a named person and lens to the exact latest version, with the database refusing everything else', async () => {
+      const decision = await createDecision(alice.client, { id: randomUUID(), orgId, modelId, title: 'Sign me', statement: 'context', ownerId: alice.id, createdBy: alice.id });
+      const first = await freezeDecisionPack(alice.client, decision.id, '# ADR: Sign me\n\nFirst.', null);
+
+      // The person who froze the pack cannot sign it (this org is not a personal one).
+      await expect(recordDecisionApproval(alice.client, { packId: first.id, lens: 'architecture', verdict: 'approve' })).rejects.toThrow(/cannot sign/);
+
+      const reviewer = await createSignedInUser('decisions-reviewer');
+      const viewer = await createSignedInUser('decisions-viewer');
+      const mallory = await createSignedInUser('decisions-approval-mallory');
+      try {
+        const reviewerMember = await service.from('members').insert({ org_id: orgId, user_id: reviewer.id, role: 'architect', invited_by: alice.id });
+        expect(reviewerMember.error).toBeNull();
+        const viewerMember = await service.from('members').insert({ org_id: orgId, user_id: viewer.id, role: 'viewer', invited_by: alice.id });
+        expect(viewerMember.error).toBeNull();
+
+        // A named architect signs version 1, and the row round-trips with who and when set by the database.
+        const signed = await recordDecisionApproval(reviewer.client, { packId: first.id, lens: 'architecture', verdict: 'approve', comment: 'Fits the target landscape' });
+        expect(signed.decided_by).toBe(reviewer.id);
+        expect(signed.decision_id).toBe(decision.id);
+        expect(signed.org_id).toBe(orgId);
+        expect(signed.verdict).toBe('approve');
+        expect((await listDecisionApprovals(alice.client, decision.id)).map((a) => a.id)).toEqual([signed.id]);
+
+        // The same person cannot sign the same lens twice, but may sign another lens.
+        await expect(recordDecisionApproval(reviewer.client, { packId: first.id, lens: 'architecture', verdict: 'decline' })).rejects.toThrow(/duplicate key/);
+        await recordDecisionApproval(reviewer.client, { packId: first.id, lens: 'security', verdict: 'decline', comment: 'Needs a pen test' });
+
+        // A viewer cannot sign at all.
+        await expect(recordDecisionApproval(viewer.client, { packId: first.id, lens: 'data', verdict: 'approve' })).rejects.toThrow();
+
+        // A signed-in user from a different organisation can neither sign nor read.
+        const otherOrg = randomUUID();
+        await createOrganisation(mallory.client, { id: otherOrg, name: 'Other Org', slug: `approvals-other-${otherOrg.slice(0, 8)}`, createdBy: mallory.id });
+        await expect(recordDecisionApproval(mallory.client, { packId: first.id, lens: 'data', verdict: 'approve' })).rejects.toThrow(/not found/);
+        expect(await listDecisionApprovals(mallory.client, decision.id)).toEqual([]);
+
+        // Nobody can change or remove a sign-off, or write one around the trigger.
+        const edited = await reviewer.client.from('decision_approvals').update({ verdict: 'approve' }).eq('id', signed.id).select('id');
+        expect(edited.error !== null || edited.data.length === 0).toBe(true);
+        const removed = await reviewer.client.from('decision_approvals').delete().eq('id', signed.id).select('id');
+        expect(removed.error !== null || removed.data.length === 0).toBe(true);
+
+        // A material edit is a new version: the old one can no longer be signed, and its sign-offs do not carry over.
+        const second = await freezeDecisionPack(alice.client, decision.id, '# ADR: Sign me\n\nSecond.', null);
+        await expect(recordDecisionApproval(reviewer.client, { packId: first.id, lens: 'delivery', verdict: 'approve' })).rejects.toThrow(/not the latest/);
+        const onSecond = await recordDecisionApproval(reviewer.client, { packId: second.id, lens: 'architecture', verdict: 'approve' });
+        expect(onSecond.pack_id).toBe(second.id);
+        expect((await listDecisionApprovals(alice.client, decision.id)).filter((a) => a.pack_id === second.id)).toHaveLength(1);
+      } finally {
+        await service.auth.admin.deleteUser(reviewer.id);
+        await service.auth.admin.deleteUser(viewer.id);
+        await service.auth.admin.deleteUser(mallory.id);
+      }
     });
   });
 });

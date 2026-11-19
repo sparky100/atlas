@@ -695,7 +695,7 @@ export function DecisionView({ modelId, decisionId, orgId, orgSlug, modelSlug, r
         </Panel>
       )}
 
-      <DecisionPacks decisionId={decision.id} canFreeze={canChooseDecisionOption(role)} commitId={main?.head_commit_id ?? null} buildMarkdown={buildAdrMarkdown} />
+      <DecisionPacks decisionId={decision.id} canFreeze={canChooseDecisionOption(role)} canSign={canChooseDecisionOption(role)} userId={userId} commitId={main?.head_commit_id ?? null} buildMarkdown={buildAdrMarkdown} />
 
       <Panel>
         <Text as="h2" size="lg">

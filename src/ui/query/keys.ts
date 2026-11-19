@@ -44,5 +44,7 @@ export const queryKeys = {
   /** The Decisions nav badge: how many decisions are still proposed (`countProposedDecisions`). */
   /** A decision's frozen packs (`listDecisionPacks`). */
   decisionPacks: (decisionId: UUID) => ['decisions', 'packs', decisionId] as const,
+  /** A decision's sign-offs on its packs (`listDecisionApprovals`). */
+  decisionApprovals: (decisionId: UUID) => ['decisions', 'approvals', decisionId] as const,
   proposedDecisionCount: (modelId: UUID | null) => ['decisions', 'proposedCount', modelId] as const,
 };
