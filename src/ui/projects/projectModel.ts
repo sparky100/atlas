@@ -34,10 +34,17 @@ export function scopeHasCapability(scope: readonly ProjectScopeItem[]): boolean 
 }
 
 /** Display order of the Projects list's groups: live work first, finished last. */
-export const PROJECT_STATUS_ORDER: readonly ProjectStatus[] = ['active', 'on_hold', 'closed', 'cancelled'];
+export const PROJECT_STATUS_ORDER: readonly ProjectStatus[] = ['proposed', 'active', 'on_hold', 'closed', 'cancelled'];
+
+/** Open projects: still being designed or worked on, so they can take decisions, changes and scope. */
+export function projectIsOpen(status: ProjectStatus): boolean {
+  return status === 'proposed' || status === 'active' || status === 'on_hold';
+}
 
 export function projectStatusLabel(status: ProjectStatus): string {
   switch (status) {
+    case 'proposed':
+      return 'Proposed';
     case 'active':
       return 'Active';
     case 'on_hold':
@@ -52,6 +59,8 @@ export function projectStatusLabel(status: ProjectStatus): string {
 /** Never colour alone — `Chip` always shows the label beside the tone. */
 export function projectStatusTone(status: ProjectStatus): ChipTone {
   switch (status) {
+    case 'proposed':
+      return 'warn';
     case 'active':
       return 'info';
     case 'on_hold':

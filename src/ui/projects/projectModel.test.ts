@@ -11,6 +11,7 @@ import {
   projectProgress,
   scopeDifference,
   scopeHasCapability,
+  projectIsOpen,
 } from './projectModel';
 
 function branch(overrides: Partial<BranchRow>): BranchRow {
@@ -106,9 +107,11 @@ describe('projectChangeStage', () => {
 });
 
 describe('groupProjectsByStatus', () => {
-  it('orders active, on hold, closed, cancelled and drops empty groups', () => {
-    const groups = groupProjectsByStatus([project({ id: 'c', status: 'closed' }), project({ id: 'a', status: 'active' })]);
-    expect(groups.map((g) => g.status)).toEqual(['active', 'closed']);
+  it('orders proposed, active, on hold, closed, cancelled and drops empty groups', () => {
+    const groups = groupProjectsByStatus([project({ id: 'c', status: 'closed' }), project({ id: 'a', status: 'active' }), project({ id: 'p', status: 'proposed' })]);
+    expect(groups.map((g) => g.status)).toEqual(['proposed', 'active', 'closed']);
+    expect(projectIsOpen('proposed')).toBe(true);
+    expect(projectIsOpen('closed')).toBe(false);
   });
 });
 

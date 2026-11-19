@@ -7,6 +7,7 @@ import { Button } from '../components/Button/Button';
 import { Text } from '../components/Text/Text';
 import { reportError } from '../errors/errorBannerStore';
 import { supabase } from '../supabaseClient';
+import { projectIsOpen } from './projectModel';
 import styles from './ProjectAssignment.module.css';
 
 export interface ProjectAssignmentProps {
@@ -50,7 +51,7 @@ export function ProjectAssignment({ modelId, orgSlug, modelSlug, currentProjectI
   }, [modelId]);
 
   const current = projects.find((p) => p.id === currentProjectId) ?? null;
-  const openProjects = projects.filter((p) => p.status === 'active' || p.status === 'on_hold');
+  const openProjects = projects.filter((p) => projectIsOpen(p.status));
 
   return (
     <div className={styles.assignment}>

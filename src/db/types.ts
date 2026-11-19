@@ -613,7 +613,8 @@ export interface AttributeDefinitionRow {
 // facts: never in deltas, heads or versions.
 // ---------------------------------------------------------------------------
 
-export type ProjectStatus = 'active' | 'on_hold' | 'closed' | 'cancelled';
+/** `proposed` only at creation; an owner or architect accepts it (to `active`) or declines it (to `cancelled`, with a reason). */
+export type ProjectStatus = 'proposed' | 'active' | 'on_hold' | 'closed' | 'cancelled';
 /** `element` is the project's declared scope; `evidence` attaches a business case, document or link. */
 export type ProjectLinkedType = 'element' | 'evidence';
 

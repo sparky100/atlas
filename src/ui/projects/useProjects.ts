@@ -17,6 +17,8 @@ export interface CreateProjectFormInput {
   startDate: string;
   targetDate: string;
   sourceFindingKey?: string;
+  /** Start as a proposal an owner or architect accepts. */
+  asProposal?: boolean;
   /** Declared scope (ADR-024 `project_links` 'element'): the capabilities and systems the project is about. */
   scopeElementIds: UUID[];
 }
@@ -94,6 +96,7 @@ export function useProjects(modelId: UUID, orgId: UUID, userId: UUID | null): Us
           startDate: input.startDate === '' ? null : input.startDate,
           targetDate: input.targetDate === '' ? null : input.targetDate,
           sourceFindingKey: input.sourceFindingKey ?? null,
+          ...(input.asProposal === true ? { status: 'proposed' as const } : {}),
           createdBy: userId,
         });
         // A second insert per scope element — project_links' own RLS needs the
