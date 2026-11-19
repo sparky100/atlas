@@ -19,6 +19,10 @@ export interface DecisionCriteriaOption {
   /** One-line derived summary of what this option does vs main ("Retires PM, adds Hana equivalent, re-points 4 flows"), or `null` for an empty-delta option — this header column renders muted and shows "No changes recorded yet" instead (decision 3, the sprint's own go-ahead). */
   summary: string | null;
   canChoose: boolean;
+  /** The option's own plain description (what the person or the Designer wrote about it), shown under its name. */
+  description?: string | null;
+  /** Where the option came from when an agent suggested it, e.g. "Suggested by the Designer, edited by Priya". `null` for an option someone added by hand. */
+  provenance?: string | null;
 }
 
 export interface DecisionCriteriaGridProps {
@@ -145,6 +149,12 @@ export function DecisionCriteriaGrid({ decisionId, options, canRate, userId, nee
                         {stripExploringPrefix(o.label)}
                       </Text>
                     </Link>
+                    {o.provenance != null && <Chip tone="info">{o.provenance}</Chip>}
+                    {o.description != null && o.description.trim() !== '' && (
+                      <Text as="p" size="sm">
+                        {o.description}
+                      </Text>
+                    )}
                     <Text as="p" size="sm" tone={o.summary === null ? 'muted' : 'default'}>
                       {o.summary ?? 'No changes recorded yet'}
                     </Text>

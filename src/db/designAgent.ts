@@ -1,4 +1,5 @@
 import type { UUID } from '../contracts/delta';
+import type { DesignerOptionDraft } from '../contracts/designerOptions';
 import type { Client } from './client';
 
 /**
@@ -7,7 +8,14 @@ import type { Client } from './client';
  * writes nothing. Any refusal or failure comes back as one plain sentence.
  */
 export interface DesignerDraft {
-  text: string;
+  /** The suggested options, already checked by the function. Never includes "Stay as we are": Atlas adds that itself. */
+  options: DesignerOptionDraft[];
+  /** What the Designer could not tell from what Atlas holds. */
+  gaps: string[];
+  /** The Designer's note on what staying as we are costs. */
+  stayNote: string;
+  /** Why the answer is not complete, in plain words. Empty when it is. */
+  problems: string[];
   /** Names of the elements the draft cites (each one a tool actually returned). */
   citedNames: string[];
   grounded: boolean;
@@ -25,32 +33,44 @@ export class DesignerError extends Error {
 interface DesignerBody {
   status?: string;
   message?: string;
+  design?: { options?: unknown; gaps?: unknown; stayNote?: unknown; problems?: unknown };
   result?: { answer?: string; citations?: string[]; citationNames?: Record<string, string>; grounded?: boolean; inputTokens?: number; outputTokens?: number; toolUses?: unknown[] };
 }
 
 /** Pure: the one place the function's reply is read, so the page never shows a raw provider message. */
 export function interpretDesignerReply(body: unknown): DesignerDraft {
   const r = (typeof body === 'object' && body !== null ? body : {}) as DesignerBody;
-  if (r.status === 'done' && typeof r.result?.answer === 'string' && r.result.answer.trim() !== '') {
+  if (r.status === 'done' && r.design !== undefined && r.result !== undefined) {
     const names = r.result.citationNames ?? {};
     const citedNames = (r.result.citations ?? []).map((id) => names[id]).filter((n): n is string => typeof n === 'string' && n !== '');
     const count = (n: unknown) => (typeof n === 'number' && Number.isFinite(n) && n >= 0 ? Math.round(n) : 0);
+    const strings = (v: unknown) => (Array.isArray(v) ? v.filter((x): x is string => typeof x === 'string') : []);
+    const options = (Array.isArray(r.design.options) ? r.design.options : []).flatMap((o): DesignerOptionDraft[] => {
+      const x = typeof o === 'object' && o !== null ? (o as Record<string, unknown>) : {};
+      return typeof x.title === 'string' && typeof x.summary === 'string' ? [{ title: x.title, summary: x.summary, toWeigh: typeof x.toWeigh === 'string' ? x.toWeigh : '' }] : [];
+    });
+    const problems = strings(r.design.problems);
+    if (options.length === 0 && problems.length === 0) problems.push('The Designer gave no usable options.');
     return {
-      text: r.result.answer.trim(),
+      options,
+      gaps: strings(r.design.gaps),
+      stayNote: typeof r.design.stayNote === 'string' ? r.design.stayNote : '',
+      problems,
       citedNames,
       grounded: r.result.grounded === true,
       usage: { inputTokens: count(r.result.inputTokens), outputTokens: count(r.result.outputTokens), lookups: Array.isArray(r.result.toolUses) ? r.result.toolUses.length : 0 },
     };
   }
+  if (r.status === 'done' && r.design === undefined) throw new DesignerError('The Designer is being updated and cannot suggest options yet. Add the options by hand, or try again later.');
   if (r.status === 'done') throw new DesignerError('The Designer gave no draft. Try again.');
   if (r.status === 'empty_model') throw new DesignerError('This model has no committed content yet, so there is nothing to base a draft on.');
   if (r.status === 'not_found') throw new DesignerError('That model could not be found.');
   throw new DesignerError(typeof r.message === 'string' && r.message !== '' ? r.message : 'The Designer could not be reached. Check that it has been deployed, then try again.');
 }
 
-export async function runDesigner(supabase: Client, input: { modelId: UUID; elementId: UUID; finding: string }): Promise<DesignerDraft> {
+export async function runDesigner(supabase: Client, input: { modelId: UUID; elementId: UUID; finding: string }, signal?: AbortSignal): Promise<DesignerDraft> {
   // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment -- untyped client; see invites.ts.
-  const { data, error } = await supabase.functions.invoke('design-agent', { body: input });
+  const { data, error } = await supabase.functions.invoke('design-agent', { body: input, ...(signal ? { signal } : {}) });
   if (error) {
     // A refusal (403, 429, 502...) carries the function's own sentence in the response body.
     const context = (error as { context?: unknown }).context;
