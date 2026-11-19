@@ -43,6 +43,7 @@ import { buildProjectPackMarkdown, projectPackFilename } from '../exports/projec
 import { downloadBlob, exportDate } from '../exports/viewExport';
 import { buildProjectJourney } from './projectJourney';
 import { projectNextStep } from './projectNextStep';
+import { findingLabel } from '../decisions/findingLabels';
 import { suggestDecisionTitle } from '../decisions/optionSuggestions';
 import { ProjectBeforeAfter } from './ProjectBeforeAfter';
 import { ProjectStep } from './ProjectStep';
@@ -454,6 +455,13 @@ function ProjectHeader({ project, ownerName, managerName, progress }: { project:
         </Text>
       )}
       {project.purpose !== '' && <Text as="p">{project.purpose}</Text>}
+      {findingLabel(project.source_finding_key) !== null && (
+        <div data-testid="project-source-finding">
+<Text as="p" tone="muted" size="sm">
+          Started from a health finding: {findingLabel(project.source_finding_key)}.
+        </Text>
+</div>
+      )}
       <Text as="p" tone="muted" size="sm">
         {formatProjectProgress(progress)}
       </Text>
@@ -523,7 +531,7 @@ function NewDecisionForm({ project, userId, scopeIds, suggestedTitle, base }: { 
         if (title.trim().length === 0) return;
         setBusy(true);
         setError(null);
-        void createDecision(supabase, { id: crypto.randomUUID(), orgId: project.org_id, modelId: project.model_id, title: title.trim(), statement: project.purpose.trim(), ownerId: userId, createdBy: userId, projectId: project.id })
+        void createDecision(supabase, { id: crypto.randomUUID(), orgId: project.org_id, modelId: project.model_id, title: title.trim(), statement: project.purpose.trim(), ownerId: userId, ...(project.source_finding_key !== null ? { sourceFindingKey: project.source_finding_key } : {}), createdBy: userId, projectId: project.id })
           .then(async (d) => {
             // Every decision starts with its "Stay as we are" baseline; if this fails the decision page offers "Add the baseline".
             await addBaseline({ orgId: project.org_id, modelId: project.model_id, decisionId: d.id, userId, projectId: project.id }).catch((err: unknown) => {
