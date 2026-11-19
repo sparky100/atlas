@@ -196,3 +196,17 @@
 .findWrap {
   flex: 0 0 auto;
 }
+
+/* Support end outside the window: pinned to the edge as a wider mark so it is still seen — out of support already (left) or beyond the window (right). */
+.supportEndTick[data-edge='before'],
+.supportEndTick[data-edge='after'] {
+  width: 4px;
+}
+
+.supportEndTick[data-edge='before'] {
+  left: 0;
+}
+
+.supportEndTick[data-edge='after'] {
+  transform: translateX(-4px);
+}

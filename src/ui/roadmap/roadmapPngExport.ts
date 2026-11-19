@@ -17,7 +17,7 @@
 import type { RoadmapMode } from './roadmapEligibility';
 import type { RoadmapFilters } from './roadmapFilter';
 import { type RoadmapGroup } from './roadmapLifecycleRows';
-import { computeRoadmapAxisTicks, isWithinRange, percentAtIso, thinAxisTicksToFit, todayPercent, type RoadmapGranularity, type RoadmapTimelineRange } from './roadmapTimelineScale';
+import { computeRoadmapAxisTicks, isWithinRange, percentAtIso, supportEndPlacement, thinAxisTicksToFit, todayPercent, type RoadmapGranularity, type RoadmapTimelineRange } from './roadmapTimelineScale';
 import { computeRoadmapVisibleData, eventsForSystem } from './roadmapVisibleData';
 import type { RoadmapBranchEvents } from '../../db/roadmapChangeEvents';
 
@@ -120,7 +120,7 @@ export function computeRoadmapPngPlan(groups: readonly RoadmapGroup[], branchEve
       for (const bar of group.bars) {
         const startPct = percentAtIso(bar.introduced, range);
         const endPct = percentAtIso(bar.plannedEnd, range);
-        const supportEndPct = isWithinRange(bar.supportEndsAt, range) ? percentAtIso(bar.supportEndsAt, range) : undefined;
+        const supportEndPct = supportEndPlacement(bar.supportEndsAt, range)?.pct;
         const left = startPct ?? 0;
         const width = Math.max((endPct ?? 100) - left, 0.5);
         rows.push({

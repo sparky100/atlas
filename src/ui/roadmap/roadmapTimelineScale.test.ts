@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { computeRoadmapAxisTicks, computeRoadmapForwardRange, computeRoadmapTimelineRange, isWithinRange, roadmapPastStart, computeRoadmapWindow, defaultRoadmapWindowStart, horizonDurationMonths, percentAt, percentAtIso, shiftRoadmapWindowStart, thinAxisTicksToFit, todayPercent } from './roadmapTimelineScale';
+import { computeRoadmapAxisTicks, computeRoadmapForwardRange, computeRoadmapTimelineRange, isWithinRange, roadmapPastStart, computeRoadmapWindow, defaultRoadmapWindowStart, horizonDurationMonths, percentAt, percentAtIso, shiftRoadmapWindowStart, supportEndPlacement, thinAxisTicksToFit, todayPercent } from './roadmapTimelineScale';
 
 const NOW = new Date('2026-06-15T00:00:00Z');
 
@@ -200,5 +200,29 @@ describe('roadmap starts at today', () => {
     expect(isWithinRange('2026-01-01', range)).toBe(false);
     expect(isWithinRange('2030-01-01', range)).toBe(false);
     expect(isWithinRange(undefined, range)).toBe(false);
+  });
+});
+
+describe('supportEndPlacement (vendor support end is visible on every roadmap)', () => {
+  const range = { start: new Date('2026-06-01T00:00:00Z'), end: new Date('2027-06-01T00:00:00Z') };
+
+  it('sits at its own date inside the window', () => {
+    const placed = supportEndPlacement('2026-12-01', range);
+    expect(placed?.edge).toBe('in');
+    expect(placed?.pct).toBeGreaterThan(0);
+    expect(placed?.pct).toBeLessThan(100);
+  });
+
+  it('is pinned to the left edge when support already ended or is before the window', () => {
+    expect(supportEndPlacement('2020-01-01', range)).toEqual({ pct: 0, edge: 'before' });
+  });
+
+  it('is pinned to the right edge when support ends after the window', () => {
+    expect(supportEndPlacement('2035-01-01', range)).toEqual({ pct: 100, edge: 'after' });
+  });
+
+  it('has no marker without a usable date', () => {
+    expect(supportEndPlacement(undefined, range)).toBeUndefined();
+    expect(supportEndPlacement('not-a-date', range)).toBeUndefined();
   });
 });

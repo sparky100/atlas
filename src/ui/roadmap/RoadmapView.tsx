@@ -10,7 +10,7 @@ import type { RoadmapFilters } from './roadmapFilter';
 import type { RoadmapMode } from './roadmapEligibility';
 import type { RoadmapProjectBar, RoadmapUnplacedProject } from './roadmapProjectBars';
 import { roadmapBarCaption, type RoadmapGroup, type RoadmapLifecycleBar } from './roadmapLifecycleRows';
-import { computeRoadmapAxisTicks, isWithinRange, percentAtIso, thinAxisTicksToFit, todayPercent, type RoadmapGranularity, type RoadmapHorizon, type RoadmapTimelineRange } from './roadmapTimelineScale';
+import { computeRoadmapAxisTicks, isWithinRange, percentAtIso, supportEndPlacement, thinAxisTicksToFit, todayPercent, type RoadmapGranularity, type RoadmapHorizon, type RoadmapTimelineRange } from './roadmapTimelineScale';
 import { changeDescription, computeRoadmapVisibleData, eventsForSystem, hiddenNoteFor, recentRoadmapChanges, roadmapRangeFor } from './roadmapVisibleData';
 import styles from './RoadmapView.module.css';
 
@@ -50,7 +50,7 @@ export interface RoadmapViewProps {
 function RoadmapRow({ bar, events, range, todayPct, showPast, orgSlug, modelSlug, found }: { found: boolean; showPast: boolean; bar: RoadmapLifecycleBar; events: readonly { event: RoadmapBranchEvents['events'][number]; branch: RoadmapBranchEvents['branch'] }[]; range: RoadmapTimelineRange; todayPct: number | undefined; orgSlug: string; modelSlug: string }) {
   const startPct = percentAtIso(bar.introduced, range);
   const endPct = percentAtIso(bar.plannedEnd, range);
-  const supportEndPct = isWithinRange(bar.supportEndsAt, range) ? percentAtIso(bar.supportEndsAt, range) : undefined;
+  const supportEnd = supportEndPlacement(bar.supportEndsAt, range);
   const left = startPct ?? 0;
   const width = (endPct ?? 100) - left;
 
@@ -69,7 +69,7 @@ function RoadmapRow({ bar, events, range, todayPct, showPast, orgSlug, modelSlug
         {showPast && todayPct !== undefined && <div className={styles.pastBand} style={{ width: `${String(todayPct)}%` }} aria-hidden="true" />}
         <div className={styles.lifecycleBar} data-tone={bar.lifecycleStatus === 'retiring' || bar.lifecycleStatus === 'retired' ? 'warn' : 'neutral'} style={{ left: `${String(left)}%`, width: `${String(Math.max(width, 0.5))}%` }} />
         {todayPct !== undefined && <div className={styles.todayLine} style={{ left: `${String(todayPct)}%` }} title="Today" aria-hidden="true" />}
-        {supportEndPct !== undefined && <div className={styles.supportEndTick} style={{ left: `${String(supportEndPct)}%` }} title={`Support ends ${bar.supportEndsAt ?? ''}`} />}
+        {supportEnd !== undefined && <div className={styles.supportEndTick} data-edge={supportEnd.edge} style={{ left: `${String(supportEnd.pct)}%` }} title={`${supportEnd.edge === 'before' ? 'Vendor support ended' : 'Vendor support ends'} ${bar.supportEndsAt ?? ''}`} />}
         {events.map(({ event, branch }, index) => {
           // A change outside the visible window is left off rather than pinned to an edge.
           if (!isWithinRange(branch.target_date ?? undefined, range)) return null;
