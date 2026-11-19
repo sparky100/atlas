@@ -9,6 +9,7 @@
 import { expect, test } from '@playwright/test';
 import type { Page } from '@playwright/test';
 import { signUpCreateOrgAndModel } from './fixtures/goldenPath';
+import { expandAllSettingsSections } from './fixtures/settings';
 
 /**
  * Starts waiting for the app's next write to Supabase (any non-GET call to
@@ -28,6 +29,7 @@ test('stale data: set the months threshold and the email opt-out, both persist',
   await page.getByRole('link', { name: 'Atlas', exact: true }).click();
   await page.getByRole('link', { name: orgName }).click();
   await page.getByRole('link', { name: 'Org settings' }).click();
+  await expandAllSettingsSections(page);
   await expect(page.getByRole('heading', { name: 'Out-of-date information' })).toBeVisible();
   const months = page.getByLabel('Months before it is out of date');
   await expect(months).toHaveValue('12');

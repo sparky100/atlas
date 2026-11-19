@@ -8,12 +8,14 @@
  */
 import { expect, test } from '@playwright/test';
 import { signUpCreateOrgAndModel } from './fixtures/goldenPath';
+import { expandAllSettingsSections } from './fixtures/settings';
 
 test('Connections: an owner saves a MuleSoft connection, the secret is never shown again, then removes it', async ({ page }) => {
   const { orgName } = await signUpCreateOrgAndModel(page, 'goldenpath-connectors');
   await page.getByRole('link', { name: 'Atlas', exact: true }).click();
   await page.getByRole('link', { name: orgName }).click();
   await page.getByRole('link', { name: 'Org settings' }).click();
+  await expandAllSettingsSections(page);
 
   await expect(page.getByRole('heading', { name: 'Connections' })).toBeVisible();
   const connection = page.getByRole('group', { name: 'MuleSoft Anypoint connection' });

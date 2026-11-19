@@ -2,7 +2,7 @@ import { Fragment, useMemo, useState } from 'react';
 import { isInactive, latestUse, PLATFORM_ADMIN_INACTIVE_DAYS, type PlatformAdminPerson } from '../../contracts/platformAdmin';
 import { Chip } from '../components/Chip/Chip';
 import { Loading } from '../components/Loading/Loading';
-import { Panel } from '../components/Panel/Panel';
+import { SettingsSection } from '../components/SettingsSection/SettingsSection';
 import { Text } from '../components/Text/Text';
 import { usePlatformAdminOverview } from './usePlatformAdminOverview';
 import styles from './PlatformAdminOverview.module.css';
@@ -49,10 +49,7 @@ export function PlatformAdminOverview() {
 
   return (
     <>
-      <Panel raised className={styles.panel ?? ''}>
-        <Text as="h2" size="lg">
-          Organisations ({state.organisations.length})
-        </Text>
+      <SettingsSection id="organisations" title="Organisations" summary={String(state.organisations.length)}>
         <div className={styles.scroll}>
           <table className={styles.table}>
             <thead>
@@ -117,12 +114,9 @@ export function PlatformAdminOverview() {
             </tbody>
           </table>
         </div>
-      </Panel>
+      </SettingsSection>
 
-      <Panel raised className={styles.panel ?? ''}>
-        <Text as="h2" size="lg">
-          People ({state.people.length})
-        </Text>
+      <SettingsSection id="people" title="People" summary={String(state.people.length)}>
         <input
           type="search"
           className={styles.search}
@@ -170,7 +164,7 @@ export function PlatformAdminOverview() {
             No one matches that email.
           </Text>
         )}
-      </Panel>
+      </SettingsSection>
     </>
   );
 }

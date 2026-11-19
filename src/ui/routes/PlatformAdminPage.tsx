@@ -4,6 +4,8 @@ import { PlatformAdminView } from '../admin/PlatformAdminView';
 import { usePlatformAdmin } from '../admin/usePlatformAdmin';
 import { AppHeader } from '../components/AppHeader/AppHeader';
 import { EmptyState } from '../components/EmptyState/EmptyState';
+import { SettingsSections } from '../components/SettingsSection/SettingsSection';
+import { useSettingsSectionsState } from '../components/SettingsSection/useSettingsSectionsState';
 import { Text } from '../components/Text/Text';
 import { useAuth } from '../auth/useAuth';
 import styles from './PlatformAdminPage.module.css';
@@ -24,6 +26,7 @@ import styles from './PlatformAdminPage.module.css';
 export function PlatformAdminPage() {
   const { userId } = useAuth();
   const { isPlatformAdmin, loading } = usePlatformAdmin(userId);
+  const sectionsState = useSettingsSectionsState('platform-admin', 'llm-proxy');
 
   return (
     <div>
@@ -35,10 +38,10 @@ export function PlatformAdminPage() {
         {loading && <Loading />}
         {!loading && !isPlatformAdmin && <EmptyState>You don&apos;t have access to this page.</EmptyState>}
         {!loading && isPlatformAdmin && (
-          <>
-            <PlatformAdminOverview />
+          <SettingsSections state={sectionsState} ids={['llm-proxy', 'organisations', 'people']}>
             <PlatformAdminView />
-          </>
+            <PlatformAdminOverview />
+          </SettingsSections>
         )}
       </main>
     </div>

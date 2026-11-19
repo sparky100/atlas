@@ -63,9 +63,6 @@ export function AttributeDefinitionsPanel({ orgId, userId }: AttributeDefinition
 
   return (
     <>
-      <Text as="h2" size="lg">
-        Custom attributes
-      </Text>
       <Text as="p" tone="muted" size="sm">
         Org-defined attributes render after core attributes on every element page they apply to, with the same provenance and edit controls.
       </Text>

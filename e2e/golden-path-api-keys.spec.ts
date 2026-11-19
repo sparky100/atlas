@@ -7,12 +7,14 @@
  */
 import { expect, test } from '@playwright/test';
 import { signUpCreateOrgAndModel } from './fixtures/goldenPath';
+import { expandAllSettingsSections } from './fixtures/settings';
 
 test('API access: an owner creates a key, sees it once, then revokes it', async ({ page }) => {
   const { orgName } = await signUpCreateOrgAndModel(page, 'goldenpath-apikeys');
   await page.getByRole('link', { name: 'Atlas', exact: true }).click();
   await page.getByRole('link', { name: orgName }).click();
   await page.getByRole('link', { name: 'Org settings' }).click();
+  await expandAllSettingsSections(page);
   await expect(page.getByRole('heading', { name: 'API access' })).toBeVisible();
   await expect(page.getByText('No API keys yet.')).toBeVisible();
 

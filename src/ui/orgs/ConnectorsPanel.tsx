@@ -31,13 +31,9 @@ const REGION_LABELS: Record<(typeof MULESOFT_REGIONS)[number], string> = {
 export function ConnectorsPanel({ orgId, role }: ConnectorsPanelProps) {
   const canSee = role === 'owner' || role === 'architect';
   const { connectors, loading, save, remove, test } = useConnectors(canSee ? orgId : null);
-  const headingId = useId();
   const connector = findConnector(connectors, 'mulesoft');
   return (
-    <section aria-labelledby={headingId}>
-      <Text as="h3" size="md" id={headingId}>
-        Connections
-      </Text>
+    <>
       <Text as="p" tone="muted" size="sm">
         Connect Atlas to another tool so an import can read it directly. Importing from an exported file keeps working as before; a connection is just another way to get the same file. Nothing changes
         in your model until you review the import and apply it.
@@ -53,7 +49,7 @@ export function ConnectorsPanel({ orgId, role }: ConnectorsPanelProps) {
       ) : (
         <MulesoftConnection key={connector?.updated_at ?? 'new'} isOwner={role === 'owner'} connector={connector} save={save} remove={remove} test={test} />
       )}
-    </section>
+    </>
   );
 }
 
