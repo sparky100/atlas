@@ -30,8 +30,13 @@ export interface ToolStamp {
 }
 
 /** The (lazy, memoised) readers a tool may use. The real ones run as the signed-in user, so row-level security decides what a tool can see. */
+/** Whether run cost may reach the AI. Chosen by every caller, never defaulted: an AI path reads the organisation's `ai_share_run_cost`; a path that is not an AI path says `'share'` and why. */
+export type RunCostSharing = 'share' | 'exclude';
+
 export interface ToolContext {
   stamp: ToolStamp;
+  /** `'exclude'` means run cost has been removed from everything below and tools must not answer from it. Absent reads as `'share'` (hand-built test contexts). */
+  runCost?: RunCostSharing;
   snapshot: () => Promise<ModelSnapshot>;
   factsFor: (elementId: UUID) => Promise<readonly FactsRow[]>;
   savedReports: () => Promise<readonly SavedReportRow[]>;

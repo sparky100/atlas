@@ -27,6 +27,8 @@ export interface OrganisationRow {
   review_min_required_architects: number;
   /** F15 (ADR-028 §7): an owner has allowed Ask Atlas to send model content to the AI provider. Off by default. */
   ai_assistant_enabled: boolean;
+  /** An owner has also allowed run cost to be sent to the AI provider (Ask Atlas and AI apps). Off by default: cost is never shared unless the organisation chooses. Only meaningful while `ai_assistant_enabled` is on. */
+  ai_share_run_cost: boolean;
   /** Calendar days a reviewer has to respond before a change review is flagged overdue (1–90, default 5). Set via `atlas.set_review_period` (owner/architect). */
   review_period_days: number;
   /** Months a value can go unchecked before it is flagged stale (1–60, default 12). Set via `atlas.set_stale_threshold` (owner/architect). */

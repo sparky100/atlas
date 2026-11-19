@@ -84,6 +84,21 @@ describe('organisation settings against a real local Supabase', () => {
     expect(off.ai_assistant_enabled).toBe(false);
   });
 
+  it('sharing run cost with Ask Atlas is off by default; an owner can switch it on and off; an architect cannot', async () => {
+    const before = await owner.client.from('organisations').select('ai_share_run_cost').eq('id', orgId).single();
+    expect((before.data as { ai_share_run_cost: boolean }).ai_share_run_cost).toBe(false);
+
+    const on = await updateOrganisation(owner.client, orgId, { aiShareRunCost: true });
+    expect(on.ai_share_run_cost).toBe(true);
+
+    await expect(updateOrganisation(architect.client, orgId, { aiShareRunCost: false })).rejects.toThrow();
+    const stillOn = await owner.client.from('organisations').select('ai_share_run_cost').eq('id', orgId).single();
+    expect((stillOn.data as { ai_share_run_cost: boolean }).ai_share_run_cost).toBe(true);
+
+    const off = await updateOrganisation(owner.client, orgId, { aiShareRunCost: false });
+    expect(off.ai_share_run_cost).toBe(false);
+  });
+
   it('review period: defaults to 5 days; an owner or architect can set it (1-90); a contributor and a direct column update cannot', async () => {
     expect(await getReviewPeriodDays(owner.client, orgId)).toBe(5);
 

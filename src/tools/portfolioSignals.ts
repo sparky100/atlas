@@ -8,7 +8,7 @@ import { z } from 'zod';
 import { buildPortfolioRows, type PortfolioRow } from '../engine/portfolio/buildPortfolioRows';
 import { PORTFOLIO_SIGNAL_KEYS, PORTFOLIO_SIGNAL_LABEL } from '../engine/portfolio/portfolioSignalLabels';
 import { clip, DEFAULT_TOOL_ROWS, MAX_TOOL_ROWS } from './limits';
-import { defineTool, okResult } from './toolKit';
+import { defineTool, failure, okResult } from './toolKit';
 import type { ModelSnapshot } from './types';
 
 export function portfolioRowsOf(snapshot: ModelSnapshot, now: Date): PortfolioRow[] {
@@ -35,6 +35,8 @@ export const portfolioSignals = defineTool({
   description: `The Portfolio view over systems and modules: run cost band, fit, criticality, planned action, whether lifecycle exposure is known, capabilities served, business owner, and the signals that fire. Like the Portfolio page it covers today's live systems only; planned and retired ones are left out unless "includePlannedAndRetired" is true. With no "signal", returns how many rows each signal fires on. With a "signal" (one of: ${PORTFOLIO_SIGNAL_KEYS.join(', ')}), returns the rows it fires on.`,
   schema,
   run: async (ctx, input) => {
+    // Every Portfolio signal is built on run cost, so with cost excluded there is nothing honest to answer — say so rather than return signals that never fire.
+    if (ctx.runCost === 'exclude') return failure('This organisation does not share run cost with the AI, and the Portfolio signals are built on it, so they cannot be answered here.');
     const everyRow = portfolioRowsOf(await ctx.snapshot(), ctx.now());
     const rows = input.includePlannedAndRetired ? everyRow : everyRow.filter((r) => r.lifecycleState === 'active');
     const leftOut = everyRow.length - rows.length;

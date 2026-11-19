@@ -12,7 +12,7 @@
 import { ANNUAL_RUN_COST_BANDS, DISPOSITION_LEVELS } from '../contracts/attributeSchema';
 import { DISPOSITION_NOT_ASSESSED_LABEL } from '../engine/elementRead/disposition';
 
-export function atlasVocabularyForAi(): string {
+export function atlasVocabularyForAi(options: { runCost?: 'share' | 'exclude' } = {}): string {
   const plannedActions = DISPOSITION_LEVELS.map((l) => `${l.label} (stored as "${l.key}")`).join(', ');
   const costBands = ANNUAL_RUN_COST_BANDS.map((b) => b.label).join(', ');
   return [
@@ -32,7 +32,7 @@ export function atlasVocabularyForAi(): string {
     '',
     'Values',
     `- Planned action (also called TIME; the field is named "disposition" in filters): ${plannedActions}. Unset reads "${DISPOSITION_NOT_ASSESSED_LABEL}".`,
-    `- Run cost is a band, never a figure, so it is never added up: ${costBands}.`,
+    ...(options.runCost === 'exclude' ? ['- Run cost is not available to you: this organisation has chosen not to share it. If asked about cost, say so; never estimate it.'] : [`- Run cost is a band, never a figure, so it is never added up: ${costBands}.`]),
     '- Lifecycle is planned, active, retiring or retired.',
     '',
     'Today\'s picture',

@@ -244,7 +244,10 @@ row-level security decides what is visible, and model calls go through
 logging stay there). It checks, in order, that the model is readable by the
 caller, that the model's owning organisation has `ai_assistant_enabled`
 (off by default, owner-only), and that the main line has a commit; only then
-is anything sent to the provider.
+is anything sent to the provider. It also reads the organisation's
+`ai_share_run_cost` (off by default): unless it is on, run cost is removed
+from every tool result. After this change `ask-model` must be redeployed
+(`pnpm functions:deploy:ask-model`); until then it still sends the cost band.
 
 The response is `application/x-ndjson`: `{"type":"event",...}` lines as
 lookups start and finish, then one `{"type":"result",...}` (status `done`,

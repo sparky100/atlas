@@ -47,6 +47,12 @@ export function resolveModel(models: readonly VisibleModel[], wanted: string | u
   return { ok: false, message: `No model called "${wanted.slice(0, 60)}" that you can see. Call atlas_list_models.` };
 }
 
+async function sharesRunCost(supabase: Client, orgId: string): Promise<boolean> {
+  const { data, error } = await supabase.from('organisations').select('ai_share_run_cost').eq('id', orgId).maybeSingle();
+  if (error) throw new Error(`Could not read the organisation: ${error.message}`);
+  return (data as { ai_share_run_cost?: boolean } | null)?.ai_share_run_cost === true;
+}
+
 async function isEnabled(supabase: Client, orgId: string): Promise<boolean> {
   const { data, error } = await supabase.from('organisations').select('ai_assistant_enabled').eq('id', orgId).maybeSingle();
   if (error) throw new Error(`Could not read the organisation: ${error.message}`);
@@ -118,7 +124,10 @@ function wrap(tool: ModelTool): McpToolDef {
 
       const commit = await commitFor(supabase, model.modelId, scope.data.change);
       if (!commit.ok) return err(commit.message);
-      const ctx = createToolContext(supabase, { id: model.modelId, name: model.name }, commit.commitId, commit.ref);
+      const ctx = createToolContext(supabase, { id: model.modelId, name: model.name }, commit.commitId, {
+        runCost: (await sharesRunCost(supabase, orgId)) ? 'share' : 'exclude',
+        ref: commit.ref,
+      });
       const result = await tool.run(ctx, rest);
       if (!result.ok) return err(result.error);
       const json = JSON.stringify({ stamp: result.stamp, total: result.total, truncated: result.truncated, data: result.data });

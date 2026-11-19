@@ -13,6 +13,7 @@ function deps(over: Partial<AskHandlerDeps> = {}): AskHandlerDeps & { calls: str
     calls,
     loadModel: () => Promise.resolve(MODEL),
     isEnabled: () => Promise.resolve(true),
+    shareRunCost: () => Promise.resolve(false),
     mainCommit: () => Promise.resolve(uid(7000)),
     createContext: () => {
       calls.push('context');
