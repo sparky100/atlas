@@ -4,6 +4,7 @@ import { useNavigate } from 'react-router';
 import type { UUID } from '../../contracts/delta';
 import { Button } from '../components/Button/Button';
 import { Chip } from '../components/Chip/Chip';
+import { CollapsibleSection } from '../components/CollapsibleSection/CollapsibleSection';
 import { EmptyState } from '../components/EmptyState/EmptyState';
 import { LinkButton } from '../components/Button/LinkButton';
 import { Panel } from '../components/Panel/Panel';
@@ -14,6 +15,7 @@ import { profileLabel } from '../comments/profileLabel';
 import type { DecisionRow } from '../../db/types';
 import type { DecisionPrefill } from './decisionPrefill';
 import { DecisionLinkPicker } from './DecisionLinkPicker';
+import { groupDecisionsList } from './decisionsListGroups';
 import { decisionStatusLabel, decisionStatusTone } from './decisionStatus';
 import { useDecisions } from './useDecisions';
 import styles from './DecisionsView.module.css';
@@ -166,13 +168,15 @@ export function DecisionsView({ modelId, orgId, userId, orgSlug, modelSlug, canC
       </Text>
       {status === 'loading' && <Loading />}
       {decisions.length === 0 && status !== 'loading' && <EmptyState>No decisions yet. {canCreate ? 'Start one above.' : 'Nobody has started one.'}</EmptyState>}
-      {decisions.length > 0 && (
-        <ul className={styles.list}>
-          {decisions.map((decision) => (
-            <DecisionRowItem key={decision.id} decision={decision} orgSlug={orgSlug} modelSlug={modelSlug} />
-          ))}
-        </ul>
-      )}
+      {groupDecisionsList(decisions).map((section) => (
+        <CollapsibleSection key={section.key} title={section.title} meta={`(${String(section.decisions.length)})`} defaultOpen={section.defaultOpen}>
+          <ul className={styles.list}>
+            {section.decisions.map((decision) => (
+              <DecisionRowItem key={decision.id} decision={decision} orgSlug={orgSlug} modelSlug={modelSlug} />
+            ))}
+          </ul>
+        </CollapsibleSection>
+      ))}
     </div>
   );
 }
