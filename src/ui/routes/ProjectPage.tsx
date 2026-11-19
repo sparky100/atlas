@@ -14,6 +14,7 @@ import { useSelectedRef } from '../branches/useSelectedRef';
 import { refLabelOf } from '../../db/ref';
 import { useModels } from '../models/useModels';
 import { useMembership } from '../orgs/useMembership';
+import { canOfferDesigner, designerUnavailableReason } from '../decisions/designerRequest';
 import { useOrganisationBySlug } from '../orgs/useOrganisationBySlug';
 import styles from './ViewPage.module.css';
 
@@ -35,6 +36,8 @@ export function ProjectPage() {
   const title = state.status === 'ready' ? state.data.project.title : 'Project';
   // Overdue is relative to today's date; read once per render, never stored.
   const today = new Date().toISOString().slice(0, 10);
+
+  const designerArgs = { role, assistantEnabled: organisation?.ai_assistant_enabled === true, agentsEnabled: organisation?.ai_agents_enabled === true, keySet: organisation?.ai_agent_key_set === true };
 
   if (orgLoading || modelsLoading || !model) {
     return (
@@ -67,7 +70,7 @@ export function ProjectPage() {
           {state.status === 'not_found' && <Text as="p">This project doesn't exist in this model, or you can't see it.</Text>}
           {state.status === 'error' && <Text as="p">{state.message}</Text>}
           {state.status === 'ready' && (
-            <ProjectView data={state.data} modelName={model.name} orgId={organisation?.id ?? ''} modelId={model.id} orgSlug={orgSlug ?? ''} modelSlug={model.slug} userId={userId} role={role} today={today} reload={reload} />
+            <ProjectView data={state.data} modelName={model.name} orgId={organisation?.id ?? ''} modelId={model.id} orgSlug={orgSlug ?? ''} modelSlug={model.slug} userId={userId} role={role} today={today} reload={reload} designerAvailable={canOfferDesigner(designerArgs)} designerUnavailable={designerUnavailableReason(designerArgs)} />
           )}
         </main>
       </div>
