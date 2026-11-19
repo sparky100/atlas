@@ -41,6 +41,13 @@ export function projectIsOpen(status: ProjectStatus): boolean {
   return status === 'proposed' || status === 'active' || status === 'on_hold';
 }
 
+/**
+ * What "proposed" means, in one place so the list, the page and the start form say the same thing.
+ * A proposal is a project that has been put forward but not yet accepted by an owner or architect.
+ */
+export const PROPOSED_PROJECT_EXPLAINER =
+  'A proposal is a project that has been put forward but not yet accepted. Until an owner or architect accepts it, it is not work in hand and is left off the roadmap. You can still add scope, decisions and changes while it is designed.';
+
 export function projectStatusLabel(status: ProjectStatus): string {
   switch (status) {
     case 'proposed':
