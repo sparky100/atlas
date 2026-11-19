@@ -77,6 +77,13 @@ test('project pack: decide and design inside a project, attach evidence, downloa
   // Evidence on the project.
   await goToModelHome(page);
   await openProject(page);
+  // Evidence starts collapsed (nothing in it needs action); open it, and check the choice is remembered on reload.
+  const evidenceToggle = page.getByRole('button', { name: /^Evidence/ });
+  await expect(evidenceToggle).toHaveAttribute('aria-expanded', 'false');
+  await evidenceToggle.click();
+  await expect(evidenceToggle).toHaveAttribute('aria-expanded', 'true');
+  await page.reload();
+  await expect(page.getByRole('button', { name: /^Evidence/ })).toHaveAttribute('aria-expanded', 'true');
   await page.getByLabel('Evidence location').fill('https://example.org/repairs-business-case');
   await page.getByLabel('Evidence description').fill('Repairs business case');
   await page.getByRole('button', { name: 'Attach evidence' }).click();

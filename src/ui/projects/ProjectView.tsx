@@ -43,6 +43,8 @@ import { buildProjectPackMarkdown, projectPackFilename } from '../exports/projec
 import { downloadBlob, exportDate } from '../exports/viewExport';
 import { buildProjectJourney } from './projectJourney';
 import { ProjectBeforeAfter } from './ProjectBeforeAfter';
+import { ProjectStep } from './ProjectStep';
+import { changesSummary, decisionsSummary, evidenceSummary, scopeSummary } from './projectStepSummary';
 import type { ProjectData } from './useProject';
 import { moduleDisplayNameFromMap } from '../elements/moduleDisplayName';
 import styles from './ProjectView.module.css';
@@ -143,9 +145,7 @@ export function ProjectView({ data, modelName, orgId, modelId, orgSlug, modelSlu
 
       {(scopeIds.length > 0 || canEdit) && (
         <Panel>
-          <Text as="h2" size="lg">
-            Declared scope
-          </Text>
+          <ProjectStep stepKey="scope" projectId={project.id} title="Declared scope" summary={scopeSummary(scopeIds.length)} defaultOpen>
           <Text as="p" tone="muted" size="sm">
             The capabilities and systems this project is about.
           </Text>
@@ -249,14 +249,13 @@ export function ProjectView({ data, modelName, orgId, modelId, orgSlug, modelSlu
               )}
             </div>
           )}
+          </ProjectStep>
         </Panel>
       )}
 
       {(decisions.length > 0 || constrainingDecisions.length > 0 || (isOpen && canStartDecision(role) && userId !== null)) && (
         <Panel>
-          <Text as="h2" size="lg">
-            Decision log
-          </Text>
+          <ProjectStep stepKey="decisions" projectId={project.id} title="Decision log" summary={decisionsSummary(decisions.map((d) => d.status))} defaultOpen={decisions.length === 0 || decisions.some((d) => d.status === 'proposed')}>
           {decisions.length > 0 && (
             <ul className={styles.list}>
               {decisions.map((d) => (
@@ -280,14 +279,13 @@ export function ProjectView({ data, modelName, orgId, modelId, orgSlug, modelSlu
               </ul>
             </>
           )}
+          </ProjectStep>
         </Panel>
       )}
 
       {(changes.length > 0 || (isOpen && canCreateChangeBranch(role) && userId !== null && Boolean(main?.head_commit_id))) && (
         <Panel>
-          <Text as="h2" size="lg">
-            Changes
-          </Text>
+          <ProjectStep stepKey="changes" projectId={project.id} title="Changes" summary={changesSummary(changes.length)} defaultOpen={changes.length === 0 || changes.some((c) => c.status !== 'merged' && c.status !== 'cancelled')}>
           {groupChangesByStage(changes).map((group) => (
             <section key={group.stage} aria-label={projectChangeStageLabel(group.stage)}>
               <Text as="h3" size="md">
@@ -301,14 +299,13 @@ export function ProjectView({ data, modelName, orgId, modelId, orgSlug, modelSlu
             </section>
           ))}
           {isOpen && canCreateChangeBranch(role) && userId !== null && main?.head_commit_id && <NewChangeForm project={project} userId={userId} mainHeadCommitId={main.head_commit_id} base={base} />}
+          </ProjectStep>
         </Panel>
       )}
 
       {(evidence.length > 0 || (canEdit && userId !== null)) && (
         <Panel>
-          <Text as="h2" size="lg">
-            Evidence
-          </Text>
+          <ProjectStep stepKey="evidence" projectId={project.id} title="Evidence" summary={evidenceSummary(evidence.length)} defaultOpen={false}>
           <Text as="p" tone="muted" size="sm">
             Business cases, vendor documents and links behind this project.
           </Text>
@@ -333,14 +330,14 @@ export function ProjectView({ data, modelName, orgId, modelId, orgSlug, modelSlu
             </ul>
           )}
           {canEdit && userId !== null && <EvidenceForm project={project} userId={userId} onAdded={reload} />}
+          </ProjectStep>
         </Panel>
       )}
 
       <Panel>
-        <Text as="h2" size="lg">
-          Comments
-        </Text>
+        <ProjectStep stepKey="comments" projectId={project.id} title="Comments" summary={'conversation on this project'} defaultOpen={false}>
         <CommentsSection orgId={orgId} modelId={modelId} userId={userId} role={role} anchorType="project" anchorId={project.id} branchId={null} />
+        </ProjectStep>
       </Panel>
     </div>
   );
