@@ -1,0 +1,28 @@
+.card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2, 0.5rem);
+  padding: var(--space-3, 0.75rem);
+  border: 1px dashed var(--color-border, #c9ccd1);
+  border-radius: var(--radius-md, 8px);
+  min-width: 0;
+}
+
+.label {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1, 0.25rem);
+}
+
+.textarea {
+  width: 100%;
+  min-height: 4rem;
+  box-sizing: border-box;
+  font: inherit;
+}
+
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2, 0.5rem);
+}

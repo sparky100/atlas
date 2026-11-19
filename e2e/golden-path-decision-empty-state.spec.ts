@@ -23,6 +23,14 @@ test('two like-for-like options with no commits of their own show the empty-stat
   await page.getByRole('button', { name: 'Start decision' }).click();
   await expect(page.getByRole('heading', { name: decisionTitle })).toBeVisible();
 
+  // Every new decision starts with its "Stay as we are" baseline: described (two plain questions), not scored.
+  const baseline = page.getByRole('region', { name: 'Stay as we are' });
+  await expect(baseline).toBeVisible();
+  await expect(baseline.getByText('Describe it; it is not scored.')).toBeVisible();
+  await baseline.getByLabel('What is the operational risk of staying as we are?').fill('The vendor ends support in March.');
+  await baseline.getByRole('button', { name: 'Save baseline' }).click();
+  await expect(baseline.getByRole('button', { name: 'Save baseline' })).toBeDisabled();
+
   const optionSpecs: [string, string][] = [
     ['vendor-a', 'Vendor A'],
     ['vendor-b', 'Vendor B'],

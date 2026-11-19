@@ -448,6 +448,12 @@ export interface DecisionRow {
   reconsider_if: string | null;
   /** Optional date to look at the decision again. Set only when an option is chosen. */
   review_by: string | null;
+  /** The operational risk of staying as we are (the "Stay as we are" baseline). Empty until written. */
+  stay_risk: string;
+  /** Why we cannot or will not change (the baseline). Empty until written. */
+  stay_reason: string;
+  /** Which of the decision's option branches is the baseline; `null` on decisions made before the baseline existed. */
+  baseline_branch_id: UUID | null;
   /** The chosen option's branch, once accepted (PR5). */
   branch_id: UUID | null;
   superseded_decision_id: UUID | null;

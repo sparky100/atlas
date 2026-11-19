@@ -1,3 +1,4 @@
+import { addBaseline } from '../decisions/addBaseline';
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router';
 import type { UUID } from '../../contracts/delta';
@@ -476,7 +477,13 @@ function NewDecisionForm({ project, userId, base }: { project: ProjectRow; userI
         setBusy(true);
         setError(null);
         void createDecision(supabase, { id: crypto.randomUUID(), orgId: project.org_id, modelId: project.model_id, title: title.trim(), statement: '', ownerId: userId, createdBy: userId, projectId: project.id })
-          .then((d) => navigate(`${base}/decisions/${d.id}`))
+          .then(async (d) => {
+            // Every decision starts with its "Stay as we are" baseline; if this fails the decision page offers "Add the baseline".
+            await addBaseline({ orgId: project.org_id, modelId: project.model_id, decisionId: d.id, userId, projectId: project.id }).catch((err: unknown) => {
+              reportError('Could not add the baseline to the new decision.', err);
+            });
+            void navigate(`${base}/decisions/${d.id}`);
+          })
           .catch((err: unknown) => {
             setError('Could not start this decision.');
             reportError('Could not start this decision.', err);

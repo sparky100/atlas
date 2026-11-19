@@ -1,11 +1,12 @@
 import { useCallback, useState } from 'react';
 import type { UUID } from '../../contracts/delta';
 import { createChangeBranch, getMainBranch } from '../../db/branches';
-import { chooseDecisionOption, createDecisionLink } from '../../db/decisions';
+import { chooseDecisionOption, createDecisionLink, updateDecision } from '../../db/decisions';
 import type { BranchRow, DecisionLinkRow, DecisionRow } from '../../db/types';
 import { supabase } from '../supabaseClient';
+import { addBaseline, type AddBaselineInput } from './addBaseline';
 
-export type DecisionOptionsStatus = 'idle' | 'adding' | 'choosing';
+export type DecisionOptionsStatus = 'idle' | 'adding' | 'choosing' | 'baseline';
 
 export interface AddOptionInput {
   orgId: UUID;
@@ -31,6 +32,10 @@ export interface UseDecisionOptionsResult {
    * one atomic call.
    */
   addOption: (input: AddOptionInput) => Promise<boolean>;
+  /** Gives a decision that has none its "Stay as we are" baseline option (`addBaseline.ts`). */
+  addBaselineOption: (input: AddBaselineInput) => Promise<boolean>;
+  /** Saves the baseline's two plain-text answers (operational risk of staying, why we can't or won't change). */
+  saveBaselineText: (decisionId: UUID, stayRisk: string, stayReason: string) => Promise<boolean>;
   /** F3's own "Choose" — `atlas.choose_decision_option` in one call (`src/db/decisions.ts`'s `chooseDecisionOption`). Optionally records what would make the choice be reconsidered, and a review date. */
   chooseOption: (decisionId: UUID, branchId: UUID, reasons: string, reconsider?: { reconsiderIf: string; reviewBy: string }) => Promise<boolean>;
 }
@@ -103,6 +108,42 @@ export function useDecisionOptions(
     [applyNewOption],
   );
 
+  const addBaselineOption = useCallback(
+    async (input: AddBaselineInput): Promise<boolean> => {
+      setError(null);
+      setStatus('baseline');
+      try {
+        const added = await addBaseline(input);
+        applyNewOption(added.link, added.branch);
+        applyDecisionUpdate(added.decision);
+        return true;
+      } catch (e) {
+        setError(e instanceof Error ? e.message : 'Could not add the baseline.');
+        return false;
+      } finally {
+        setStatus('idle');
+      }
+    },
+    [applyNewOption, applyDecisionUpdate],
+  );
+
+  const saveBaselineText = useCallback(
+    async (decisionId: UUID, stayRisk: string, stayReason: string): Promise<boolean> => {
+      setError(null);
+      setStatus('baseline');
+      try {
+        applyDecisionUpdate(await updateDecision(supabase, decisionId, { stayRisk: stayRisk.trim(), stayReason: stayReason.trim() }));
+        return true;
+      } catch (e) {
+        setError(e instanceof Error ? e.message : 'Could not save the baseline.');
+        return false;
+      } finally {
+        setStatus('idle');
+      }
+    },
+    [applyDecisionUpdate],
+  );
+
   const chooseOption = useCallback(
     async (decisionId: UUID, branchId: UUID, reasons: string, reconsider?: { reconsiderIf: string; reviewBy: string }): Promise<boolean> => {
       if (reasons.trim().length === 0) {
@@ -129,5 +170,5 @@ export function useDecisionOptions(
     [applyDecisionUpdate, refreshOptionsAndArguments],
   );
 
-  return { status, error, addOption, chooseOption };
+  return { status, error, addOption, addBaselineOption, saveBaselineText, chooseOption };
 }

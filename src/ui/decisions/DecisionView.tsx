@@ -18,6 +18,7 @@ import { profileLabel } from '../comments/profileLabel';
 import { canAddDecisionConcern, canCancelDecision, canChooseDecisionOption, canCreateChangeBranch, canEditDecision, canRateDecisionOption } from '../orgs/useMembership';
 import { useMembers } from '../orgs/useMembers';
 import type { AlsoAffectedElement } from './alsoAffected';
+import { DecisionBaselineCard } from './DecisionBaselineCard';
 import { DecisionCriteriaGrid, type DecisionCriteriaOption } from './DecisionCriteriaGrid';
 import { DecisionGoLive } from './DecisionGoLive';
 import { DecisionPacks } from './DecisionPacks';
@@ -137,6 +138,9 @@ export function DecisionView({ modelId, decisionId, orgId, orgSlug, modelSlug, r
   const canChoose = canChooseDecisionOption(role) && decision.status === 'proposed';
   const canRate = canRateDecisionOption(role, decision);
   const chosenBranch = decision.branch_id !== null ? linkedBranchesById.get(decision.branch_id) : undefined;
+  const scoredLinks = branchLinks.filter((l) => l.linked_id !== decision.baseline_branch_id);
+  const canEditBaseline = canAddOption && canEditDecision(role, decision, userId);
+  const baselineBranch = decision.baseline_branch_id !== null ? linkedBranchesById.get(decision.baseline_branch_id) : undefined;
 
   // Prompt pack F3 PR6's "Export as ADR markdown" — assembled from data
   // this page has already loaded (no second round trip).
@@ -347,11 +351,45 @@ export function DecisionView({ modelId, decisionId, orgId, orgSlug, modelSlug, r
       {(branchLinks.length > 0 || canAddOption) && (
         <Panel>
           <Text as="h2" size="lg">
-            {branchLinks.length > 0 ? 'Criteria' : 'Options'}
+            {scoredLinks.length > 0 ? 'Criteria' : 'Options'}
           </Text>
-          {branchLinks.length === 0 ? null : (
+          {baselineBranch !== undefined && (
+            <DecisionBaselineCard
+              key={`${decision.stay_risk}\u0000${decision.stay_reason}`}
+              stayRisk={decision.stay_risk}
+              stayReason={decision.stay_reason}
+              canEdit={canEditBaseline}
+              canChoose={canChoose && baselineBranch.status === 'draft'}
+              isChosen={decision.branch_id === baselineBranch.id}
+              busy={optionsState.status === 'baseline'}
+              onSave={(risk, reason) => {
+                void optionsState.saveBaselineText(decisionId, risk, reason);
+              }}
+              onChoose={() => {
+                setChoosingBranchId(baselineBranch.id);
+                setReasons('');
+              }}
+            />
+          )}
+          {decision.baseline_branch_id === null && canEditBaseline && userId !== null && (
+            <div className={styles.addOptionForm}>
+              <Text as="p" tone="muted" size="sm">
+                Every decision compares its options against staying as we are. This one has no baseline yet.
+              </Text>
+              <Button
+                variant="secondary"
+                disabled={optionsState.status === 'baseline'}
+                onClick={() => {
+                  void optionsState.addBaselineOption({ orgId, modelId, decisionId, userId, projectId: decision.project_id });
+                }}
+              >
+                {optionsState.status === 'baseline' ? 'Adding…' : 'Add the "Stay as we are" baseline'}
+              </Button>
+            </div>
+          )}
+          {branchLinks.length === 0 || scoredLinks.length === 0 ? null : (
             (() => {
-              const criteriaOptions: DecisionCriteriaOption[] = branchLinks
+              const criteriaOptions: DecisionCriteriaOption[] = scoredLinks
                 .map((link) => linkedBranchesById.get(link.linked_id))
                 .filter((b): b is NonNullable<typeof b> => b !== undefined)
                 .map((b) => ({
