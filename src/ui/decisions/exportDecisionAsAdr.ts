@@ -128,6 +128,16 @@ export function exportDecisionAsAdrMarkdown(input: DecisionAdrExportInput): stri
     }
   }
 
+  const stayRisk = decision.stay_risk.trim();
+  const stayReason = decision.stay_reason.trim();
+  if (stayRisk.length > 0 || stayReason.length > 0) {
+    lines.push('');
+    lines.push('## Staying as we are');
+    lines.push('');
+    if (stayRisk.length > 0) lines.push(`Risk of staying: ${stayRisk}`);
+    if (stayReason.length > 0) lines.push(`Why we cannot or will not change: ${stayReason}`);
+  }
+
   if (whatChangesRows.length > 0) {
     lines.push('');
     lines.push('## What changes (evidence)');

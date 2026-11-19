@@ -54,6 +54,17 @@ function makeBranch(overrides: Partial<BranchRow> = {}): BranchRow {
 }
 
 describe('exportDecisionAsAdrMarkdown', () => {
+  it('records the stay-as-we-are baseline only when something was written', () => {
+    const base = { ownerName: 'Alice', concerns: [], options: [], whatChangesRows: [], reasons: null };
+    expect(exportDecisionAsAdrMarkdown({ ...base, decision: makeDecision() })).not.toContain('## Staying as we are');
+    const md = exportDecisionAsAdrMarkdown({ ...base, decision: makeDecision({ stay_risk: 'Support ends in 2027.', stay_reason: 'No budget this year.' }) });
+    expect(md).toContain('## Staying as we are');
+    expect(md).toContain('Risk of staying: Support ends in 2027.');
+    expect(md).toContain('Why we cannot or will not change: No budget this year.');
+    const onlyRisk = exportDecisionAsAdrMarkdown({ ...base, decision: makeDecision({ stay_risk: 'Fragile.' }) });
+    expect(onlyRisk).not.toContain('Why we cannot');
+  });
+
   it('renders a proposed decision with no options as "Not yet decided", no Options/Concerns/What-changes sections', () => {
     const markdown = exportDecisionAsAdrMarkdown({ decision: makeDecision(), ownerName: 'Alice', concerns: [], options: [], whatChangesRows: [], reasons: null });
     expect(markdown).toContain('# ADR: Replace Ledger Service?');
