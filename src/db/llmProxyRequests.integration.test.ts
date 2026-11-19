@@ -95,6 +95,24 @@ describe('llm_proxy_requests against a real local Supabase', () => {
     expect(error).not.toBeNull();
   });
 
+  it('records which key paid: rows default to the platform key, and only app or org is accepted', async () => {
+    const orgRowId = randomUUID();
+    const plainId = randomUUID();
+    const base = { org_id: orgId, model: 'claude-opus-5', status: 'ok', input_tokens: 10, output_tokens: 2, latency_ms: 5 };
+    // Two separate inserts: postgrest-js sends an explicit null for a key one row omits, which would defeat the default.
+    const own = await service.from('llm_proxy_requests').insert({ id: orgRowId, ...base, key_source: 'org' });
+    expect(own.error).toBeNull();
+    const plain = await service.from('llm_proxy_requests').insert({ id: plainId, ...base });
+    expect(plain.error).toBeNull();
+    const rows = await listLlmProxyUsage(owner.client, orgId);
+    expect(rows.find((r) => r.id === orgRowId)?.key_source).toBe('org');
+    expect(rows.find((r) => r.id === plainId)?.key_source).toBe('app');
+    const bad = await service.from('llm_proxy_requests').insert({ id: randomUUID(), ...base, key_source: 'someone-else' });
+    expect(bad.error).not.toBeNull();
+    // A signed-in user from another organisation sees none of it.
+    expect(await listLlmProxyUsage(outsider.client, orgId)).toEqual([]);
+  });
+
   it('has no prompt/response column to retain a payload in — the "no payload retention" design is a real schema constraint, not just a convention the edge function happens to follow', async () => {
     const { error } = await service.from('llm_proxy_requests').select('prompt').eq('id', olderRequestId);
     expect(error?.message).toMatch(/column .*prompt.* does not exist/i);

@@ -16,3 +16,10 @@ export function designerInputFromPrefill(prefill: DecisionPrefill | null): { ele
 export function canOfferDesigner(args: { role: string | null; assistantEnabled: boolean; agentsEnabled: boolean; keySet: boolean }): boolean {
   return (args.role === 'owner' || args.role === 'architect') && args.assistantEnabled && args.agentsEnabled && args.keySet;
 }
+
+/** "What did this cost": tokens and lookups, in words. No money figure, because Atlas holds no price list and a guessed price would read as a fact. */
+export function designerCostLine(usage: { inputTokens: number; outputTokens: number; lookups: number }): string {
+  const n = (v: number) => v.toLocaleString('en-GB');
+  const lookups = usage.lookups === 1 ? '1 lookup' : `${n(usage.lookups)} lookups`;
+  return `This run used ${n(usage.inputTokens)} tokens in and ${n(usage.outputTokens)} out, with ${lookups}, on your organisation's AI key.`;
+}

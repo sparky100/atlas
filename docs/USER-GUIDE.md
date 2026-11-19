@@ -312,6 +312,7 @@ When you start a decision from a finding (for example **Keep, link or retire?** 
 - The draft appears in a box you can edit. **Add to the context above** puts your edited text into the decision's context; nothing is recorded until you press **Start decision**, and the Designer never changes the model or approves anything.
 - It says which records it was based on. If it cites none, it says so: check it carefully.
 - It runs on the organisation's own AI key (organisation settings, **Agents**), not Atlas's. If it cannot run, it says why in one sentence.
+- Under each draft it says what the run used: tokens in and out and how many lookups it made (tokens, not money). **Agents** in organisation settings shows this month's AI calls and tokens on the organisation's key; one draft makes several calls.
 
 ## Ask Atlas
 
