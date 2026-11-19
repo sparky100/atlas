@@ -131,7 +131,7 @@ test('project lifecycle: start from a finding, decide inside it, deliver the cho
   await expect(changesToggle).toHaveAttribute('aria-expanded', 'false');
   await changesToggle.click();
   await expect(page.getByRole('region', { name: 'Merged' }).getByRole('link', { name: 'Build Repairs Hub' })).toBeVisible();
-  await expect(page.getByTestId('project-next-step').getByText('Close the project', { exact: true })).toBeVisible();
+  await expect(page.getByTestId('project-next-step').getByText('Check the result, then close the project', { exact: true })).toBeVisible();
   await page.getByRole('button', { name: 'Close project' }).click();
   await expect(page.getByText('Closed', { exact: true }).first()).toBeVisible();
   await expect(page.getByRole('button', { name: '✎ Edit project' })).toHaveCount(0);

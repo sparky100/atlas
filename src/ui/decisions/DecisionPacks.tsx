@@ -18,6 +18,8 @@ export interface DecisionPacksProps {
   /** Owner or architect: may approve or decline the latest pack. */
   canSign: boolean;
   userId: UUID | null;
+  /** Who signed, by user id, so each sign-off names its person. A missing id reads as a former member. */
+  nameOfUser?: (id: UUID) => string;
   /** The live model's head commit now, recorded with the pack. */
   commitId: UUID | null;
   /** The decision write-up as it reads right now. */
@@ -29,7 +31,7 @@ export interface DecisionPacksProps {
  * is on a fixed record. A later edit never changes a pack; a material change
  * is frozen as the next version. Insert-only (`atlas.freeze_decision_pack`).
  */
-export function DecisionPacks({ decisionId, canFreeze, canSign, userId, commitId, buildMarkdown }: DecisionPacksProps) {
+export function DecisionPacks({ decisionId, canFreeze, canSign, userId, nameOfUser, commitId, buildMarkdown }: DecisionPacksProps) {
   const queryClient = useQueryClient();
   const [busy, setBusy] = useState(false);
   const [lens, setLens] = useState<DecisionApprovalLens | ''>('');
@@ -111,7 +113,7 @@ export function DecisionPacks({ decisionId, canFreeze, canSign, userId, commitId
                   <ul className={styles.signOffs} aria-label={`Sign-offs on version ${String(pack.version)}`}>
                     {own.map((a) => (
                       <li key={a.id}>
-                        {LENS_LABELS[a.lens]}: {a.verdict === 'approve' ? 'approved' : 'declined'} on {a.decided_at.slice(0, 10)}
+                        {LENS_LABELS[a.lens]}: {a.verdict === 'approve' ? 'approved' : 'declined'} by {nameOfUser ? nameOfUser(a.decided_by) : 'a member'} on {a.decided_at.slice(0, 10)}
                         {a.comment !== '' ? ` — ${a.comment}` : ''}
                       </li>
                     ))}

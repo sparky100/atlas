@@ -742,7 +742,7 @@ export function DecisionView({ modelId, decisionId, orgId, orgSlug, modelSlug, r
         </Panel>
       )}
 
-      <DecisionPacks decisionId={decision.id} canFreeze={canChooseDecisionOption(role)} canSign={canChooseDecisionOption(role)} userId={userId} commitId={main?.head_commit_id ?? null} buildMarkdown={buildAdrMarkdown} />
+      <DecisionPacks decisionId={decision.id} canFreeze={canChooseDecisionOption(role)} canSign={canChooseDecisionOption(role)} userId={userId} nameOfUser={(id) => { const m = members.find((x) => x.member.user_id === id); return m ? profileLabel(m.profile) : 'a former member'; }} commitId={main?.head_commit_id ?? null} buildMarkdown={buildAdrMarkdown} />
 
       <Panel>
         <Text as="h2" size="lg">

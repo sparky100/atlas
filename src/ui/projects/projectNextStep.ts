@@ -57,21 +57,33 @@ export function projectNextStep(input: NextStepInput): NextStep | null {
   if (input.decisions.length === 0) {
     return input.canStartDecision
       ? { kind: 'decide', title: 'Work out the options', body: "Start a decision. It takes this project's purpose as its context and the project's scope as what it concerns, and opens ready to edit.", action: { kind: 'start-decision' } }
-      : { kind: 'decide', title: 'Work out the options', body: 'An owner or architect starts the decision for this project.', action: { kind: 'none' } };
+      : { kind: 'decide', title: 'Work out the options', body: 'An owner, architect or contributor starts the decision for this project.', action: { kind: 'none' } };
   }
   const firstProposed = proposed[0];
   if (chosen.length === 0 && firstProposed) {
-    return { kind: 'compare', title: 'Compare your options and choose', body: `${proposed.length === 1 ? 'One decision is' : `${String(proposed.length)} decisions are`} open. Add options, compare what each changes, then choose and give your reasons.`, action: { kind: 'open-decision', id: firstProposed.id, label: `Open ${firstProposed.title}` } };
+    return { kind: 'compare', title: 'Compare your options and choose', body: `No option is chosen yet. ${proposed.length === 1 ? 'One decision is' : `${String(proposed.length)} decisions are`} open. Add options, compare what each changes, then choose and give your reasons.`, action: { kind: 'open-decision', id: firstProposed.id, label: `Open ${firstProposed.title}` } };
+  }
+  if (chosen.length === 0) {
+    // Decisions exist but every one was rejected, superseded or cancelled: nothing was chosen, so there is no choice to carry out.
+    return input.canStartDecision
+      ? { kind: 'decide', title: 'Start a new decision', body: 'The earlier decision ended without an option being carried forward. Start a new one to work out the options again.', action: { kind: 'start-decision' } }
+      : { kind: 'decide', title: 'Start a new decision', body: 'The earlier decision ended without an option being carried forward. An owner, architect or contributor starts a new one.', action: { kind: 'none' } };
   }
   if (input.changes.length === 0) {
     if (input.canCreateChange && input.canDraftChange) {
-      return { kind: 'change', title: 'Draft the change that carries out your choice', body: 'A change is a draft of what would be different in the model. It stays a draft until it is reviewed.', action: { kind: 'start-change' } };
+      return { kind: 'change', title: 'Draft the change that carries out your choice', body: 'An option is chosen. A change is a draft of what would be different in the model. It stays a draft until it is reviewed.', action: { kind: 'start-change' } };
     }
-    return { kind: 'change', title: 'Draft the change that carries out your choice', body: 'A contributor, architect or owner drafts the change.', action: { kind: 'none' } };
+    return { kind: 'change', title: 'Draft the change that carries out your choice', body: 'An option is chosen. A contributor, architect or owner drafts the change.', action: { kind: 'none' } };
   }
   const firstOpen = openChanges[0];
   if (firstOpen) {
     return { kind: 'deliver', title: 'Take the change through review', body: `${openChanges.length === 1 ? 'One change is' : `${String(openChanges.length)} changes are`} not yet merged or cancelled.`, action: { kind: 'open-change', id: firstOpen.id, label: `Open ${firstOpen.title ?? firstOpen.name}` } };
   }
-  return { kind: 'finish', title: 'Close the project', body: 'The decision is made and the changes are done. Close the project from Status above when you are ready.', action: { kind: 'none' } };
+  if (!input.changes.some((c) => c.status === 'merged')) {
+    // Every change was cancelled: the choice has not been carried out.
+    return input.canCreateChange && input.canDraftChange
+      ? { kind: 'change', title: 'Draft another change', body: 'Every change was cancelled, so your choice has not been carried out. Draft another change, or close the project from Status above if you are stopping.', action: { kind: 'start-change' } }
+      : { kind: 'change', title: 'Draft another change', body: 'Every change was cancelled, so your choice has not been carried out. A contributor, architect or owner drafts another, or the project is closed from Status above.', action: { kind: 'none' } };
+  }
+  return { kind: 'finish', title: 'Check the result, then close the project', body: 'The changes are merged into the model. That records what changed. It does not show the project achieved its purpose, so check that first, then close the project from Status above.', action: { kind: 'none' } };
 }
