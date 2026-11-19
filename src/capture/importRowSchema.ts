@@ -101,7 +101,7 @@ const ATTRIBUTE_COLUMNS: readonly (readonly [ImportColumn, ImportRowAttributeKey
   // ADR-026: an interface on an integration platform — container-only, so a system row setting either fails validation.
   ['interface_type', 'interfaceType'],
   ['transformation', 'transformation'],
-  // Roadmap dates (ISO YYYY-MM-DD). `support_ends_at` is system-only (vendor support end), so a module row setting it fails validation.
+  // Roadmap dates (ISO YYYY-MM-DD). `support_ends_at` is the vendor support end; a module may set its own (Simon, 2026-11-19), and it is never inherited from the platform.
   ['introduced', 'introduced'],
   ['planned_end', 'plannedEnd'],
   ['support_ends_at', 'supportEndsAt'],
@@ -189,8 +189,6 @@ export function validateImportRow(raw: Record<string, unknown>, rowNumber: numbe
   for (const [column, key] of ATTRIBUTE_COLUMNS) {
     const cell = cellToString(raw[column]);
     if (cell === undefined) continue;
-    // Modules now carry their own support end in the model, but the importer is unchanged until Simon approves importing it (2026-11-19): a module row still fails here.
-    if (elementType === 'container' && key === 'supportEndsAt') return { ok: false, rowNumber, error: `"${column}": \`container\` has no "supportEndsAt" attribute` };
     const result = validateAttributeValue(elementType, key, cell);
     if (!result.ok) return { ok: false, rowNumber, error: `"${column}": ${result.error}` };
     // `validateAttributeValue` normalises to `Json`, which for every one of
