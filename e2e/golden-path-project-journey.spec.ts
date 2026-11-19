@@ -40,10 +40,17 @@ test('project journey: requirement, what it touches, how it might be met from th
   // The first step not done reads "Next", in words.
   await expect(journey.getByText('Next', { exact: true })).toBeVisible();
 
+  // Before and after, per capability: what supports it today, and no change to compare yet.
+  const beforeAfter = page.getByTestId('project-before-after');
+  await expect(beforeAfter.getByRole('heading', { name: 'What this changes, capability by capability' })).toBeVisible();
+  await expect(beforeAfter.getByRole('link', { name: 'Quote Tool', exact: true })).toBeVisible();
+  await expect(beforeAfter.getByText('No change has been drafted yet', { exact: false })).toBeVisible();
+
   // Nothing we run supports this one: said plainly, not an error.
   await goToModelHome(page);
   await startProject(page, 'Fault response', 'Respond to supply faults faster.', 'Handle a fault');
   await expect(page.getByRole('list', { name: 'Project journey' }).getByText('Nothing we run supports Handle a fault — a buy or build option is needed.')).toBeVisible();
+  await expect(page.getByTestId('project-before-after').getByText('Nothing we run supports this. A buy or build option is needed.')).toBeVisible();
 
   const overflow = await page.evaluate(() => document.documentElement.scrollWidth > document.documentElement.clientWidth + 1);
   expect(overflow).toBe(false);
