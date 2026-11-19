@@ -17,6 +17,9 @@ import type { BranchIntent, BranchRow } from '../../db/types';
 import { branchStatusTone } from './branchStatus';
 import { dateFieldLabelForIntent, INTENT_LABEL, NEW_CHANGE_INTENT_OPTIONS } from './branchIntent';
 import { groupChangesList } from './changesListGroups';
+import { buildChangesHierarchy, type DecisionBlock } from './changesHierarchy';
+import { useChangesHierarchyData } from './useChangesHierarchyData';
+import { OPEN_CHANGE_STATUSES } from '../../db/branches';
 import { useRouteTiming } from '../perf/useRouteTiming';
 import { useChangeSummaries } from './useChangeSummaries';
 import { focusImpact } from './impactFocus';
@@ -89,7 +92,12 @@ export function ChangesView({ modelId, orgId, userId, orgSlug, modelSlug, canCre
   // active/collapsed split `OrgHome.tsx` uses for archived models. An intent
   // group shows only when it has an open change, rather than four sections
   // where most read "nothing here" on a small model.
-  const { waitingForReview, openByIntent, merged, cancelled, closed } = groupChangesList(branches);
+  // Project, then decision, then change (Simon, 2026-11-19): open changes sit under their decision and project; only a change in neither is listed on its own, in the sections below. Until the projects and decisions load, every change is listed on its own, as before.
+  const hierarchyData = useChangesHierarchyData(modelId);
+  const openBranches = branches.filter((b) => OPEN_CHANGE_STATUSES.includes(b.status));
+  const hierarchy = hierarchyData ? buildChangesHierarchy(openBranches, hierarchyData.decisions, hierarchyData.projects, hierarchyData.optionLinks) : null;
+  const standaloneIds = hierarchy ? new Set(hierarchy.standalone.map((b) => b.id)) : null;
+  const { waitingForReview, openByIntent, merged, cancelled, closed } = groupChangesList(standaloneIds ? branches.filter((b) => !OPEN_CHANGE_STATUSES.includes(b.status) || standaloneIds.has(b.id)) : branches);
   // A standard change: start a "propose" change with a plain title, select it, then
   // open the screen that does the job on it (Retire panel, edit form, or the add box).
   const startGuided = ({ kind, system }: GuidedChangeStart) => {
@@ -103,7 +111,7 @@ export function ChangesView({ modelId, orgId, userId, orgSlug, modelSlug, canCre
       else void navigate(`${base}/e/${system.id}?${refParam}&action=${kind === 'retire' ? 'retire' : 'edit'}`);
     });
   };
-  const hasOpen = waitingForReview.length > 0 || openByIntent.some((g) => g.branches.length > 0);
+  const hasOpen = openBranches.length > 0;
   const endedSections = [
     { title: 'Merged', branches: merged },
     { title: 'Cancelled', branches: cancelled },
@@ -284,6 +292,38 @@ export function ChangesView({ modelId, orgId, userId, orgSlug, modelSlug, canCre
       )}
       {branches.length === 0 && status !== 'loading' && <EmptyState>No changes yet. {canCreate ? 'Create one above.' : 'Nobody has proposed one.'}</EmptyState>}
       {branches.length > 0 && !hasOpen && status !== 'loading' && <EmptyState>No open changes.{canCreate ? ' Create one above.' : ''}</EmptyState>}
+      {hierarchy !== null && hierarchy.projects.length > 0 && (
+        <CollapsibleSection title="In projects" meta={`(${String(hierarchy.projects.reduce((n, p) => n + p.changes.length + p.decisions.reduce((m, d) => m + d.options.length, 0), 0))})`}>
+          <div data-testid="changes-in-projects">
+            {hierarchy.projects.map(({ project, decisions: decisionBlocks, changes }) => (
+              <div key={project.id} className={styles.group}>
+                <Text as="h3" size="md">
+                  <Link to={`/o/${orgSlug}/m/${modelSlug}/projects/${project.id}`}>{project.title}</Link>
+                </Text>
+                {decisionBlocks.map((block) => (
+                  <DecisionGroup key={block.decision.id} block={block} orgSlug={orgSlug} modelSlug={modelSlug} threadCounts={threadCounts} summaries={summaries} />
+                ))}
+                {changes.length > 0 && (
+                  <ul className={styles.list}>
+                    {changes.map((branch) => (
+                      <ChangeRow key={branch.id} branch={branch} orgSlug={orgSlug} modelSlug={modelSlug} unresolvedCount={threadCounts?.get(branch.id)?.open} summary={summaries?.get(branch.id)} />
+                    ))}
+                  </ul>
+                )}
+              </div>
+            ))}
+          </div>
+        </CollapsibleSection>
+      )}
+      {hierarchy !== null && hierarchy.decisions.length > 0 && (
+        <CollapsibleSection title="In decisions" meta={`(${String(hierarchy.decisions.reduce((n, d) => n + d.options.length, 0))})`}>
+          <div data-testid="changes-in-decisions">
+            {hierarchy.decisions.map((block) => (
+              <DecisionGroup key={block.decision.id} block={block} orgSlug={orgSlug} modelSlug={modelSlug} threadCounts={threadCounts} summaries={summaries} />
+            ))}
+          </div>
+        </CollapsibleSection>
+      )}
       {waitingForReview.length > 0 && (
         <CollapsibleSection title="Waiting for review" meta={`(${String(waitingForReview.length)})`}>
           <ul className={styles.list}>
@@ -339,6 +379,34 @@ export function ChangesView({ modelId, orgId, userId, orgSlug, modelSlug, canCre
             </CollapsibleSection>
           ),
       )}
+    </div>
+  );
+}
+
+/** One decision with its option changes beneath it. */
+function DecisionGroup({
+  block,
+  orgSlug,
+  modelSlug,
+  threadCounts,
+  summaries,
+}: {
+  block: DecisionBlock;
+  orgSlug: string;
+  modelSlug: string;
+  threadCounts: ReadonlyMap<string, { open: number }> | undefined;
+  summaries: ReadonlyMap<string, ChangeListSummary> | undefined;
+}) {
+  return (
+    <div className={styles.group}>
+      <Text as="h4" size="sm" tone="muted">
+        Decision: <Link to={`/o/${orgSlug}/m/${modelSlug}/decisions/${block.decision.id}`}>{block.decision.title}</Link>
+      </Text>
+      <ul className={styles.list}>
+        {block.options.map((branch) => (
+          <ChangeRow key={branch.id} branch={branch} orgSlug={orgSlug} modelSlug={modelSlug} unresolvedCount={threadCounts?.get(branch.id)?.open} summary={summaries?.get(branch.id)} />
+        ))}
+      </ul>
     </div>
   );
 }

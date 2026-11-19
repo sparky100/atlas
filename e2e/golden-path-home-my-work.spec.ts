@@ -35,6 +35,15 @@ test('My work lists the project, not the decision options inside it', async ({ p
   await expect(list.getByRole('link', { name: 'Build Repairs Hub' })).toHaveCount(0);
   await expect(list.getByRole('link', { name: 'Stay as we are' })).toHaveCount(0);
 
+  // The Changes list nests the option under its decision, under the project: nothing stands alone.
+  await clickNavItem(page, 'Changes');
+  const inProjects = page.getByTestId('changes-in-projects');
+  await expect(inProjects.getByRole('link', { name: 'Who supports Housing Repairs' })).toBeVisible();
+  await expect(inProjects.getByRole('link', { name: 'How should we meet Housing Repairs?' })).toBeVisible();
+  await expect(inProjects.getByRole('link', { name: /Build Repairs Hub/ })).toHaveCount(1);
+  await expect(page.getByRole('button', { name: /^Propose/ })).toHaveCount(0);
+  await expect(page.getByRole('button', { name: /^Explore/ })).toHaveCount(0);
+
   const overflow = await page.evaluate(() => document.documentElement.scrollWidth > document.documentElement.clientWidth + 1);
   expect(overflow).toBe(false);
 });
