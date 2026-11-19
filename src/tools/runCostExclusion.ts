@@ -18,7 +18,7 @@ const COST_KEYS = new Set(COST_ATTRIBUTE_KEYS);
 function withoutCostAttributes(element: ElementsHeadRow): ElementsHeadRow {
   const attributes = attributesRecord(element.attributes);
   if (!Object.keys(attributes).some((key) => COST_KEYS.has(key))) return element;
-  return { ...element, attributes: Object.fromEntries(Object.entries(attributes).filter(([key]) => !COST_KEYS.has(key))) as ElementsHeadRow['attributes'] };
+  return { ...element, attributes: Object.fromEntries(Object.entries(attributes).filter(([key]) => !COST_KEYS.has(key))) };
 }
 
 export function snapshotWithoutCost(snapshot: ModelSnapshot): ModelSnapshot {
