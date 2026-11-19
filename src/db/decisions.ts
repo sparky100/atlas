@@ -234,6 +234,11 @@ export interface UpdateDecisionInput {
   ownerId?: UUID;
   neededBy?: string | null;
   lensMapUrl?: string | null;
+  /** The baseline's two plain-text answers ("Stay as we are"). */
+  stayRisk?: string;
+  stayReason?: string;
+  /** Which option branch is the baseline; must already be linked to the decision (a trigger checks). */
+  baselineBranchId?: UUID | null;
 }
 
 /**
@@ -250,6 +255,9 @@ export async function updateDecision(supabase: Client, decisionId: UUID, input: 
   if (input.ownerId !== undefined) patch.owner_id = input.ownerId;
   if (input.neededBy !== undefined) patch.needed_by = input.neededBy;
   if (input.lensMapUrl !== undefined) patch.lens_map_url = input.lensMapUrl;
+  if (input.stayRisk !== undefined) patch.stay_risk = input.stayRisk;
+  if (input.stayReason !== undefined) patch.stay_reason = input.stayReason;
+  if (input.baselineBranchId !== undefined) patch.baseline_branch_id = input.baselineBranchId;
   const { data, error } = await supabase.from('decisions').update(patch).eq('id', decisionId).select('*');
   if (error) throw new Error(`updateDecision: ${error.message}`);
   const row = (data as DecisionRow[])[0];

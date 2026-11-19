@@ -1,3 +1,4 @@
+import { addBaseline } from './addBaseline';
 import { useCallback, useEffect, useState } from 'react';
 import type { UUID } from '../../contracts/delta';
 import { createDecision, createDecisionLink, listDecisionsForModel } from '../../db/decisions';
@@ -107,6 +108,11 @@ export function useDecisions(modelId: UUID, orgId: UUID, userId: UUID | null): U
         for (const link of input.links) {
           await createDecisionLink(supabase, { decisionId: decision.id, linkedType: link.linkedType, linkedId: link.linkedId, createdBy: userId });
         }
+        // Every decision starts with its "Stay as we are" baseline. If this fails the
+        // decision stands without one and the decision page offers "Add the baseline".
+        await addBaseline({ orgId, modelId, decisionId: decision.id, userId, projectId: decision.project_id }).catch((e: unknown) => {
+          reportError('Could not add the baseline to the new decision.', e);
+        });
         setStatus('idle');
         reload();
         return decision;

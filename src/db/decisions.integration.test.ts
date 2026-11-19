@@ -335,6 +335,33 @@ describe('decisions/decision_links/decision_arguments/assumptions/evidence again
       expect(rewriteError).not.toBeNull();
     });
 
+    it('records a "Stay as we are" baseline: two plain answers, a baseline option that must be one of the decision\'s own, editable only while proposed', async () => {
+      const main = await getMainBranch(alice.client, modelId);
+      if (!main?.head_commit_id) throw new Error('main branch not found');
+      const decision = await createDecision(alice.client, { id: randomUUID(), orgId, modelId, title: 'Baseline record', statement: 'context', ownerId: alice.id, createdBy: alice.id });
+      expect(decision).toMatchObject({ stay_risk: '', stay_reason: '', baseline_branch_id: null });
+      const baseline = await createChangeBranch(alice.client, { id: randomUUID(), orgId, modelId, name: `baseline-${randomUUID().slice(0, 8)}`, createdBy: alice.id, intent: 'explore', mainHeadCommitId: main.head_commit_id });
+      const stranger = await createChangeBranch(alice.client, { id: randomUUID(), orgId, modelId, name: `not-an-option-${randomUUID().slice(0, 8)}`, createdBy: alice.id, intent: 'explore', mainHeadCommitId: main.head_commit_id });
+      await createDecisionLink(alice.client, { decisionId: decision.id, linkedType: 'branch', linkedId: baseline.id, createdBy: alice.id });
+
+      // A branch that is not one of the decision's options cannot be its baseline.
+      await expect(updateDecision(alice.client, decision.id, { baselineBranchId: stranger.id })).rejects.toThrow(/baseline must be one of/);
+
+      const described = await updateDecision(alice.client, decision.id, { stayRisk: 'Vendor support ends in March', stayReason: 'No budget this year', baselineBranchId: baseline.id });
+      expect(described).toMatchObject({ stay_risk: 'Vendor support ends in March', stay_reason: 'No budget this year', baseline_branch_id: baseline.id });
+
+      // The baseline is an ordinary option: it can be chosen.
+      const accepted = await chooseDecisionOption(alice.client, decision.id, baseline.id, 'We cannot deliver a change this year.');
+      expect(accepted).toMatchObject({ status: 'accepted', branch_id: baseline.id, baseline_branch_id: baseline.id });
+
+      // Closed with the decision: no further edits.
+      await expect(updateDecision(alice.client, decision.id, { stayRisk: 'edited later' })).rejects.toThrow();
+
+      // A signed-in user from a different organisation cannot touch the baseline fields.
+      const outsider = await createSignedInUser('baseline-outsider');
+      await expect(updateDecision(outsider.client, decision.id, { stayRisk: 'not mine' })).rejects.toThrow();
+    });
+
     it('a signed-in user from a different organisation cannot choose an option on this decision', async () => {
       const main = await getMainBranch(alice.client, modelId);
       if (!main?.head_commit_id) throw new Error('main branch not found');
