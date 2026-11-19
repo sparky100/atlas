@@ -119,15 +119,19 @@ export function DecisionsView({ modelId, orgId, userId, orgSlug, modelSlug, canC
                 setTitle(e.target.value);
               }}
             />
-            <textarea
-              className={styles.textarea}
-              aria-label="What the options need to solve"
-              placeholder="What the options need to solve, and why this decision needs making"
-              value={statement}
-              onChange={(e) => {
-                setStatement(e.target.value);
-              }}
-            />
+            <label>
+              <Text as="span" size="sm">
+                What the options need to solve
+              </Text>
+              <textarea
+                className={styles.textarea}
+                placeholder="Context — why this decision needs making"
+                value={statement}
+                onChange={(e) => {
+                  setStatement(e.target.value);
+                }}
+              />
+            </label>
             {!designerAvailable && designerUnavailable !== null && (
               <div data-testid="designer-unavailable">
                 <Text as="p" tone="muted" size="sm">
