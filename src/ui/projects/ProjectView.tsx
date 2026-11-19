@@ -42,6 +42,7 @@ import { markdownToPdfBytes } from '../exports/markdownPdf';
 import { buildProjectPackMarkdown, projectPackFilename } from '../exports/projectPack';
 import { downloadBlob, exportDate } from '../exports/viewExport';
 import { buildProjectJourney } from './projectJourney';
+import { ProjectBeforeAfter } from './ProjectBeforeAfter';
 import type { ProjectData } from './useProject';
 import { moduleDisplayNameFromMap } from '../elements/moduleDisplayName';
 import styles from './ProjectView.module.css';
@@ -137,6 +138,8 @@ export function ProjectView({ data, modelName, orgId, modelId, orgSlug, modelSlu
           ))}
         </ol>
       </Panel>
+
+      <ProjectBeforeAfter modelId={modelId} projectId={project.id} mainHeadCommitId={main?.head_commit_id ?? null} changes={changes} capabilities={data.journeyCapabilities.map((c) => ({ id: c.id, name: c.name }))} base={base} />
 
       {(scopeIds.length > 0 || canEdit) && (
         <Panel>

@@ -14,7 +14,8 @@ export interface DecisionPrinciplesPanelProps {
   links: readonly DecisionPrincipleRow[];
   /** While the decision is proposed and the person may link: radios and a reason box are shown. Otherwise the panel only reads. */
   editable: boolean;
-  saving: boolean;
+  /** The principles whose stance is saving now; only their own cards lock. */
+  savingIds: ReadonlySet<string>;
   error: string | null;
   principlesHref: string;
   onSetStance: (principleId: UUID, stance: PrincipleStance | null, reason: string) => Promise<boolean>;
@@ -25,7 +26,7 @@ export interface DecisionPrinciplesPanelProps {
  * departs from it (a reason is required), or takes no view. Plain words, no score. Once the decision is decided
  * it lists only the principles it cites, as a record.
  */
-export function DecisionPrinciplesPanel({ principles, links, editable, saving, error, principlesHref, onSetStance }: DecisionPrinciplesPanelProps) {
+export function DecisionPrinciplesPanel({ principles, links, editable, savingIds, error, principlesHref, onSetStance }: DecisionPrinciplesPanelProps) {
   const lines = decisionPrincipleLines(principles, links, editable);
   // A reason being typed for a departure that isn't saved yet.
   const [drafts, setDrafts] = useState<Readonly<Record<string, string>>>({});
@@ -66,6 +67,7 @@ export function DecisionPrinciplesPanel({ principles, links, editable, saving, e
             {lines.map(({ principle, stance, reason }) => {
               const isDeparting = departing.has(principle.id);
               const name = `stance-${principle.id}`;
+              const saving = savingIds.has(principle.id);
               return (
                 <li key={principle.id} className={styles.card}>
                   <div className={styles.cardHead}>
