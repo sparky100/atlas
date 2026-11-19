@@ -9,7 +9,6 @@
 .grid {
   width: 100%;
   border-collapse: collapse;
-  table-layout: fixed;
 }
 
 .grid th,
@@ -25,12 +24,18 @@
    readable while option columns scroll under it. */
 .criterionHeaderCell,
 .criterionLabel {
-  white-space: nowrap;
   position: sticky;
   left: 0;
   background: var(--surface);
   z-index: 1;
-  min-width: 90px;
+  /* A narrow label column (not half the table): the option columns get the room. */
+  width: 9rem;
+  min-width: 7rem;
+  max-width: 9rem;
+}
+
+.grid th:not(.criterionHeaderCell) {
+  min-width: 220px;
 }
 
 .optionHeader {

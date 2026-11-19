@@ -376,7 +376,7 @@ export function DecisionView({ modelId, decisionId, orgId, orgSlug, modelSlug, r
       {(branchLinks.length > 0 || canAddOption) && (
         <Panel>
           <Text as="h2" size="lg">
-            {scoredLinks.length > 0 ? 'Criteria' : 'Options'}
+            Options
           </Text>
           {baselineBranch !== undefined && (
             <DecisionBaselineCard
@@ -613,11 +613,6 @@ export function DecisionView({ modelId, decisionId, orgId, orgSlug, modelSlug, r
             <Text as="h2" size="lg">
               What changes
             </Text>
-            {comparison.status === 'ready' && (
-              <Text as="span" size="sm" tone="muted">
-                Boundary crossings (model-wide): {comparison.main.boundaryCrossingCount}
-              </Text>
-            )}
           </div>
 
           {comparison.status === 'loading' && (
