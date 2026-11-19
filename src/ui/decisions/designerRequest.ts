@@ -17,6 +17,22 @@ export function canOfferDesigner(args: { role: string | null; assistantEnabled: 
   return (args.role === 'owner' || args.role === 'architect') && args.assistantEnabled && args.agentsEnabled && args.keySet;
 }
 
+/**
+ * Why the Designer is not offered, in one plain sentence, or `null` when it is
+ * (Simon, 2026-11-19: a feature a person can't see doesn't exist for them, so a
+ * missing button says why). `canFix` is true when the person can change the
+ * setting themselves, so the page can link to it.
+ */
+export function designerUnavailableReason(args: { role: string | null; assistantEnabled: boolean; agentsEnabled: boolean; keySet: boolean }): { text: string; canFix: boolean } | null {
+  if (canOfferDesigner(args)) return null;
+  if (args.role !== 'owner' && args.role !== 'architect') {
+    return { text: 'The Designer, which drafts options with AI, is available to owners and architects.', canFix: false };
+  }
+  if (!args.assistantEnabled) return { text: 'The Designer, which drafts options with AI, is off. Turn on Ask Atlas in organisation settings to use it.', canFix: true };
+  if (!args.agentsEnabled) return { text: 'The Designer, which drafts options with AI, is off. Allow AI agents in organisation settings to use it.', canFix: true };
+  return { text: 'The Designer, which drafts options with AI, needs your organisation\'s AI key. Save one in organisation settings to use it.', canFix: true };
+}
+
 /** "What did this cost": tokens and lookups, in words. No money figure, because Atlas holds no price list and a guessed price would read as a fact. */
 export function designerCostLine(usage: { inputTokens: number; outputTokens: number; lookups: number }): string {
   const n = (v: number) => v.toLocaleString('en-GB');
