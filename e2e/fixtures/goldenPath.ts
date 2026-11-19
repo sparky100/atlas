@@ -1,5 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import { expect, type Locator, type Page } from '@playwright/test';
+import { expandAllSettingsSections } from './settings';
 
 /**
  * S2's own shared click-only helpers (docs/prompts/atlas-prompt-pack.md):
@@ -104,6 +105,7 @@ export async function inviteMemberFromHome(page: Page, orgName: string, memberEm
   await page.getByRole('link', { name: orgName }).click();
   await page.getByRole('link', { name: 'Org settings' }).click();
   await expect(page.getByRole('heading', { name: 'Organisation settings' })).toBeVisible();
+  await expandAllSettingsSections(page);
   await page.getByLabel('Email').fill(memberEmail);
   // exact: true — an existing member's own row has a "Role for <name>"
   // select too; the invite form's own field is the bare "Role" label.

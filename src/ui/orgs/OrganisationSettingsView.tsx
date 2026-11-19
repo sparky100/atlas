@@ -4,7 +4,8 @@ import type { UUID } from '../../contracts/delta';
 import { Button } from '../components/Button/Button';
 import { Chip } from '../components/Chip/Chip';
 import { EmptyState } from '../components/EmptyState/EmptyState';
-import { Panel } from '../components/Panel/Panel';
+import { SettingsSection, SettingsSections } from '../components/SettingsSection/SettingsSection';
+import { useSettingsSectionsState } from '../components/SettingsSection/useSettingsSectionsState';
 import { Text } from '../components/Text/Text';
 import { TypedNameConfirm } from '../components/TypedNameConfirm/TypedNameConfirm';
 import type { MemberRole, OrganisationRow } from '../../db/types';
@@ -64,6 +65,8 @@ export function OrganisationSettingsView({ organisation, role, userId, onChanged
   // above already uses for create).
   const [resendStatusByInviteId, setResendStatusByInviteId] = useState<Record<UUID, 'sending' | 'sent' | 'error'>>({});
   const navigate = useNavigate();
+  const sectionIds = ['organisation', 'review', 'stale', 'ask', 'members', 'sign-in', 'api', 'connections', 'attributes', ...(canManage ? ['invite', 'audit', 'delete'] : [])];
+  const sectionsState = useSettingsSectionsState(`org-${organisation.id}`, 'organisation');
   // Real label/input association (`htmlFor`/`id`) — `ModelSettingsView.tsx`'s
   // own fix for the same issue (a sibling `Text as="label"` with no `for`
   // isn't programmatically associated with anything).
@@ -72,18 +75,12 @@ export function OrganisationSettingsView({ organisation, role, userId, onChanged
   const minArchitectsId = useId();
   const inviteEmailId = useId();
   const inviteRoleId = useId();
-  const askHeadingId = useId();
   const reviewPeriodId = useId();
-  const reviewHeadingId = useId();
   const staleMonthsId = useId();
-  const staleHeadingId = useId();
 
   return (
-    <div>
-      <Panel>
-        <Text as="h2" size="lg">
-          Organisation
-        </Text>
+    <SettingsSections state={sectionsState} ids={sectionIds}>
+      <SettingsSection id="organisation" title="Organisation" summary={`${organisation.name} · ${String(organisation.review_min_required_architects)} architect${organisation.review_min_required_architects === 1 ? '' : 's'} needed`}>
         {organisation.is_personal && <Chip tone="neutral">Personal</Chip>}
         <form
           className={styles.form}
@@ -148,10 +145,9 @@ export function OrganisationSettingsView({ organisation, role, userId, onChanged
             </Button>
           )}
         </form>
-        <section aria-labelledby={reviewHeadingId}>
-          <Text as="h3" size="md" id={reviewHeadingId}>
-            Review reminders
-          </Text>
+      </SettingsSection>
+
+      <SettingsSection id="review" title="Review reminders" summary={`${String(organisation.review_period_days)} days to review`}>
           <Text as="p" tone="muted" size="sm">
             How long a reviewer has to respond once a change is submitted for review. After that the review is marked overdue, on the review itself and on Home, and the person who submitted it, an owner or an architect can send the reviewers one reminder email.
           </Text>
@@ -190,11 +186,9 @@ export function OrganisationSettingsView({ organisation, role, userId, onChanged
               </Text>
             )}
           </form>
-        </section>
-        <section aria-labelledby={staleHeadingId}>
-          <Text as="h3" size="md" id={staleHeadingId}>
-            Out-of-date information
-          </Text>
+      </SettingsSection>
+
+      <SettingsSection id="stale" title="Out-of-date information" summary={`${String(organisation.stale_after_months)} months`}>
           <Text as="p" tone="muted" size="sm">
             How long something can go without being updated or confirmed before it is flagged as out of date. Flagged items appear under "Where to focus" on Home, and an owner or architect can email their owners a reminder from the list.
           </Text>
@@ -233,11 +227,9 @@ export function OrganisationSettingsView({ organisation, role, userId, onChanged
               </Text>
             )}
           </form>
-        </section>
-        <section aria-labelledby={askHeadingId}>
-          <Text as="h3" size="md" id={askHeadingId}>
-            Ask Atlas
-          </Text>
+      </SettingsSection>
+
+      <SettingsSection id="ask" title="Ask Atlas" summary={organisation.ai_assistant_enabled ? (organisation.ai_share_run_cost ? 'On · run cost shared' : 'On · run cost not shared') : 'Off'}>
           <Text as="p" tone="muted" size="sm">
             When Ask Atlas is on, the questions members ask, and the names, descriptions, attributes and relationships of the elements needed to answer them, are sent to our AI provider to produce each answer. It also covers Draft with AI on the Changes page: the brief you write and the names, descriptions, attributes and relationships of the model's current elements are sent to our AI provider to suggest edits. Comments and unreviewed imports are not sent. It also covers AI apps that members connect to Atlas on their own computer (such as Claude Desktop): while it is off, those apps get no model content. Nothing is sent while it is off. Run cost is never part of that unless you also allow it below.
           </Text>
@@ -275,16 +267,10 @@ export function OrganisationSettingsView({ organisation, role, userId, onChanged
               Only an owner can change this.
             </Text>
           )}
-        </section>
-        <ApiKeysPanel orgId={organisation.id} isOwner={role === 'owner'} />
-        <ConnectorsPanel orgId={organisation.id} role={role} />
         {error !== null && <Text as="p">{error}</Text>}
-      </Panel>
+      </SettingsSection>
 
-      <Panel>
-        <Text as="h2" size="lg">
-          Members
-        </Text>
+      <SettingsSection id="members" title="Members" summary={`${String(members.length)} ${members.length === 1 ? 'person' : 'people'}`}>
         {membersError !== null && <Text as="p">{membersError}</Text>}
         {!membersLoading && members.length === 0 && <EmptyState>No members.</EmptyState>}
         {members.length > 0 && (
@@ -341,13 +327,10 @@ export function OrganisationSettingsView({ organisation, role, userId, onChanged
             })}
           </ul>
         )}
-      </Panel>
+      </SettingsSection>
 
       {canManage && (
-        <Panel>
-          <Text as="h2" size="lg">
-            Invite by email
-          </Text>
+        <SettingsSection id="invite" title="Invite by email" summary={invites.length > 0 ? `${String(invites.length)} waiting to join` : undefined}>
           <Text as="p" tone="muted" size="sm">
             No email is sent. The invited address joins with the chosen role the moment they sign up or next sign in.
           </Text>
@@ -462,26 +445,31 @@ export function OrganisationSettingsView({ organisation, role, userId, onChanged
               })}
             </ul>
           )}
-        </Panel>
+        </SettingsSection>
       )}
 
       {canManage && (
-        <Panel>
+        <SettingsSection id="sign-in" title="Microsoft sign-in">
           <EntraSignInPanel orgId={organisation.id} />
-        </Panel>
+        </SettingsSection>
       )}
 
+      <SettingsSection id="api" title="API access">
+        <ApiKeysPanel orgId={organisation.id} isOwner={role === 'owner'} />
+      </SettingsSection>
+
+      <SettingsSection id="connections" title="Connections">
+        <ConnectorsPanel orgId={organisation.id} role={role} />
+      </SettingsSection>
+
       {canManage && (
-        <Panel>
+        <SettingsSection id="attributes" title="Custom attributes">
           <AttributeDefinitionsPanel orgId={organisation.id} userId={userId} />
-        </Panel>
+        </SettingsSection>
       )}
 
       {canManage && (memberEventsLoading || memberEvents.length > 0 || memberEventsError !== null) && (
-          <Panel>
-            <Text as="h2" size="lg">
-              Membership audit
-            </Text>
+          <SettingsSection id="audit" title="Membership audit">
             {memberEventsError !== null && <Text as="p">{memberEventsError}</Text>}
             {memberEvents.length > 0 && (
               <ul className={styles.memberList}>
@@ -503,14 +491,11 @@ export function OrganisationSettingsView({ organisation, role, userId, onChanged
                 })}
               </ul>
             )}
-          </Panel>
+          </SettingsSection>
       )}
 
       {canManage && (
-        <Panel>
-          <Text as="h2" size="lg">
-            Delete
-          </Text>
+        <SettingsSection id="delete" title="Delete organisation" summary="Owner only" danger>
           <Text as="p" tone="muted" size="sm">
             Permanently deletes this organisation. Only possible while it has no models. This cannot be undone.
           </Text>
@@ -538,8 +523,8 @@ export function OrganisationSettingsView({ organisation, role, userId, onChanged
             </Text>
           )}
           {deleteResult === 'not_found' && <Text as="p">This organisation no longer exists.</Text>}
-        </Panel>
+        </SettingsSection>
       )}
-    </div>
+    </SettingsSections>
   );
 }

@@ -23,15 +23,11 @@ export function ApiKeysPanel({ orgId, isOwner }: ApiKeysPanelProps) {
   const [name, setName] = useState('');
   const [fresh, setFresh] = useState<{ name: string; token: string } | null>(null);
   const [copied, setCopied] = useState(false);
-  const headingId = useId();
   const nameId = useId();
   const active = keys.filter((k) => k.revoked_at === null);
 
   return (
-    <section aria-labelledby={headingId}>
-      <Text as="h3" size="md" id={headingId}>
-        API access
-      </Text>
+    <>
       <Text as="p" tone="muted" size="sm">
         An API key lets another tool, such as a reporting tool or a script, read this organisation's models: elements, capabilities, relationships and findings. It can only read the current, agreed version, never change anything, and is limited to {API_RATE_LIMIT_PER_MINUTE} requests a minute. Treat a key like a password.
       </Text>
@@ -116,6 +112,6 @@ export function ApiKeysPanel({ orgId, isOwner }: ApiKeysPanelProps) {
           )}
         </>
       )}
-    </section>
+    </>
   );
 }

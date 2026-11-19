@@ -15,6 +15,7 @@ import type { Env } from '../src/db/env';
 import { loadEnv } from '../src/db/env';
 import { updateMyProfile } from '../src/db/profiles';
 import { bootstrapChangeBranchFixture } from './fixtures/changeBranchFixture';
+import { expandAllSettingsSections } from './fixtures/settings';
 
 /**
  * Signs up a fresh user through the real `/sign-in` form (own browser
@@ -62,6 +63,7 @@ test('owner renames the organisation, changes a member’s role, and removes a m
   await page.goto(`/o/${orgSlug}`);
   await page.getByRole('link', { name: 'Org settings' }).click();
   await expect(page.getByRole('heading', { name: 'Organisation settings' })).toBeVisible();
+  await expandAllSettingsSections(page);
 
   // 2. Rename — saving reloads the page (OrganisationSettingsPage.tsx's own
   // onChanged), so the real proof is the input's own value on the fresh
@@ -70,6 +72,7 @@ test('owner renames the organisation, changes a member’s role, and removes a m
   await page.getByLabel('Name', { exact: true }).fill(newName);
   await page.locator('form').filter({ has: page.getByLabel('Name', { exact: true }) }).getByRole('button', { name: 'Save', exact: true }).click();
   await expect(page.getByRole('heading', { name: 'Organisation settings' })).toBeVisible({ timeout: 15_000 });
+  await expandAllSettingsSections(page);
   await expect(page.getByLabel('Name', { exact: true })).toHaveValue(newName);
 
   // 3. Change Ada's role — no page reload on a member mutation (useMembers
@@ -92,6 +95,7 @@ test('the last owner cannot demote or remove themself — guard_last_owner surfa
 
   await page.goto(`/o/${orgSlug}/settings`);
   await expect(page.getByRole('heading', { name: 'Organisation settings' })).toBeVisible();
+  await expandAllSettingsSections(page);
 
   // The owner's own row is the only one, marked "(you)".
   await expect(page.getByText('(you)')).toBeVisible();

@@ -1,5 +1,6 @@
 import { expect, test } from '@playwright/test';
 import { clickNavItem, goToModelHome, signUpCreateOrgAndModel } from './fixtures/goldenPath';
+import { expandAllSettingsSections } from './fixtures/settings';
 
 test('enable Draft with AI and send a change brief to capture review', async ({ page }) => {
   const { orgName, modelName } = await signUpCreateOrgAndModel(page, 'goldenpath-ai-draft');
@@ -11,6 +12,7 @@ test('enable Draft with AI and send a change brief to capture review', async ({ 
 
   await clickNavItem(page, 'Ask Atlas');
   await page.getByRole('link', { name: 'organisation settings' }).click();
+  await expandAllSettingsSections(page);
   const allow = page.getByLabel('Allow Ask Atlas for this organisation');
   await allow.click();
   await expect(allow).toBeChecked();

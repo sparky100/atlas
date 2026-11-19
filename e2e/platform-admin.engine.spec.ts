@@ -16,6 +16,7 @@ import { randomUUID } from 'node:crypto';
 import { expect, test, type Page } from '@playwright/test';
 import { createServiceRoleClient, createSupabaseClient } from '../src/db/client';
 import { loadEnv } from '../src/db/env';
+import { expandAllSettingsSections } from './fixtures/settings';
 
 async function signUp(page: Page, prefix: string): Promise<{ email: string; password: string }> {
   const email = `${prefix}-${randomUUID()}@example.test`;
@@ -48,10 +49,11 @@ test('a platform admin can view and change LLM proxy settings from the user menu
   await page.getByRole('button', { name: 'Account menu' }).click();
   await page.getByRole('link', { name: 'Platform admin' }).click();
   await expect(page.getByRole('heading', { name: 'Platform admin' })).toBeVisible();
+  await expandAllSettingsSections(page);
 
   // Organisations and People lists: the admin's own account shows up, with a join date and a last sign-in.
-  await expect(page.getByRole('heading', { name: /^Organisations \(/ })).toBeVisible();
-  await expect(page.getByRole('heading', { name: /^People \(/ })).toBeVisible();
+  await expect(page.getByRole('heading', { name: /^Organisations/ })).toBeVisible();
+  await expect(page.getByRole('heading', { name: /^People/ })).toBeVisible();
   await page.getByLabel('Search people by email').fill(email);
   await expect(page.getByRole('row', { name: new RegExp(email) })).toBeVisible();
   await page.screenshot({ path: 'test-results/platform-admin-overview.png', fullPage: true });

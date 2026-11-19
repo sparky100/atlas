@@ -15,6 +15,7 @@
  */
 import { expect, test } from '@playwright/test';
 import { addSystemFromHome, clickNavItem, expectNavCurrent, goToModelHome, signUpCreateOrgAndModel } from './fixtures/goldenPath';
+import { expandAllSettingsSections } from './fixtures/settings';
 
 test('switch Ask Atlas on, ask a question, and follow a cited element', async ({ page }) => {
   const { orgName, modelName } = await signUpCreateOrgAndModel(page, 'goldenpath-ask');
@@ -60,6 +61,7 @@ test('switch Ask Atlas on, ask a question, and follow a cited element', async ({
   // The owner switches it on in organisation settings.
   await page.getByRole('link', { name: 'organisation settings' }).click();
   await expect(page.getByRole('heading', { name: 'Organisation settings' })).toBeVisible();
+  await expandAllSettingsSections(page);
   const allow = page.getByLabel('Allow Ask Atlas for this organisation');
   // Saving reloads the page (organisation settings' own onChanged), so click and then wait for the saved state rather than `check()`, which would race the reload.
   await allow.click();

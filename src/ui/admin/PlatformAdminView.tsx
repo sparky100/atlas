@@ -2,8 +2,8 @@ import { Loading } from '../components/Loading/Loading';
 import { useId, useState } from 'react';
 import { LLM_PROXY_MODEL_OPTIONS, LLM_PROXY_PROVIDER_OPTIONS, useLlmProxyConfig } from './useLlmProxyConfig';
 import { Button } from '../components/Button/Button';
-import { Panel } from '../components/Panel/Panel';
 import { Text } from '../components/Text/Text';
+import { SettingsSection } from '../components/SettingsSection/SettingsSection';
 import styles from './PlatformAdminView.module.css';
 
 /**
@@ -58,10 +58,7 @@ export function PlatformAdminView() {
   };
 
   return (
-    <Panel raised className={styles.panel ?? ''}>
-      <Text as="h2" size="lg">
-        LLM proxy
-      </Text>
+    <SettingsSection id="llm-proxy" title="LLM proxy" summary={hasApiKey ? `${provider} · key set` : 'Using function defaults'}>
       <Text as="p" tone="muted" size="sm">
         Application-level overrides for the `llm-proxy` edge function — read by every organisation, not per-org. Falls back to the function&apos;s own Supabase secrets when unset.
       </Text>
@@ -175,6 +172,6 @@ export function PlatformAdminView() {
           {error}
         </Text>
       )}
-    </Panel>
+    </SettingsSection>
   );
 }

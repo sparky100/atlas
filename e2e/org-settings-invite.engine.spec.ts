@@ -12,6 +12,7 @@ import { randomUUID } from 'node:crypto';
 import { expect, test } from '@playwright/test';
 import { loadEnv } from '../src/db/env';
 import { bootstrapChangeBranchFixture } from './fixtures/changeBranchFixture';
+import { expandAllSettingsSections } from './fixtures/settings';
 
 test('inviting an email that has never signed up: they sign up and land in the org with the invited role', async ({ page, browser }) => {
   const env = loadEnv();
@@ -21,6 +22,7 @@ test('inviting an email that has never signed up: they sign up and land in the o
   // 1. Owner sends the invite via the settings UI.
   await page.goto(`/o/${orgSlug}/settings`);
   await expect(page.getByRole('heading', { name: 'Organisation settings' })).toBeVisible();
+  await expandAllSettingsSections(page);
   const email = `orgsettingsinvitefresh-${randomUUID()}@example.test`;
   await page.getByLabel('Email').fill(email);
   await page.getByLabel('Role', { exact: true }).selectOption('contributor');
@@ -85,6 +87,7 @@ test('inviting an email that already has an account: consumed at their next sign
 
   // 3. Owner invites that already-registered email.
   await page.goto(`/o/${orgSlug}/settings`);
+  await expandAllSettingsSections(page);
   await page.getByLabel('Email').fill(email);
   await page.getByLabel('Role', { exact: true }).selectOption('viewer');
   await page.getByRole('button', { name: 'Send invite' }).click();

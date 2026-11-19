@@ -11,6 +11,7 @@ import { createSupabaseClient } from '../src/db/client';
 import { createModel } from '../src/db/models';
 import { loadEnv } from '../src/db/env';
 import { bootstrapChangeBranchFixture } from './fixtures/changeBranchFixture';
+import { expandAllSettingsSections } from './fixtures/settings';
 
 test('archive a model, see it move to the collapsed Archived section, restore it as the owner', async ({ page, browser }) => {
   const env = loadEnv();
@@ -44,6 +45,7 @@ test('archive a model, see it move to the collapsed Archived section, restore it
   await page.getByRole('button', { name: 'Model actions' }).click();
   await page.getByRole('link', { name: 'Model settings' }).click();
   await expect(page.getByRole('heading', { name: 'Model settings' })).toBeVisible();
+  await expandAllSettingsSections(page);
 
   // 2. Rename — saving reloads the page (ModelSettingsPage.tsx's own
   // onChanged), so the real proof is the input's own value on the fresh
@@ -52,6 +54,7 @@ test('archive a model, see it move to the collapsed Archived section, restore it
   await page.getByLabel('Name', { exact: true }).fill(newName);
   await page.getByRole('button', { name: 'Save' }).click();
   await expect(page.getByRole('heading', { name: 'Model settings' })).toBeVisible({ timeout: 15_000 });
+  await expandAllSettingsSections(page);
   await expect(page.getByLabel('Name', { exact: true })).toHaveValue(newName);
 
   // 3. Archive — another round trip + reload.
@@ -73,17 +76,20 @@ test('archive a model, see it move to the collapsed Archived section, restore it
   // 5. A direct link still resolves, read-only — item 1's own "read-only
   // when opened" requirement, distinct from "hidden from lists".
   await page.goto(`/o/${orgSlug}/m/${modelSlug}/settings`);
+  await expandAllSettingsSections(page);
   await expect(page.getByLabel('Name', { exact: true })).toBeDisabled();
   await expect(page.getByRole('button', { name: 'Save' })).toHaveCount(0);
 
   // 6. Restore is owner-only: the architect sees no Restore control at all.
   await architectPage.goto(`/o/${orgSlug}/m/${modelSlug}/settings`);
+  await expandAllSettingsSections(architectPage);
   await expect(architectPage.getByRole('button', { name: 'Restore model' })).toHaveCount(0);
   await expect(architectPage.getByText('Only an owner can restore an archived model.')).toBeVisible();
 
   // 7. The owner restores it — back in the ordinary list.
   await page.getByRole('button', { name: 'Restore model' }).click();
   await expect(page.getByRole('heading', { name: 'Model settings' })).toBeVisible({ timeout: 15_000 });
+  await expandAllSettingsSections(page);
   await expect(page.getByText('Archived', { exact: true })).toHaveCount(0);
   await page.goto(`/o/${orgSlug}`);
   await expect(page.getByText(newName)).toBeVisible();
@@ -95,16 +101,20 @@ test('delete refuses a model that is not archived; archiving first and typing th
   const { orgSlug, modelSlug } = fixture;
 
   await page.goto(`/o/${orgSlug}/m/${modelSlug}/settings`);
+
+  await expandAllSettingsSections(page);
   // Not archived yet — Delete isn't offered at all (the prompt's own "only
   // when archived"), not shown-then-refused.
   await expect(page.getByRole('button', { name: 'Delete model' })).toHaveCount(0);
 
   await page.getByRole('button', { name: 'Archive model' }).click();
   await expect(page.getByText('Archived', { exact: true })).toBeVisible({ timeout: 15_000 });
+  // The Delete section only exists once the model is archived, so it starts closed.
+  await expandAllSettingsSections(page);
 
   const modelName = await page.getByLabel('Name', { exact: true }).inputValue();
   const confirmInput = page.getByLabel(`Type ${modelName} to confirm`);
-  const deleteButton = page.getByRole('button', { name: 'Delete model' });
+  const deleteButton = page.getByRole('button', { name: 'Delete model', exact: true });
   await expect(deleteButton).toBeDisabled();
   await confirmInput.fill('the wrong name');
   await expect(deleteButton).toBeDisabled();
@@ -144,6 +154,7 @@ test('a freshly created model appears under Models, not Archived; archiving one 
   // Both models — the fixture's own and this second one — show under the
   // ordinary "Models" list, and no "Archived" section renders at all.
   await page.goto(`/o/${orgSlug}/m/${fixture.modelSlug}/settings`);
+  await expandAllSettingsSections(page);
   const firstModelName = await page.getByLabel('Name', { exact: true }).inputValue();
   await page.goto(`/o/${orgSlug}`);
   await expect(page.getByRole('link', { name: new RegExp(firstModelName) })).toBeVisible();
@@ -155,6 +166,7 @@ test('a freshly created model appears under Models, not Archived; archiving one 
   await secondModelLink.click();
   await page.getByRole('button', { name: 'Model actions' }).click();
   await page.getByRole('link', { name: 'Model settings' }).click();
+  await expandAllSettingsSections(page);
   await page.getByRole('button', { name: 'Archive model' }).click();
   await expect(page.getByText('Archived', { exact: true })).toBeVisible({ timeout: 15_000 });
 

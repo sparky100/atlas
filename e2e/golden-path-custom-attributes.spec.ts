@@ -10,6 +10,7 @@
  */
 import { expect, test } from '@playwright/test';
 import { addSystemFromHome, goToModelHome, signUpCreateOrgAndModel } from './fixtures/goldenPath';
+import { expandAllSettingsSections } from './fixtures/settings';
 
 test('define a select attribute, set it on a system, and filter the browse table by it', async ({ page }) => {
   const { orgName, modelName } = await signUpCreateOrgAndModel(page, 'customattrs');
@@ -77,6 +78,7 @@ test('define a select attribute, set it on a system, and filter the browse table
   await page.getByRole('link', { name: orgName }).click();
   await page.getByRole('link', { name: 'Org settings' }).click();
   await expect(page.getByRole('heading', { name: 'Organisation settings' })).toBeVisible();
+  await expandAllSettingsSections(page);
   await expect(page.getByRole('heading', { name: 'Custom attributes' })).toBeVisible();
 
   await page.getByLabel('Key', { exact: true }).fill('region');
