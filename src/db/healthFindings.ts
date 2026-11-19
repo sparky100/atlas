@@ -410,15 +410,35 @@ export function findSystemsWithoutCapability(
   systems: readonly ElementsHeadRow[],
   supportsEdges: readonly RelationshipsHeadRow[],
   containers: readonly ElementsHeadRow[] = [],
+  usesAndFlowsToEdges: readonly RelationshipsHeadRow[] = [],
 ): ElementsHeadRow[] {
   const linkedElementIds = new Set(supportsEdges.map((edge) => edge.from_element_id));
   const modulesByPlatformId = groupModulesByPlatformId(containers);
+  const parentById = new Map<UUID, UUID>();
+  for (const module of containers) if (module.parent_id !== null) parentById.set(module.element_id, module.parent_id);
+  /** The system an element belongs to: a module's own platform, otherwise itself. */
+  const owningSystemId = (id: UUID): UUID => parentById.get(id) ?? id;
+  // A2 platform dependency rule (one hop, deliberately): a platform with no
+  // capability link of its own is NOT flagged when something that does
+  // serve a capability uses it, flows to/from it, or routes through it
+  // (`via`) — "no capability link recorded" is not "no business use found".
+  const servesCapability = (id: UUID): boolean => linkedElementIds.has(id) || (modulesByPlatformId.get(id) ?? []).some((m) => linkedElementIds.has(m.element_id));
+  const reachedByServingSystem = (platform: ElementsHeadRow): boolean => {
+    const ownIds = new Set<UUID>([platform.element_id, ...(modulesByPlatformId.get(platform.element_id) ?? []).map((m) => m.element_id)]);
+    return usesAndFlowsToEdges.some((edge) => {
+      const via = attributesRecord(edge.attributes).via;
+      const touches = ownIds.has(edge.from_element_id) || ownIds.has(edge.to_element_id) || (typeof via === 'string' && ownIds.has(via));
+      if (!touches) return false;
+      return [edge.from_element_id, edge.to_element_id].some((end) => !ownIds.has(end) && servesCapability(owningSystemId(end)));
+    });
+  };
   return systems.filter((system) => {
+    let unlinked = !linkedElementIds.has(system.element_id);
     if (isPlatform(system)) {
       const modules = modulesByPlatformId.get(system.element_id);
-      if (modules && modules.length > 0) return !modules.some((module) => linkedElementIds.has(module.element_id));
+      if (modules && modules.length > 0) unlinked = !modules.some((module) => linkedElementIds.has(module.element_id));
     }
-    return !linkedElementIds.has(system.element_id);
+    return unlinked && !(isPlatform(system) && reachedByServingSystem(system));
   });
 }
 

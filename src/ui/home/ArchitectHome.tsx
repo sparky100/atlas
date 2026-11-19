@@ -18,6 +18,7 @@ import { branchStatusTone } from '../changes/branchStatus';
 import {
   decisionPrefillToSearchParams,
   prefillFromCriticalExposedFinding,
+  prefillFromSystemWithoutCapability,
   prefillFromCriticalSupportEndFinding,
   prefillFromOutgoingDisposition,
   type DecisionPrefill,
@@ -230,6 +231,9 @@ export function ArchitectHome({ data, modelId, mainCommitIdHint, insights, role,
       severity: 'medium',
       browseHref: browseHref('unlinked-systems'),
       browseLabel: 'Review and link →',
+      // A2: one system → straight to a decision on keep / link / retire
+      // (retirement as an option to investigate). Several → the browse list.
+      ...(canStartDecision(role) ? { singleItemAction: (item: HealthFindingItem) => ({ ...startDecisionAction(prefillFromSystemWithoutCapability({ id: item.id, name: item.label })), label: 'Keep, link or retire? →' }) } : {}),
     },
     {
       // S1 item 19: purely informational (see this finding's own doc
