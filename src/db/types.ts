@@ -477,6 +477,24 @@ export interface DecisionPackRow {
   frozen_at: string;
 }
 
+/** The capacities a person can sign a decision pack in. A lens is a stated capacity, not a verified role. */
+export const DECISION_APPROVAL_LENSES = ['business_owner', 'architecture', 'delivery', 'security', 'data', 'funding'] as const;
+export type DecisionApprovalLens = (typeof DECISION_APPROVAL_LENSES)[number];
+export type DecisionApprovalVerdict = 'approve' | 'decline';
+
+/** The literal shape of a row in `decision_approvals` (Phase C2): one named person's verdict on one exact frozen pack. Insert-only. */
+export interface DecisionApprovalRow {
+  id: UUID;
+  org_id: UUID;
+  decision_id: UUID;
+  pack_id: UUID;
+  lens: DecisionApprovalLens;
+  verdict: DecisionApprovalVerdict;
+  comment: string;
+  decided_by: UUID;
+  decided_at: string;
+}
+
 /** The literal shape of a row in `decision_arguments` — a decision's own pro/con list. Written only by `atlas.choose_decision_option` (PR5); no open insert grant exists until then. */
 export interface DecisionArgumentRow {
   id: UUID;
