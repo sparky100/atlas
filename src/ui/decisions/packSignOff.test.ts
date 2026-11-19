@@ -18,8 +18,8 @@ describe('packSignOff', () => {
   });
   it('reads in plain words', () => {
     expect(packSignOffSummary({ state: 'none', approvals: 0, declines: 0 })).toBe('not signed yet');
-    expect(packSignOffSummary({ state: 'approved', approvals: 2, declines: 0 })).toBe('approved by 2');
-    expect(packSignOffSummary({ state: 'declined', approvals: 1, declines: 1 })).toBe('declined by 1, approved by 1');
+    expect(packSignOffSummary({ state: 'approved', approvals: 2, declines: 0 })).toBe('2 approvals recorded');
+    expect(packSignOffSummary({ state: 'declined', approvals: 1, declines: 1 })).toBe('declined by 1, 1 approval recorded');
   });
 });
 

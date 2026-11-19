@@ -18,7 +18,7 @@ describe('projectNextStep', () => {
     const blocked = projectNextStep({ ...base, canStartDecision: false });
     expect(blocked?.kind).toBe('decide');
     expect(blocked?.action).toEqual({ kind: 'none' });
-    expect(blocked?.body).toMatch(/owner or architect/);
+    expect(blocked?.body).toMatch(/owner, architect or contributor/);
   });
   it('points at the open decision to compare and choose', () => {
     const step = projectNextStep({ ...base, decisions: [decision('proposed')] });
@@ -33,5 +33,25 @@ describe('projectNextStep', () => {
     const chosen = [decision('accepted')];
     expect(projectNextStep({ ...base, decisions: chosen, changes: [change('draft')] })?.action).toEqual({ kind: 'open-change', id: 'c1', label: 'Open Cutover' });
     expect(projectNextStep({ ...base, decisions: chosen, changes: [change('merged')] })?.kind).toBe('finish');
+  });
+  it('does not say a choice exists when every decision ended without one', () => {
+    const step = projectNextStep({ ...base, decisions: [decision('rejected'), decision('superseded')] });
+    expect(step?.kind).toBe('decide');
+    expect(step?.title).toBe('Start a new decision');
+    expect(step?.action).toEqual({ kind: 'start-decision' });
+    expect(projectNextStep({ ...base, canStartDecision: false, decisions: [decision('rejected')] })?.action).toEqual({ kind: 'none' });
+  });
+  it('says the choice is not carried out when every change was cancelled', () => {
+    const step = projectNextStep({ ...base, decisions: [decision('accepted')], changes: [change('cancelled')] });
+    expect(step?.kind).toBe('change');
+    expect(step?.body).toMatch(/not been carried out/);
+    expect(step?.action).toEqual({ kind: 'start-change' });
+  });
+  it('does not claim the benefit was achieved once changes are merged', () => {
+    const step = projectNextStep({ ...base, decisions: [decision('accepted')], changes: [change('merged')] });
+    expect(step?.body).toMatch(/does not show the project achieved its purpose/);
+  });
+  it('says no option is chosen while a decision is open', () => {
+    expect(projectNextStep({ ...base, decisions: [decision('proposed')] })?.body).toMatch(/No option is chosen yet/);
   });
 });

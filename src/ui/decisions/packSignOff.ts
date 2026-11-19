@@ -27,11 +27,17 @@ export function packSignOff(packId: string, approvals: readonly DecisionApproval
   return { state: no > 0 ? 'declined' : ok > 0 ? 'approved' : 'none', approvals: ok, declines: no };
 }
 
-/** One plain line for the pack heading. */
+/**
+ * One plain line for the pack heading. It reports what was recorded, never
+ * "approved" outright: no capacity is required, so one approval is a record,
+ * not an authorisation (Simon, 2026-11-19: never imply completion because one
+ * reviewer finished).
+ */
 export function packSignOffSummary(signOff: PackSignOff): string {
+  const approvals = `${String(signOff.approvals)} ${signOff.approvals === 1 ? 'approval' : 'approvals'} recorded`;
   if (signOff.state === 'none') return 'not signed yet';
-  if (signOff.state === 'declined') return `declined by ${String(signOff.declines)}${signOff.approvals > 0 ? `, approved by ${String(signOff.approvals)}` : ''}`;
-  return `approved by ${String(signOff.approvals)}`;
+  if (signOff.state === 'declined') return `declined by ${String(signOff.declines)}${signOff.approvals > 0 ? `, ${approvals}` : ''}`;
+  return approvals;
 }
 
 /** The lenses a person has not yet signed this pack as, so the form offers only what is still open to them. */
