@@ -3,7 +3,7 @@ import type { BranchRow } from '../../db/types';
 import type { RoadmapBranchEvents } from '../../db/roadmapChangeEvents';
 import { EMPTY_ROADMAP_FILTERS, type RoadmapFilters } from './roadmapFilter';
 import type { RoadmapGroup, RoadmapLifecycleBar } from './roadmapLifecycleRows';
-import { computeRoadmapVisibleData, hiddenNoteFor, RECENT_CHANGES_LIMIT, recentRoadmapChanges, roadmapRangeFor } from './roadmapVisibleData';
+import { computeRoadmapVisibleData, hiddenNoteFor, onlyChangingSystems, RECENT_CHANGES_LIMIT, recentRoadmapChanges, roadmapRangeFor } from './roadmapVisibleData';
 
 const NOW = new Date('2026-06-15T00:00:00Z');
 
@@ -144,5 +144,24 @@ describe('the roadmap starts at today', () => {
     expect(hiddenNoteFor(1, 0, false)).toBe('1 already-retired system is hidden. Turn on “Show the past year” to see the most recent.');
     expect(hiddenNoteFor(4, 2, false)).toContain('4 already-retired systems and 2 earlier changes are hidden');
     expect(hiddenNoteFor(0, 3, true)).toBe('3 earlier changes from before the past year are not shown.');
+  });
+});
+
+describe('onlyChangingSystems ("By project" is about change)', () => {
+  it('drops a system that just carries on, and a group left empty with it', () => {
+    const groups = [group({ key: 'p1', bars: [bar({ systemId: 'steady', name: 'Steady' })] })];
+    expect(onlyChangingSystems(groups, [], 'asIs')).toEqual([]);
+  });
+
+  it('keeps a system that a change touches, in the mode that change counts in', () => {
+    const groups = [group({ key: 'p1', bars: [bar({ systemId: 'touched' }), bar({ systemId: 'steady' })] })];
+    const events: RoadmapBranchEvents[] = [{ branch: branch({ status: 'merged' }), events: [{ kind: 'add', elementId: 'touched', elementName: 'Touched' }] }];
+    expect(onlyChangingSystems(groups, events, 'toBe')[0]?.bars.map((b) => b.systemId)).toEqual(['touched']);
+  });
+
+  it('keeps a system with a planned end, a support end, or a lifecycle tag', () => {
+    const groups = [group({ key: 'p1', bars: [bar({ systemId: 'a', plannedEnd: '2027-01-01' }), bar({ systemId: 'b', supportEndsAt: '2027-02-01' }), bar({ systemId: 'c', lifecycleTag: { state: 'planned', date: '2027-03-01' } as NonNullable<RoadmapLifecycleBar['lifecycleTag']> }), bar({ systemId: 'd' })] })];
+    const kept = onlyChangingSystems(groups, [], 'asIs');
+    expect(kept[0]?.bars.map((b) => b.systemId)).toEqual(['a', 'b', 'c']);
   });
 });

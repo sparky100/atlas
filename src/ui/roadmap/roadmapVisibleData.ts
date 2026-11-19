@@ -136,3 +136,19 @@ export function hiddenNoteFor(retired: number, changes: number, showPast: boolea
   const what = parts.join(' and ');
   return showPast ? `${what} from before the past year ${retired + changes === 1 ? 'is' : 'are'} not shown.` : `${what} ${retired + changes === 1 ? 'is' : 'are'} hidden. Turn on “Show the past year” to see the most recent.`;
 }
+
+/**
+ * "By project" is about change: a system that simply carries on (no planned
+ * end, no support end, not planned or retired, and no change touching it in
+ * this mode) says nothing about a project, so it is left off, and a group
+ * left empty goes with it. The other groupings keep every system — there the
+ * roadmap is also a lifecycle view of the whole estate.
+ */
+export function onlyChangingSystems(groups: readonly RoadmapGroup[], branchEvents: readonly RoadmapBranchEvents[], mode: RoadmapMode): RoadmapGroup[] {
+  return groups
+    .map((group) => ({
+      ...group,
+      bars: group.bars.filter((bar) => bar.plannedEnd !== undefined || bar.supportEndsAt !== undefined || bar.lifecycleTag !== undefined || eventsForSystem(bar.systemId, branchEvents, mode).length > 0),
+    }))
+    .filter((group) => group.bars.length > 0);
+}

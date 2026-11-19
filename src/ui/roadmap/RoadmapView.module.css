@@ -191,3 +191,8 @@
   border-radius: var(--radius-sm);
   background: transparent;
 }
+
+/* Holds the Find box at its natural height inside the column-flex `.roadmap`. */
+.findWrap {
+  flex: 0 0 auto;
+}

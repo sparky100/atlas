@@ -23,6 +23,7 @@ import { useRoadmap } from '../roadmap/useRoadmap';
 import { useRoadmapExport } from '../roadmap/useRoadmapExport';
 import { parseRoadmapFilters, roadmapFiltersToSearchParams, parseRoadmapGroupBy, roadmapGroupByToSearchParams, parseRoadmapGranularity, roadmapGranularityToSearchParams, parseRoadmapHorizon, roadmapHorizonToSearchParams, parseRoadmapStartMonth, roadmapStartMonthToSearchParams, parseRoadmapShowPast, roadmapShowPastToSearchParams, type RoadmapGroupBy, type RoadmapGranularity, type RoadmapHorizon } from '../roadmap/roadmapFilterParams';
 import { defaultRoadmapWindowStart, roadmapPastStart, shiftRoadmapWindowStart } from '../roadmap/roadmapTimelineScale';
+import { onlyChangingSystems } from '../roadmap/roadmapVisibleData';
 import type { RoadmapFilters } from '../roadmap/roadmapFilter';
 import type { RoadmapMode } from '../roadmap/roadmapEligibility';
 import styles from './RoadmapPage.module.css';
@@ -108,7 +109,8 @@ export function RoadmapPage() {
   const roadmapData = state.status === 'ready' ? state.data : null;
   // F6 Step 6: the same bars, grouped by capability or value stream — both
   // were computed by `useRoadmap`, so switching the toggle never refetches.
-  const groups = groupBy === 'valueStream' ? (roadmapData?.valueStreamGroups ?? []) : groupBy === 'project' ? (roadmapData?.projectGroups ?? []) : (roadmapData?.groups ?? []);
+  // By project is about change: systems that just carry on are left off it (`onlyChangingSystems`).
+  const groups = groupBy === 'valueStream' ? (roadmapData?.valueStreamGroups ?? []) : groupBy === 'project' ? onlyChangingSystems(roadmapData?.projectGroups ?? [], roadmapData?.branchEvents ?? [], mode) : (roadmapData?.groups ?? []);
   const roadmapExport = useRoadmapExport({
     groups,
     branchEvents: roadmapData?.branchEvents ?? [],
