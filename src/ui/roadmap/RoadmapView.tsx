@@ -8,6 +8,7 @@ import { useCanvasWidth } from '../landscape/useCanvasWidth';
 import type { RoadmapBranchEvents } from '../../db/roadmapChangeEvents';
 import type { RoadmapFilters } from './roadmapFilter';
 import type { RoadmapMode } from './roadmapEligibility';
+import type { RoadmapProjectBar, RoadmapUnplacedProject } from './roadmapProjectBars';
 import { roadmapBarCaption, type RoadmapGroup, type RoadmapLifecycleBar } from './roadmapLifecycleRows';
 import { computeRoadmapAxisTicks, isWithinRange, percentAtIso, thinAxisTicksToFit, todayPercent, type RoadmapGranularity, type RoadmapHorizon, type RoadmapTimelineRange } from './roadmapTimelineScale';
 import { changeDescription, computeRoadmapVisibleData, eventsForSystem, hiddenNoteFor, recentRoadmapChanges, roadmapRangeFor } from './roadmapVisibleData';
@@ -34,6 +35,8 @@ export interface RoadmapViewProps {
   orgSlug: string;
   modelSlug: string;
   now?: Date;
+  /** Plan A3: open projects with no place on the plan, listed beneath it. Only passed for the "By capability" view. */
+  unplacedProjects?: readonly RoadmapUnplacedProject[];
 }
 
 /**
@@ -86,6 +89,31 @@ function RoadmapRow({ bar, events, range, todayPct, showPast, orgSlug, modelSlug
             </span>
           );
         })}
+      </div>
+    </div>
+  );
+}
+
+/** Plan A3: one open project on a capability domain — an outlined bar (a different shape from a system's filled one, so it never borrows a colour's meaning), start to target. */
+function ProjectPlanRow({ bar, range, todayPct }: { bar: RoadmapProjectBar; range: RoadmapTimelineRange; todayPct: number | undefined }) {
+  const startPct = percentAtIso(bar.start, range);
+  const endPct = percentAtIso(bar.target, range);
+  const left = startPct ?? 0;
+  const width = (endPct ?? 100) - left;
+  const caption = `${bar.start !== undefined ? `From ${bar.start}` : 'Start date not recorded'} ${bar.target !== undefined ? `to ${bar.target}` : '— no target date'}`;
+  return (
+    <div className={styles.row} data-project-id={bar.projectId}>
+      <Link to={bar.href} className={styles.rowName} title={bar.title}>
+        <Text as="span" size="sm">
+          {bar.title}
+        </Text>
+        <Text as="span" size="xs" tone="muted" className={styles.rowCaption}>
+          Project · {caption}
+        </Text>
+      </Link>
+      <div className={styles.track}>
+        <div className={styles.projectBar} style={{ left: `${String(left)}%`, width: `${String(Math.max(width, 0.5))}%` }} />
+        {todayPct !== undefined && <div className={styles.todayLine} style={{ left: `${String(todayPct)}%` }} title="Today" aria-hidden="true" />}
       </div>
     </div>
   );
@@ -170,8 +198,8 @@ function HiddenNote({ retired, changes, showPast }: { retired: number; changes: 
  * same role-boundary stance the capability map redesign already
  * established for this app's other structural-reference views.
  */
-export function RoadmapView({ groupsLabel = 'Capability domains', groups, branchEvents, mode, filters, granularity, horizon, windowStart, showPast, orgSlug, modelSlug, now = new Date() }: RoadmapViewProps) {
-  const { filteredGroups, eligibleEvents, hiddenRetiredCount, hiddenChangeCount } = computeRoadmapVisibleData(groups, branchEvents, mode, filters, now, showPast);
+export function RoadmapView({ groupsLabel = 'Capability domains', groups, branchEvents, mode, filters, granularity, horizon, windowStart, showPast, orgSlug, modelSlug, now = new Date(), unplacedProjects = [] }: RoadmapViewProps) {
+  const { filteredGroups, eligibleEvents, hiddenRetiredCount, hiddenChangeCount } = computeRoadmapVisibleData(groups, branchEvents, mode, filters, now, showPast, true);
   const range = roadmapRangeFor(groups, branchEvents, mode, horizon, windowStart, now, showPast);
   const todayPct = todayPercent(range, now);
 
@@ -227,6 +255,15 @@ export function RoadmapView({ groupsLabel = 'Capability domains', groups, branch
                     {group.label}
                   </Text>
                 )}
+                {(group.projectBars?.length ?? 0) > 0 && (
+                  <div role="list" aria-label={`${group.label} projects`}>
+                    {group.projectBars?.map((bar) => (
+                      <div key={bar.projectId} role="listitem">
+                        <ProjectPlanRow bar={bar} range={range} todayPct={todayPct} />
+                      </div>
+                    ))}
+                  </div>
+                )}
                 <div role="list" aria-label={`${group.label} systems`}>
                   {group.bars.map((bar) => (
                     <div key={bar.systemId} role="listitem">
@@ -238,6 +275,27 @@ export function RoadmapView({ groupsLabel = 'Capability domains', groups, branch
             ))}
           </div>
         </>
+      )}
+      {unplacedProjects.length > 0 && (
+        <div className={styles.changesList} data-testid="roadmap-unplaced-projects">
+          <Text as="h2" size="md">
+            Projects not on the plan yet
+          </Text>
+          <ul>
+            {unplacedProjects.map((project) => (
+              <li key={project.projectId}>
+                <Link to={project.href}>
+                  <Text as="span" size="sm">
+                    {project.title}
+                  </Text>
+                </Link>{' '}
+                <Text as="span" size="sm" tone="muted">
+                  {project.reason === 'no-dates' ? 'needs a start or target date' : 'is not tied to a capability'}
+                </Text>
+              </li>
+            ))}
+          </ul>
+        </div>
       )}
       <RoadmapChangesList eligibleEvents={eligibleEvents} />
     </div>

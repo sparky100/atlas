@@ -37,7 +37,7 @@ function isGoneBefore(bar: RoadmapLifecycleBar, floorIso: string, showPast: bool
  * retired before that and changes delivered before that are left off, and
  * counted so the page can say so.
  */
-export function computeRoadmapVisibleData(groups: readonly RoadmapGroup[], branchEvents: readonly RoadmapBranchEvents[], mode: RoadmapMode, filters: RoadmapFilters, now: Date, showPast = false): RoadmapVisibleData {
+export function computeRoadmapVisibleData(groups: readonly RoadmapGroup[], branchEvents: readonly RoadmapBranchEvents[], mode: RoadmapMode, filters: RoadmapFilters, now: Date, showPast = false, keepProjectOnlyGroups = false): RoadmapVisibleData {
   const floorIso = isoDay(roadmapPastStart(now, showPast));
   // The capability facet matches the bar's own level-1 capability, not the
   // group key — the same bar groups under a stream id in value-stream mode,
@@ -46,7 +46,8 @@ export function computeRoadmapVisibleData(groups: readonly RoadmapGroup[], branc
   const hiddenRetiredCount = new Set(matching.flatMap((group) => group.bars.filter((bar) => isGoneBefore(bar, floorIso, showPast)).map((bar) => bar.systemId))).size;
   const filteredGroups = matching
     .map((group) => ({ ...group, bars: group.bars.filter((bar) => !isGoneBefore(bar, floorIso, showPast)) }))
-    .filter((group) => group.bars.length > 0);
+    // A3: the screen also keeps a domain that has only project bars; the exports (which draw systems only) never do.
+    .filter((group) => group.bars.length > 0 || (keepProjectOnlyGroups && (group.projectBars?.length ?? 0) > 0));
   const modeEligible = branchEvents.filter(({ branch }) => isRoadmapEligibleBranch(branch, mode));
   const eligibleEvents = modeEligible.filter(({ branch }) => (branch.target_date ?? '') >= floorIso);
   return { filteredGroups, eligibleEvents, hiddenRetiredCount, hiddenChangeCount: modeEligible.length - eligibleEvents.length };
@@ -57,6 +58,7 @@ function allDatesFor(groups: readonly RoadmapGroup[], branchEvents: readonly Roa
   const dates: (string | undefined)[] = [];
   for (const group of groups) {
     for (const bar of group.bars) dates.push(bar.introduced, bar.plannedEnd, bar.supportEndsAt);
+    for (const bar of group.projectBars ?? []) dates.push(bar.start, bar.target);
   }
   for (const { branch } of branchEvents) {
     if (isRoadmapEligibleBranch(branch, mode)) dates.push(branch.target_date ?? undefined);

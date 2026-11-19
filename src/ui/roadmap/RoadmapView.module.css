@@ -180,3 +180,14 @@
   border-radius: var(--radius-sm) 0 0 var(--radius-sm);
   pointer-events: none;
 }
+
+/* Plan A3: an open project — outlined, not filled, so it never reuses a system bar's colour meaning. */
+.projectBar {
+  position: absolute;
+  top: 4px;
+  height: 12px;
+  box-sizing: border-box;
+  border: 2px solid var(--accent);
+  border-radius: var(--radius-sm);
+  background: transparent;
+}
