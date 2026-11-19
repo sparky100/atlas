@@ -233,13 +233,16 @@ export function RoadmapView({ groupsLabel = 'Capability domains', groups, branch
       <HiddenNote retired={hiddenRetiredCount} changes={hiddenChangeCount} showPast={showPast} />
       {filteredGroups.length > 0 && (
         <>
-          <LandscapeFind
-            options={findOptions}
-            onPick={(id) => { setFound((prev) => ({ id, n: (prev?.n ?? 0) + 1 })); }}
-            label="Find on this roadmap"
-            listLabel="Matches on this roadmap"
-            emptyText="Nothing on this roadmap matches. A filter may be hiding it."
-          />
+          {/* In a wrapper that is not itself a flex item: `LandscapeFind`'s own `flex: 1 1 220px` is meant for a row, and as a direct child of this column container it became a 220px-tall box — the blank gap above the timeline, worst on a phone. */}
+          <div className={styles.findWrap}>
+            <LandscapeFind
+              options={findOptions}
+              onPick={(id) => { setFound((prev) => ({ id, n: (prev?.n ?? 0) + 1 })); }}
+              label="Find on this roadmap"
+              listLabel="Matches on this roadmap"
+              emptyText="Nothing on this roadmap matches. A filter may be hiding it."
+            />
+          </div>
           <RoadmapAxis range={range} granularity={granularity} />
           <div role="list" aria-label={groupsLabel}>
             {filteredGroups.map((group) => (

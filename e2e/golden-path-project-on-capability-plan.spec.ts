@@ -51,6 +51,13 @@ test('a project shows on its capability in the Roadmap plan; an undated one is l
   await expect(unplaced.getByRole('link', { name: 'Quote policy review' })).toBeVisible();
   await expect(unplaced.getByText('needs a start or target date')).toBeVisible();
 
+  // No blank gap between the Find box and the timeline (the Find box once stretched to 220px tall in this column, worst on a phone).
+  const findBox = await page.getByRole('combobox', { name: 'Find on this roadmap' }).boundingBox();
+  const axisBox = await page.getByRole('img', { name: 'Timeline by quarter' }).boundingBox();
+  expect(findBox).not.toBeNull();
+  expect(axisBox).not.toBeNull();
+  expect((axisBox?.y ?? 0) - ((findBox?.y ?? 0) + (findBox?.height ?? 0))).toBeLessThan(60);
+
   const overflow = await page.evaluate(() => document.documentElement.scrollWidth > document.documentElement.clientWidth + 1);
   expect(overflow).toBe(false);
 });
