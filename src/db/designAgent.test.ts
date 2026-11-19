@@ -2,28 +2,47 @@ import { describe, expect, it } from 'vitest';
 import { DesignerError, interpretDesignerReply } from './designAgent';
 
 describe('interpretDesignerReply', () => {
-  it('returns the draft with the names of what it cites', () => {
-    const draft = interpretDesignerReply({ status: 'done', result: { answer: ' 1. Stay as we are. ', citations: ['a', 'b'], citationNames: { a: 'Quote Tool' }, grounded: true, inputTokens: 1200, outputTokens: 340, toolUses: [{}, {}, {}] } });
-    expect(draft).toEqual({ text: '1. Stay as we are.', citedNames: ['Quote Tool'], grounded: true, usage: { inputTokens: 1200, outputTokens: 340, lookups: 3 } });
+  const design = { options: [{ title: 'Configure', summary: 'Use it as is.', toWeigh: 'Fit.' }, { title: 'Replace', summary: 'Buy one.' }], gaps: ['No owner recorded'], stayNote: 'Slow.', problems: [] };
+
+  it('returns the options, the gaps and the names of what it cites', () => {
+    const draft = interpretDesignerReply({ status: 'done', design, result: { answer: '{}', citations: ['a', 'b'], citationNames: { a: 'Quote Tool' }, grounded: true, inputTokens: 1200, outputTokens: 340, toolUses: [{}, {}, {}] } });
+    expect(draft).toEqual({
+      options: [{ title: 'Configure', summary: 'Use it as is.', toWeigh: 'Fit.' }, { title: 'Replace', summary: 'Buy one.', toWeigh: '' }],
+      gaps: ['No owner recorded'],
+      stayNote: 'Slow.',
+      problems: [],
+      citedNames: ['Quote Tool'],
+      grounded: true,
+      usage: { inputTokens: 1200, outputTokens: 340, lookups: 3 },
+    });
   });
 
   it('reads missing or odd usage as zero rather than showing nonsense', () => {
-    const draft = interpretDesignerReply({ status: 'done', result: { answer: 'x', inputTokens: -5, outputTokens: 'lots', toolUses: 'none' } });
+    const draft = interpretDesignerReply({ status: 'done', design, result: { answer: 'x', inputTokens: -5, outputTokens: 'lots', toolUses: 'none' } });
     expect(draft.usage).toEqual({ inputTokens: 0, outputTokens: 0, lookups: 0 });
   });
 
   it('marks a draft with no verified citation as not grounded', () => {
-    expect(interpretDesignerReply({ status: 'done', result: { answer: 'x', citations: [], citationNames: {}, grounded: false } }).grounded).toBe(false);
+    expect(interpretDesignerReply({ status: 'done', design, result: { answer: 'x', citations: [], citationNames: {}, grounded: false } }).grounded).toBe(false);
   });
 
-  it('says so plainly for an empty draft, an empty model and a missing model', () => {
-    expect(() => interpretDesignerReply({ status: 'done', result: { answer: '  ' } })).toThrow(/no draft/);
+  it('keeps the function\'s own reasons when an answer is incomplete, and invents one when there are none and no options', () => {
+    const partial = interpretDesignerReply({ status: 'done', design: { options: [{ title: 'A', summary: 'a' }], problems: ['The Designer gave fewer options than expected.'] }, result: { answer: 'x' } });
+    expect(partial.problems).toEqual(['The Designer gave fewer options than expected.']);
+    expect(interpretDesignerReply({ status: 'done', design: { options: [] }, result: { answer: 'x' } }).problems).toEqual(['The Designer gave no usable options.']);
+  });
+
+  it('says the Designer is being updated when an older function returns only text', () => {
+    expect(() => interpretDesignerReply({ status: 'done', result: { answer: 'prose' } })).toThrow(/being updated/);
+  });
+
+  it('says so plainly for an empty model and a missing model', () => {
     expect(() => interpretDesignerReply({ status: 'empty_model' })).toThrow(/no committed content/);
     expect(() => interpretDesignerReply({ status: 'not_found' })).toThrow(/could not be found/);
   });
 
   it("shows the function's own sentence for a refusal, and a plain fallback otherwise", () => {
-    expect(() => interpretDesignerReply({ status: 'forbidden', message: 'Only an owner or architect can run the Designer.' })).toThrow('Only an owner or architect can run the Designer.');
+    expect(() => interpretDesignerReply({ status: 'forbidden', message: 'Only an owner, architect or contributor can run the Designer.' })).toThrow('Only an owner, architect or contributor can run the Designer.');
     expect(() => interpretDesignerReply(null)).toThrow(DesignerError);
     expect(() => interpretDesignerReply({ status: 'error' })).toThrow(/could not be reached/);
   });

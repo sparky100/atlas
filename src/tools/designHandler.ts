@@ -10,6 +10,7 @@
  * The Designer writes nothing. Its draft is text for a person to read and edit.
  */
 import type { UUID } from '../contracts/delta';
+import { parseDesignerOptions, type DesignerOptionsResult } from '../contracts/designerOptions';
 import { runAsk } from './askLoop';
 import type { AskModelClient, AskResult } from './askLoop';
 import { designerBrief, designerSystemPrompt, DESIGNER_MAX_FINDING_CHARS } from './designPrompt';
@@ -42,7 +43,7 @@ export type DesignOutcome =
   | { status: 'forbidden'; message: string }
   | { status: 'not_enabled'; message: string }
   | { status: 'empty_model' }
-  | { status: 'done'; result: AskResult; stamp: ToolStamp };
+  | { status: 'done'; result: AskResult; stamp: ToolStamp; design: DesignerOptionsResult };
 
 const UUID_SHAPE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
@@ -70,7 +71,8 @@ export async function handleDesign(deps: DesignHandlerDeps, body: unknown): Prom
   if (!model) return { status: 'not_found' };
 
   const role = await deps.callerRole(model.orgId);
-  if (role !== 'owner' && role !== 'architect') return { status: 'forbidden', message: 'Only an owner or architect can run the Designer.' };
+  // Contributors may run it: they can start decisions, the Designer only drafts text and writes nothing, and the owner still controls it through the organisation's switches and key (journey proposal section 6).
+  if (role !== 'owner' && role !== 'architect' && role !== 'contributor') return { status: 'forbidden', message: 'Only an owner, architect or contributor can run the Designer.' };
 
   const settings = await deps.agentSettings(model.orgId);
   if (!settings.assistantEnabled || !settings.agentsEnabled || !settings.keySet) {
@@ -89,5 +91,8 @@ export async function handleDesign(deps: DesignHandlerDeps, body: unknown): Prom
     question: designerBrief({ elementId: parsed.elementId, finding: parsed.finding }),
     system: designerSystemPrompt(ctx.stamp.modelName, ctx.now().toISOString().slice(0, 10), { runCost }),
   });
-  return { status: 'done', result, stamp: ctx.stamp };
+  const design = parseDesignerOptions(result.answer);
+  // A run cut off by a limit is never complete, whatever the part that arrived looks like.
+  if (result.status !== 'answered' && design.problems.length === 0) design.problems.push('The Designer was cut short, so this answer may be incomplete.');
+  return { status: 'done', result, stamp: ctx.stamp, design };
 }

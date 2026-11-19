@@ -16,6 +16,8 @@ import { useBranchLabel } from '../branches/useBranchLabel';
 import { useSelectedRef } from '../branches/useSelectedRef';
 import { refLabelOf } from '../../db/ref';
 import { useModels } from '../models/useModels';
+import { useMembers } from '../orgs/useMembers';
+import { profileLabel } from '../comments/profileLabel';
 import { canStartDecision, useMembership } from '../orgs/useMembership';
 import { useOrganisationBySlug } from '../orgs/useOrganisationBySlug';
 import styles from './ViewPage.module.css';
@@ -44,6 +46,8 @@ export function DecisionsPage() {
   const { models, loading: modelsLoading } = useModels(organisation?.id ?? null);
   const model = models.find((m) => m.slug === modelSlug);
   const { role } = useMembership(organisation?.id ?? null, userId);
+  const { members } = useMembers(organisation?.id ?? null);
+  const ownerNames = members.filter((m) => m.member.role === 'owner').map((m) => profileLabel(m.profile));
   const canCreate = canStartDecision(role);
 
   if (orgLoading || modelsLoading || !model) {
@@ -74,7 +78,7 @@ export function DecisionsPage() {
             </Text>
           </div>
           <PageIntro>{WORK_COPY.decision}</PageIntro>
-          <DecisionsView modelId={model.id} orgId={organisation?.id ?? ''} userId={userId} orgSlug={orgSlug ?? ''} modelSlug={model.slug} canCreate={canCreate} prefill={prefill} designerAvailable={canOfferDesigner({ role, assistantEnabled: organisation?.ai_assistant_enabled === true, agentsEnabled: organisation?.ai_agents_enabled === true, keySet: organisation?.ai_agent_key_set === true })} designerUnavailable={designerUnavailableReason({ role, assistantEnabled: organisation?.ai_assistant_enabled === true, agentsEnabled: organisation?.ai_agents_enabled === true, keySet: organisation?.ai_agent_key_set === true })} />
+          <DecisionsView modelId={model.id} orgId={organisation?.id ?? ''} userId={userId} orgSlug={orgSlug ?? ''} modelSlug={model.slug} canCreate={canCreate} prefill={prefill} designerAvailable={canOfferDesigner({ role, assistantEnabled: organisation?.ai_assistant_enabled === true, agentsEnabled: organisation?.ai_agents_enabled === true, keySet: organisation?.ai_agent_key_set === true })} designerUnavailable={designerUnavailableReason({ role, assistantEnabled: organisation?.ai_assistant_enabled === true, agentsEnabled: organisation?.ai_agents_enabled === true, keySet: organisation?.ai_agent_key_set === true, ownerNames })} />
         </main>
       </div>
     </div>

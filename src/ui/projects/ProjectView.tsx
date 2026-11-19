@@ -47,8 +47,8 @@ import { projectNextStep } from './projectNextStep';
 import { findingLabel } from '../decisions/findingLabels';
 import { suggestDecisionTitle } from '../decisions/optionSuggestions';
 import { ProjectBeforeAfter } from './ProjectBeforeAfter';
-import { DesignerPanel } from '../decisions/DesignerPanel';
-import { DESIGNER_MAX_FINDING_CHARS } from '../../tools/designPrompt';
+import { DesignerSuggestions, type SuggestionSelection } from '../decisions/DesignerSuggestions';
+import { clockNow, pendingKey, savePending } from '../decisions/pendingOptions';
 import { ProjectStep } from './ProjectStep';
 import { changesSummary, decisionsSummary, evidenceSummary, scopeSummary } from './projectStepSummary';
 import type { ProjectData } from './useProject';
@@ -548,14 +548,15 @@ function NewDecisionForm({
   const [title, setTitle] = useState(suggestedTitle);
   // The Designer drafts options from what the project is about, the same panel the Decisions page offers (Simon, 2026-11-19: it must appear here too). Its draft is added to the context and the decision records that an agent helped.
   const [statement, setStatement] = useState(project.purpose.trim());
-  const [aiDraft, setAiDraft] = useState<{ draftedAt: string; edited: boolean } | null>(null);
+  const [suggested, setSuggested] = useState<SuggestionSelection>({ options: [], draftedAt: null, anyEdited: false });
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const firstScope = scopeIds[0];
-  const finding = (project.purpose.trim() !== '' ? project.purpose : project.title).trim().slice(0, DESIGNER_MAX_FINDING_CHARS);
+  // The Designer is sent what is written in the box below, so correcting it changes the brief.
+  const aiDraft = suggested.draftedAt !== null ? { draftedAt: suggested.draftedAt, edited: suggested.anyEdited } : null;
   return (
     <form
-      className={styles.inlineForm}
+      className={[styles.inlineForm, styles.inlineFormWide].filter(Boolean).join(' ')}
       onSubmit={(e) => {
         e.preventDefault();
         if (title.trim().length === 0) return;
@@ -573,7 +574,9 @@ function NewDecisionForm({
                 reportError('Could not link the project scope to the new decision.', err);
               });
             }
-            void navigate(`${base}/decisions/${d.id}?edit=1`);
+            // The options the person kept are saved on the decision page as it opens, one by one, so a failure there can be retried without losing them.
+            if (suggested.options.length > 0) savePending(localStorage, pendingKey(project.org_id, userId, d.id), suggested.options, clockNow());
+            void navigate(`${base}/decisions/${d.id}${suggested.options.length > 0 ? '' : '?edit=1'}`);
           })
           .catch((err: unknown) => {
             setError('Could not start this decision.');
@@ -594,15 +597,21 @@ function NewDecisionForm({
           setTitle(e.target.value);
         }}
       />
-      {designerAvailable && firstScope !== undefined && (
-        <DesignerPanel
-          modelId={project.model_id}
-          input={{ elementId: firstScope, finding }}
-          onUse={(text, info) => {
-            setAiDraft({ draftedAt: info.draftedAt, edited: info.edited });
-            setStatement((prev) => (prev.trim() === '' ? text : `${prev.trim()}\n\nDesigner's draft options:\n${text}`));
+      <label>
+        <Text as="span" size="sm">What the options need to solve</Text>
+        <textarea
+          className={styles.input}
+          aria-label="What the options need to solve"
+          placeholder="Say what you need, in your own words"
+          rows={3}
+          value={statement}
+          onChange={(e) => {
+            setStatement(e.target.value);
           }}
         />
+      </label>
+      {designerAvailable && firstScope !== undefined && (
+        <DesignerSuggestions orgId={project.org_id} userId={userId} modelId={project.model_id} elementId={firstScope} brief={statement.trim() !== '' ? statement : project.title} scope={`project-${project.id}`} onChange={setSuggested} />
       )}
       {!designerAvailable && designerUnavailable !== null && firstScope !== undefined && (
         <div data-testid="designer-unavailable">
@@ -612,7 +621,7 @@ function NewDecisionForm({
         </div>
       )}
       <Button type="submit" disabled={busy || title.trim().length === 0}>
-        {busy ? 'Starting…' : 'Start decision'}
+        {busy ? 'Starting…' : suggested.options.length > 0 ? `Start decision with ${String(suggested.options.length)} suggested ${suggested.options.length === 1 ? 'option' : 'options'}` : 'Start decision'}
       </Button>
       {error !== null && <Text as="p">{error}</Text>}
     </form>

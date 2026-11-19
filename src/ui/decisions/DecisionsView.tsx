@@ -15,7 +15,8 @@ import { profileLabel } from '../comments/profileLabel';
 import type { DecisionRow } from '../../db/types';
 import type { DecisionPrefill } from './decisionPrefill';
 import { DecisionLinkPicker } from './DecisionLinkPicker';
-import { DesignerPanel } from './DesignerPanel';
+import { DesignerSuggestions, type SuggestionSelection } from './DesignerSuggestions';
+import { clockNow, pendingKey, savePending } from './pendingOptions';
 import { designerInputFromPrefill } from './designerRequest';
 import { groupDecisionsList } from './decisionsListGroups';
 import { decisionStatusLabel, decisionStatusTone } from './decisionStatus';
@@ -47,7 +48,6 @@ export interface DecisionsViewProps {
  */
 export function DecisionsView({ modelId, orgId, userId, orgSlug, modelSlug, canCreate, prefill, designerAvailable = false, designerUnavailable = null }: DecisionsViewProps) {
   const navigate = useNavigate();
-  const designerInput = designerAvailable ? designerInputFromPrefill(prefill) : null;
   const { status, decisions, error, createDecisionWithLinks } = useDecisions(modelId, orgId, userId);
   const { branch: main } = useMainBranch(modelId);
   const { members } = useMembers(orgId);
@@ -59,17 +59,21 @@ export function DecisionsView({ modelId, orgId, userId, orgSlug, modelSlug, canC
   const [title, setTitle] = useState(() => prefill?.title ?? '');
   const [statement, setStatement] = useState(() => prefill?.statement ?? '');
   // Set when the Designer's draft is put into the context, so the decision says an agent helped (Simon, 2026-11-19). Editing the context afterwards marks it edited.
-  const [aiDraft, setAiDraft] = useState<{ draftedAt: string; edited: boolean } | null>(null);
+  const [suggested, setSuggested] = useState<SuggestionSelection>({ options: [], draftedAt: null, anyEdited: false });
+  const aiDraft = suggested.draftedAt !== null ? { draftedAt: suggested.draftedAt, edited: suggested.anyEdited } : null;
   const [ownerId, setOwnerId] = useState(userId ?? '');
   const [neededBy, setNeededBy] = useState('');
   const [links, setLinks] = useState<{ elementId: UUID; name: string }[]>(() =>
     prefill ? prefill.linkedElements.map((el) => ({ elementId: el.id, name: el.name })) : [],
   );
 
+  // The Designer is pointed at the first thing the decision is about: the finding behind the form, or whatever the person has linked.
+  const designerElementId = designerInputFromPrefill(prefill)?.elementId ?? links[0]?.elementId;
+
   const resetForm = () => {
     setTitle('');
     setStatement('');
-    setAiDraft(null);
+    setSuggested({ options: [], draftedAt: null, anyEdited: false });
     setOwnerId(userId ?? '');
     setNeededBy('');
     setLinks([]);
@@ -98,6 +102,8 @@ export function DecisionsView({ modelId, orgId, userId, orgSlug, modelSlug, canC
                 links: links.map((l) => ({ linkedType: 'element' as const, linkedId: l.elementId })),
               }).then((decision) => {
                 if (decision) {
+                  // The options the person kept are saved on the decision page as it opens, one by one, so a failure there can be retried without losing them.
+                  if (suggested.options.length > 0 && userId) savePending(localStorage, pendingKey(orgId, userId, decision.id), suggested.options, clockNow());
                   resetForm();
                   void navigate(`/o/${orgSlug}/m/${modelSlug}/decisions/${decision.id}`);
                 }
@@ -113,16 +119,20 @@ export function DecisionsView({ modelId, orgId, userId, orgSlug, modelSlug, canC
                 setTitle(e.target.value);
               }}
             />
-            <textarea
-              className={styles.textarea}
-              placeholder="Context — why this decision needs making"
-              value={statement}
-              onChange={(e) => {
-                setStatement(e.target.value);
-                setAiDraft((prev) => (prev === null ? prev : { ...prev, edited: true }));
-              }}
-            />
-            {designerInput === null && !designerAvailable && designerUnavailable !== null && designerInputFromPrefill(prefill) !== null && (
+            <label>
+              <Text as="span" size="sm">
+                What the options need to solve
+              </Text>
+              <textarea
+                className={styles.textarea}
+                placeholder="Context — why this decision needs making"
+                value={statement}
+                onChange={(e) => {
+                  setStatement(e.target.value);
+                }}
+              />
+            </label>
+            {!designerAvailable && designerUnavailable !== null && (
               <div data-testid="designer-unavailable">
                 <Text as="p" tone="muted" size="sm">
                   {designerUnavailable.text}{' '}
@@ -130,15 +140,15 @@ export function DecisionsView({ modelId, orgId, userId, orgSlug, modelSlug, canC
                 </Text>
               </div>
             )}
-            {designerInput !== null && (
-              <DesignerPanel
-                modelId={modelId}
-                input={designerInput}
-                onUse={(text, info) => {
-                  setAiDraft({ draftedAt: info.draftedAt, edited: info.edited });
-                  setStatement((prev) => (prev.trim() === '' ? text : `${prev.trim()}\n\nDesigner's draft options:\n${text}`));
-                }}
-              />
+            {designerAvailable && userId && designerElementId !== undefined && (
+              <DesignerSuggestions orgId={orgId} userId={userId} modelId={modelId} elementId={designerElementId} brief={statement.trim() !== '' ? statement : title} scope={`decisions-${modelId}`} onChange={setSuggested} />
+            )}
+            {designerAvailable && designerElementId === undefined && (
+              <div data-testid="designer-needs-link">
+                <Text as="p" tone="muted" size="sm">
+                  To get suggested options, say below what this decision is about (a system or capability).
+                </Text>
+              </div>
             )}
             <div className={styles.formRow}>
               <Text as="label" size="sm" tone="muted">
@@ -186,7 +196,7 @@ export function DecisionsView({ modelId, orgId, userId, orgSlug, modelSlug, canC
               />
             )}
             <Button variant="primary" type="submit" disabled={status === 'creating' || !ownerId || title.trim().length === 0}>
-              {status === 'creating' ? 'Starting…' : 'Start decision'}
+              {status === 'creating' ? 'Starting…' : suggested.options.length > 0 ? `Start decision with ${String(suggested.options.length)} suggested ${suggested.options.length === 1 ? 'option' : 'options'}` : 'Start decision'}
             </Button>
           </form>
           {error !== null && <Text as="p">{error}</Text>}

@@ -584,16 +584,16 @@ Deno.serve(async (req: Request) => {
 
     // Agents run on the organisation's OWN key (Phase D, Simon 2026-11-19), never the platform key.
     // `useOrgKey: true` is allowed only when every switch is on (assistant, agents, a saved key) and
-    // the caller is an owner or architect of the organisation. Otherwise it is refused outright: it
+    // the caller is an owner, architect or contributor of the organisation (a viewer is refused, as is anyone outside it). Otherwise it is refused outright: it
     // never falls back to the platform key, so an organisation without a key cannot spend ours.
     let orgApiKey: string | null = null;
     if (bodyRecord.useOrgKey === true) {
-      const refuse = () => jsonResponse({ status: 'error', message: 'Agents are not available for this organisation: an owner needs to switch them on and save an AI key, and only an owner or architect can run them.' }, 403);
+      const refuse = () => jsonResponse({ status: 'error', message: 'Agents are not available for this organisation: an owner needs to switch them on and save an AI key, and only an owner, architect or contributor can run them.' }, 403);
       const { data: userData, error: userError } = await callerClient.auth.getUser();
       if (userError || !userData.user) return refuse();
       const { data: own, error: ownError } = await callerClient.from('members').select('role').eq('org_id', orgId).eq('user_id', userData.user.id).maybeSingle();
       const role = (own as { role?: string } | null)?.role;
-      if (ownError || (role !== 'owner' && role !== 'architect')) return refuse();
+      if (ownError || (role !== 'owner' && role !== 'architect' && role !== 'contributor')) return refuse();
       const { data: orgRow, error: orgError } = await serviceClient.from('organisations').select('ai_assistant_enabled, ai_agents_enabled, ai_agent_key_set').eq('id', orgId).maybeSingle();
       const flags = orgRow as { ai_assistant_enabled?: boolean; ai_agents_enabled?: boolean; ai_agent_key_set?: boolean } | null;
       if (orgError || flags?.ai_assistant_enabled !== true || flags.ai_agents_enabled !== true || flags.ai_agent_key_set !== true) return refuse();

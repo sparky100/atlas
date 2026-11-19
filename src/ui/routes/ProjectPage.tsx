@@ -13,6 +13,8 @@ import { useBranchLabel } from '../branches/useBranchLabel';
 import { useSelectedRef } from '../branches/useSelectedRef';
 import { refLabelOf } from '../../db/ref';
 import { useModels } from '../models/useModels';
+import { useMembers } from '../orgs/useMembers';
+import { profileLabel } from '../comments/profileLabel';
 import { useMembership } from '../orgs/useMembership';
 import { canOfferDesigner, designerUnavailableReason } from '../decisions/designerRequest';
 import { useOrganisationBySlug } from '../orgs/useOrganisationBySlug';
@@ -32,6 +34,8 @@ export function ProjectPage() {
   const { models, loading: modelsLoading } = useModels(organisation?.id ?? null);
   const model = models.find((m) => m.slug === modelSlug);
   const { role } = useMembership(organisation?.id ?? null, userId);
+  const { members } = useMembers(organisation?.id ?? null);
+  const ownerNames = members.filter((m) => m.member.role === 'owner').map((m) => profileLabel(m.profile));
   const { state, reload } = useProject(model?.id ?? '', projectId ?? '');
   const title = state.status === 'ready' ? state.data.project.title : 'Project';
   // Overdue is relative to today's date; read once per render, never stored.
@@ -70,7 +74,7 @@ export function ProjectPage() {
           {state.status === 'not_found' && <Text as="p">This project doesn't exist in this model, or you can't see it.</Text>}
           {state.status === 'error' && <Text as="p">{state.message}</Text>}
           {state.status === 'ready' && (
-            <ProjectView data={state.data} modelName={model.name} orgId={organisation?.id ?? ''} modelId={model.id} orgSlug={orgSlug ?? ''} modelSlug={model.slug} userId={userId} role={role} today={today} reload={reload} designerAvailable={canOfferDesigner(designerArgs)} designerUnavailable={designerUnavailableReason(designerArgs)} />
+            <ProjectView data={state.data} modelName={model.name} orgId={organisation?.id ?? ''} modelId={model.id} orgSlug={orgSlug ?? ''} modelSlug={model.slug} userId={userId} role={role} today={today} reload={reload} designerAvailable={canOfferDesigner(designerArgs)} designerUnavailable={designerUnavailableReason({ ...designerArgs, ownerNames })} />
           )}
         </main>
       </div>

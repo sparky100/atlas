@@ -48,6 +48,8 @@ import { exportDecisionAsAdrMarkdown } from './exportDecisionAsAdr';
 import type { DecisionPageState } from './useDecision';
 import { useDecisionComparison, type DecisionComparisonOption } from './useDecisionComparison';
 import { useDecisionOptions } from './useDecisionOptions';
+import { usePendingOptions } from './usePendingOptions';
+import { optionProvenance } from './optionProvenance';
 import { useDecisionRatings } from './useDecisionRatings';
 import { groupWhatChangesRows, type WhatChangesRow } from './whatChangesRows';
 import styles from './DecisionView.module.css';
@@ -88,6 +90,8 @@ export function DecisionView({ modelId, decisionId, orgId, orgSlug, modelSlug, r
   const { branch: main } = useMainBranch(modelId);
   const { members } = useMembers(orgId);
   const optionsState = useDecisionOptions(applyNewOption, applyDecisionUpdate, refreshOptionsAndArguments);
+  // Options kept from the Designer's suggestions are saved here as the page opens (journey proposal step 2).
+  const pendingOptions = usePendingOptions({ orgId, modelId, decisionId, userId, projectId: state.status === 'ready' ? state.decision.project_id : null, canAdd: state.status === 'ready' && state.decision.status === 'proposed' && canCreateChangeBranch(role), applyNewOption });
   const navigate = useNavigate();
   // `?edit=1` (from "Start decision" on a project) opens the decision's own edit form straight away.
   const [searchParams] = useSearchParams();
@@ -365,6 +369,27 @@ export function DecisionView({ modelId, decisionId, orgId, orgSlug, modelSlug, r
       {(branchLinks.length > 0 || canAddOption) && (
         <Panel>
           <CollapsibleSection title="Options" meta={`(${String(branchLinks.length)})`}>
+          {pendingOptions.waiting > 0 && (
+            <div role={pendingOptions.status === 'failed' ? 'alert' : 'status'} data-testid="pending-options">
+              {pendingOptions.status === 'failed' ? (
+                <>
+                  <Text as="p">
+                    {pendingOptions.waiting === 1 ? 'One suggested option is not saved yet.' : `${String(pendingOptions.waiting)} suggested options are not saved yet.`} {pendingOptions.error} The ones already saved are below. Nothing is lost: you can try again.
+                  </Text>
+                  <Button variant="secondary" onClick={pendingOptions.retry}>
+                    Save them again
+                  </Button>{' '}
+                  <Button variant="secondary" onClick={pendingOptions.discard}>
+                    Leave them out
+                  </Button>
+                </>
+              ) : (
+                <Text as="p" size="sm">
+                  Saving your suggested options… {String(pendingOptions.waiting)} to go.
+                </Text>
+              )}
+            </div>
+          )}
           {baselineBranch !== undefined && (
             <DecisionBaselineCard
               key={`${decision.stay_risk}\u0000${decision.stay_reason}`}
@@ -411,6 +436,8 @@ export function DecisionView({ modelId, decisionId, orgId, orgSlug, modelSlug, r
                   isChosen: decision.branch_id === b.id,
                   summary: comparison.status === 'ready' ? (comparison.optionSummaries.get(b.id) ?? null) : null,
                   canChoose: canChoose && b.status === 'draft',
+                  description: b.description,
+                  provenance: optionProvenance(pendingOptions.marks.get(b.id), (id) => profileLabel(members.find((m) => m.member.user_id === id)?.profile)),
                 }));
               return (
                 <DecisionCriteriaGrid

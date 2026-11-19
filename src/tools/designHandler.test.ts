@@ -68,13 +68,25 @@ describe('handleDesign', () => {
     expect(asked).toBe(MODEL.orgId);
   });
 
-  it('only an owner or architect can run it', async () => {
-    for (const role of ['contributor', 'viewer', null]) {
+  it('an owner, architect or contributor can run it; a viewer or an outsider cannot', async () => {
+    for (const role of ['viewer', null]) {
       const d = deps({ callerRole: () => Promise.resolve(role) });
       expect((await handleDesign(d, body)).status).toBe('forbidden');
       expect(d.calls).toEqual([]);
     }
-    expect((await handleDesign(deps({ callerRole: () => Promise.resolve('owner') }), body)).status).toBe('done');
+    for (const role of ['owner', 'architect', 'contributor']) {
+      expect((await handleDesign(deps({ callerRole: () => Promise.resolve(role) }), body)).status).toBe('done');
+    }
+  });
+
+  it('returns the options as a checked structure, and marks an unusable answer incomplete', async () => {
+    const ok = JSON.stringify({ options: [{ title: 'Configure', summary: 'Use it as is.' }, { title: 'Replace', summary: 'Buy one.' }], gaps: [], stayNote: 'Slow.' });
+    const good = await handleDesign(deps({ createClient: () => ({ complete: () => Promise.resolve({ text: ok, stopReason: 'end_turn', inputTokens: 1, outputTokens: 1 }) }) }), body);
+    expect(good.status === 'done' && good.design.problems).toEqual([]);
+    expect(good.status === 'done' && good.design.options).toHaveLength(2);
+    const prose = await handleDesign(deps(), body);
+    expect(prose.status === 'done' && prose.design.problems.length).toBeGreaterThan(0);
+    expect(prose.status === 'done' && prose.design.options).toEqual([]);
   });
 
   it('withholds run cost from the agent unless the owner shares it', async () => {
@@ -100,7 +112,7 @@ describe('handleDesign', () => {
 
 describe('parseDesignBody', () => {
   it('rejects malformed input with a plain message', () => {
-    for (const bad of [null, {}, { ...body, modelId: 'x' }, { ...body, elementId: 'x' }, { ...body, finding: '  ' }, { ...body, finding: 'x'.repeat(301) }]) {
+    for (const bad of [null, {}, { ...body, modelId: 'x' }, { ...body, elementId: 'x' }, { ...body, finding: '  ' }, { ...body, finding: 'x'.repeat(1001) }]) {
       expect(typeof parseDesignBody(bad)).toBe('string');
     }
   });
@@ -110,9 +122,10 @@ describe('parseDesignBody', () => {
 });
 
 describe('the Designer prompt', () => {
-  it('always names the Stay as we are baseline and treats retirement as an option, never a conclusion', () => {
+  it('leaves Stay as we are to Atlas, asks for one JSON object, and treats retirement as an option, never a conclusion', () => {
     const prompt = designerSystemPrompt('Estate', '2026-11-19');
-    expect(prompt).toContain('Stay as we are');
+    expect(prompt).toContain('Atlas always adds it');
+    expect(prompt).toContain('one JSON object');
     expect(prompt).toMatch(/never present retirement as the conclusion/i);
     expect(prompt).toContain('draft for a person to edit');
   });

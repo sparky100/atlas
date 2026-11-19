@@ -517,6 +517,21 @@ export interface DecisionArgumentRow {
 }
 
 /** The literal shape of a row in `decision_links` — a polymorphic link from a decision to whatever it concerns (`element`/`relationship`) or offers as an option (`branch`, F3's own options mechanism) or cites (`assumption`/`evidence`). Primary key `(decision_id, linked_type, linked_id)`, so no `id` column of its own. */
+/** The literal shape of a row in `decision_option_marks` (`20261120010000_decision_option_marks.sql`). */
+export interface DecisionOptionMarkRow {
+  decision_id: UUID;
+  branch_id: UUID;
+  agent: 'designer';
+  drafted_at: string;
+  draft_run_id: UUID | null;
+  suggested_title: string;
+  suggested_summary: string;
+  edited_by: UUID | null;
+  edited_at: string | null;
+  created_by: UUID;
+  created_at: string;
+}
+
 export interface DecisionLinkRow {
   decision_id: UUID;
   linked_type: DecisionLinkedType;

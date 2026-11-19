@@ -1,0 +1,78 @@
+import type { UUID } from '../../contracts/delta';
+
+/**
+ * Suggested options a person has chosen to carry into a decision, held until
+ * each one is saved (journey proposal, continuity). Browser-held, per
+ * organisation and per person, and they expire after 24 hours, so a draft is
+ * not kept indefinitely on a shared machine. Nothing is stored on the server
+ * until an option is actually added. Pure apart from the storage handle it is
+ * given.
+ *
+ * `id` is created when the card is made and becomes the option's branch id,
+ * so adding the same option twice (a retry, a double click) can never create a
+ * second one.
+ */
+export interface PendingOption {
+  id: UUID;
+  title: string;
+  summary: string;
+  toWeigh: string;
+  /** What the Designer actually said, kept for the option's mark. */
+  suggestedTitle: string;
+  suggestedSummary: string;
+  draftedAt: string;
+}
+
+export const PENDING_TTL_MS = 24 * 60 * 60 * 1000;
+
+export interface StorageLike {
+  getItem(key: string): string | null;
+  setItem(key: string, value: string): void;
+  removeItem(key: string): void;
+}
+
+export function pendingKey(orgId: UUID, userId: UUID, decisionId: UUID): string {
+  return `atlas:pending-options:${orgId}:${userId}:${decisionId}`;
+}
+
+interface Stored {
+  savedAt: number;
+  options: PendingOption[];
+}
+
+export function savePending(storage: StorageLike, key: string, options: readonly PendingOption[], now: number): void {
+  if (options.length === 0) {
+    storage.removeItem(key);
+    return;
+  }
+  const stored: Stored = { savedAt: now, options: [...options] };
+  storage.setItem(key, JSON.stringify(stored));
+}
+
+/** What is still waiting to be saved, or nothing when it is absent, unreadable or older than 24 hours (and then it is removed). */
+export function loadPending(storage: StorageLike, key: string, now: number): PendingOption[] {
+  const raw = storage.getItem(key);
+  if (raw === null) return [];
+  try {
+    const stored = JSON.parse(raw) as Partial<Stored>;
+    if (typeof stored.savedAt !== 'number' || now - stored.savedAt > PENDING_TTL_MS || !Array.isArray(stored.options)) throw new Error('stale');
+    return stored.options.filter((o): o is PendingOption => typeof o.id === 'string' && typeof o.title === 'string' && o.title.trim() !== '');
+  } catch {
+    storage.removeItem(key);
+    return [];
+  }
+}
+
+export function removePending(storage: StorageLike, key: string, id: UUID, now: number): void {
+  savePending(storage, key, loadPending(storage, key, now).filter((o) => o.id !== id), now);
+}
+
+/** The text stored as the option's description: the plain summary, then what to weigh on its own line. */
+export function optionDescription(option: Pick<PendingOption, 'summary' | 'toWeigh'>): string {
+  return option.toWeigh.trim() === '' ? option.summary.trim() : `${option.summary.trim()}\n\nTo weigh: ${option.toWeigh.trim()}`;
+}
+
+/** The clock, read in one place so callers in render code do not each call it. */
+export function clockNow(): number {
+  return Date.now();
+}
