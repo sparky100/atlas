@@ -138,11 +138,11 @@ export function hiddenNoteFor(retired: number, changes: number, showPast: boolea
 }
 
 /**
- * "By project" is about change: a system that simply carries on (no planned
+ * Every roadmap is about change (Simon, 2026-11-19: "more than that is clutter"): a system that simply carries on (no planned
  * end, no support end, not planned or retired, and no change touching it in
- * this mode) says nothing about a project, so it is left off, and a group
- * left empty goes with it. The other groupings keep every system — there the
- * roadmap is also a lifecycle view of the whole estate.
+ * this mode) says nothing on a roadmap, so it is left off, and a group
+ * left empty goes with it. A vendor support end is an external deadline, so it
+ * keeps a system or module on every roadmap.
  */
 export function onlyChangingSystems(groups: readonly RoadmapGroup[], branchEvents: readonly RoadmapBranchEvents[], mode: RoadmapMode): RoadmapGroup[] {
   return groups
@@ -150,5 +150,6 @@ export function onlyChangingSystems(groups: readonly RoadmapGroup[], branchEvent
       ...group,
       bars: group.bars.filter((bar) => bar.plannedEnd !== undefined || bar.supportEndsAt !== undefined || bar.lifecycleTag !== undefined || eventsForSystem(bar.systemId, branchEvents, mode).length > 0),
     }))
-    .filter((group) => group.bars.length > 0);
+    // A domain with project bars stays even when no system in it is changing: the projects are the change.
+    .filter((group) => group.bars.length > 0 || (group.projectBars?.length ?? 0) > 0);
 }
