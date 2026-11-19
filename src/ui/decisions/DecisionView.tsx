@@ -236,9 +236,34 @@ export function DecisionView({ modelId, decisionId, orgId, orgSlug, modelSlug, r
             {decision.statement || 'No context recorded.'}
           </Text>
         </div>
-        {decision.status === 'accepted' && (
+      </Panel>
+
+      {decision.status === 'accepted' && (
+        <Panel>
+          <Text as="h2" size="lg">
+            What we chose, why, and what would make us reconsider
+          </Text>
           <div className={styles.field}>
-            <Text as="h2" size="lg">
+            <Text as="h3" size="sm" tone="muted">
+              What we chose
+            </Text>
+            <Text as="p">{chosenBranch !== undefined ? (chosenBranch.title ?? chosenBranch.name) : 'An option that is no longer linked to this decision.'}</Text>
+            {decision.decided_at !== null && (
+              <Text as="p" size="sm" tone="muted">
+                Decided {decision.decided_at.slice(0, 10)}
+              </Text>
+            )}
+          </div>
+          <div className={styles.field}>
+            <Text as="h3" size="sm" tone="muted">
+              Why
+            </Text>
+            <Text as="p" tone={args.some((a) => a.stance === 'for') ? 'default' : 'muted'}>
+              {args.find((a) => a.stance === 'for')?.body ?? 'No reasons recorded.'}
+            </Text>
+          </div>
+          <div className={styles.field}>
+            <Text as="h3" size="sm" tone="muted">
               What would make us reconsider
             </Text>
             <Text as="p" tone={decision.reconsider_if ? 'default' : 'muted'}>
@@ -250,8 +275,8 @@ export function DecisionView({ modelId, decisionId, orgId, orgSlug, modelSlug, r
               </Text>
             )}
           </div>
-        )}
-      </Panel>
+        </Panel>
+      )}
 
       <Panel>
         <Text as="h2" size="lg">

@@ -104,9 +104,9 @@ test('rate decision options on judgement criteria, leave some unrated, choose on
 
   // The decision shows the chosen option and the rationale recorded at Choose time.
   await expect(optionAHeader).toContainText('chosen');
-  await expect(page.getByText('Option 1 is cheaper and ready sooner.')).toBeVisible();
+  await expect(page.getByText('Option 1 is cheaper and ready sooner.').first()).toBeVisible();
   // And what would make them reconsider, recorded at the same moment.
-  await expect(page.getByRole('heading', { name: 'What would make us reconsider' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'What we chose, why, and what would make us reconsider' })).toBeVisible();
   await expect(page.getByText('The vendor price rises or support is extended.')).toBeVisible();
 
   // The page never blanked during Choose — the marker set above is still

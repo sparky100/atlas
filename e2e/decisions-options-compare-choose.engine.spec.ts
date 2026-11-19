@@ -142,7 +142,7 @@ test('add three options to a decision, compare them, choose one; the chosen opti
 
   await expect(page.getByText('accepted', { exact: true })).toBeVisible();
   await expect(page.getByText('chosen', { exact: true })).toBeVisible();
-  await expect(page.getByText('Option B is the only one that actually adds the replacement capacity.')).toBeVisible();
+  await expect(page.getByText('Option B is the only one that actually adds the replacement capacity.').first()).toBeVisible();
 
   // The comparison table never blanked or refetched during Choose — same
   // DOM node (the marker survived), same per-option numbers as before.
