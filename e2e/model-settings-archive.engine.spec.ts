@@ -76,11 +76,13 @@ test('archive a model, see it move to the collapsed Archived section, restore it
   // 5. A direct link still resolves, read-only — item 1's own "read-only
   // when opened" requirement, distinct from "hidden from lists".
   await page.goto(`/o/${orgSlug}/m/${modelSlug}/settings`);
+  await expandAllSettingsSections(page);
   await expect(page.getByLabel('Name', { exact: true })).toBeDisabled();
   await expect(page.getByRole('button', { name: 'Save' })).toHaveCount(0);
 
   // 6. Restore is owner-only: the architect sees no Restore control at all.
   await architectPage.goto(`/o/${orgSlug}/m/${modelSlug}/settings`);
+  await expandAllSettingsSections(architectPage);
   await expect(architectPage.getByRole('button', { name: 'Restore model' })).toHaveCount(0);
   await expect(architectPage.getByText('Only an owner can restore an archived model.')).toBeVisible();
 
@@ -99,6 +101,8 @@ test('delete refuses a model that is not archived; archiving first and typing th
   const { orgSlug, modelSlug } = fixture;
 
   await page.goto(`/o/${orgSlug}/m/${modelSlug}/settings`);
+
+  await expandAllSettingsSections(page);
   // Not archived yet — Delete isn't offered at all (the prompt's own "only
   // when archived"), not shown-then-refused.
   await expect(page.getByRole('button', { name: 'Delete model' })).toHaveCount(0);
@@ -148,6 +152,7 @@ test('a freshly created model appears under Models, not Archived; archiving one 
   // Both models — the fixture's own and this second one — show under the
   // ordinary "Models" list, and no "Archived" section renders at all.
   await page.goto(`/o/${orgSlug}/m/${fixture.modelSlug}/settings`);
+  await expandAllSettingsSections(page);
   const firstModelName = await page.getByLabel('Name', { exact: true }).inputValue();
   await page.goto(`/o/${orgSlug}`);
   await expect(page.getByRole('link', { name: new RegExp(firstModelName) })).toBeVisible();

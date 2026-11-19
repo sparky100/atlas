@@ -330,7 +330,7 @@ export function OrganisationSettingsView({ organisation, role, userId, onChanged
       </SettingsSection>
 
       {canManage && (
-        <SettingsSection id="invite" title="Invite by email" summary={invites.length > 0 ? `${String(invites.length)} pending` : undefined}>
+        <SettingsSection id="invite" title="Invite by email" summary={invites.length > 0 ? `${String(invites.length)} waiting to join` : undefined}>
           <Text as="p" tone="muted" size="sm">
             No email is sent. The invited address joins with the chosen role the moment they sign up or next sign in.
           </Text>

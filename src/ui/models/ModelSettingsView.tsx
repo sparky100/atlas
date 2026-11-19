@@ -222,7 +222,7 @@ export function ModelSettingsView({ model, role, orgId, orgSlug, onChanged }: Mo
       )}
 
       {canArchiveModel(role) && (
-        <SettingsSection id="archive" title={isArchived ? 'Restore' : 'Archive'} summary={isArchived ? 'Archived' : 'Active'}>
+        <SettingsSection id="archive" title={isArchived ? 'Restore' : 'Archive'} summary={isArchived ? 'This model is archived' : 'This model is active'}>
           {!isArchived && (
             <>
               <Text as="p" tone="muted" size="sm">
