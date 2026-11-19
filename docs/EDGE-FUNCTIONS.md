@@ -446,3 +446,8 @@ The read-only API (ADR-031, `docs/API.md`). Holds the service-role key (provided
 ## `connector-fetch`
 
 Live connectors (ADR-032, `docs/import/mulesoft/connector.md`). Called with the signed-in user's own session (JWT verified by the platform): the connector row is read as that user, so owner/architect row-level security is the permission check, then the service role reads the one secret from Supabase Vault. Deploy with `pnpm functions:deploy:connector-fetch`, after the migration `20261113060000_org_connectors.sql` (which enables the Vault extension). Outbound HTTPS to `anypoint.mulesoft.com` (or the `eu1`/`gov` host) must be allowed. Live behaviour against a real Anypoint organisation has not been verified: after deploying, an owner sets up a connection in Organisation settings and presses **Test connection**.
+
+## `org-ai-key`
+
+Phase D step 1. Saves or removes an organisation's own AI key (for agents). POST `{ orgId, action: 'set' | 'clear', key? }` with the caller's session. The caller must be an owner of the organisation (checked through their own session); only then does the function use the service role to call `atlas.set_org_ai_key` / `atlas.clear_org_ai_key`, which keep the key in Vault. The key is never returned, logged or put in an error. Replies `saved`, `cleared`, `invalid` (400), `forbidden` (403) or a plain `error` (500). Deploy with `pnpm functions:deploy:org-ai-key` (default JWT verification stays on). Until it is deployed, the Agents section of organisation settings says it cannot reach the key service.
+

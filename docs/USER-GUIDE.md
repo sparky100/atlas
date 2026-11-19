@@ -309,7 +309,7 @@ A report that uses a health-finding filter cannot be saved yet; the page says so
 
 **Analyse → Ask Atlas** (or press Ctrl-K and type "ask") lets you ask a question about the model in plain words, such as "Which systems are critical?".
 
-- It is **off until an organisation owner switches it on**, in organisation settings under Ask Atlas. While it is on, your questions and the names, descriptions, attributes and relationships of the elements needed to answer them are sent to our AI provider. Comments and unreviewed imports are not sent. **Annual run cost is not sent unless an owner also ticks "Also share annual run cost with Ask Atlas"** (off by default), and then only as a band.
+- It is **off until an organisation owner switches it on**, in organisation settings under Ask Atlas. While it is on, your questions and the names, descriptions, attributes and relationships of the elements needed to answer them are sent to our AI provider. Comments and unreviewed imports are not sent. **Annual run cost is not sent unless an owner also ticks "Also share annual run cost with AI"** (off by default), and then only as a band.
 - It can only read. It cannot change anything. It can answer about elements and how they connect, saved reports, data-quality findings, portfolio signals, and the changes, decisions, projects, goals and principles recorded for the model (summaries only; comments and unreviewed imports are not read).
 - Every element it names is a link to that element's page. An answer that names no element is marked **Ungrounded**, and a reference it could not verify is removed and flagged. Open **What was looked up** under an answer to see each lookup and how many results it found.
 - Answers come from the live model only (Claude Desktop, below, can also read a change). They are for today, like the Portfolio and the landscape: planned and retired systems are left out, and the answer says when it has left some out. Ask for them by name, or ask what is planned, and it includes them. It uses the words the app uses, for example **Planned action**, and explains **uses** and **flows to** as this guide does. Long lists are cut short, and the answer says so.
@@ -351,7 +351,7 @@ A **version** is a named, permanent snapshot of the live model at a point in tim
 
 ## Settings
 
-- **Organisation settings** (owners): the organisation's name, **members** and their roles, **invite by email**, the **membership audit** log, **custom attributes**, and deleting the organisation.
+- **Organisation settings** (owners): the organisation's name, **members** and their roles, **invite by email**, the **membership audit** log, **custom attributes**, and deleting the organisation. Owners can also save the organisation's own **AI key** under **Agents** (never shown again, removable). It prepares for the agents Atlas will offer, which will run on that key rather than Atlas's own; no agent is released yet, so saving a key and switching agents on changes nothing today.
 - **Model settings**: name and description; **archive** a model you've finished with (architects and owners), and **restore** or **delete** an archived one (owners); **share with another organisation** — read-only access to the live model or to one version, never edit access.
 - **Your profile** (the **•••** menu at the top right → Profile): your name, **notifications**, and your signed-in **sessions**.
 

@@ -20,6 +20,7 @@ supabase/.branches/
 # hand-edited, so never worth reviewing as a diff.
 supabase/functions/capture-run/index.ts
 supabase/functions/ask-model/index.ts
+supabase/functions/org-ai-key/index.ts
 supabase/functions/api/index.ts
 supabase/functions/connector-fetch/index.ts
 

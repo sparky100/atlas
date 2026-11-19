@@ -29,6 +29,10 @@ export interface OrganisationRow {
   ai_assistant_enabled: boolean;
   /** An owner has also allowed run cost to be sent to the AI provider (Ask Atlas and AI apps). Off by default: cost is never shared unless the organisation chooses. Only meaningful while `ai_assistant_enabled` is on. */
   ai_share_run_cost: boolean;
+  /** Phase D: an owner has switched agents on. They also need `ai_assistant_enabled` and a saved organisation key (`ai_agent_key_set`) — fail closed at the point of use. Off by default. */
+  ai_agents_enabled: boolean;
+  /** Phase D: whether the organisation's own AI key is saved (in Vault, never readable by a client). Set only by the `org-ai-key` function; no client can update it. */
+  ai_agent_key_set: boolean;
   /** Calendar days a reviewer has to respond before a change review is flagged overdue (1–90, default 5). Set via `atlas.set_review_period` (owner/architect). */
   review_period_days: number;
   /** Months a value can go unchecked before it is flagged stale (1–60, default 12). Set via `atlas.set_stale_threshold` (owner/architect). */
