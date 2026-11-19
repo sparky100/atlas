@@ -249,6 +249,8 @@ is anything sent to the provider. It also reads the organisation's
 from every tool result. After this change `ask-model` must be redeployed
 (`pnpm functions:deploy:ask-model`); until then it still sends the cost band.
 
+The `api` function reads the same `ai_share_run_cost` flag for the key's organisation: unless it is on, run cost is removed from every API result. `api` must be redeployed for this to take effect.
+
 The response is `application/x-ndjson`: `{"type":"event",...}` lines as
 lookups start and finish, then one `{"type":"result",...}` (status `done`,
 `not_found`, `disabled`, `empty_model` or `invalid`) or

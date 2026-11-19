@@ -59,8 +59,13 @@ Deno.serve(async (req: Request) => {
           if (error) throw new Error(`Could not read the main line: ${error.message}`);
           return (data as { head_commit_id?: string | null } | null)?.head_commit_id ?? null;
         },
-        // Not an AI path: the read-only API-key API returns data to the key holder, never to a model, so run cost stays as it always was.
-        createContext: (model, commitId) => createToolContext(supabase, model, commitId, { runCost: 'share' }),
+        // Run cost goes only to a key whose organisation has chosen to share it with AI (the same owner switch as Ask Atlas): an API key is often handed to an outside AI client, so the default is to withhold it.
+        createContext: async (model, commitId, orgId) => {
+          const { data, error } = await supabase.from('organisations').select('ai_share_run_cost').eq('id', orgId).maybeSingle();
+          if (error) throw new Error(`Could not read the organisation: ${error.message}`);
+          const share = (data as { ai_share_run_cost?: boolean } | null)?.ai_share_run_cost === true;
+          return createToolContext(supabase, model, commitId, { runCost: share ? 'share' : 'exclude' });
+        },
       },
       { method: req.method, path, query: url.searchParams, authorization: req.headers.get('Authorization') },
     );
