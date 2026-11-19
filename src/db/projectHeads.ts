@@ -1,7 +1,7 @@
 /**
  * The live model's head and each open change's own head, folded from the
  * same commit history `loadChangeSummary` reads — what the project page's
- * before/after panels (`src/ui/projects/projectBeforeAfter.ts`) compare.
+ * before/after panels (`src/ui/projects/projectBeforeAfterModel.ts`) compare.
  * Read-only; nothing here writes or stores a head.
  */
 import type { UUID } from '../contracts/delta';

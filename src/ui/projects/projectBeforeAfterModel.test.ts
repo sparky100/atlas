@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { ElementType, RelationshipType } from '../../contracts/delta';
 import { emptyHead, type Head } from '../../engine/deltas';
-import { buildProjectBeforeAfter } from './projectBeforeAfter';
+import { buildProjectBeforeAfter } from './projectBeforeAfterModel';
 
 const NOW = new Date('2026-11-19T00:00:00Z');
 

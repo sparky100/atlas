@@ -7,7 +7,7 @@ import { Chip } from '../components/Chip/Chip';
 import { Panel } from '../components/Panel/Panel';
 import { Text } from '../components/Text/Text';
 import { supabase } from '../supabaseClient';
-import { buildProjectBeforeAfter, type BeforeAfterColumn, type BeforeAfterMark } from './projectBeforeAfter';
+import { buildProjectBeforeAfter, type BeforeAfterColumn, type BeforeAfterMark } from './projectBeforeAfterModel';
 import styles from './ProjectBeforeAfter.module.css';
 
 const OPEN_STATUSES = new Set(['draft', 'proposed', 'in_review', 'approved']);
