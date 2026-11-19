@@ -101,3 +101,32 @@
   flex-wrap: wrap;
   gap: var(--space-2);
 }
+
+/* B1: the journey strip — four steps in a row, stacking on a phone. State is always words, never colour alone. */
+.journey {
+  list-style: none;
+  margin: var(--space-2) 0 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: var(--space-3);
+}
+
+.journeyStep {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  padding: var(--space-2) var(--space-3);
+  border: var(--border-width) solid var(--border);
+  border-radius: var(--radius-md);
+}
+
+.journeyStep[data-state='next'] {
+  border-color: var(--text);
+}
+
+@media (max-width: 767px) {
+  .journey {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
