@@ -58,6 +58,8 @@ export function DecisionsView({ modelId, orgId, userId, orgSlug, modelSlug, canC
   // title/statement/link the person already touched.
   const [title, setTitle] = useState(() => prefill?.title ?? '');
   const [statement, setStatement] = useState(() => prefill?.statement ?? '');
+  // Set when the Designer's draft is put into the context, so the decision says an agent helped (Simon, 2026-11-19). Editing the context afterwards marks it edited.
+  const [aiDraft, setAiDraft] = useState<{ draftedAt: string; edited: boolean } | null>(null);
   const [ownerId, setOwnerId] = useState(userId ?? '');
   const [neededBy, setNeededBy] = useState('');
   const [links, setLinks] = useState<{ elementId: UUID; name: string }[]>(() =>
@@ -67,6 +69,7 @@ export function DecisionsView({ modelId, orgId, userId, orgSlug, modelSlug, canC
   const resetForm = () => {
     setTitle('');
     setStatement('');
+    setAiDraft(null);
     setOwnerId(userId ?? '');
     setNeededBy('');
     setLinks([]);
@@ -91,6 +94,7 @@ export function DecisionsView({ modelId, orgId, userId, orgSlug, modelSlug, canC
                 neededBy,
                 // An empty key is the element page's own "Start a decision…" (no finding behind it).
                 ...(prefill && prefill.sourceFindingKey !== '' ? { sourceFindingKey: prefill.sourceFindingKey } : {}),
+                ...(aiDraft !== null ? { aiDraft: { agent: 'designer' as const, draftedAt: aiDraft.draftedAt, edited: aiDraft.edited } } : {}),
                 links: links.map((l) => ({ linkedType: 'element' as const, linkedId: l.elementId })),
               }).then((decision) => {
                 if (decision) {
@@ -115,6 +119,7 @@ export function DecisionsView({ modelId, orgId, userId, orgSlug, modelSlug, canC
               value={statement}
               onChange={(e) => {
                 setStatement(e.target.value);
+                setAiDraft((prev) => (prev === null ? prev : { ...prev, edited: true }));
               }}
             />
             {designerInput === null && !designerAvailable && designerUnavailable !== null && designerInputFromPrefill(prefill) !== null && (
@@ -129,7 +134,8 @@ export function DecisionsView({ modelId, orgId, userId, orgSlug, modelSlug, canC
               <DesignerPanel
                 modelId={modelId}
                 input={designerInput}
-                onUse={(text) => {
+                onUse={(text, info) => {
+                  setAiDraft({ draftedAt: info.draftedAt, edited: info.edited });
                   setStatement((prev) => (prev.trim() === '' ? text : `${prev.trim()}\n\nDesigner's draft options:\n${text}`));
                 }}
               />

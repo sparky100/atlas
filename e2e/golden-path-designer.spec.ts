@@ -99,4 +99,11 @@ test('the Designer drafts options from a finding, editable, and only when agents
 
   const overflow = await page.evaluate(() => document.documentElement.scrollWidth > document.documentElement.clientWidth + 1);
   expect(overflow).toBe(false);
+
+  // Starting the decision records that the Designer helped, and the decision says so for good.
+  await page.getByRole('combobox').first().selectOption({ index: 1 });
+  await page.getByRole('button', { name: 'Start decision' }).click();
+  await expect(page.getByRole('heading', { name: 'Keep, link or retire Quote Tool?' })).toBeVisible();
+  await expect(page.getByTestId('decision-ai-mark')).toContainText('AI helped with this: Drafted by the Designer on');
+  await expect(page.getByTestId('decision-ai-mark')).toContainText('then edited by a person');
 });

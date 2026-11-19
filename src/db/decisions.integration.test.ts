@@ -177,6 +177,52 @@ describe('decisions/decision_links/decision_arguments/assumptions/evidence again
     expect(listed.map((d) => d.id)).toContain(decision.id);
   });
 
+  it('AI marks (step F): set at creation and read back; only ai_draft_edited can be updated; another organisation sees and changes nothing', async () => {
+    const draftedAt = '2026-11-19T18:00:00.000Z';
+    const decision = await createDecision(alice.client, {
+      id: randomUUID(),
+      orgId,
+      modelId,
+      title: 'Drafted with the Designer',
+      statement: "Designer's draft options:\n1. Stay as we are.",
+      ownerId: alice.id,
+      aiDraft: { agent: 'designer', draftedAt, edited: false },
+      createdBy: alice.id,
+    });
+    expect(decision).toMatchObject({ ai_draft_agent: 'designer', ai_draft_edited: false });
+    expect(new Date(decision.ai_drafted_at ?? '').toISOString()).toBe(draftedAt);
+
+    // A fully human decision carries no mark.
+    const human = await createDecision(alice.client, { id: randomUUID(), orgId, modelId, title: 'Written by hand', statement: 'Context.', ownerId: alice.id, createdBy: alice.id });
+    expect(human).toMatchObject({ ai_draft_agent: null, ai_drafted_at: null, ai_draft_edited: false });
+
+    // The one updatable AI-mark column.
+    const edited = await updateDecision(alice.client, decision.id, { aiDraftEdited: true });
+    expect(edited.ai_draft_edited).toBe(true);
+
+    // The agent and the time are not in the update grant: Postgres refuses them.
+    const { error: agentError } = await alice.client.from('decisions').update({ ai_draft_agent: null }).eq('id', decision.id);
+    expect(agentError).not.toBeNull();
+    const { error: timeError } = await alice.client.from('decisions').update({ ai_drafted_at: null }).eq('id', decision.id);
+    expect(timeError).not.toBeNull();
+
+    // The marks are consistent: an edited mark needs an agent, and agent and time go together.
+    await expect(service.from('decisions').update({ ai_draft_edited: true }).eq('id', human.id).then((r) => r.error?.message ?? '')).resolves.toMatch(/ai_draft_edited_needs_agent/);
+    await expect(service.from('decisions').update({ ai_draft_agent: 'designer' }).eq('id', human.id).then((r) => r.error?.message ?? '')).resolves.toMatch(/ai_draft_together/);
+
+    // Another organisation's signed-in user cannot read the decision or change its mark.
+    const outsider = await createSignedInUser('decisions-ai-outsider');
+    try {
+      await createOrganisation(outsider.client, { id: randomUUID(), name: 'Outsider Org', slug: `outsider-${randomUUID().slice(0, 8)}`, createdBy: outsider.id });
+      expect(await getDecision(outsider.client, decision.id)).toBeNull();
+      const { data: touched } = await outsider.client.from('decisions').update({ ai_draft_edited: false }).eq('id', decision.id).select('id');
+      expect(touched ?? []).toHaveLength(0);
+      expect((await getDecision(alice.client, decision.id))?.ai_draft_edited).toBe(true);
+    } finally {
+      await service.auth.admin.deleteUser(outsider.id);
+    }
+  });
+
   it('a plain update to title/statement succeeds while proposed; status/decided_by/branch_id are never touchable by a plain update', async () => {
     const decision = await createDecision(alice.client, { id: randomUUID(), orgId, modelId, title: 'Draft title', statement: 'Draft context.', ownerId: alice.id, createdBy: alice.id });
 

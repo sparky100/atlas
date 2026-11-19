@@ -465,6 +465,11 @@ export interface DecisionRow {
   superseded_decision_id: UUID | null;
   /** ADR-024: the project this decision is part of (its decision log); `null` is a portfolio-level decision. Moved only through `atlas.set_decision_project`, so option changes follow (P1). */
   project_id: UUID | null;
+  /** Which agent drafted part of the context (only the Designer so far); `null` is fully human. Set at creation only. */
+  ai_draft_agent: 'designer' | null;
+  ai_drafted_at: string | null;
+  /** A person edited the agent's draft before using it, or the context afterwards. */
+  ai_draft_edited: boolean;
   created_by: UUID;
   created_at: string;
 }
