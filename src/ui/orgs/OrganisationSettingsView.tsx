@@ -10,6 +10,7 @@ import { Text } from '../components/Text/Text';
 import { TypedNameConfirm } from '../components/TypedNameConfirm/TypedNameConfirm';
 import type { MemberRole, OrganisationRow } from '../../db/types';
 import { formatDate, formatRelativeTime } from '../time';
+import { AgentsPanel } from './AgentsPanel';
 import { ApiKeysPanel } from './ApiKeysPanel';
 import { ConnectorsPanel } from './ConnectorsPanel';
 import { AttributeDefinitionsPanel } from './AttributeDefinitionsPanel';
@@ -65,7 +66,7 @@ export function OrganisationSettingsView({ organisation, role, userId, onChanged
   // above already uses for create).
   const [resendStatusByInviteId, setResendStatusByInviteId] = useState<Record<UUID, 'sending' | 'sent' | 'error'>>({});
   const navigate = useNavigate();
-  const sectionIds = ['organisation', 'review', 'stale', 'ask', 'members', 'sign-in', 'api', 'connections', 'attributes', ...(canManage ? ['invite', 'audit', 'delete'] : [])];
+  const sectionIds = ['organisation', 'review', 'stale', 'ask', 'agents', 'members', 'sign-in', 'api', 'connections', 'attributes', ...(canManage ? ['invite', 'audit', 'delete'] : [])];
   const sectionsState = useSettingsSectionsState(`org-${organisation.id}`, 'organisation');
   // Real label/input association (`htmlFor`/`id`) — `ModelSettingsView.tsx`'s
   // own fix for the same issue (a sibling `Text as="label"` with no `for`
@@ -268,6 +269,10 @@ export function OrganisationSettingsView({ organisation, role, userId, onChanged
             </Text>
           )}
         {error !== null && <Text as="p">{error}</Text>}
+      </SettingsSection>
+
+      <SettingsSection id="agents" title="Agents" summary={organisation.ai_agents_enabled ? 'On' : organisation.ai_agent_key_set ? 'Key set · off' : 'Off · no key'}>
+        <AgentsPanel organisation={organisation} canManage={canManage} saving={status === 'saving'} onChanged={onChanged} onToggleAgents={(enabled) => { void update({ aiAgentsEnabled: enabled }); }} />
       </SettingsSection>
 
       <SettingsSection id="members" title="Members" summary={`${String(members.length)} ${members.length === 1 ? 'person' : 'people'}`}>
