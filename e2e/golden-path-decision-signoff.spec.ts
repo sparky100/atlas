@@ -26,6 +26,9 @@ test('the person who froze a pack cannot sign it; only the latest version is ope
   await packs.getByRole('button', { name: 'Freeze a pack' }).click();
   await expect(packs.getByText(/Version 1 — frozen .* — not signed yet/)).toBeVisible();
 
+  // Review progress by capacity: nobody has been heard from yet, and no capacity is required.
+  await expect(packs.getByRole('list', { name: 'Capacities heard from on version 1' }).getByText('Architecture: not heard from')).toBeVisible();
+
   const form = packs.getByRole('group', { name: 'Sign off version 1' });
   await expect(form.getByRole('button', { name: 'Approve this version' })).toBeDisabled();
   await form.getByLabel('Signing as').selectOption({ label: 'Architecture' });
