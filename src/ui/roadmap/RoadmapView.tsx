@@ -10,7 +10,7 @@ import type { RoadmapFilters } from './roadmapFilter';
 import type { RoadmapMode } from './roadmapEligibility';
 import type { RoadmapProjectBar, RoadmapUnplacedProject } from './roadmapProjectBars';
 import { roadmapBarCaption, type RoadmapGroup, type RoadmapLifecycleBar } from './roadmapLifecycleRows';
-import { computeRoadmapAxisTicks, isWithinRange, percentAtIso, supportEndPlacement, thinAxisTicksToFit, todayPercent, type RoadmapGranularity, type RoadmapHorizon, type RoadmapTimelineRange } from './roadmapTimelineScale';
+import { computeRoadmapAxisTicks, isWithinRange, percentAtIso, supportEndPlacement, thinAxisTicksToFit, todayPercent, unsupportedRunPlacement, type RoadmapGranularity, type RoadmapHorizon, type RoadmapTimelineRange } from './roadmapTimelineScale';
 import { changeDescription, computeRoadmapVisibleData, eventsForSystem, hiddenNoteFor, recentRoadmapChanges, roadmapRangeFor } from './roadmapVisibleData';
 import styles from './RoadmapView.module.css';
 
@@ -47,7 +47,8 @@ export interface RoadmapViewProps {
  * capability map redesign's own "fact, not a flag" stance forward: a thin
  * shape and colour, never a filled alarm treatment.
  */
-function RoadmapRow({ bar, events, range, todayPct, showPast, orgSlug, modelSlug, found }: { found: boolean; showPast: boolean; bar: RoadmapLifecycleBar; events: readonly { event: RoadmapBranchEvents['events'][number]; branch: RoadmapBranchEvents['branch'] }[]; range: RoadmapTimelineRange; todayPct: number | undefined; orgSlug: string; modelSlug: string }) {
+function RoadmapRow({ bar, events, range, todayPct, now, showPast, orgSlug, modelSlug, found }: { found: boolean; showPast: boolean; bar: RoadmapLifecycleBar; events: readonly { event: RoadmapBranchEvents['events'][number]; branch: RoadmapBranchEvents['branch'] }[]; range: RoadmapTimelineRange; todayPct: number | undefined; now: Date; orgSlug: string; modelSlug: string }) {
+  const unsupported = unsupportedRunPlacement(bar.supportEndsAt, bar.plannedEnd, range, now);
   const startPct = percentAtIso(bar.introduced, range);
   const endPct = percentAtIso(bar.plannedEnd, range);
   const supportEnd = supportEndPlacement(bar.supportEndsAt, range);
@@ -70,6 +71,12 @@ function RoadmapRow({ bar, events, range, todayPct, showPast, orgSlug, modelSlug
         {/* A bar means "until its planned end". With no end planned there is nothing to draw: a grey bar running to the edge of the window was clutter, saying only that the system continues (Simon, 2026-11-19). The row, its caption, support-end tick and change markers still show. */}
         {bar.plannedEnd !== undefined && (
           <div className={styles.lifecycleBar} data-tone={bar.lifecycleStatus === 'retiring' || bar.lifecycleStatus === 'retired' ? 'warn' : 'neutral'} style={{ left: `${String(left)}%`, width: `${String(Math.max(width, 0.5))}%` }} />
+        )}
+        {/* Support has ended and no end is planned: still live, without vendor support. A dashed run in the support-end colour from the tick to the edge, with words so it is never colour alone (Simon, 2026-11-19). */}
+        {unsupported !== undefined && (
+          <div className={styles.unsupportedRun} data-testid="unsupported-run" style={{ left: `${String(unsupported.startPct)}%`, width: `${String(100 - unsupported.startPct)}%` }} title={`Vendor support ended ${bar.supportEndsAt ?? ''}; no end date planned`}>
+            <span className={styles.unsupportedLabel}>Unsupported since {bar.supportEndsAt}, no end planned</span>
+          </div>
         )}
         {todayPct !== undefined && <div className={styles.todayLine} style={{ left: `${String(todayPct)}%` }} title="Today" aria-hidden="true" />}
         {supportEnd !== undefined && <div className={styles.supportEndTick} data-edge={supportEnd.edge} style={{ left: `${String(supportEnd.pct)}%` }} title={`${supportEnd.edge === 'before' ? 'Vendor support ended' : 'Vendor support ends'} ${bar.supportEndsAt ?? ''}`} />}
@@ -273,7 +280,7 @@ export function RoadmapView({ groupsLabel = 'Capability domains', groups, branch
                 <div role="list" aria-label={`${group.label} systems`}>
                   {group.bars.map((bar) => (
                     <div key={bar.systemId} role="listitem">
-                      <RoadmapRow bar={bar} events={eventsForSystem(bar.systemId, branchEvents, mode)} range={range} todayPct={todayPct} showPast={showPast} orgSlug={orgSlug} modelSlug={modelSlug} found={found?.id === bar.systemId} />
+                      <RoadmapRow bar={bar} events={eventsForSystem(bar.systemId, branchEvents, mode)} range={range} todayPct={todayPct} now={now} showPast={showPast} orgSlug={orgSlug} modelSlug={modelSlug} found={found?.id === bar.systemId} />
                     </div>
                   ))}
                 </div>

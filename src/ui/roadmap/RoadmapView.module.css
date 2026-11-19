@@ -105,6 +105,34 @@
   background: var(--status-warn);
 }
 
+.unsupportedRun {
+  position: absolute;
+  top: 4px;
+  height: 12px;
+  box-sizing: border-box;
+  border: 1px dashed var(--status-danger);
+  border-radius: var(--radius-sm);
+  /* Open at the right: it runs to the edge of the window, with no end planned. */
+  border-right: 0;
+  border-top-right-radius: 0;
+  border-bottom-right-radius: 0;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+}
+
+/* Clipped with an ellipsis rather than wrapped, so it fits any width and any resize. */
+.unsupportedLabel {
+  padding-left: calc(var(--space-1) + 4px);
+  font-size: var(--text-xs-size);
+  line-height: 1;
+  color: var(--text-muted);
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  overflow: hidden;
+  min-width: 0;
+}
+
 .supportEndTick {
   position: absolute;
   top: -4px;
