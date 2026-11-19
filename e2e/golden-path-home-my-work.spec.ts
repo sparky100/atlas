@@ -6,7 +6,7 @@
  * kind that stands alone.
  */
 import { expect, test } from '@playwright/test';
-import { addCapability, goToModelHome, signUpCreateOrgAndModel } from './fixtures/goldenPath';
+import { addCapability, clickNavItem, goToModelHome, signUpCreateOrgAndModel } from './fixtures/goldenPath';
 
 test('My work lists the project, not the decision options inside it', async ({ page }) => {
   test.slow();
