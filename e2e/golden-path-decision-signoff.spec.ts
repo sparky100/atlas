@@ -1,16 +1,17 @@
 /**
  * Phase C2: sign-off on a frozen decision pack. Click-only from Home.
- * A "just me" organisation has nobody else to sign, so its owner may sign the
- * pack they froze (the two-person refusal is proved in the integration test,
- * with a second signed-in user). This walks: freeze version 1, sign it as the
- * Architecture capacity, see it approved; a material edit frozen as version 2
- * starts unsigned, because a sign-off never carries over to a later version.
+ * One signed-in person in an ordinary organisation froze the pack, so the
+ * database refuses their own sign-off (the two-person approval, a viewer and
+ * another organisation are proved in the integration test, which has several
+ * signed-in users). This walks what that person sees: freeze version 1, try
+ * to sign it and be told why not, then freeze version 2, which is the latest
+ * and so the only version still open to sign.
  */
 import { randomUUID } from 'node:crypto';
 import { expect, test } from '@playwright/test';
 import { signUpCreateOrgAndModel, clickNavItem } from './fixtures/goldenPath';
 
-test('sign a frozen pack as one capacity; a new version starts unsigned', async ({ page }) => {
+test('the person who froze a pack cannot sign it; only the latest version is open to sign', async ({ page }) => {
   await signUpCreateOrgAndModel(page, 'decisionsignoff');
 
   await clickNavItem(page, 'Decisions');
@@ -30,8 +31,8 @@ test('sign a frozen pack as one capacity; a new version starts unsigned', async 
   await form.getByLabel('Signing as').selectOption({ label: 'Architecture' });
   await form.getByLabel('Comment (optional)').fill('Fits the target landscape.');
   await form.getByRole('button', { name: 'Approve this version' }).click();
-  await expect(packs.getByText(/Version 1 — frozen .* — approved by 1/)).toBeVisible();
-  await expect(packs.getByRole('list', { name: 'Sign-offs on version 1' }).getByText(/Architecture: approved .* — Fits the target landscape\./)).toBeVisible();
+  await expect(page.getByText(/the person who froze a pack cannot sign it/)).toBeVisible();
+  await expect(packs.getByText(/Version 1 — frozen .* — not signed yet/)).toBeVisible();
 
   // Freezing again makes version 2, which nobody has signed.
   await packs.getByRole('button', { name: 'Freeze as version 2' }).click();
