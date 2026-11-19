@@ -144,9 +144,11 @@ export function DecisionsView({ modelId, orgId, userId, orgSlug, modelSlug, canC
               <DesignerSuggestions orgId={orgId} userId={userId} modelId={modelId} elementId={designerElementId} brief={statement.trim() !== '' ? statement : title} scope={`decisions-${modelId}`} onChange={setSuggested} />
             )}
             {designerAvailable && designerElementId === undefined && (
-              <Text as="p" tone="muted" size="sm" data-testid="designer-needs-link">
-                To get suggested options, say below what this decision is about (a system or capability).
-              </Text>
+              <div data-testid="designer-needs-link">
+                <Text as="p" tone="muted" size="sm">
+                  To get suggested options, say below what this decision is about (a system or capability).
+                </Text>
+              </div>
             )}
             <div className={styles.formRow}>
               <Text as="label" size="sm" tone="muted">

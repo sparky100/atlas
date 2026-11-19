@@ -214,9 +214,11 @@ export function DesignerSuggestions({ orgId, userId, modelId, elementId, brief, 
         </>
       )}
       {all.length > 0 && (
-        <Text as="p" size="sm" data-testid="designer-selection">
+        <div data-testid="designer-selection">
+        <Text as="p" size="sm">
           {included.length === 0 ? 'No suggestions are included. The decision will start with only staying as we are.' : `${String(included.length)} ${included.length === 1 ? 'suggestion' : 'suggestions'} will be added as options when you start the decision. They stay editable there.`}
         </Text>
+        </div>
       )}
     </div>
   );
