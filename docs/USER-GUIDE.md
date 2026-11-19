@@ -305,6 +305,14 @@ On **Elements** and **Portfolio**, **Save as report…** keeps the page's curren
 
 A report that uses a health-finding filter cannot be saved yet; the page says so.
 
+### Draft options with the Designer
+
+When you start a decision from a finding (for example **Keep, link or retire?** on a system with no capability link), owners and architects in an organisation that has agents switched on see **Draft options with the Designer**. It reads what Atlas holds about that system and drafts a short set of options as plain text, always including **Stay as we are**, and never treating retirement as a conclusion. Run cost is left out unless an owner shares it.
+
+- The draft appears in a box you can edit. **Add to the context above** puts your edited text into the decision's context; nothing is recorded until you press **Start decision**, and the Designer never changes the model or approves anything.
+- It says which records it was based on. If it cites none, it says so: check it carefully.
+- It runs on the organisation's own AI key (organisation settings, **Agents**), not Atlas's. If it cannot run, it says why in one sentence.
+
 ## Ask Atlas
 
 **Analyse → Ask Atlas** (or press Ctrl-K and type "ask") lets you ask a question about the model in plain words, such as "Which systems are critical?".
@@ -351,7 +359,7 @@ A **version** is a named, permanent snapshot of the live model at a point in tim
 
 ## Settings
 
-- **Organisation settings** (owners): the organisation's name, **members** and their roles, **invite by email**, the **membership audit** log, **custom attributes**, and deleting the organisation. Owners can also save the organisation's own **AI key** under **Agents** (never shown again, removable). It prepares for the agents Atlas will offer, which will run on that key rather than Atlas's own; no agent is released yet, so saving a key and switching agents on changes nothing today.
+- **Organisation settings** (owners): the organisation's name, **members** and their roles, **invite by email**, the **membership audit** log, **custom attributes**, and deleting the organisation. Owners can also save the organisation's own **AI key** under **Agents** (never shown again, removable). Agents run on that key rather than Atlas's own, because they use a lot of AI time. The first is the **Designer** (see Decisions): with a key saved, Ask Atlas on and **Allow agents** ticked, owners and architects see a **Draft options with the Designer** button on a decision started from a finding.
 - **Model settings**: name and description; **archive** a model you've finished with (architects and owners), and **restore** or **delete** an archived one (owners); **share with another organisation** — read-only access to the live model or to one version, never edit access.
 - **Your profile** (the **•••** menu at the top right → Profile): your name, **notifications**, and your signed-in **sessions**.
 
