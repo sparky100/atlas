@@ -239,7 +239,7 @@ export function OrganisationSettingsView({ organisation, role, userId, onChanged
             Ask Atlas
           </Text>
           <Text as="p" tone="muted" size="sm">
-            When Ask Atlas is on, the questions members ask, and the names, descriptions, attributes and relationships of the elements needed to answer them, are sent to our AI provider to produce each answer. It also covers Draft with AI on the Changes page: the brief you write and the names, descriptions, attributes and relationships of the model's current elements are sent to our AI provider to suggest edits. Comments and unreviewed imports are not sent. It also covers AI apps that members connect to Atlas on their own computer (such as Claude Desktop): while it is off, those apps get no model content. Nothing is sent while it is off.
+            When Ask Atlas is on, the questions members ask, and the names, descriptions, attributes and relationships of the elements needed to answer them, are sent to our AI provider to produce each answer. It also covers Draft with AI on the Changes page: the brief you write and the names, descriptions, attributes and relationships of the model's current elements are sent to our AI provider to suggest edits. Comments and unreviewed imports are not sent. It also covers AI apps that members connect to Atlas on their own computer (such as Claude Desktop): while it is off, those apps get no model content. Nothing is sent while it is off. Run cost is never part of that unless you also allow it below.
           </Text>
           <label className={styles.checkRow}>
             <input
@@ -254,6 +254,22 @@ export function OrganisationSettingsView({ organisation, role, userId, onChanged
               Allow Ask Atlas for this organisation
             </Text>
           </label>
+          <label className={styles.checkRow}>
+            <input
+              type="checkbox"
+              checked={organisation.ai_share_run_cost}
+              disabled={!canManage || status === 'saving' || !organisation.ai_assistant_enabled}
+              onChange={(e) => {
+                void update({ aiShareRunCost: e.target.checked });
+              }}
+            />
+            <Text as="span" size="sm">
+              Also share annual run cost with Ask Atlas
+            </Text>
+          </label>
+          <Text as="p" tone="muted" size="sm">
+            Off by default. Run cost is commercially sensitive, so Ask Atlas and connected AI apps cannot see it, filter by it or compare on it until an owner turns this on. It is shared as a band (for example “£100k–£500k”), never an exact figure.
+          </Text>
           {!canManage && (
             <Text as="p" tone="muted" size="sm">
               Only an owner can change this.

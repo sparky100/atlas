@@ -9,7 +9,7 @@
 import type { UUID } from '../contracts/delta';
 import { runAsk } from './askLoop';
 import type { AskEvent, AskModelClient, AskResult, AskTurn } from './askLoop';
-import type { ToolContext, ToolStamp } from './types';
+import type { RunCostSharing, ToolContext, ToolStamp } from './types';
 
 export interface AskModelInfo {
   id: UUID;
@@ -24,7 +24,9 @@ export interface AskHandlerDeps {
   isEnabled: (orgId: UUID) => Promise<boolean>;
   /** Head commit of the model's main line, or `null` when it has none. */
   mainCommit: (modelId: UUID) => Promise<UUID | null>;
-  createContext: (model: AskModelInfo, commitId: UUID) => ToolContext;
+  /** The owning organisation's `ai_share_run_cost` (default off): whether run cost may reach the model. */
+  shareRunCost: (orgId: UUID) => Promise<boolean>;
+  createContext: (model: AskModelInfo, commitId: UUID, runCost: RunCostSharing) => ToolContext;
   createClient: (orgId: UUID) => AskModelClient;
 }
 
@@ -71,7 +73,8 @@ export async function handleAsk(deps: AskHandlerDeps, body: unknown, onEvent?: (
   const commitId = await deps.mainCommit(model.id);
   if (!commitId) return { status: 'empty_model' };
 
-  const ctx = deps.createContext(model, commitId);
+  const runCost: RunCostSharing = (await deps.shareRunCost(model.orgId)) ? 'share' : 'exclude';
+  const ctx = deps.createContext(model, commitId, runCost);
   const result = await runAsk({ client: deps.createClient(model.orgId), ctx, history: parsed.history, question: parsed.question, onEvent });
   return { status: 'done', result, stamp: ctx.stamp };
 }

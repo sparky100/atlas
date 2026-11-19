@@ -69,12 +69,17 @@ Deno.serve(async (req: Request) => {
               if (error) throw new Error(`Could not read the organisation: ${error.message}`);
               return (data as { ai_assistant_enabled?: boolean } | null)?.ai_assistant_enabled === true;
             },
+            shareRunCost: async (orgId) => {
+              const { data, error } = await supabase.from('organisations').select('ai_share_run_cost').eq('id', orgId).maybeSingle();
+              if (error) throw new Error(`Could not read the organisation: ${error.message}`);
+              return (data as { ai_share_run_cost?: boolean } | null)?.ai_share_run_cost === true;
+            },
             mainCommit: async (modelId) => {
               const { data, error } = await supabase.from('branches').select('head_commit_id').eq('model_id', modelId).eq('kind', 'main').maybeSingle();
               if (error) throw new Error(`Could not read the main line: ${error.message}`);
               return (data as { head_commit_id?: string | null } | null)?.head_commit_id ?? null;
             },
-            createContext: (model: AskModelInfo, commitId) => createToolContext(supabase, { id: model.id, name: model.name }, commitId),
+            createContext: (model: AskModelInfo, commitId, runCost) => createToolContext(supabase, { id: model.id, name: model.name }, commitId, { runCost }),
             createClient: (orgId) => createProxyAskClient({ proxyUrl: `${supabaseUrl}/functions/v1/llm-proxy`, authorization: authHeader, anonKey: supabaseAnonKey, orgId }),
           },
           body,

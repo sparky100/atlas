@@ -59,7 +59,8 @@ Deno.serve(async (req: Request) => {
           if (error) throw new Error(`Could not read the main line: ${error.message}`);
           return (data as { head_commit_id?: string | null } | null)?.head_commit_id ?? null;
         },
-        createContext: (model, commitId) => createToolContext(supabase, model, commitId),
+        // Not an AI path: the read-only API-key API returns data to the key holder, never to a model, so run cost stays as it always was.
+        createContext: (model, commitId) => createToolContext(supabase, model, commitId, { runCost: 'share' }),
       },
       { method: req.method, path, query: url.searchParams, authorization: req.headers.get('Authorization') },
     );
