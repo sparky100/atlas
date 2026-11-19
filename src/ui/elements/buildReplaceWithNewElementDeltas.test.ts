@@ -103,11 +103,11 @@ describe('buildReplaceWithNewElementDeltas', () => {
     expect(created.attributes).toEqual({ role: 'secondary', description: 'the main one' });
   });
 
-  it('leaves uses and flows_to edges on the old element for review — only capability links are copied', () => {
+  it('copies uses and flows_to links with their direction and attributes, and leaves the old links in place', () => {
     const a = system('a', 'Old System');
     const usesEdge = rel('r2', 'uses', 'a', 'other-system', { description: 'looks up prices' });
     const flowsEdge = rel('r3', 'flows_to', 'other-system', 'a', { description: 'sends readings to' });
-    const { deltas } = buildReplaceWithNewElementDeltas({
+    const { deltas, newElementId } = buildReplaceWithNewElementDeltas({
       element: a,
       facts: NO_FACTS,
       relationships: [usesEdge, flowsEdge],
@@ -118,8 +118,30 @@ describe('buildReplaceWithNewElementDeltas', () => {
     });
 
     expect(deltas.some((d) => d.kind === 'relationship.retract')).toBe(false);
-    const types = (deltas.filter((d) => d.kind === 'relationship.create') as unknown as { relationshipType: string }[]).map((d) => d.relationshipType);
-    expect(types).toEqual(['replaces']);
+    const creates = deltas.filter((d) => d.kind === 'relationship.create') as unknown as { relationshipType: string; fromElementId: string; toElementId: string; attributes: Record<string, unknown> }[];
+    const uses = creates.find((d) => d.relationshipType === 'uses');
+    const flows = creates.find((d) => d.relationshipType === 'flows_to');
+    expect(uses).toMatchObject({ fromElementId: newElementId, toElementId: 'other-system', attributes: { description: 'looks up prices' } });
+    expect(flows).toMatchObject({ fromElementId: 'other-system', toElementId: newElementId, attributes: { description: 'sends readings to' } });
+    expect(creates.map((d) => d.relationshipType).sort()).toEqual(['flows_to', 'replaces', 'uses']);
+  });
+
+  it('copies only the links left ticked', () => {
+    const a = system('a', 'Old System');
+    const usesEdge = rel('r2', 'uses', 'a', 'other-system');
+    const capEdge = rel('r1', 'supports', 'a', 'cap-1');
+    const { deltas } = buildReplaceWithNewElementDeltas({
+      element: a,
+      facts: NO_FACTS,
+      relationships: [usesEdge, capEdge],
+      copyEdgeIds: new Set(['r1']),
+      plannedEnd: '2027-01-01',
+      replacementName: 'New System',
+      sourceId: 'src',
+      onMain: true,
+    });
+    const types = (deltas.filter((d) => d.kind === 'relationship.create') as unknown as { relationshipType: string }[]).map((d) => d.relationshipType).sort();
+    expect(types).toEqual(['replaces', 'supports']);
   });
 
   it('never transfers an owns edge, or a relationship where A is neither endpoint — the only relationship.create is the replaces edge', () => {

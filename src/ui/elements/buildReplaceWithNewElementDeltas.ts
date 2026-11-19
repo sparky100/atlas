@@ -5,6 +5,7 @@ import { buildReplacesDelta } from '../../engine/buildReplacesDelta';
 import { describeEnvelope } from '../../engine/describeEnvelope';
 import type { BranchRow } from '../../db/types';
 import { attributesRecord } from './attributesRecord';
+import { buildCopiedEdgeDeltas } from './replacementEdges';
 
 export interface ReplaceWithNewElementInput {
   /** The retiring element (A) — a system, or (platforms and modules) a container/module, same scope `useElementRetire.ts` already has. */
@@ -15,6 +16,8 @@ export interface ReplaceWithNewElementInput {
   plannedEnd: string;
   /** The new element's (B's) own name — everything else about B is left blank (`defaultCreateAttributes`'s own required-field defaults only), never copied from A: a replacement is usually a different real product (different vendor/version/hosting), so carrying A's values over could silently mislead. */
   replacementName: string;
+  /** Which of A's links to copy onto B (their relationship ids). Absent copies every capability link and interface (`listCopyableEdges`); a person can untick any in the retire panel. */
+  copyEdgeIds?: ReadonlySet<UUID> | undefined;
   sourceId: UUID;
   /** `useElementCreate.ts`'s own `defaultCreateAttributes` context — `lifecycleStatus` defaults to `active` on main, `planned` on a change branch. */
   onMain: boolean;
@@ -37,23 +40,20 @@ export interface ReplaceWithNewElementResult {
  * when B is being created as part of the *same* action, its id is known
  * the instant it's created, so there's nothing to find. One commit:
  * create B, retire A (`lifecycleStatus`/`plannedEnd`, identical to
- * `useElementRetire.ts`), then transfer A's own edges onto B — its
- * `supports` edges (same transfer `useElementRetire.ts` already does,
- * `role: 'secondary'`, never a copy of the original role, for the same
- * primary-collision reasoning that hook's own comment gives) **and**,
- * unlike the existing-replacement case, its `uses`/`flows_to` edges too —
- * safe to copy more freely here since a brand-new B has no relationships
- * of its own yet to collide with (an existing replacement might) — plus
- * the same `replaces` edge (ADR-001 amendment, `buildReplacesDelta`, B
- * replaces A) `useElementRetire.ts`'s own "replaced by" picker now writes.
+ * `useElementRetire.ts`), then copy A's links onto B — its capability
+ * (`supports`) links as `role: 'secondary'` (never the original role, for the
+ * primary-collision reasoning `useElementRetire.ts`'s own comment gives) and
+ * its interfaces (`uses`/`flows_to`, either direction, attributes kept),
+ * all by default, or only the ones the person left ticked (`copyEdgeIds`) —
+ * plus the `replaces` edge (ADR-001 amendment, `buildReplacesDelta`, B
+ * replaces A).
  *
  * Deliberately out of scope, disclosed rather than silently dropped:
  * `owns` edges (an actor's ownership of A) never transfer — a person
- * doing this can add ownership on B separately; and a `uses`/`flows_to`
- * edge naming A as its own `via` (A is an integration platform other
- * flows route through, not itself an endpoint) is invisible here, since
- * `relationships` only ever holds edges where A is `from`/`to` — the
- * exact scope `ElementPageData.relationships` already has.
+ * doing this can add ownership on B separately; and a flow naming A as its
+ * `via` (A is an integration platform other flows route through, not itself
+ * an endpoint) is invisible here, since `relationships` only ever holds edges
+ * where A is `from`/`to`.
  *
  * Extracted as its own pure function (input in, deltas out, no I/O) rather
  * than inlined in a hook the way `useElementRetire.ts` is — this case is
@@ -63,7 +63,7 @@ export interface ReplaceWithNewElementResult {
  * for a comparably complex multi-delta operation.
  */
 export function buildReplaceWithNewElementDeltas(input: ReplaceWithNewElementInput): ReplaceWithNewElementResult {
-  const { element, facts, relationships, plannedEnd, replacementName, sourceId, onMain } = input;
+  const { element, facts, relationships, plannedEnd, replacementName, sourceId, onMain, copyEdgeIds } = input;
   const deltas: Delta[] = [];
   const newElementId = crypto.randomUUID();
 
@@ -112,25 +112,8 @@ export function buildReplaceWithNewElementDeltas(input: ReplaceWithNewElementInp
     confidence: 1,
   } as Delta);
 
-  // Supports: A is always the `from` side (system/container → capability,
-  // ADR-000's own "platforms and modules" amendment) — same transfer
-  // `useElementRetire.ts` already builds.
-  for (const edge of relationships) {
-    if (edge.relationship_type !== 'supports' || edge.from_element_id !== element.element_id) continue;
-    // Copy, never move: A keeps its own link until its planned end passes.
-    const description = attributesRecord(edge.attributes).description;
-    deltas.push({
-      kind: 'relationship.create',
-      id: crypto.randomUUID(),
-      relationshipId: crypto.randomUUID(),
-      relationshipType: 'supports',
-      fromElementId: newElementId,
-      toElementId: edge.to_element_id,
-      attributes: typeof description === 'string' && description.trim() !== '' ? { role: 'secondary', description } : { role: 'secondary' },
-      sourceId,
-      confidence: 1,
-    });
-  }
+  // Capability links (always secondary) and interfaces (`uses`, `flows_to`, either direction, attributes kept): see `replacementEdges.ts`. A copy, never a move — A keeps its own until its planned end.
+  deltas.push(...buildCopiedEdgeDeltas({ oldId: element.element_id, newId: newElementId, relationships, chosen: copyEdgeIds, sourceId }));
 
   deltas.push(buildReplacesDelta(newElementId, element.element_id, sourceId));
 

@@ -5,6 +5,7 @@ import type { BranchRow } from '../../../db/types';
 import { attributesRecord } from '../../elements/attributesRecord';
 import { buildReplaceWithNewElementDeltas } from '../../elements/buildReplaceWithNewElementDeltas';
 import { moduleDisplayName } from '../../elements/moduleDisplayName';
+import { listCopyableEdges } from '../../elements/replacementEdges';
 import { useElementRetire, type RetireReplacement } from '../../elements/useElementRetire';
 import { SYSTEM_OR_MODULE_TYPES, useRelationshipTargetSearch } from '../../elements/useRelationshipTargetSearch';
 import { useReplaceWithNewElement } from '../../elements/useReplaceWithNewElement';
@@ -20,6 +21,8 @@ export interface RetireActionProps {
   element: ElementsHeadRow;
   facts: Map<string, FactsRow>;
   relationships: readonly RelationshipsHeadRow[];
+  /** The elements at the other end of `relationships`, to name each link in the copy list (`ElementPageData.relationshipEndpoints`). */
+  relationshipEndpoints: ReadonlyMap<UUID, ElementsHeadRow>;
   /** The "replaced by" picker's own search pool — always main's real head, same reasoning `ElementSearchAdd.tsx`/`RelationshipAdd.tsx` already give. */
   searchCommitId: UUID;
   branch: BranchRow;
@@ -54,6 +57,7 @@ export function RetireAction({
   element,
   facts,
   relationships,
+  relationshipEndpoints,
   searchCommitId,
   branch,
   expectedHeadCommitId,
@@ -68,6 +72,8 @@ export function RetireAction({
   // existing-element picker. 'creating': the new "doesn't exist yet" mode.
   const [mode, setMode] = useState<'none' | 'searching' | 'creating'>('none');
   const [newReplacementName, setNewReplacementName] = useState('');
+  // Links left unticked are not copied to the replacement. Everything is ticked by default.
+  const [unticked, setUnticked] = useState<ReadonlySet<UUID>>(new Set());
   const plannedEndId = useId();
   const newNameId = useId();
   // A replacement named in the same change as the retire itself (real
@@ -102,6 +108,44 @@ export function RetireAction({
     expectedHeadCommitId,
     onReplaced: onReplacedWithNew,
   });
+  const copyable = listCopyableEdges(element.element_id, relationships, (id) => relationshipEndpoints.get(id)?.name).filter((e) => e.otherId !== replacement?.elementId);
+  const copyEdgeIds: ReadonlySet<UUID> = new Set(copyable.filter((e) => !unticked.has(e.relationshipId)).map((e) => e.relationshipId));
+  const copyList =
+    copyable.length === 0 ? null : (
+      <fieldset className={styles.copyList} data-testid="replacement-copy-list">
+        <legend>
+          <Text as="span" size="sm" tone="muted">
+            Copy these links to the replacement
+          </Text>
+        </legend>
+        {copyable.map((e) => (
+          <label key={e.relationshipId} className={styles.copyRow}>
+            <input
+              type="checkbox"
+              checked={!unticked.has(e.relationshipId)}
+              onChange={(ev) => {
+                const next = new Set(unticked);
+                if (ev.target.checked) next.delete(e.relationshipId);
+                else next.add(e.relationshipId);
+                setUnticked(next);
+              }}
+            />
+            <Text as="span" size="sm">
+              {e.label}
+              {e.kind === 'interface' && (
+                <Text as="span" size="xs" tone="faint">
+                  {' '}
+                  — to confirm: does the replacement connect this way?
+                </Text>
+              )}
+            </Text>
+          </label>
+        ))}
+        <Text as="p" tone="faint" size="xs">
+          Copies only: &ldquo;{element.name}&rdquo; keeps its own links until it is retired.
+        </Text>
+      </fieldset>
+    );
   const busy = status === 'retiring' || replaceStatus === 'replacing';
   // A cheap, real preview — never a hand-summarised approximation
   // (CLAUDE.md rule 7) — computed by calling the same pure builder the
@@ -116,11 +160,12 @@ export function RetireAction({
             relationships,
             plannedEnd: plannedEnd.trim() === '' ? '2099-01-01' : plannedEnd,
             replacementName: newReplacementName.trim(),
+            copyEdgeIds,
             sourceId: 'preview',
             onMain: branch.kind === 'main',
           });
-          const supportsCount = deltas.filter((d) => d.kind === 'relationship.create' && (d as unknown as { relationshipType: string }).relationshipType === 'supports').length;
-          return { supportsCount };
+          const copiedCount = deltas.filter((d) => d.kind === 'relationship.create' && (d as unknown as { relationshipType: string }).relationshipType !== 'replaces').length;
+          return { copiedCount };
         })()
       : null;
 
@@ -145,8 +190,9 @@ export function RetireAction({
       />
 
       {replacement ? (
+        <>
         <Text as="p" size="sm">
-          Replaced by <strong>{replacement.name}</strong> — its capability links are copied to the replacement, and stop showing on the old one after its planned end date.{' '}
+          Replaced by <strong>{replacement.name}</strong> — the links ticked below are copied to the replacement, and the old ones stop counting after its planned end date.{' '}
           <Button
             variant="ghost"
             onClick={() => {
@@ -157,6 +203,8 @@ export function RetireAction({
             Change
           </Button>
         </Text>
+        {copyList}
+        </>
       ) : mode === 'searching' ? (
         <div>
           <input
@@ -232,10 +280,11 @@ export function RetireAction({
               setNewReplacementName(e.target.value);
             }}
           />
+          {copyList}
           {previewCounts && (
             <Text as="p" tone="faint" size="xs">
               This will create <strong>{newReplacementName.trim()}</strong>
-              {previewCounts.supportsCount > 0 ? `, copy ${String(previewCounts.supportsCount)} capability ${previewCounts.supportsCount === 1 ? 'link' : 'links'} to it` : ''}, and retire &ldquo;{element.name}&rdquo;. Other connections stay on &ldquo;{element.name}&rdquo; for you to review.
+              {previewCounts.copiedCount > 0 ? `, copy ${String(previewCounts.copiedCount)} ${previewCounts.copiedCount === 1 ? 'link' : 'links'} to it` : ''}, and retire &ldquo;{element.name}&rdquo;. Ownership and other links stay on &ldquo;{element.name}&rdquo; for you to review.
             </Text>
           )}
           <div className={styles.actions}>
@@ -275,7 +324,7 @@ export function RetireAction({
       <div className={styles.actions}>
         <Button
           variant="primary"
-          onClick={() => (mode === 'creating' ? void replace(plannedEnd, newReplacementName) : void retire(plannedEnd, replacement))}
+          onClick={() => (mode === 'creating' ? void replace(plannedEnd, newReplacementName, copyEdgeIds) : void retire(plannedEnd, replacement, copyEdgeIds))}
           disabled={busy || plannedEnd.trim() === '' || (mode === 'creating' && newReplacementName.trim() === '')}
         >
           {busy ? 'Retiring…' : 'Retire'}

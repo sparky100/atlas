@@ -28,7 +28,7 @@ export interface UseReplaceWithNewElementInput {
 export interface UseReplaceWithNewElementResult {
   status: ReplaceWithNewElementStatus;
   error: string | null;
-  replace: (plannedEnd: string, replacementName: string) => Promise<void>;
+  replace: (plannedEnd: string, replacementName: string, copyEdgeIds?: ReadonlySet<UUID>) => Promise<void>;
 }
 
 /**
@@ -49,7 +49,7 @@ export function useReplaceWithNewElement(input: UseReplaceWithNewElementInput): 
   const queryClient = useQueryClient();
 
   const replace = useCallback(
-    async (plannedEnd: string, replacementName: string) => {
+    async (plannedEnd: string, replacementName: string, copyEdgeIds?: ReadonlySet<UUID>) => {
       if (!userId) {
         setError('You must be signed in to replace this.');
         return;
@@ -77,6 +77,7 @@ export function useReplaceWithNewElement(input: UseReplaceWithNewElementInput): 
           element,
           facts,
           relationships,
+          copyEdgeIds,
           plannedEnd: typeof validated.value === 'string' ? validated.value : plannedEnd,
           replacementName: trimmedName,
           sourceId: source.id,
