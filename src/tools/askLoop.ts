@@ -152,12 +152,14 @@ export interface RunAskInput {
   ctx: ToolContext;
   history: readonly AskTurn[];
   question: string;
+  /** Replaces Ask Atlas's own instructions (the Designer agent brings its own). Absent: Ask Atlas's. */
+  system?: string | undefined;
   onEvent?: ((event: AskEvent) => void) | undefined;
 }
 
 export async function runAsk(input: RunAskInput): Promise<AskResult> {
   const { client, ctx, onEvent } = input;
-  const system = askSystemPrompt(ctx.stamp.modelName, ctx.now().toISOString().slice(0, 10), { runCost: ctx.runCost ?? 'share' });
+  const system = input.system ?? askSystemPrompt(ctx.stamp.modelName, ctx.now().toISOString().slice(0, 10), { runCost: ctx.runCost ?? 'share' });
   const tools = toolDefinitions();
   const question = input.question.trim().slice(0, ASK_MAX_QUESTION_CHARS);
 

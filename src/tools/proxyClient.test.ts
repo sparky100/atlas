@@ -39,3 +39,19 @@ describe('createProxyAskClient', () => {
     await expect(c.complete(REQUEST)).rejects.toThrow(/502/);
   });
 });
+
+describe('createProxyAskClient on the organisation\'s own key', () => {
+  it('asks the proxy to use the organisation key only when told to, and never otherwise', async () => {
+    const sent: Record<string, unknown>[] = [];
+    const fetchFn: typeof fetch = (_url, init) => {
+      sent.push(JSON.parse(init?.body as string) as Record<string, unknown>);
+      return Promise.resolve(Response.json({ status: 'ok', text: 'x', inputTokens: 1, outputTokens: 1 }));
+    };
+    const base = { proxyUrl: 'https://x.test/functions/v1/llm-proxy', authorization: 'Bearer u', anonKey: 'anon', orgId: 'org-1', fetchFn };
+    await createProxyAskClient(base).complete(REQUEST);
+    await createProxyAskClient({ ...base, useOrgKey: true }).complete(REQUEST);
+    expect(sent[0]).not.toHaveProperty('useOrgKey');
+    expect(sent[1]?.useOrgKey).toBe(true);
+  });
+});
+
