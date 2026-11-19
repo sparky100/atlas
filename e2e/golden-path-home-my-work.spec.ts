@@ -26,6 +26,8 @@ test('My work lists the project, not the decision options inside it', async ({ p
   await expect(page.getByText('Build Repairs Hub').first()).toBeVisible();
 
   await goToModelHome(page);
+  // The visit to Overview above is remembered, so switch back to My work.
+  await page.getByRole('button', { name: 'My work', exact: true }).click();
   const list = page.getByTestId('my-work-list');
   await expect(page.getByRole('heading', { name: 'My work' })).toBeVisible();
   await expect(list.getByRole('link', { name: 'Who supports Housing Repairs' })).toBeVisible();
