@@ -14,9 +14,11 @@ import {
   findCriticalExposedSystems,
   findCriticalSystemsPastOrNearSupportEnd,
   findOutgoingWithoutRetiringChange,
+  findProjectsWithoutCapability,
   listOpenProjectScopeForModel,
   loadElementsRetiredByOpenChanges,
   type ElementProjectScope,
+  type ProjectWithoutCapability,
   findAiAgentsActingAloneWithoutTechnicalOwner,
   findCriticalSystemsWithoutBusinessOwner,
   findExternalInterfacesMissingClassification,
@@ -106,6 +108,8 @@ export interface ArchitectHomeInsightsData {
   outgoingWithoutRetiringChange: ElementsHeadRow[];
   /** F11: the open project whose declared scope includes each element, when there is one — the finding names it. */
   projectByElementId: Map<UUID, ElementProjectScope>;
+  /** A1b: open projects whose declared scope names no capability (`findProjectsWithoutCapability`) — the gap A1a's form guard now prevents at creation. */
+  projectsWithoutCapability: ProjectWithoutCapability[];
   /** S1 item 11a's own first Assurance finding: a `uses`/`flows_to` edge crossing the enterprise/external boundary (`isExternal`/`externalOrganisation`, not IT/OT domain) with no data classification. */
   externalInterfacesMissingClassification: ExternalInterfaceCrossing[];
   /** S1 item 11a's own second Assurance row: purely informational — every external actor `uses` edge, naming the organisation and which system it reaches. No classification requirement (see that finding's own doc comment for why). */
@@ -262,6 +266,7 @@ export function useArchitectHomeInsights(modelId: UUID, userId: UUID | null): Ar
             criticalSystemsPastOrNearSupportEnd: findCriticalSystemsPastOrNearSupportEnd(notPlannedSystems),
             outgoingWithoutRetiringChange: findOutgoingWithoutRetiringChange([...systems, ...containers], retiringElementIds, new Map(systems.map((el) => [el.element_id, el]))),
             projectByElementId: new Map(projectScope.map((scope) => [scope.elementId, scope])),
+            projectsWithoutCapability: findProjectsWithoutCapability(projectScope, elementsById),
             externalInterfacesMissingClassification: findExternalInterfacesMissingClassification(liveUsesAndFlowsTo, usesAndFlowsToEndpointsById),
             externalOrganisationAccess: findExternalOrganisationAccess(liveUsesAndFlowsTo, usesAndFlowsToEndpointsById),
           },

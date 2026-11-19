@@ -396,6 +396,24 @@ export function ArchitectHome({ data, modelId, mainCommitIdHint, insights, role,
           : { href: `/o/${orgSlug}/m/${modelSlug}/e/${item.id}`, label: 'View →' };
       },
     },
+    {
+      // A1b: an open project whose declared scope names no capability — the
+      // gap A1a's form guard prevents at creation, surfaced for projects
+      // made before it. Each item is the project itself (its id, not an
+      // element id, so the names line stays plain text); the one action
+      // opens the project, where the derived capabilities can be added in
+      // one click.
+      key: 'project-no-capability',
+      count: insightsData.projectsWithoutCapability.length,
+      summary: `${String(insightsData.projectsWithoutCapability.length)} ${plural(insightsData.projectsWithoutCapability.length, 'project', 'projects')} not tied to a capability`,
+      items: insightsData.projectsWithoutCapability.map((p) => ({ id: p.projectId, label: p.projectTitle })),
+      severity: 'medium',
+      // No elements-browse home — a project isn't an element; for more than
+      // one, the card's action opens the Projects list instead.
+      browseHref: `/o/${orgSlug}/m/${modelSlug}/projects`,
+      browseLabel: 'Review projects →',
+      singleItemAction: (item: HealthFindingItem): FindingCardAction => ({ href: `/o/${orgSlug}/m/${modelSlug}/projects/${item.id}`, label: `Open ${item.label} →` }),
+    },
       ];
   const { active: activeHealthChecks, clear: clearHealthChecks } = partitionHealthChecks(healthChecks);
   // Item 3: informational findings never sit in the grid — they render as

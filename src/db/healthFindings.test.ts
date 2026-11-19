@@ -2,6 +2,9 @@ import { describe, expect, it } from 'vitest';
 import type { ElementsHeadRow, FactsRow, Json, RelationshipsHeadRow } from '../contracts/rows';
 import {
   findOutgoingWithoutRetiringChange,
+  findProjectsWithoutCapability,
+  deriveCapabilitiesForScope,
+  type ElementProjectScope,
   computeSelfOwnedCapabilityIds,
   computeStaleAttributesFinding,
   findBoundaryCrossings,
@@ -964,5 +967,58 @@ describe('findOutgoingWithoutRetiringChange (F11)', () => {
     const ownActive: ElementsHeadRow = { ...module, element_id: 'module-2', attributes: { disposition: 'migrate', lifecycleStatus: 'active', isExternal: false } };
     const byId = new Map([[platform.element_id, platform]]);
     expect(findOutgoingWithoutRetiringChange([platform, module, ownActive], new Set(), byId).map((e) => e.element_id)).toEqual(['module-2']);
+  });
+});
+
+describe('findProjectsWithoutCapability (A1b)', () => {
+  function scope(projectId: string, projectTitle: string, elementId: string): ElementProjectScope {
+    return { projectId, projectTitle, elementId };
+  }
+
+  it('flags an open project whose scope names only systems, and clears one that names a capability', () => {
+    const byId = elementsMap(capability('cap-1'), system('sys-1'), system('sys-2'));
+    const projectScope = [
+      scope('p-no-cap', 'Move off the mainframe', 'sys-1'),
+      scope('p-no-cap', 'Move off the mainframe', 'sys-2'),
+      scope('p-ok', 'Improve billing', 'cap-1'),
+      scope('p-ok', 'Improve billing', 'sys-1'),
+    ];
+    expect(findProjectsWithoutCapability(projectScope, byId)).toEqual([{ projectId: 'p-no-cap', projectTitle: 'Move off the mainframe' }]);
+  });
+
+  it('treats a scope element whose type is unknown (not in the map) as not a capability', () => {
+    const byId = elementsMap(system('sys-1'));
+    const projectScope = [scope('p', 'Legacy project', 'sys-1'), scope('p', 'Legacy project', 'gone')];
+    expect(findProjectsWithoutCapability(projectScope, byId)).toEqual([{ projectId: 'p', projectTitle: 'Legacy project' }]);
+  });
+
+  it('a project with no scope rows at all never reaches the finding', () => {
+    expect(findProjectsWithoutCapability([], elementsMap(capability('cap-1')))).toEqual([]);
+  });
+});
+
+describe('deriveCapabilitiesForScope (A1b)', () => {
+  it('offers the capabilities the scoped systems and modules support, deduped and in first-reached order', () => {
+    const byId = elementsMap(system('sys-1'), container('mod-1', 'plat'), capability('cap-a'), capability('cap-b'));
+    const supports = [
+      relationship('r1', 'supports', 'sys-1', 'cap-a'),
+      relationship('r2', 'supports', 'mod-1', 'cap-b'),
+      relationship('r3', 'supports', 'sys-1', 'cap-b'),
+    ];
+    expect(deriveCapabilitiesForScope(['sys-1', 'mod-1'], supports, byId)).toEqual([
+      { id: 'cap-a', name: 'Capability cap-a' },
+      { id: 'cap-b', name: 'Capability cap-b' },
+    ]);
+  });
+
+  it('skips a capability already in scope, a supporter outside scope, and a target that is not a live capability', () => {
+    const byId = elementsMap(system('sys-1'), system('sys-out'), capability('cap-a'), system('sys-x'));
+    const supports = [
+      relationship('r1', 'supports', 'sys-1', 'cap-a'), // already in scope → skipped
+      relationship('r2', 'supports', 'sys-out', 'cap-b'), // supporter not in scope → skipped
+      relationship('r3', 'supports', 'sys-1', 'cap-gone'), // target not in the map → skipped
+      relationship('r4', 'supports', 'sys-1', 'sys-x'), // target is a system, not a capability → skipped
+    ];
+    expect(deriveCapabilitiesForScope(['sys-1', 'cap-a'], supports, byId)).toEqual([]);
   });
 });

@@ -815,6 +815,82 @@ export async function listOpenProjectScopeForModel(supabase: Client, modelId: UU
   });
 }
 
+/** Plan A1b ("a project must name a capability"): one open project whose declared scope names no capability — its one action opens the project, where the derived capabilities can be added in one click. */
+export interface ProjectWithoutCapability {
+  projectId: UUID;
+  projectTitle: string;
+}
+
+/**
+ * Plan A1b's own finding, the Home half: open (active/on-hold) projects
+ * whose declared element-scope includes no capability — the gap A1a's
+ * "Start a project" form guard now prevents at creation, surfaced for
+ * projects made before it (or ones a capability was later removed from).
+ * A project reaches this finding only through its own scope links, so a
+ * project with no scope at all is not flagged here — there is nothing to
+ * derive a capability from, and A1a already stops a new project starting
+ * empty; the project page's own prompt is where a missing capability gets
+ * added, derived or by hand. Pure over the scope rows
+ * (`listOpenProjectScopeForModel`) and the model's elements, so the same
+ * `elementsById` the other findings already build decides a link's type —
+ * no extra query. One row per project, in first-seen project order; a
+ * project's rows keep the scope query's own `project_id, linked_id`
+ * ordering.
+ */
+export function findProjectsWithoutCapability(
+  projectScope: readonly ElementProjectScope[],
+  elementsById: ReadonlyMap<UUID, ElementsHeadRow>,
+): ProjectWithoutCapability[] {
+  const byProject = new Map<UUID, { title: string; hasCapability: boolean }>();
+  for (const row of projectScope) {
+    const isCapability = elementsById.get(row.elementId)?.element_type === 'capability';
+    const existing = byProject.get(row.projectId);
+    if (existing) existing.hasCapability = existing.hasCapability || isCapability;
+    else byProject.set(row.projectId, { title: row.projectTitle, hasCapability: isCapability });
+  }
+  const findings: ProjectWithoutCapability[] = [];
+  for (const [projectId, { title, hasCapability }] of byProject) {
+    if (!hasCapability) findings.push({ projectId, projectTitle: title });
+  }
+  return findings;
+}
+
+/**
+ * Plan A1b's project-page half: the capabilities a scope-less project could
+ * adopt in one click, derived from the capabilities its own scoped systems
+ * and modules already support (existing `supports` edges only — `from` is
+ * the supporter, `to` the capability). Deduped and name-resolved, in the
+ * order each is first reached walking the scoped systems; a candidate
+ * already in scope, or one that is no longer a live capability, is left
+ * out. Pure — the caller fetches the scoped systems' `supports` edges
+ * (`listSupportsEdgesForSystems`) and resolves the capability names.
+ */
+export function deriveCapabilitiesForScope(
+  scopeIds: readonly UUID[],
+  supportsEdges: readonly RelationshipsHeadRow[],
+  elementsById: ReadonlyMap<UUID, ElementsHeadRow>,
+): { id: UUID; name: string }[] {
+  const scopeSet = new Set(scopeIds);
+  const supporterIds = new Set(
+    scopeIds.filter((id) => {
+      const type = elementsById.get(id)?.element_type;
+      return type === 'system' || type === 'container';
+    }),
+  );
+  const derived: { id: UUID; name: string }[] = [];
+  const seen = new Set<UUID>();
+  for (const edge of supportsEdges) {
+    if (!supporterIds.has(edge.from_element_id)) continue;
+    const capId = edge.to_element_id;
+    if (seen.has(capId) || scopeSet.has(capId)) continue;
+    const cap = elementsById.get(capId);
+    if (cap?.element_type !== 'capability') continue;
+    seen.add(capId);
+    derived.push({ id: capId, name: cap.name });
+  }
+  return derived;
+}
+
 /**
  * A decision-shaped finding (architect-door per-item-action prompt):
  * level-1 capabilities with zero supporting systems anywhere in their own

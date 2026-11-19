@@ -4,6 +4,8 @@ import type { ElementsHeadRow } from '../../contracts/rows';
 import { getMainBranch } from '../../db/branches';
 import { loadChangeSummariesForModel } from '../../db/changeSummary';
 import { getElementsByIds } from '../../db/elements';
+import { deriveCapabilitiesForScope } from '../../db/healthFindings';
+import { listSupportsEdgesForSystems } from '../../db/landscape';
 import { containerParentIds } from '../elements/moduleDisplayName';
 import { listEvidenceForModel } from '../../db/evidence';
 import {
@@ -34,6 +36,10 @@ export interface ProjectData {
   reachedIds: UUID[];
   /** Scope and touched elements that exist on main, plus each module's own platform so it can be named "Platform · Module". */
   elementsById: Map<UUID, ElementsHeadRow>;
+  /** A1b: whether the declared scope already names at least one capability — a project can't stand apart from a capability (A1a enforces it at creation; this surfaces the gap for projects made before it). */
+  scopeHasCapability: boolean;
+  /** A1b: capabilities the project's scoped systems and modules already support, offered to add to the scope in one click — empty when there is nothing to derive, or when the scope already names a capability. */
+  derivedCapabilityCandidates: { id: UUID; name: string }[];
 }
 
 export type ProjectState = { status: 'loading' } | { status: 'not_found' } | { status: 'error'; message: string } | { status: 'ready'; data: ProjectData };
@@ -106,8 +112,29 @@ export function useProject(modelId: UUID, projectId: UUID): UseProjectResult {
         if (main?.head_commit_id && missingParentIds.length > 0) {
           for (const [id, row] of await getElementsByIds(supabase, main.head_commit_id, missingParentIds)) elementsById.set(id, row);
         }
+        // A1b: does the declared scope name a capability, and if not, which
+        // capabilities do its scoped systems support? Derived only when the
+        // project is open and names none — a closed project, or one that
+        // already has a capability, needs neither the prompt nor the query.
+        const scopeHasCapability = scopeIds.some((id) => elementsById.get(id)?.element_type === 'capability');
+        const isOpen = project.status === 'active' || project.status === 'on_hold';
+        let derivedCapabilityCandidates: { id: UUID; name: string }[] = [];
+        if (isOpen && !scopeHasCapability && main?.head_commit_id) {
+          const scopedSystemIds = scopeIds.filter((id) => {
+            const type = elementsById.get(id)?.element_type;
+            return type === 'system' || type === 'container';
+          });
+          if (scopedSystemIds.length > 0) {
+            const supportsEdges = await listSupportsEdgesForSystems(supabase, main.head_commit_id, scopedSystemIds);
+            const candidateIds = [...new Set(supportsEdges.map((e) => e.to_element_id))].filter((id) => !elementsById.has(id));
+            if (candidateIds.length > 0) {
+              for (const [id, row] of await getElementsByIds(supabase, main.head_commit_id, candidateIds)) elementsById.set(id, row);
+            }
+            derivedCapabilityCandidates = deriveCapabilitiesForScope(scopeIds, supportsEdges, elementsById);
+          }
+        }
         if (isCancelled()) return;
-        setState({ status: 'ready', data: { project, decisions, constrainingDecisions, changes, links, evidence, touched: [...touchedById.values()], reachedIds: [...reachedIds], elementsById } });
+        setState({ status: 'ready', data: { project, decisions, constrainingDecisions, changes, links, evidence, touched: [...touchedById.values()], reachedIds: [...reachedIds], elementsById, scopeHasCapability, derivedCapabilityCandidates } });
       } catch (e) {
         if (isCancelled()) return;
         setState({ status: 'error', message: "Couldn't load this project." });
