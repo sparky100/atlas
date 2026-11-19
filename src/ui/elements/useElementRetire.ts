@@ -5,6 +5,7 @@ import { validateAttributeValue } from '../../contracts/attributeSchema';
 import type { ElementsHeadRow, FactsRow, RelationshipsHeadRow } from '../../contracts/rows';
 import { attributesRecord } from './attributesRecord';
 import { commitToBranch } from '../../db/commits';
+import { buildCopiedEdgeDeltas } from './replacementEdges';
 import { buildReplacesDelta } from '../../engine/buildReplacesDelta';
 import { describeEnvelope } from '../../engine/describeEnvelope';
 import { getOrCreateManualSource } from '../../db/sources';
@@ -25,7 +26,7 @@ export interface RetireReplacement {
 export interface UseElementRetireResult {
   status: ElementRetireStatus;
   error: string | null;
-  retire: (plannedEnd: string, replacement: RetireReplacement | null) => Promise<void>;
+  retire: (plannedEnd: string, replacement: RetireReplacement | null, copyEdgeIds?: ReadonlySet<UUID>) => Promise<void>;
 }
 
 export interface UseElementRetireInput {
@@ -60,9 +61,9 @@ export interface UseElementRetireInput {
  * new `role: 'secondary'` edge is created on the replacement (a copy, never
  * a move; Simon, 2026-11-16) — and (b) records the replacement
  * itself as a first-class fact: a `replaces` edge (ADR-001 amendment,
- * `buildReplacesDelta`) from the replacement to the retiring element. Only
- * capability (`supports`) links are copied; integrations and other links are
- * left on the old system for a person to review. The old system stops counting
+ * `buildReplacesDelta`) from the replacement to the retiring element. Capability
+ * links and interfaces (`uses`, `flows_to`) are copied (a person can untick any);
+ * other links are left on the old system for a person to review. The old system stops counting
  * once its planned end passes (`supportsEdgesInForce`), and a capability's
  * "lifecycle exposure" check ignores a replaced system through the `replaces`
  * edge (`replacedElementIds`), so keeping the old edge no longer leaves the
@@ -86,7 +87,7 @@ export function useElementRetire(input: UseElementRetireInput): UseElementRetire
   const queryClient = useQueryClient();
 
   const retire = useCallback(
-    async (plannedEnd: string, replacement: RetireReplacement | null) => {
+    async (plannedEnd: string, replacement: RetireReplacement | null, copyEdgeIds?: ReadonlySet<UUID>) => {
       if (!userId) {
         setError('You must be signed in to retire this.');
         return;
@@ -144,30 +145,11 @@ export function useElementRetire(input: UseElementRetireInput): UseElementRetire
         }
 
         if (replacement) {
-          const ownSupportsEdges = relationships.filter((rel) => rel.relationship_type === 'supports' && rel.from_element_id === element.element_id);
-          // A capability the replacement already supports is skipped, never
-          // duplicated (C10 would reject the whole commit). Read from the
-          // projection at this branch's head, so it also sees a change's own edges.
+          // A link the replacement already has is skipped, never duplicated (C10 would reject the whole commit). Read from the projection at this branch's head, so it also sees a change's own edges.
           const projection = await loadProjectionAtCommitCached(supabase, modelId, expectedHeadCommitId);
-          const alreadySupported = new Set(projectionRelationshipsForElement(projection, replacement.elementId).filter((rel) => rel.relationship_type === 'supports' && rel.from_element_id === replacement.elementId).map((rel) => rel.to_element_id));
-          for (const edge of ownSupportsEdges) {
-            if (alreadySupported.has(edge.to_element_id)) continue;
-            // Copy, never move: the old system keeps its own link (it stops
-            // counting once its planned end passes — `supportsEdgesInForce`),
-            // so the capability still shows it until then.
-            const description = attributesRecord(edge.attributes).description;
-            deltas.push({
-              kind: 'relationship.create',
-              id: crypto.randomUUID(),
-              relationshipId: crypto.randomUUID(),
-              relationshipType: 'supports',
-              fromElementId: replacement.elementId,
-              toElementId: edge.to_element_id,
-              attributes: typeof description === 'string' && description.trim() !== '' ? { role: 'secondary', description } : { role: 'secondary' },
-              sourceId: source.id,
-              confidence: 1,
-            });
-          }
+          const alreadyThere = new Set(projectionRelationshipsForElement(projection, replacement.elementId).map((rel) => `${rel.relationship_type}|${rel.from_element_id}|${rel.to_element_id}`));
+          // Copy, never move: the old system keeps its own links (it stops counting once its planned end passes — `supportsEdgesInForce`). Capability links go across as secondary; interfaces keep their direction (`replacementEdges.ts`).
+          deltas.push(...buildCopiedEdgeDeltas({ oldId: element.element_id, newId: replacement.elementId, relationships, chosen: copyEdgeIds, alreadyThere, sourceId: source.id }));
 
           deltas.push(buildReplacesDelta(replacement.elementId, element.element_id, source.id));
         }
