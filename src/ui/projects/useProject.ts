@@ -6,6 +6,9 @@ import { loadChangeSummariesForModel } from '../../db/changeSummary';
 import { getElementsByIds } from '../../db/elements';
 import { deriveCapabilitiesForScope } from '../../db/healthFindings';
 import { listSupportsEdgesForSystems } from '../../db/landscape';
+import { listSupportsEdgesForCapabilities } from '../../db/capabilityMap';
+import { lifecycleStateOf } from '../../engine/elementRead/fitAndExposure';
+import type { JourneyCapability } from './projectJourney';
 import { containerParentIds } from '../elements/moduleDisplayName';
 import { listEvidenceForModel } from '../../db/evidence';
 import {
@@ -40,6 +43,8 @@ export interface ProjectData {
   scopeHasCapability: boolean;
   /** A1b: capabilities the project's scoped systems and modules already support, offered to add to the scope in one click — empty when there is nothing to derive, or when the scope already names a capability. */
   derivedCapabilityCandidates: { id: UUID; name: string }[];
+  /** B1 (journey strip, "how it might be met"): each capability in the declared scope with the live systems that already support it — an estate query, never stored. */
+  journeyCapabilities: JourneyCapability[];
 }
 
 export type ProjectState = { status: 'loading' } | { status: 'not_found' } | { status: 'error'; message: string } | { status: 'ready'; data: ProjectData };
@@ -133,8 +138,30 @@ export function useProject(modelId: UUID, projectId: UUID): UseProjectResult {
             derivedCapabilityCandidates = deriveCapabilitiesForScope(scopeIds, supportsEdges, elementsById);
           }
         }
+        // B1: the estate query behind "how it might be met" — for each
+        // capability in scope, the systems we run today that support it.
+        const scopeCapabilities = scopeIds.flatMap((id) => {
+          const el = elementsById.get(id);
+          return el?.element_type === 'capability' ? [el] : [];
+        });
+        const journeyCapabilities: JourneyCapability[] = [];
+        if (scopeCapabilities.length > 0 && main?.head_commit_id) {
+          const edges = await listSupportsEdgesForCapabilities(supabase, main.head_commit_id, scopeCapabilities.map((c) => c.element_id));
+          const supporterIds = [...new Set(edges.map((e) => e.from_element_id))];
+          const supporters = supporterIds.length > 0 ? await getElementsByIds(supabase, main.head_commit_id, supporterIds) : new Map<UUID, ElementsHeadRow>();
+          const now = new Date();
+          for (const capability of scopeCapabilities) {
+            const names = edges
+              .filter((e) => e.to_element_id === capability.element_id)
+              .flatMap((e) => {
+                const supporter = supporters.get(e.from_element_id);
+                return supporter && lifecycleStateOf(supporter, supporters, now) === 'active' ? [supporter.name] : [];
+              });
+            journeyCapabilities.push({ id: capability.element_id, name: capability.name, supporters: [...new Set(names)].sort() });
+          }
+        }
         if (isCancelled()) return;
-        setState({ status: 'ready', data: { project, decisions, constrainingDecisions, changes, links, evidence, touched: [...touchedById.values()], reachedIds: [...reachedIds], elementsById, scopeHasCapability, derivedCapabilityCandidates } });
+        setState({ status: 'ready', data: { project, decisions, constrainingDecisions, changes, links, evidence, touched: [...touchedById.values()], reachedIds: [...reachedIds], elementsById, scopeHasCapability, derivedCapabilityCandidates, journeyCapabilities } });
       } catch (e) {
         if (isCancelled()) return;
         setState({ status: 'error', message: "Couldn't load this project." });

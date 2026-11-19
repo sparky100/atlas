@@ -157,7 +157,7 @@ export interface RunAskInput {
 
 export async function runAsk(input: RunAskInput): Promise<AskResult> {
   const { client, ctx, onEvent } = input;
-  const system = askSystemPrompt(ctx.stamp.modelName, ctx.now().toISOString().slice(0, 10));
+  const system = askSystemPrompt(ctx.stamp.modelName, ctx.now().toISOString().slice(0, 10), { runCost: ctx.runCost ?? 'share' });
   const tools = toolDefinitions();
   const question = input.question.trim().slice(0, ASK_MAX_QUESTION_CHARS);
 

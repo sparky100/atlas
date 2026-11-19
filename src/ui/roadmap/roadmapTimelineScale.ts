@@ -132,6 +132,22 @@ export function percentAtIso(value: string | undefined, range: RoadmapTimelineRa
   return date === null ? undefined : percentAt(date, range);
 }
 
+/**
+ * Where a vendor support-end marker sits on a row. Support end is an outside
+ * deadline, so it is shown on every roadmap whatever the window: inside the
+ * window at its date, and pinned to the left (already out of support, or
+ * earlier than the window) or right edge (later than the window) when
+ * outside it — never silently left off. `undefined` only when there is no
+ * usable date.
+ */
+export function supportEndPlacement(value: string | undefined, range: RoadmapTimelineRange): { pct: number; edge: 'before' | 'in' | 'after' } | undefined {
+  const date = parseDate(value);
+  if (date === null) return undefined;
+  if (date.getTime() < range.start.getTime()) return { pct: 0, edge: 'before' };
+  if (date.getTime() > range.end.getTime()) return { pct: 100, edge: 'after' };
+  return { pct: percentAt(date, range), edge: 'in' };
+}
+
 export type RoadmapHorizon = '1y' | '3y' | 'all';
 
 /** How many months a fixed horizon covers; `null` for `'all'` (the full date span). */

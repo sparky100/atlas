@@ -19,7 +19,8 @@ import { listPrincipleLinksForPrinciples, listPrinciplesForModel } from '../db/p
 import { listProjectsForModel } from '../db/projects';
 import { listSavedReports } from '../db/reports';
 import { selectAll } from '../db/selectAll';
-import type { ModelSnapshot, ToolContext, ToolStamp } from './types';
+import { factsWithoutCost, snapshotWithoutCost } from './runCostExclusion';
+import type { ModelSnapshot, RunCostSharing, ToolContext, ToolStamp } from './types';
 
 async function loadSnapshot(supabase: Client, modelId: UUID, commitId: UUID): Promise<ModelSnapshot> {
   const aliasesQuery = supabase.from('aliases').select('element_id, alias_value', { count: 'exact' }).eq('model_id', modelId).neq('alias_type', 'merged_id').order('id');
@@ -37,7 +38,14 @@ async function loadSnapshot(supabase: Client, modelId: UUID, commitId: UUID): Pr
   return { elements, relationships, aliases };
 }
 
-export function createToolContext(supabase: Client, model: { id: UUID; name: string }, commitId: UUID, ref: ToolStamp['ref'] = 'main'): ToolContext {
+/**
+ * `runCost` has no default on purpose: a caller must decide. With `'exclude'`
+ * run cost is removed from the snapshot and the facts here, once, so no tool
+ * can return it and none can answer a question from it.
+ */
+export function createToolContext(supabase: Client, model: { id: UUID; name: string }, commitId: UUID, options: { runCost: RunCostSharing; ref?: ToolStamp['ref'] }): ToolContext {
+  const { runCost, ref = 'main' } = options;
+  const exclude = runCost === 'exclude';
   let snapshot: Promise<ModelSnapshot> | null = null;
   let reports: ReturnType<typeof listSavedReports> | null = null;
   let facts: ReturnType<typeof listFactsForCommit> | null = null;
@@ -53,10 +61,14 @@ export function createToolContext(supabase: Client, model: { id: UUID; name: str
   let principleLinks: ReturnType<typeof listPrincipleLinksForPrinciples> | null = null;
   return {
     stamp: { modelId: model.id, modelName: model.name, ref, commitId },
-    snapshot: () => (snapshot ??= loadSnapshot(supabase, model.id, commitId)),
-    factsFor: (elementId) => listFactsForSubject(supabase, commitId, elementId),
+    runCost,
+    snapshot: () => (snapshot ??= loadSnapshot(supabase, model.id, commitId).then((s) => (exclude ? snapshotWithoutCost(s) : s))),
+    factsFor: async (elementId) => {
+      const rows = await listFactsForSubject(supabase, commitId, elementId);
+      return exclude ? factsWithoutCost(rows) : rows;
+    },
     savedReports: () => (reports ??= listSavedReports(supabase, model.id)),
-    allFacts: () => (facts ??= listFactsForCommit(supabase, commitId)),
+    allFacts: () => (facts ??= listFactsForCommit(supabase, commitId).then((rows) => (exclude ? factsWithoutCost(rows) : rows))),
     retiredByOpenChanges: () => (retired ??= loadElementsRetiredByOpenChanges(supabase, model.id)),
     staleAfterMonths: () => (staleMonths ??= getStaleAfterMonthsForModel(supabase, model.id)),
     changes: () => (changes ??= listChangeBranches(supabase, model.id)),

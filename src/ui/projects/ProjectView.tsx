@@ -39,6 +39,7 @@ import { loadProjectPack } from '../exports/loadProjectPack';
 import { markdownToPdfBytes } from '../exports/markdownPdf';
 import { buildProjectPackMarkdown, projectPackFilename } from '../exports/projectPack';
 import { downloadBlob, exportDate } from '../exports/viewExport';
+import { buildProjectJourney } from './projectJourney';
 import type { ProjectData } from './useProject';
 import { moduleDisplayNameFromMap } from '../elements/moduleDisplayName';
 import styles from './ProjectView.module.css';
@@ -107,6 +108,33 @@ export function ProjectView({ data, modelName, orgId, modelId, orgSlug, modelSlu
           </Text>
         </Panel>
       )}
+
+      <Panel>
+        <Text as="h2" size="lg">
+          From need to choice
+        </Text>
+        <ol className={styles.journey} aria-label="Project journey">
+          {buildProjectJourney({
+            purpose: project.purpose,
+            capabilities: data.journeyCapabilities,
+            changeCount: changes.length,
+            decisionCount: decisions.length,
+            chosenCount: decisions.filter((d) => d.status === 'accepted').length,
+          }).map((step) => (
+            <li key={step.key} className={styles.journeyStep} data-state={step.state}>
+              <Text as="span" size="xs" tone="muted">
+                {step.state === 'done' ? 'Done' : step.state === 'next' ? 'Next' : 'Not started'}
+              </Text>
+              <Text as="span" size="sm">
+                {step.title}
+              </Text>
+              <Text as="span" size="xs" tone="muted">
+                {step.detail}
+              </Text>
+            </li>
+          ))}
+        </ol>
+      </Panel>
 
       {(scopeIds.length > 0 || canEdit) && (
         <Panel>
