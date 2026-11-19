@@ -10,8 +10,8 @@ import styles from './DecisionsView.module.css';
 export interface DesignerPanelProps {
   modelId: UUID;
   input: { elementId: UUID; finding: string };
-  /** Put the (edited) draft into the decision's context. The person still starts the decision themselves. */
-  onUse: (text: string) => void;
+  /** Put the (edited) draft into the decision's context. The person still starts the decision themselves. `edited` is true when the person changed the Designer's draft first, so the decision can say so. */
+  onUse: (text: string, info: { edited: boolean; draftedAt: string }) => void;
 }
 
 /**
@@ -24,6 +24,8 @@ export function DesignerPanel({ modelId, input, onUse }: DesignerPanelProps) {
   const [state, setState] = useState<'idle' | 'running' | 'failed' | 'drafted'>('idle');
   const [message, setMessage] = useState('');
   const [draft, setDraft] = useState('');
+  const [original, setOriginal] = useState('');
+  const [draftedAt, setDraftedAt] = useState('');
   const [meta, setMeta] = useState<Pick<DesignerDraft, 'citedNames' | 'grounded' | 'usage'> | null>(null);
 
   async function run() {
@@ -32,6 +34,8 @@ export function DesignerPanel({ modelId, input, onUse }: DesignerPanelProps) {
     try {
       const result = await runDesigner(supabase, { modelId, ...input });
       setDraft(result.text);
+      setOriginal(result.text);
+      setDraftedAt(new Date().toISOString());
       setMeta({ citedNames: result.citedNames, grounded: result.grounded, usage: result.usage });
       setState('drafted');
     } catch (e) {
@@ -83,7 +87,7 @@ export function DesignerPanel({ modelId, input, onUse }: DesignerPanelProps) {
             variant="secondary"
             disabled={draft.trim() === ''}
             onClick={() => {
-              onUse(draft.trim());
+              onUse(draft.trim(), { edited: draft.trim() !== original.trim(), draftedAt });
             }}
           >
             Add to the context above

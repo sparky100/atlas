@@ -42,6 +42,9 @@ import { markdownToPdfBytes } from '../exports/markdownPdf';
 import { buildProjectPackMarkdown, projectPackFilename } from '../exports/projectPack';
 import { downloadBlob, exportDate } from '../exports/viewExport';
 import { buildProjectJourney } from './projectJourney';
+import { projectNextStep } from './projectNextStep';
+import { findingLabel } from '../decisions/findingLabels';
+import { suggestDecisionTitle } from '../decisions/optionSuggestions';
 import { ProjectBeforeAfter } from './ProjectBeforeAfter';
 import { ProjectStep } from './ProjectStep';
 import { changesSummary, decisionsSummary, evidenceSummary, scopeSummary } from './projectStepSummary';
@@ -98,6 +101,23 @@ export function ProjectView({ data, modelName, orgId, modelId, orgSlug, modelSlu
   const difference = scopeDifference(scopeIds, touchedIds, data.reachedIds);
   const progress = projectProgress(changes, decisions);
   const firstDecision = originatingDecision(decisions);
+  const scopeNamesOfType = (types: readonly string[]) => scopeIds.filter((id) => types.includes(elementsById.get(id)?.element_type ?? '')).map((id) => elementName(id));
+  const suggestedTitle = suggestDecisionTitle(scopeNamesOfType(['system', 'container']), scopeNamesOfType(['capability']));
+  const canDecide = canStartDecision(role) && userId !== null;
+  const canDraft = canCreateChangeBranch(role) && userId !== null && Boolean(main?.head_commit_id);
+  const nextStep = projectNextStep({
+    isOpen,
+    purpose: project.purpose,
+    hasCapability: data.scopeHasCapability,
+    decisions,
+    changes,
+    canStartDecision: canDecide,
+    canCreateChange: canCreateChangeBranch(role) && userId !== null,
+    canDraftChange: Boolean(main?.head_commit_id),
+  });
+  // The card hosts the form for its step, so the same form is not drawn twice further down.
+  const cardHostsDecisionForm = nextStep?.action.kind === 'start-decision';
+  const cardHostsChangeForm = nextStep?.action.kind === 'start-change';
 
   return (
     <div className={styles.page}>
@@ -115,6 +135,26 @@ export function ProjectView({ data, modelName, orgId, modelId, orgSlug, modelSlu
             {project.status === 'closed' ? 'Closed' : 'Cancelled'} by {nameOfUser(project.closed_by)} on {project.closed_at?.slice(0, 10) ?? ''}
             {project.close_reason !== null ? ` — ${project.close_reason}` : ''}.
           </Text>
+        </Panel>
+      )}
+
+      {nextStep !== null && (
+        <Panel data-testid="project-next-step">
+          <Text as="h2" size="lg">
+            What to do next
+          </Text>
+          <Text as="p" size="md">
+            {nextStep.title}
+          </Text>
+          <Text as="p" size="sm" tone="muted">
+            {nextStep.body}
+          </Text>
+          {nextStep.action.kind === 'start-decision' && userId !== null && <NewDecisionForm project={project} userId={userId} scopeIds={scopeIds} suggestedTitle={suggestedTitle} base={base} />}
+          {nextStep.action.kind === 'start-change' && userId !== null && main?.head_commit_id && <NewChangeForm project={project} userId={userId} mainHeadCommitId={main.head_commit_id} base={base} />}
+          {nextStep.action.kind === 'open-decision' && (
+            <Link to={`${base}/decisions/${nextStep.action.id}`}>{nextStep.action.label}</Link>
+          )}
+          {nextStep.action.kind === 'open-change' && <Link to={`${base}/changes/${nextStep.action.id}`}>{nextStep.action.label}</Link>}
         </Panel>
       )}
 
@@ -268,7 +308,7 @@ export function ProjectView({ data, modelName, orgId, modelId, orgSlug, modelSlu
               ))}
             </ul>
           )}
-          {isOpen && canStartDecision(role) && userId !== null && <NewDecisionForm project={project} userId={userId} scopeIds={scopeIds} base={base} />}
+          {isOpen && canDecide && !cardHostsDecisionForm && <NewDecisionForm project={project} userId={userId} scopeIds={scopeIds} suggestedTitle={suggestedTitle} base={base} />}
           {constrainingDecisions.length > 0 && (
             <>
               <Text as="h3" size="md">
@@ -303,7 +343,7 @@ export function ProjectView({ data, modelName, orgId, modelId, orgSlug, modelSlu
               </ul>
             </section>
           ))}
-          {isOpen && canCreateChangeBranch(role) && userId !== null && main?.head_commit_id && <NewChangeForm project={project} userId={userId} mainHeadCommitId={main.head_commit_id} base={base} />}
+          {isOpen && canDraft && main?.head_commit_id && !cardHostsChangeForm && <NewChangeForm project={project} userId={userId} mainHeadCommitId={main.head_commit_id} base={base} />}
           </ProjectStep>
         </Panel>
       )}
@@ -415,6 +455,13 @@ function ProjectHeader({ project, ownerName, managerName, progress }: { project:
         </Text>
       )}
       {project.purpose !== '' && <Text as="p">{project.purpose}</Text>}
+      {findingLabel(project.source_finding_key) !== null && (
+        <div data-testid="project-source-finding">
+<Text as="p" tone="muted" size="sm">
+          Started from a health finding: {findingLabel(project.source_finding_key)}.
+        </Text>
+</div>
+      )}
       <Text as="p" tone="muted" size="sm">
         {formatProjectProgress(progress)}
       </Text>
@@ -471,9 +518,9 @@ function ChangeLine({ change, href }: { change: BranchRow; href: string }) {
  * decision's context, the project's declared scope is what it concerns, and the
  * decision page opens in edit mode so the wording can be shaped straight away.
  */
-function NewDecisionForm({ project, userId, scopeIds, base }: { project: ProjectRow; userId: UUID; scopeIds: readonly UUID[]; base: string }) {
+function NewDecisionForm({ project, userId, scopeIds, suggestedTitle, base }: { project: ProjectRow; userId: UUID; scopeIds: readonly UUID[]; suggestedTitle: string; base: string }) {
   const navigate = useNavigate();
-  const [title, setTitle] = useState('');
+  const [title, setTitle] = useState(suggestedTitle);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   return (
@@ -484,7 +531,7 @@ function NewDecisionForm({ project, userId, scopeIds, base }: { project: Project
         if (title.trim().length === 0) return;
         setBusy(true);
         setError(null);
-        void createDecision(supabase, { id: crypto.randomUUID(), orgId: project.org_id, modelId: project.model_id, title: title.trim(), statement: project.purpose.trim(), ownerId: userId, createdBy: userId, projectId: project.id })
+        void createDecision(supabase, { id: crypto.randomUUID(), orgId: project.org_id, modelId: project.model_id, title: title.trim(), statement: project.purpose.trim(), ownerId: userId, ...(project.source_finding_key !== null ? { sourceFindingKey: project.source_finding_key } : {}), createdBy: userId, projectId: project.id })
           .then(async (d) => {
             // Every decision starts with its "Stay as we are" baseline; if this fails the decision page offers "Add the baseline".
             await addBaseline({ orgId: project.org_id, modelId: project.model_id, decisionId: d.id, userId, projectId: project.id }).catch((err: unknown) => {

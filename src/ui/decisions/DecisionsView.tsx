@@ -1,6 +1,6 @@
 import { Loading } from '../components/Loading/Loading';
 import { useState } from 'react';
-import { useNavigate } from 'react-router';
+import { Link, useNavigate } from 'react-router';
 import type { UUID } from '../../contracts/delta';
 import { Button } from '../components/Button/Button';
 import { Chip } from '../components/Chip/Chip';
@@ -34,6 +34,8 @@ export interface DecisionsViewProps {
   prefill: DecisionPrefill | null;
   /** Phase D: true only for an owner or architect in an organisation with Ask Atlas on, agents on and an AI key saved. Absent means the Designer is not offered. */
   designerAvailable?: boolean;
+  /** Why the Designer is not offered, shown only when a finding is behind the form and it could have been. */
+  designerUnavailable?: { text: string; canFix: boolean } | null;
 }
 
 /**
@@ -43,7 +45,7 @@ export interface DecisionsViewProps {
  * Mirrors `ChangesView.tsx`'s own shape: a create form gated by role,
  * loading/empty states, a list of rows linking onward.
  */
-export function DecisionsView({ modelId, orgId, userId, orgSlug, modelSlug, canCreate, prefill, designerAvailable = false }: DecisionsViewProps) {
+export function DecisionsView({ modelId, orgId, userId, orgSlug, modelSlug, canCreate, prefill, designerAvailable = false, designerUnavailable = null }: DecisionsViewProps) {
   const navigate = useNavigate();
   const designerInput = designerAvailable ? designerInputFromPrefill(prefill) : null;
   const { status, decisions, error, createDecisionWithLinks } = useDecisions(modelId, orgId, userId);
@@ -56,6 +58,8 @@ export function DecisionsView({ modelId, orgId, userId, orgSlug, modelSlug, canC
   // title/statement/link the person already touched.
   const [title, setTitle] = useState(() => prefill?.title ?? '');
   const [statement, setStatement] = useState(() => prefill?.statement ?? '');
+  // Set when the Designer's draft is put into the context, so the decision says an agent helped (Simon, 2026-11-19). Editing the context afterwards marks it edited.
+  const [aiDraft, setAiDraft] = useState<{ draftedAt: string; edited: boolean } | null>(null);
   const [ownerId, setOwnerId] = useState(userId ?? '');
   const [neededBy, setNeededBy] = useState('');
   const [links, setLinks] = useState<{ elementId: UUID; name: string }[]>(() =>
@@ -65,6 +69,7 @@ export function DecisionsView({ modelId, orgId, userId, orgSlug, modelSlug, canC
   const resetForm = () => {
     setTitle('');
     setStatement('');
+    setAiDraft(null);
     setOwnerId(userId ?? '');
     setNeededBy('');
     setLinks([]);
@@ -89,6 +94,7 @@ export function DecisionsView({ modelId, orgId, userId, orgSlug, modelSlug, canC
                 neededBy,
                 // An empty key is the element page's own "Start a decision…" (no finding behind it).
                 ...(prefill && prefill.sourceFindingKey !== '' ? { sourceFindingKey: prefill.sourceFindingKey } : {}),
+                ...(aiDraft !== null ? { aiDraft: { agent: 'designer' as const, draftedAt: aiDraft.draftedAt, edited: aiDraft.edited } } : {}),
                 links: links.map((l) => ({ linkedType: 'element' as const, linkedId: l.elementId })),
               }).then((decision) => {
                 if (decision) {
@@ -113,13 +119,23 @@ export function DecisionsView({ modelId, orgId, userId, orgSlug, modelSlug, canC
               value={statement}
               onChange={(e) => {
                 setStatement(e.target.value);
+                setAiDraft((prev) => (prev === null ? prev : { ...prev, edited: true }));
               }}
             />
+            {designerInput === null && !designerAvailable && designerUnavailable !== null && designerInputFromPrefill(prefill) !== null && (
+              <div data-testid="designer-unavailable">
+                <Text as="p" tone="muted" size="sm">
+                  {designerUnavailable.text}{' '}
+                  {designerUnavailable.canFix && <Link to={`/o/${orgSlug}/settings`}>Open organisation settings</Link>}
+                </Text>
+              </div>
+            )}
             {designerInput !== null && (
               <DesignerPanel
                 modelId={modelId}
                 input={designerInput}
-                onUse={(text) => {
+                onUse={(text, info) => {
+                  setAiDraft({ draftedAt: info.draftedAt, edited: info.edited });
                   setStatement((prev) => (prev.trim() === '' ? text : `${prev.trim()}\n\nDesigner's draft options:\n${text}`));
                 }}
               />

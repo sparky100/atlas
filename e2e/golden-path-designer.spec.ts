@@ -38,6 +38,9 @@ test('the Designer drafts options from a finding, editable, and only when agents
 
   // Agents are off by default: the Designer is not offered.
   await expect(page.getByRole('button', { name: 'Draft options with the Designer' })).toHaveCount(0);
+  // ...and the page says why, with a way to fix it, instead of going quiet.
+  await expect(page.getByTestId('designer-unavailable')).toContainText('Turn on Ask Atlas');
+  await expect(page.getByTestId('designer-unavailable').getByRole('link', { name: 'Open organisation settings' })).toBeVisible();
 
   // Test setup: the organisation now has Ask Atlas on, agents on and a key saved.
   await page.route('**/rest/v1/organisations*', async (route) => {
@@ -96,4 +99,11 @@ test('the Designer drafts options from a finding, editable, and only when agents
 
   const overflow = await page.evaluate(() => document.documentElement.scrollWidth > document.documentElement.clientWidth + 1);
   expect(overflow).toBe(false);
+
+  // Starting the decision records that the Designer helped, and the decision says so for good.
+  await page.getByRole('combobox').first().selectOption({ index: 1 });
+  await page.getByRole('button', { name: 'Start decision' }).click();
+  await expect(page.getByRole('heading', { name: 'Keep, link or retire Quote Tool?' })).toBeVisible();
+  await expect(page.getByTestId('decision-ai-mark')).toContainText('AI helped with this: Drafted by the Designer on');
+  await expect(page.getByTestId('decision-ai-mark')).toContainText('then edited by a person');
 });

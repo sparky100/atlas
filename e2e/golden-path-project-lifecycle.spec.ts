@@ -38,14 +38,28 @@ test('project lifecycle: start from a finding, decide inside it, deliver the cho
   const scopePanel = page.locator('section, div').filter({ has: page.getByRole('heading', { name: 'Declared scope' }) }).last();
   await expect(scopePanel.getByRole('link', { name: 'Housing Repairs' })).toBeVisible();
 
-  // 2. A decision inside the project.
-  await page.getByLabel('New decision title').fill('Which system supports repairs?');
+  // The project remembers which finding it started from, and says so.
+  await expect(page.getByTestId('project-source-finding')).toContainText('Started from a health finding: a capability nothing supports.');
+
+  // 2. The page says what to do next, and the decision form is right there in that card.
+  const nextStep = page.getByTestId('project-next-step');
+  await expect(nextStep.getByRole('heading', { name: 'What to do next' })).toBeVisible();
+  await expect(nextStep.getByText('Work out the options')).toBeVisible();
+  await expect(nextStep.getByLabel('New decision title')).toHaveValue('How should we meet Housing Repairs?');
+  await nextStep.getByLabel('New decision title').fill('Which system supports repairs?');
   await page.getByRole('button', { name: 'Start decision' }).click();
   await expect(page.getByRole('heading', { name: 'Which system supports repairs?' })).toBeVisible();
   await expect(page.getByRole('link', { name: PROJECT_TITLE })).toBeVisible();
+  await expect(page.getByTestId('decision-source-finding')).toContainText('Started from a health finding: a capability nothing supports.');
   // It starts from where the person came from: the project's purpose is the context, the project's capability is what it concerns, and the edit form is already open.
   await expect(page.getByPlaceholder('What needs deciding, and why now')).not.toHaveValue('');
   await expect(page.getByRole('link', { name: 'Housing Repairs' }).first()).toBeVisible();
+  await page.getByRole('button', { name: 'Cancel', exact: true }).click();
+  // Starting points read from the model (no AI): the person adds one, edits it, or ignores them.
+  const suggestions = page.getByTestId('option-suggestions');
+  await expect(suggestions.getByText('no AI', { exact: false })).toBeVisible();
+  await suggestions.getByRole('button', { name: 'Build it ourselves' }).click();
+  await expect(page.getByLabel("What's this option?")).toHaveValue('Build it ourselves');
   await page.getByRole('button', { name: 'Cancel', exact: true }).click();
 
   // 3. Two options, one rating, choose the first.
@@ -89,6 +103,8 @@ test('project lifecycle: start from a finding, decide inside it, deliver the cho
   await expect(page.getByText('Touched by this project\'s changes, not in scope')).toBeVisible();
   // The system now also appears in the before/after panel, so match the first link on the page.
   await expect(page.getByRole('link', { name: 'Repairs Hub', exact: true }).first()).toBeVisible();
+  // The card follows the work: the choice is made and the design is open, so the next step is review.
+  await expect(page.getByTestId('project-next-step').getByText('Take the change through review')).toBeVisible();
   // Closing is refused while the design is open — and the page says what's open.
   await expect(page.getByRole('button', { name: 'Close project' })).toHaveCount(0);
   await expect(page.getByText('To close or cancel this project, first finish or cancel what is still open in it:')).toBeVisible();
@@ -115,9 +131,12 @@ test('project lifecycle: start from a finding, decide inside it, deliver the cho
   await expect(changesToggle).toHaveAttribute('aria-expanded', 'false');
   await changesToggle.click();
   await expect(page.getByRole('region', { name: 'Merged' }).getByRole('link', { name: 'Build Repairs Hub' })).toBeVisible();
+  await expect(page.getByTestId('project-next-step').getByText('Close the project', { exact: true })).toBeVisible();
   await page.getByRole('button', { name: 'Close project' }).click();
   await expect(page.getByText('Closed', { exact: true }).first()).toBeVisible();
   await expect(page.getByRole('button', { name: '✎ Edit project' })).toHaveCount(0);
+  // A closed project has no next step.
+  await expect(page.getByTestId('project-next-step')).toHaveCount(0);
 
   // No horizontal overflow on the project page (meaningful at 390).
   const overflow = await page.evaluate(() => document.documentElement.scrollWidth > document.documentElement.clientWidth + 1);
