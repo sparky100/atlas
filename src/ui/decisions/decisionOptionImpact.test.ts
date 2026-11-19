@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import type { ElementsHeadRow, Json, RelationshipsHeadRow } from '../../contracts/rows';
 import type { ElementRow, RelationshipRow } from '../../engine/deltas';
 import type { ElementVersionDiff, RelationshipVersionDiff, VersionDiff } from '../../engine/versionDiff';
-import { impactedLaneKeys } from './decisionOptionImpact';
+import { impactedLaneKeys, scopeLaneKeys } from './decisionOptionImpact';
 
 function capability(id: string, name: string): ElementsHeadRow {
   return { element_id: id, element_type: 'capability', name, parent_id: null, attributes: {}, exists_delta_id: `d-${id}` };
@@ -59,5 +59,19 @@ describe('impactedLaneKeys', () => {
   it('does not mark a lane impacted just because a capability element itself changed, with no related system change', () => {
     const diff: VersionDiff = { elements: [elementDiff('sys-a', 'unchanged'), elementDiff('sys-b', 'unchanged'), elementDiff('cap-a', 'changed')], relationships: [] };
     expect(impactedLaneKeys(diff, [sysA, sysB], supportsEdges, l1)).toEqual(new Set());
+  });
+});
+
+describe('scopeLaneKeys', () => {
+  it('uses the lane of a system the decision names', () => {
+    expect(scopeLaneKeys(new Set(['sys-a']), [sysA, sysB], supportsEdges, l1)).toEqual(new Set(['cap-a']));
+  });
+
+  it('uses the lane of the systems that support a capability the decision names', () => {
+    expect(scopeLaneKeys(new Set(['cap-b']), [sysA, sysB], supportsEdges, l1)).toEqual(new Set(['cap-b']));
+  });
+
+  it('is empty when the decision names nothing in the landscape', () => {
+    expect(scopeLaneKeys(new Set(), [sysA, sysB], supportsEdges, l1)).toEqual(new Set());
   });
 });
