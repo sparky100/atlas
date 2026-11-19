@@ -147,7 +147,7 @@ describe('the roadmap starts at today', () => {
   });
 });
 
-describe('onlyChangingSystems ("By project" is about change)', () => {
+describe('onlyChangingSystems (every roadmap is about change)', () => {
   it('drops a system that just carries on, and a group left empty with it', () => {
     const groups = [group({ key: 'p1', bars: [bar({ systemId: 'steady', name: 'Steady' })] })];
     expect(onlyChangingSystems(groups, [], 'asIs')).toEqual([]);
@@ -163,5 +163,12 @@ describe('onlyChangingSystems ("By project" is about change)', () => {
     const groups = [group({ key: 'p1', bars: [bar({ systemId: 'a', plannedEnd: '2027-01-01' }), bar({ systemId: 'b', supportEndsAt: '2027-02-01' }), bar({ systemId: 'c', lifecycleTag: { state: 'planned', date: '2027-03-01' } as NonNullable<RoadmapLifecycleBar['lifecycleTag']> }), bar({ systemId: 'd' })] })];
     const kept = onlyChangingSystems(groups, [], 'asIs');
     expect(kept[0]?.bars.map((b) => b.systemId)).toEqual(['a', 'b', 'c']);
+  });
+
+  it('keeps a domain that has only project bars', () => {
+    const groups = [group({ key: 'cap', bars: [bar({ systemId: 'steady' })], projectBars: [{ projectId: 'p', name: 'P', start: '2026-07-01', target: '2026-12-01' }] as unknown as NonNullable<RoadmapGroup['projectBars']> })];
+    const kept = onlyChangingSystems(groups, [], 'asIs');
+    expect(kept).toHaveLength(1);
+    expect(kept[0]?.bars).toEqual([]);
   });
 });

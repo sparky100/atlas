@@ -189,6 +189,8 @@ export function validateImportRow(raw: Record<string, unknown>, rowNumber: numbe
   for (const [column, key] of ATTRIBUTE_COLUMNS) {
     const cell = cellToString(raw[column]);
     if (cell === undefined) continue;
+    // Modules now carry their own support end in the model, but the importer is unchanged until Simon approves importing it (2026-11-19): a module row still fails here.
+    if (elementType === 'container' && key === 'supportEndsAt') return { ok: false, rowNumber, error: `"${column}": \`container\` has no "supportEndsAt" attribute` };
     const result = validateAttributeValue(elementType, key, cell);
     if (!result.ok) return { ok: false, rowNumber, error: `"${column}": ${result.error}` };
     // `validateAttributeValue` normalises to `Json`, which for every one of

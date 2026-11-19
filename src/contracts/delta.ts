@@ -349,6 +349,8 @@ export interface ContainerAttributes {
   introduced?: ISODate;
   /** See `SystemAttributes.plannedEnd`. */
   plannedEnd?: ISODate;
+  /** See `SystemAttributes.supportEndsAt`: a module's own vendor support end (e.g. one SAP module), never inherited from its platform. */
+  supportEndsAt?: ISODate;
   /**
    * "Platforms and modules": a module's own override of its platform's
    * `lifecycleStatus`/`criticality`/`hostingModel`/`hostingProvider`/

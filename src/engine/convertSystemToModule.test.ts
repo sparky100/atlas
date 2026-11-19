@@ -52,20 +52,19 @@ describe('buildConvertSystemToModuleDeltas', () => {
     expect(resultingHead.elements.get(newContainerId)).toMatchObject({ elementType: 'container', parentId: 'sap', name: 'Freight Tracker' });
   });
 
-  it('reports system-only attributes as dropped and omits them from the new container', () => {
+  it('reports system-only attributes as dropped, omits them from the new container, and carries the vendor support end over', () => {
     const head = headFrom([
       createElement('d-sap', 'sap', 'system', 'SAP', null, SYSTEM_ATTRS),
       createElement('d-sys', 'sys', 'system', 'Freight Tracker', null, { lifecycleStatus: 'active', isExternal: true, vendor: 'Acme', externalOrganisation: 'Acme Corp', kind: 'application', supportEndsAt: '2027-01-01' }),
     ]);
     const { deltas, droppedAttributeKeys, newContainerId } = buildConvertSystemToModuleDeltas(cloneHead(head), 'sys', 'sap', SOURCE_ID, mintId);
-    expect(new Set(droppedAttributeKeys)).toEqual(new Set(['vendor', 'externalOrganisation', 'kind', 'supportEndsAt']));
+    expect(new Set(droppedAttributeKeys)).toEqual(new Set(['vendor', 'externalOrganisation', 'kind']));
     const create = deltas.find((d) => d.kind === 'element.create' && d.elementId === newContainerId);
     if (create?.kind === 'element.create') {
       expect(create.attributes).not.toHaveProperty('vendor');
       expect(create.attributes).not.toHaveProperty('externalOrganisation');
       expect(create.attributes).not.toHaveProperty('kind');
-      expect(create.attributes).not.toHaveProperty('supportEndsAt');
-      expect(create.attributes).toMatchObject({ isExternal: true });
+      expect(create.attributes).toMatchObject({ isExternal: true, supportEndsAt: '2027-01-01' });
     }
   });
 

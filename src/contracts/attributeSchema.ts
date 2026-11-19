@@ -299,6 +299,7 @@ const CONTAINER_META: Record<keyof ContainerAttributes, AttributeFieldMeta> = {
   isExternal: { label: 'Outside our organisation', required: true, kind: 'boolean', help: EXTERNAL_HELP },
   introduced: { label: 'Introduced', required: false, kind: 'date' },
   plannedEnd: { label: 'Planned end', required: false, kind: 'date' },
+  supportEndsAt: { label: 'Vendor support ends', required: false, kind: 'date' },
   // "Platforms and modules": a module's own override of its platform's
   // attribute — see ContainerAttributes.lifecycleStatus's own doc comment
   // (delta.ts). Meaningless (never shown as inherited here — this is the
@@ -332,6 +333,7 @@ const CONTAINER_ORDER: (keyof ContainerAttributes)[] = [
   'isExternal',
   'introduced',
   'plannedEnd',
+  'supportEndsAt',
   'lifecycleStatus',
   'version',
   'criticality',
