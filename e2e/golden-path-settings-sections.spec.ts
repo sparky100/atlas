@@ -36,7 +36,7 @@ test('settings sections: first one open, toggle, expand all, remembered after re
 
   await page.getByRole('button', { name: 'Expand all' }).click();
   await expect(reviewField).toBeVisible();
-  await expect(page.getByRole('button', { name: /^Delete organisation/ })).toHaveAttribute('aria-expanded', 'true');
+  await expect(page.getByTestId('settings-section-delete').locator('button[aria-expanded]')).toHaveAttribute('aria-expanded', 'true');
 
   // Remembered after a reload.
   await review.click();
