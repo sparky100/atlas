@@ -428,6 +428,43 @@ describe('projects (ADR-024) against a real local Supabase', () => {
       await expect(createComment(otherContributor.client, { id: randomUUID(), orgId, modelId, anchorType: 'project', anchorId: randomUUID(), body: 'Nowhere', authorId: otherContributor.id })).rejects.toThrow();
     });
   });
+
+  describe('proposed projects (Phase B2)', () => {
+    async function newProposal(by: TestUser) {
+      return createProject(by.client, { id: randomUUID(), orgId, modelId, title: `Proposal ${randomUUID().slice(0, 8)}`, purpose: 'Maybe.', ownerId: by.id, status: 'proposed', createdBy: by.id });
+    }
+
+    it('a contributor may propose; it can take a decision while proposed; only an owner or architect accepts it, never the proposer or another organisation; it never goes back to proposed', async () => {
+      const project = await newProposal(contributor);
+      expect(project.status).toBe('proposed');
+      await updateProject(contributor.client, project.id, { purpose: 'Edited while proposed.' });
+      await newDecision(contributor, project.id);
+
+      await expect(setProjectStatus(contributor.client, project.id, 'active')).rejects.toThrow(/only an owner or architect may accept/);
+      await expect(setProjectStatus(outsider.client, project.id, 'active')).rejects.toThrow();
+      await expect(setProjectStatus(architect.client, project.id, 'on_hold')).rejects.toThrow(/accept or decline/);
+      await expect(setProjectStatus(architect.client, project.id, 'closed')).rejects.toThrow(/accept or decline/);
+      expect((await getProject(viewer.client, project.id))?.status).toBe('proposed');
+
+      expect((await setProjectStatus(architect.client, project.id, 'active')).status).toBe('updated');
+      expect((await getProject(viewer.client, project.id))?.status).toBe('active');
+      await expect(setProjectStatus(architect.client, project.id, 'proposed')).rejects.toThrow(/unknown status/);
+    });
+
+    it('declining needs a reason and becomes cancelled; a project cannot be inserted proposed by a viewer, nor flipped to proposed by a plain update', async () => {
+      const project = await newProposal(contributor);
+      await expect(setProjectStatus(architect.client, project.id, 'cancelled')).rejects.toThrow(/say why/);
+      expect((await setProjectStatus(architect.client, project.id, 'cancelled', 'Not this year.')).status).toBe('updated');
+      const after = await getProject(viewer.client, project.id);
+      expect(after?.status).toBe('cancelled');
+      expect(after?.close_reason).toBe('Not this year.');
+
+      await expect(newProposal(viewer)).rejects.toThrow();
+      const active = await newProject(contributor);
+      const { error } = await contributor.client.from('projects').update({ status: 'proposed' }).eq('id', active.id).select('id');
+      expect(error).not.toBeNull();
+    });
+  });
 });
 
 describe('atlas.delete_model clears projects and decision ratings', () => {

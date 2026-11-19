@@ -9,6 +9,7 @@
  */
 import type { UUID } from '../../contracts/delta';
 import type { BranchRow, DecisionRow, MemberRole, ProjectRow } from '../../db/types';
+import { projectIsOpen } from '../projects/projectModel';
 
 /** Mirrors `models_insert`'s RLS check (`atlas.has_role(org_id, 'owner', 'architect')`, supabase/migrations/20260906071300_models.sql) — for showing/hiding the affordance; the database enforces the real rule regardless of what this returns. */
 export function canCreateModel(role: MemberRole | null): boolean {
@@ -152,8 +153,13 @@ export function canStartProject(role: MemberRole | null): boolean {
 /** F10 (ADR-024 §4): mirrors `atlas.can_edit_project` — the project's creator or owner, or an org owner/architect, while the project is open. */
 export function canEditProject(role: MemberRole | null, project: ProjectRow, userId: UUID | null): boolean {
   if (role === null || role === 'viewer') return false;
-  if (project.status !== 'active' && project.status !== 'on_hold') return false;
+  if (!projectIsOpen(project.status)) return false;
   return role === 'owner' || role === 'architect' || (userId !== null && (project.created_by === userId || project.owner_id === userId));
+}
+
+/** Phase B2: mirrors `atlas.set_project_status`'s accept rule: only an org owner or architect accepts a proposed project, never the proposer alone. */
+export function canAcceptProject(role: MemberRole | null): boolean {
+  return role === 'owner' || role === 'architect';
 }
 
 /** Prompt pack F3 PR5: mirrors `atlas.choose_decision_option`'s own role check (`supabase/migrations/20260913120000_choose_decision_option.sql`) — owner/architect only, the same floor `canApproveOrMergeRequest` uses, since choosing an option converts a branch to `propose` intent and closes out every other option in one action. */

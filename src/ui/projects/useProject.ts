@@ -9,6 +9,7 @@ import { listSupportsEdgesForSystems } from '../../db/landscape';
 import { listSupportsEdgesForCapabilities } from '../../db/capabilityMap';
 import { lifecycleStateOf } from '../../engine/elementRead/fitAndExposure';
 import type { JourneyCapability } from './projectJourney';
+import { projectIsOpen } from './projectModel';
 import { containerParentIds } from '../elements/moduleDisplayName';
 import { listEvidenceForModel } from '../../db/evidence';
 import {
@@ -122,7 +123,7 @@ export function useProject(modelId: UUID, projectId: UUID): UseProjectResult {
         // project is open and names none — a closed project, or one that
         // already has a capability, needs neither the prompt nor the query.
         const scopeHasCapability = scopeIds.some((id) => elementsById.get(id)?.element_type === 'capability');
-        const isOpen = project.status === 'active' || project.status === 'on_hold';
+        const isOpen = projectIsOpen(project.status);
         let derivedCapabilityCandidates: { id: UUID; name: string }[] = [];
         if (isOpen && !scopeHasCapability && main?.head_commit_id) {
           const scopedSystemIds = scopeIds.filter((id) => {

@@ -24,6 +24,8 @@ export interface CreateProjectInput {
   startDate?: string | null;
   targetDate?: string | null;
   sourceFindingKey?: string | null;
+  /** `proposed` starts the project as a proposal an owner or architect accepts; omitted means active. */
+  status?: 'proposed';
   createdBy: UUID;
 }
 
@@ -40,6 +42,7 @@ export async function createProject(supabase: Client, input: CreateProjectInput)
     start_date: input.startDate ?? null,
     target_date: input.targetDate ?? null,
     source_finding_key: input.sourceFindingKey ?? null,
+    ...(input.status === 'proposed' ? { status: 'proposed' } : {}),
     created_by: input.createdBy,
   };
   // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment -- untyped client; see branches.ts's module comment.

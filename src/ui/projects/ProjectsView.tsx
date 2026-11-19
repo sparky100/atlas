@@ -51,6 +51,7 @@ export function ProjectsView({ modelId, orgId, userId, orgSlug, modelSlug, canCr
   const [startDate, setStartDate] = useState('');
   const [targetDate, setTargetDate] = useState('');
   const [scope, setScope] = useState<ProjectScopeItem[]>(() => initial?.scope ?? []);
+  const [asProposal, setAsProposal] = useState(false);
   const groups = groupProjectsByStatus(projects);
   // Plan A1 / Simon's rule: a project must name at least one capability.
   const hasCapability = scopeHasCapability(scope);
@@ -75,6 +76,7 @@ export function ProjectsView({ modelId, orgId, userId, orgSlug, modelSlug, canCr
                 startDate,
                 targetDate,
                 ...(initial?.sourceFindingKey ? { sourceFindingKey: initial.sourceFindingKey } : {}),
+                asProposal,
                 scopeElementIds: scope.map((s) => s.elementId),
               }).then((project) => {
                 if (project) void navigate(`/o/${orgSlug}/m/${modelSlug}/projects/${project.id}`);
@@ -185,8 +187,25 @@ export function ProjectsView({ modelId, orgId, userId, orgSlug, modelSlug, canCr
                 Name at least one capability this project serves — a project can’t stand apart from a capability.
               </Text>
             )}
+            <label>
+              <input
+                type="checkbox"
+                checked={asProposal}
+                onChange={(e) => {
+                  setAsProposal(e.target.checked);
+                }}
+              />{' '}
+              <Text as="span" size="sm">
+                Start as a proposal
+              </Text>
+            </label>
+            {asProposal && (
+              <Text as="p" size="sm" tone="muted">
+                A proposal does not count as work in hand until someone with the right role accepts it.
+              </Text>
+            )}
             <Button variant="primary" type="submit" disabled={status === 'creating' || !ownerId || title.trim().length === 0 || !hasCapability}>
-              {status === 'creating' ? 'Starting…' : 'Start project'}
+              {status === 'creating' ? 'Starting…' : asProposal ? 'Propose project' : 'Start project'}
             </Button>
           </form>
           {error !== null && <Text as="p">{error}</Text>}
