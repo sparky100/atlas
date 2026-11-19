@@ -109,10 +109,12 @@ test('delete refuses a model that is not archived; archiving first and typing th
 
   await page.getByRole('button', { name: 'Archive model' }).click();
   await expect(page.getByText('Archived', { exact: true })).toBeVisible({ timeout: 15_000 });
+  // The Delete section only exists once the model is archived, so it starts closed.
+  await expandAllSettingsSections(page);
 
   const modelName = await page.getByLabel('Name', { exact: true }).inputValue();
   const confirmInput = page.getByLabel(`Type ${modelName} to confirm`);
-  const deleteButton = page.getByRole('button', { name: 'Delete model' });
+  const deleteButton = page.getByRole('button', { name: 'Delete model', exact: true });
   await expect(deleteButton).toBeDisabled();
   await confirmInput.fill('the wrong name');
   await expect(deleteButton).toBeDisabled();
@@ -164,6 +166,7 @@ test('a freshly created model appears under Models, not Archived; archiving one 
   await secondModelLink.click();
   await page.getByRole('button', { name: 'Model actions' }).click();
   await page.getByRole('link', { name: 'Model settings' }).click();
+  await expandAllSettingsSections(page);
   await page.getByRole('button', { name: 'Archive model' }).click();
   await expect(page.getByText('Archived', { exact: true })).toBeVisible({ timeout: 15_000 });
 
