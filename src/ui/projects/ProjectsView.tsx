@@ -19,6 +19,7 @@ import { ProjectManagerField } from './ProjectManagerField';
 import { NO_PROJECT_MANAGER, projectManagerToInput, type ProjectManagerValue } from './projectManagerValue';
 import { projectFormFromPrefill } from './projectPrefill';
 import { useProjects } from './useProjects';
+import { useSupportedCapabilities } from './useSupportedCapabilities';
 import styles from './ProjectsView.module.css';
 
 export interface ProjectsViewProps {
@@ -52,6 +53,7 @@ export function ProjectsView({ modelId, orgId, userId, orgSlug, modelSlug, canCr
   const [targetDate, setTargetDate] = useState('');
   const [scope, setScope] = useState<ProjectScopeItem[]>(() => initial?.scope ?? []);
   const [asProposal, setAsProposal] = useState(false);
+  const supportNotices = useSupportedCapabilities(main?.head_commit_id ?? null, scope, setScope);
   const groups = groupProjectsByStatus(projects);
   // Plan A1 / Simon's rule: a project must name at least one capability.
   const hasCapability = scopeHasCapability(scope);
@@ -182,6 +184,11 @@ export function ProjectsView({ modelId, orgId, userId, orgSlug, modelSlug, canCr
                 }}
               />
             )}
+            {supportNotices.map((text) => (
+              <Text key={text} as="p" size="sm" tone="muted">
+                {text}
+              </Text>
+            ))}
             {!hasCapability && (
               <Text as="p" size="sm" tone="muted">
                 Name at least one capability this project serves — a project can’t stand apart from a capability.
