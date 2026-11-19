@@ -3,6 +3,7 @@ import { Link } from 'react-router';
 import type { UUID } from '../../contracts/delta';
 import { PRINCIPLE_LIMITS, principleStanceLabel, type DecisionPrincipleRow, type PrincipleRow, type PrincipleStance } from '../../contracts/principles';
 import { Button } from '../components/Button/Button';
+import { CollapsibleSection } from '../components/CollapsibleSection/CollapsibleSection';
 import { Chip } from '../components/Chip/Chip';
 import { Panel } from '../components/Panel/Panel';
 import { Text } from '../components/Text/Text';
@@ -49,9 +50,7 @@ export function DecisionPrinciplesPanel({ principles, links, editable, savingIds
 
   return (
     <Panel>
-      <Text as="h2" size="lg">
-        Principles
-      </Text>
+      <CollapsibleSection title="Principles" meta={`(${String(lines.filter((l) => l.stance !== null).length)} of ${String(lines.length)} with a stance)`}>
       {lines.length === 0 ? (
         <Text as="p" tone="muted">
           This model has no principles yet. <Link to={principlesHref}>Add some on the Principles page.</Link>
@@ -168,6 +167,7 @@ export function DecisionPrinciplesPanel({ principles, links, editable, savingIds
         </>
       )}
       {error !== null && <Text as="p">{error}</Text>}
+      </CollapsibleSection>
     </Panel>
   );
 }

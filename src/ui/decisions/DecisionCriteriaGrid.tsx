@@ -125,7 +125,11 @@ export function DecisionCriteriaGrid({ decisionId, options, canRate, userId, nee
         <table className={styles.grid}>
           <thead>
             <tr>
-              <th className={styles.criterionHeaderCell} />
+              <th className={styles.criterionHeaderCell}>
+                <Text as="span" size="sm" tone="muted">
+                  How the options compare
+                </Text>
+              </th>
               {options.map((o) => (
                 <th key={o.branchId} className={o.summary === null ? styles.mutedHeaderCell : undefined}>
                   <div className={styles.optionHeader}>

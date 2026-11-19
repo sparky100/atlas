@@ -66,7 +66,7 @@ test('start a decision with context/owner/needed-by/a linked system; see it list
   await expect(page.getByRole('heading', { name: decisionTitle })).toBeVisible();
   await expect(page.getByText('proposed', { exact: true })).toBeVisible();
   await expect(page.getByText('Ledger Service is past its support end date and needs a replacement.')).toBeVisible();
-  await page.getByRole('heading', { name: 'Concerns' }).scrollIntoViewIfNeeded();
+  await page.getByRole('button', { name: /^Concerns/ }).scrollIntoViewIfNeeded();
   await expect(page.getByRole('link', { name: 'Ledger Service' })).toBeVisible();
 
   const decisionUrl = page.url();
