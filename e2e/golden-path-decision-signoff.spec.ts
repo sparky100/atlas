@@ -31,7 +31,7 @@ test('the person who froze a pack cannot sign it; only the latest version is ope
   await form.getByLabel('Signing as').selectOption({ label: 'Architecture' });
   await form.getByLabel('Comment (optional)').fill('Fits the target landscape.');
   await form.getByRole('button', { name: 'Approve this version' }).click();
-  await expect(page.getByText(/the person who froze a pack cannot sign it/)).toBeVisible();
+  await expect(page.getByText('You froze this pack, so someone else has to sign it.')).toBeVisible();
   await expect(packs.getByText(/Version 1 — frozen .* — not signed yet/)).toBeVisible();
 
   // Freezing again makes version 2, which nobody has signed.
