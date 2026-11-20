@@ -29,6 +29,7 @@
 }
 
 .select {
+  max-width: 100%;
   height: var(--row-height);
   padding: 0 var(--space-2);
   border-radius: var(--radius-sm);
