@@ -20,6 +20,7 @@ import { canApproveOrMergeRequest, canCancelChange } from '../orgs/useMembership
 import { BranchRebasePanel } from '../reviews/BranchRebasePanel';
 import { supabase } from '../supabaseClient';
 import { refQueryParam } from '../../db/ref';
+import { ElementNamedText } from './ElementNamedText';
 import { OptionDraftCard } from './OptionDraftCard';
 import { dateFieldLabelForIntent, intentReviewWeight, isDateRequiredForIntent } from './branchIntent';
 import { branchStatusTone } from './branchStatus';
@@ -398,7 +399,7 @@ export function ChangeView({ orgId, modelId, branchId, orgSlug, modelSlug, role,
                     Description
                   </Text>
                   <Text as="p" tone={branch.description ? 'default' : 'muted'}>
-                    {branch.description ?? 'Add a short description so reviewers know why.'}
+                    {branch.description !== null ? <ElementNamedText text={branch.description} commitId={branch.head_commit_id} /> : 'Add a short description so reviewers know why.'}
                   </Text>
                 </div>
               </Panel>

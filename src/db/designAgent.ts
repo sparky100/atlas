@@ -47,6 +47,11 @@ export function citationsToNames(text: string, names: Record<string, string>): s
   });
 }
 
+/** Pure: the element ids a saved text still cites as [[element:<id>]] (options saved before names were substituted). */
+export function citationIds(text: string): string[] {
+  return [...new Set([...text.matchAll(CITATION)].map((m) => m[1] ?? ''))].filter((id) => id !== '');
+}
+
 /** Pure: the one place the function's reply is read, so the page never shows a raw provider message. */
 export function interpretDesignerReply(body: unknown): DesignerDraft {
   const r = (typeof body === 'object' && body !== null ? body : {}) as DesignerBody;

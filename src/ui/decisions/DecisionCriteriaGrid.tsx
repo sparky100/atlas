@@ -4,6 +4,7 @@ import type { UUID } from '../../contracts/delta';
 import { DECISION_CRITERIA, DECISION_RATING_LEVELS, decisionRatingLevelTone, type DecisionCriterionKey, type DecisionRatingLevel } from '../../contracts/decisionCriteria';
 import type { BranchStatus, DecisionOptionRatingRow } from '../../db/types';
 import { branchStatusTone } from '../changes/branchStatus';
+import { ElementNamedText } from '../changes/ElementNamedText';
 import { Button } from '../components/Button/Button';
 import { Chip } from '../components/Chip/Chip';
 import { Text } from '../components/Text/Text';
@@ -35,6 +36,8 @@ export interface DecisionCriteriaGridProps {
   neededBy: string | null;
   orgSlug: string;
   modelSlug: string;
+  /** The model's head commit, used to read the names of elements an older saved description still cites. */
+  commitId?: UUID | null;
   onChoose: (branchId: UUID) => void;
   /** `canCreateChangeBranch(role)` at the call site, ungated by `decision.status` (unlike `canAddOption`/`canChoose`) — this action is only ever offered on the *chosen* option, which by definition means the decision has already moved past `proposed`. */
   canWorkOnChange: boolean;
@@ -88,7 +91,7 @@ function stripExploringPrefix(label: string): string {
  * only ever gets the person *into* the change workspace, never repeats
  * that flip.
  */
-export function DecisionCriteriaGrid({ decisionId, options, canRate, userId, neededBy, orgSlug, modelSlug, onChoose, canWorkOnChange, onWorkOnThisChange, ratingsState }: DecisionCriteriaGridProps) {
+export function DecisionCriteriaGrid({ decisionId, options, canRate, userId, neededBy, orgSlug, modelSlug, commitId, onChoose, canWorkOnChange, onWorkOnThisChange, ratingsState }: DecisionCriteriaGridProps) {
   const ratings = ratingsState.ratings;
   const [editing, setEditing] = useState<EditingCell | null>(null);
   const [levelDraft, setLevelDraft] = useState<DecisionRatingLevel | null>(null);
@@ -152,7 +155,7 @@ export function DecisionCriteriaGrid({ decisionId, options, canRate, userId, nee
                     {o.provenance != null && <Chip tone="info">{o.provenance}</Chip>}
                     {o.description != null && o.description.trim() !== '' && (
                       <Text as="p" size="sm">
-                        {o.description}
+                        <ElementNamedText text={o.description} commitId={commitId ?? null} />
                       </Text>
                     )}
                     <Text as="p" size="sm" tone={o.summary === null ? 'muted' : 'default'}>

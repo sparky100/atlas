@@ -212,7 +212,10 @@ export function summarizeOwnDeltas(ownDeltas: readonly Delta[], asIsHead: Head, 
   for (const [subjectId, entry] of deltasBySubject) {
     if (entry.subjectType === 'element') {
       const el = element(subjectId);
-      subjects.push({ subjectId, ...entry, name: el ? displayNameOf(subjectId) : subjectId });
+      // An element created and retracted on this same change is in neither head — its own create delta still names it.
+      const created = entry.deltas.find((d) => d.kind === 'element.create');
+      const ownName = created?.kind === 'element.create' ? created.name : null;
+      subjects.push({ subjectId, ...entry, name: el ? displayNameOf(subjectId) : (ownName ?? 'An element that no longer exists') });
       if (el?.elementType === 'system') addTouchedReason(subjectId, subjectId, { kind: 'edited', systemName: el.name });
       if (el?.elementType === 'capability') addCapabilityReason(subjectId, { kind: 'direct' }, null);
       if (el?.elementType === 'container') {

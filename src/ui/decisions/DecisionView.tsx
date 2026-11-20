@@ -448,6 +448,7 @@ export function DecisionView({ modelId, decisionId, orgId, orgSlug, modelSlug, r
                   neededBy={decision.needed_by}
                   orgSlug={orgSlug}
                   modelSlug={modelSlug}
+                  commitId={main?.head_commit_id ?? null}
                   onChoose={(branchId) => {
                     setChoosingBranchId(branchId);
                     setReasons('');
