@@ -63,7 +63,7 @@ test('an option that removes an IT/OT boundary crossing shows only the scoped-cr
   await expect(page.getByRole('heading', { name: decisionTitle })).toBeVisible();
 
   // 4. One option, then select it as the session's editing ref (the
-  // exact "Edit in this change" mechanism, reused rather than reinvented
+  // exact "Draft this option's changes" mechanism, reused rather than reinvented
   // — decision-side-completion item 5).
   const optionTitle = 'Remove the crossing';
   await page.getByRole('button', { name: '+ Add an option' }).click();
@@ -72,8 +72,9 @@ test('an option that removes an IT/OT boundary crossing shows only the scoped-cr
   await expect(page.getByText(optionTitle).first()).toBeVisible();
 
   await page.getByRole('link', { name: optionTitle }).click();
-  await page.getByRole('button', { name: 'Edit in this change' }).click();
-  await expect(page.getByRole('button', { name: 'Editing in this change' })).toBeVisible();
+  // An option leads with "Draft this option's changes", which opens the landscape on this option (it becomes the editing ref).
+  await page.getByRole('link', { name: "Draft this option's changes" }).click();
+  await expect(page).toHaveURL(/landscape/);
 
   // 5. On the option's own branch: remove the uses edge (the crossing
   // itself), then retire System C with no replacement (the undeclared
