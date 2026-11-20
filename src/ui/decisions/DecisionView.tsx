@@ -20,6 +20,9 @@ import type { BranchRow, DecisionLinkRow, DecisionRow, MemberRole } from '../../
 import { intentHeaderLine } from '../changes/branchIntent';
 import { profileLabel } from '../comments/profileLabel';
 import { chooseNote } from './chooseNote';
+import { askToChooseComment, decisionNextStep } from './decisionNextStep';
+import { DecisionNextStepCard } from './DecisionNextStepCard';
+import { createComment } from '../../db/comments';
 import { canAddDecisionConcern, canCancelDecision, canChooseDecisionOption, canCreateChangeBranch, canEditDecision, canRateDecisionOption } from '../orgs/useMembership';
 import { useMembers } from '../orgs/useMembers';
 import type { AlsoAffectedElement } from './alsoAffected';
@@ -114,6 +117,10 @@ export function DecisionView({ modelId, decisionId, orgId, orgSlug, modelSlug, r
   const [reviewBy, setReviewBy] = useState('');
   const [adrCopied, setAdrCopied] = useState(false);
   const [whatChangesExpanded, setWhatChangesExpanded] = useState(false);
+  const [askedNames, setAskedNames] = useState<string[] | null>(null);
+  const [askBusy, setAskBusy] = useState(false);
+  const [askError, setAskError] = useState<string | null>(null);
+  const [commentsKey, setCommentsKey] = useState(0);
 
   // Every hook above must run unconditionally (rules of hooks) — the
   // comparison hook too, even before `state` has resolved to `ready`;
@@ -157,6 +164,41 @@ export function DecisionView({ modelId, decisionId, orgId, orgSlug, modelSlug, r
   const scoredLinks = branchLinks.filter((l) => l.linked_id !== decision.baseline_branch_id);
   const canEditBaseline = canAddOption && canEditDecision(role, decision, userId);
   const baselineBranch = decision.baseline_branch_id !== null ? linkedBranchesById.get(decision.baseline_branch_id) : undefined;
+  const approvers = members.filter((m) => m.member.role === 'owner' || m.member.role === 'architect');
+  const ratedBranchIds = new Set(ratingsState.ratings.map((r) => r.branch_id));
+  const nextStep = decisionNextStep({
+    status: decision.status,
+    optionCount: scoredLinks.length,
+    ratedOptionCount: scoredLinks.filter((l) => ratedBranchIds.has(l.linked_id)).length,
+    canAddOption,
+    canChoose,
+    chosenTitle: chosenBranch ? intentHeaderLine(chosenBranch) : null,
+  });
+
+  function onNextStepAction() {
+    if (!nextStep) return;
+    if (nextStep.action === 'compare' || nextStep.action === 'choose') {
+      document.getElementById('decision-compare')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      return;
+    }
+    if (nextStep.action === 'ask-to-choose' && userId !== null) {
+      setAskBusy(true);
+      setAskError(null);
+      const handles = approvers.map((m) => m.profile?.handle).filter((h): h is string => h !== undefined && h !== '');
+      void createComment(supabase, { id: crypto.randomUUID(), orgId, modelId, anchorType: 'decision', anchorId: decisionId, body: askToChooseComment(handles, decision.title), authorId: userId })
+        .then(() => {
+          setAskedNames(approvers.map((m) => profileLabel(m.profile)));
+          setCommentsKey((k) => k + 1);
+        })
+        .catch((e: unknown) => {
+          setAskError("Couldn't send the request. Try again.");
+          reportError("Couldn't ask an owner or architect to choose.", e);
+        })
+        .finally(() => {
+          setAskBusy(false);
+        });
+    }
+  }
 
   // Prompt pack F3 PR6's "Export as ADR markdown" — assembled from data
   // this page has already loaded (no second round trip).
@@ -221,6 +263,7 @@ export function DecisionView({ modelId, decisionId, orgId, orgSlug, modelSlug, r
           {adrCopied ? 'Copied' : 'Copy as ADR markdown'}
         </Button>
       </div>
+      {nextStep !== null && <DecisionNextStepCard step={nextStep} onAction={onNextStepAction} busy={askBusy} askedNames={askedNames} error={askError} />}
       {canEditDecision(role, decision, userId) && (
         <DecisionEdit
           decision={decision}
@@ -441,6 +484,7 @@ export function DecisionView({ modelId, decisionId, orgId, orgSlug, modelSlug, r
                   provenance: optionProvenance(pendingOptions.marks.get(b.id), (id) => profileLabel(members.find((m) => m.member.user_id === id)?.profile)),
                 }));
               return (
+                <div id="decision-compare">
                 <DecisionCriteriaGrid
                   decisionId={decisionId}
                   options={criteriaOptions}
@@ -462,6 +506,7 @@ export function DecisionView({ modelId, decisionId, orgId, orgSlug, modelSlug, r
                   }}
                   ratingsState={ratingsState}
                 />
+                </div>
               );
             })()
           )}
@@ -779,7 +824,7 @@ export function DecisionView({ modelId, decisionId, orgId, orgSlug, modelSlug, r
         <Text as="h2" size="lg">
           Comments
         </Text>
-        <CommentsSection orgId={orgId} modelId={modelId} userId={userId} role={role} anchorType="decision" anchorId={decisionId} branchId={null} />
+        <CommentsSection key={commentsKey} orgId={orgId} modelId={modelId} userId={userId} role={role} anchorType="decision" anchorId={decisionId} branchId={null} />
       </Panel>
     </div>
   );

@@ -26,6 +26,7 @@ import {
   type DecisionPrefill,
 } from '../decisions/decisionPrefill';
 import { canStartDecision } from '../orgs/useMembership';
+import { useProposedDecisionCount } from '../decisions/useProposedDecisionCount';
 import { GoalsWithoutCapabilityNote } from '../goals/GoalsWithoutCapabilityNote';
 import { PrincipleDeparturesNote } from '../principles/PrincipleDeparturesNote';
 import { attributesRecord } from '../elements/attributesRecord';
@@ -197,6 +198,9 @@ export function ArchitectHome({ data, modelId, mainCommitIdHint, insights, role,
   const now = new Date();
   const { userId: homeUserId } = useAuth();
   const otherApproverExists = orgMembers.some((m) => (m.member.role === 'owner' || m.member.role === 'architect') && m.member.user_id !== homeUserId);
+  // Decisions still open on this model: an owner or architect is the one who chooses, so Home says so.
+  const openDecisionCount = useProposedDecisionCount(modelId);
+  const decisionsToChoose = role === 'owner' || role === 'architect' ? (openDecisionCount ?? 0) : 0;
   const waitingProjects = projectsWaitingForAcceptance(data.allProjects, canAcceptProject(role), homeUserId, otherApproverExists);
   // E8 item (4): `null` while Health findings/Recent activity are still
   // loading (or failed) — every array below built from it defaults to
@@ -639,6 +643,15 @@ export function ArchitectHome({ data, modelId, mainCommitIdHint, insights, role,
           <Text as="p">
             <Link to={`${modelHref}/projects`}>
               {waitingProjects === 1 ? '1 project is waiting for you to accept it →' : `${String(waitingProjects)} projects are waiting for you to accept them →`}
+            </Link>
+          </Text>
+        </div>
+      ) : null}
+      {decisionsToChoose > 0 ? (
+        <div data-testid="decisions-waiting-for-you">
+          <Text as="p">
+            <Link to={`${modelHref}/decisions`}>
+              {decisionsToChoose === 1 ? '1 decision is open and needs a choice →' : `${String(decisionsToChoose)} decisions are open and need a choice →`}
             </Link>
           </Text>
         </div>
