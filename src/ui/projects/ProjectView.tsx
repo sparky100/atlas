@@ -48,6 +48,8 @@ import { findingLabel } from '../decisions/findingLabels';
 import { suggestDecisionTitle } from '../decisions/optionSuggestions';
 import { ProjectBeforeAfter } from './ProjectBeforeAfter';
 import { DesignerSuggestions, type SuggestionSelection } from '../decisions/DesignerSuggestions';
+import { DecisionDraftBanner } from '../decisions/DecisionDraftBanner';
+import { useDecisionFormDraft } from '../decisions/useDecisionFormDraft';
 import { clockNow, pendingKey, savePending } from '../decisions/pendingOptions';
 import { ProjectStep } from './ProjectStep';
 import { changesSummary, decisionsSummary, evidenceSummary, scopeSummary } from './projectStepSummary';
@@ -551,6 +553,7 @@ function NewDecisionForm({
   const [suggested, setSuggested] = useState<SuggestionSelection>({ options: [], draftedAt: null, anyEdited: false });
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const draft = useDecisionFormDraft(project.org_id, userId, `project-${project.id}`, { title, statement });
   const firstScope = scopeIds[0];
   // The Designer is sent what is written in the box below, so correcting it changes the brief.
   const aiDraft = suggested.draftedAt !== null ? { draftedAt: suggested.draftedAt, edited: suggested.anyEdited } : null;
@@ -576,6 +579,7 @@ function NewDecisionForm({
             }
             // The options the person kept are saved on the decision page as it opens, one by one, so a failure there can be retried without losing them.
             if (suggested.options.length > 0) savePending(localStorage, pendingKey(project.org_id, userId, d.id), suggested.options, clockNow());
+            draft.clear();
             void navigate(`${base}/decisions/${d.id}${suggested.options.length > 0 ? '' : '?edit=1'}`);
           })
           .catch((err: unknown) => {
@@ -587,6 +591,17 @@ function NewDecisionForm({
           });
       }}
     >
+      {draft.offered !== null && (
+        <DecisionDraftBanner
+          draft={draft.offered}
+          onRestore={(d) => {
+            setTitle(d.title);
+            setStatement(d.statement);
+            draft.accept();
+          }}
+          onDiscard={draft.discard}
+        />
+      )}
       <input
         className={styles.input}
         type="text"
@@ -595,6 +610,7 @@ function NewDecisionForm({
         value={title}
         onChange={(e) => {
           setTitle(e.target.value);
+          draft.remember({ title: e.target.value, statement });
         }}
       />
       <label>
@@ -607,6 +623,7 @@ function NewDecisionForm({
           value={statement}
           onChange={(e) => {
             setStatement(e.target.value);
+            draft.remember({ title, statement: e.target.value });
           }}
         />
       </label>

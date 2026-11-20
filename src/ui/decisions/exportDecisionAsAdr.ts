@@ -73,6 +73,22 @@ function statusLine(decision: DecisionRow): string {
   return decision.decided_at ? `${label} — decided ${decision.decided_at.slice(0, 10)}` : label;
 }
 
+/** The outcome in one plain line, so a reader meets it before the detail. */
+function outcomeLine(decision: DecisionRow, options: readonly DecisionAdrExportOption[]): string {
+  if (decision.status === 'accepted') {
+    const chosen = options.find((o) => o.isChosen);
+    return chosen ? `Chose ${chosen.branch.title ?? chosen.branch.name}` : 'An option was chosen, but it is no longer linked to this decision';
+  }
+  if (decision.status === 'rejected') return 'Cancelled without choosing an option';
+  return 'Not yet decided';
+}
+
+/** What the option is, in one line, when someone wrote it down (a Designer suggestion the person kept, or their own words). */
+function optionAboutLines(option: DecisionAdrExportOption): string[] {
+  const about = (option.branch.description ?? '').replace(/\s+/g, ' ').trim();
+  return about === '' ? [] : [`  - About: ${about}`];
+}
+
 function optionLine(option: DecisionAdrExportOption): string {
   const label = intentHeaderLine(option.branch);
   if (option.isChosen) return `- **${label}** — chosen`;
@@ -104,6 +120,7 @@ export function exportDecisionAsAdrMarkdown(input: DecisionAdrExportInput): stri
   lines.push(`# ADR: ${decision.title}`);
   lines.push('');
   lines.push(`**Status:** ${statusLine(decision)}`);
+  lines.push(`**Outcome:** ${outcomeLine(decision, options)}`);
   lines.push(`**Owner:** ${ownerName}`);
   if (decision.needed_by) lines.push(`**Needed by:** ${decision.needed_by}`);
   if (decision.lens_map_url) lines.push(`**Lens map:** ${decision.lens_map_url}`);
@@ -130,6 +147,7 @@ export function exportDecisionAsAdrMarkdown(input: DecisionAdrExportInput): stri
     lines.push('');
     for (const option of options) {
       lines.push(optionLine(option));
+      lines.push(...optionAboutLines(option));
       lines.push(...optionRatingLines(option));
     }
   }

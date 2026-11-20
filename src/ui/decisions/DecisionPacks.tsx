@@ -9,6 +9,7 @@ import { Text } from '../components/Text/Text';
 import { reportError } from '../errors/errorBannerStore';
 import { queryKeys } from '../query/keys';
 import { supabase } from '../supabaseClient';
+import { PackDocument } from './PackDocumentView';
 import { LENS_LABELS, lensProgress, lensesOpenTo, packIsStale, packSignOff, packSignOffSummary } from './packSignOff';
 import styles from './DecisionPacks.module.css';
 
@@ -98,7 +99,7 @@ export function DecisionPacks({ decisionId, canFreeze, canSign, userId, nameOfUs
                     Version {pack.version} — frozen {pack.frozen_at.slice(0, 10)} — {packSignOffSummary(packSignOff(pack.id, approvals ?? []))}
                     {stale ? ' — the decision has changed since this was frozen' : ''}
                   </summary>
-                  <pre className={styles.body}>{pack.body_markdown}</pre>
+                  <PackDocument markdown={pack.body_markdown} />
                 </details>
                 {isLatest && (
                   <ul className={styles.lensProgress} aria-label={`Capacities heard from on version ${String(pack.version)}`}>

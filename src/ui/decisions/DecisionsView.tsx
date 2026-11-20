@@ -15,6 +15,8 @@ import { profileLabel } from '../comments/profileLabel';
 import type { DecisionRow } from '../../db/types';
 import type { DecisionPrefill } from './decisionPrefill';
 import { DecisionLinkPicker } from './DecisionLinkPicker';
+import { DecisionDraftBanner } from './DecisionDraftBanner';
+import { useDecisionFormDraft } from './useDecisionFormDraft';
 import { DesignerSuggestions, type SuggestionSelection } from './DesignerSuggestions';
 import { clockNow, pendingKey, savePending } from './pendingOptions';
 import { designerInputFromPrefill } from './designerRequest';
@@ -70,7 +72,10 @@ export function DecisionsView({ modelId, orgId, userId, orgSlug, modelSlug, canC
   // The Designer is pointed at the first thing the decision is about: the finding behind the form, or whatever the person has linked.
   const designerElementId = designerInputFromPrefill(prefill)?.elementId ?? links[0]?.elementId;
 
+  const draft = useDecisionFormDraft(orgId, userId, `decisions-${modelId}`, { title, statement });
+
   const resetForm = () => {
+    draft.clear();
     setTitle('');
     setStatement('');
     setSuggested({ options: [], draftedAt: null, anyEdited: false });
@@ -110,6 +115,17 @@ export function DecisionsView({ modelId, orgId, userId, orgSlug, modelSlug, canC
               });
             }}
           >
+            {draft.offered !== null && (
+              <DecisionDraftBanner
+                draft={draft.offered}
+                onRestore={(d) => {
+                  setTitle(d.title);
+                  setStatement(d.statement);
+                  draft.accept();
+                }}
+                onDiscard={draft.discard}
+              />
+            )}
             <input
               className={styles.input}
               type="text"
@@ -117,6 +133,7 @@ export function DecisionsView({ modelId, orgId, userId, orgSlug, modelSlug, canC
               value={title}
               onChange={(e) => {
                 setTitle(e.target.value);
+                draft.remember({ title: e.target.value, statement });
               }}
             />
             <label>
@@ -129,6 +146,7 @@ export function DecisionsView({ modelId, orgId, userId, orgSlug, modelSlug, canC
                 value={statement}
                 onChange={(e) => {
                   setStatement(e.target.value);
+                  draft.remember({ title, statement: e.target.value });
                 }}
               />
             </label>
