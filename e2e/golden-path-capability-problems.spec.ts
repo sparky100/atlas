@@ -19,7 +19,10 @@ test('a capability page leads with its problem and starts a project from it', as
   // Rate the supports link a poor fit.
   await page.getByRole('button', { name: 'Show attributes' }).click();
   await page.getByRole('button', { name: 'Edit', exact: true }).click();
+  // Fit notes stay out of the way until a poor or adequate fit asks "What is the problem?".
+  await expect(page.getByLabel('What is the problem?')).toHaveCount(0);
   await page.getByLabel('Fit for purpose').selectOption('poor');
+  await page.getByLabel('What is the problem?').fill('Quotes are keyed by hand and take two days.');
   await page.getByRole('button', { name: 'Save', exact: true }).click();
   await expect(page.getByText('Fit for purpose: poor', { exact: false })).toBeVisible();
 
@@ -28,7 +31,8 @@ test('a capability page leads with its problem and starts a project from it', as
   const band = page.getByTestId('capability-problems');
   await expect(band.getByRole('heading', { name: 'What needs attention' })).toBeVisible();
   await expect(band.getByRole('link', { name: 'Quote Tool' })).toBeVisible();
-  await expect(band).toContainText('rated a poor fit, but no reason is recorded');
+  await expect(band).toContainText('Quote Tool is a poor fit.');
+  await expect(band).toContainText('Quotes are keyed by hand and take two days.');
   await expect(band).not.toContainText(/replace|retire/i);
 
   // One visible button, not only in the ⋯ menu; the capability is already the scope.
