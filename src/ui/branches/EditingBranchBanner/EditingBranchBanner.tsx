@@ -1,12 +1,16 @@
+import { useQuery } from '@tanstack/react-query';
 import { useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router';
 import type { UUID } from '../../../contracts/delta';
 import type { Ref } from '../../../db/ref';
 import type { ViewMode } from '../../../db/viewMode';
+import { getDecisionForOption } from '../../../db/decisions';
 import { Button } from '../../components/Button/Button';
+import { LinkButton } from '../../components/Button/LinkButton';
 import { Text } from '../../components/Text/Text';
 import { ReviewerPicker } from '../../changes/ReviewerPicker';
 import { useSubmitForReview } from '../../changes/useSubmitForReview';
+import { supabase } from '../../supabaseClient';
 import { useEditingBranch } from '../useEditingBranch';
 import { useSelectedRef } from '../useSelectedRef';
 import styles from './EditingBranchBanner.module.css';
@@ -95,7 +99,16 @@ export function EditingBranchBanner({ activeRef, modelId, orgSlug, modelSlug, sh
   // change's own page fail outright ("this change needs a reviewer set").
   const isMultiReviewerIntent = branch !== null && (branch.intent === 'propose' || branch.intent === 'explore');
 
+  // An option is finished from its decision, not submitted on its own: offer the way back to the decision instead of Submit.
+  const isOption = branch !== null && branch.intent === 'explore';
+  const { data: optionDecision } = useQuery({
+    queryKey: ['bannerOptionDecision', branch?.id ?? null],
+    enabled: isOption && branch !== null,
+    queryFn: () => (branch === null ? null : getDecisionForOption(supabase, branch.id)),
+  });
+
   if (activeRef.kind !== 'branch') return null;
+  const backToDecision = isOption && optionDecision ? optionDecision : null;
 
   const setMode = (mode: ViewMode) => {
     setSearchParams((prev) => {
@@ -157,7 +170,12 @@ export function EditingBranchBanner({ activeRef, modelId, orgSlug, modelSlug, sh
           </button>
         </div>
       )}
-      {showSubmitForReview && branch?.status === 'draft' && (
+      {backToDecision !== null && (
+        <LinkButton to={`/o/${orgSlug}/m/${modelSlug}/decisions/${backToDecision.id}`} variant="primary">
+          Back to the decision
+        </LinkButton>
+      )}
+      {showSubmitForReview && backToDecision === null && branch?.status === 'draft' && (
         <Button variant="primary" onClick={submitForReview} disabled={submission.status === 'submitting'}>
           {submission.status === 'submitting' ? 'Submitting…' : 'Submit for review'}
         </Button>
