@@ -103,7 +103,7 @@ export function EditingBranchBanner({ activeRef, modelId, orgSlug, modelSlug, sh
   const isOption = branch !== null && branch.intent === 'explore';
   const { data: optionDecision } = useQuery({
     queryKey: ['bannerOptionDecision', branch?.id ?? null],
-    enabled: isOption && branch !== null,
+    enabled: isOption,
     queryFn: () => (branch === null ? null : getDecisionForOption(supabase, branch.id)),
   });
 
