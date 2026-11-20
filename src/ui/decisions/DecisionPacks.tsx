@@ -9,7 +9,7 @@ import { Text } from '../components/Text/Text';
 import { reportError } from '../errors/errorBannerStore';
 import { queryKeys } from '../query/keys';
 import { supabase } from '../supabaseClient';
-import { PackDocument } from './PackDocument';
+import { PackDocument } from './PackDocumentView';
 import { LENS_LABELS, lensProgress, lensesOpenTo, packIsStale, packSignOff, packSignOffSummary } from './packSignOff';
 import styles from './DecisionPacks.module.css';
 

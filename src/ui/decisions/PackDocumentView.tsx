@@ -1,7 +1,7 @@
 import { Fragment } from 'react';
 import { Text } from '../components/Text/Text';
 import { parsePackDocument, type InlinePart, type PackBlock } from './packDocument';
-import styles from './PackDocument.module.css';
+import styles from './PackDocumentView.module.css';
 
 function Inline({ parts }: { parts: readonly InlinePart[] }) {
   return (
