@@ -142,37 +142,39 @@ export function ProjectsView({ modelId, orgId, userId, orgSlug, modelSlug, canCr
                 inputClassName={styles.input}
               />
             </div>
-            <div className={styles.formRow}>
-              <label htmlFor="project-start">
-                <Text as="span" size="sm" tone="muted">
-                  Start date
-                </Text>
-              </label>
-              <input
-                id="project-start"
-                className={styles.input}
-                type="date"
-                value={startDate}
-                onChange={(e) => {
-                  setStartDate(e.target.value);
-                }}
-              />
-            </div>
-            <div className={styles.formRow}>
-              <label htmlFor="project-target">
-                <Text as="span" size="sm" tone="muted">
-                  Target date
-                </Text>
-              </label>
-              <input
-                id="project-target"
-                className={styles.input}
-                type="date"
-                value={targetDate}
-                onChange={(e) => {
-                  setTargetDate(e.target.value);
-                }}
-              />
+            <div className={styles.datesRow}>
+              <div className={styles.formRow}>
+                <label htmlFor="project-start">
+                  <Text as="span" size="sm" tone="muted">
+                    Start date (optional)
+                  </Text>
+                </label>
+                <input
+                  id="project-start"
+                  className={styles.input}
+                  type="date"
+                  value={startDate}
+                  onChange={(e) => {
+                    setStartDate(e.target.value);
+                  }}
+                />
+              </div>
+              <div className={styles.formRow}>
+                <label htmlFor="project-target">
+                  <Text as="span" size="sm" tone="muted">
+                    Target date (optional)
+                  </Text>
+                </label>
+                <input
+                  id="project-target"
+                  className={styles.input}
+                  type="date"
+                  value={targetDate}
+                  onChange={(e) => {
+                    setTargetDate(e.target.value);
+                  }}
+                />
+              </div>
             </div>
             {main?.head_commit_id && (
               <DecisionLinkPicker
