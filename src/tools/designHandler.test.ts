@@ -35,6 +35,8 @@ function deps(over: Partial<DesignHandlerDeps> = {}): DesignHandlerDeps & { call
       costModes.push(runCost);
       return estateContext();
     },
+    trialRunsLeft: () => Promise.resolve(0),
+    newRunId: () => 'run-1',
     createClient: () => {
       calls.push('client');
       return client;
@@ -53,12 +55,31 @@ describe('handleDesign', () => {
     expect(JSON.stringify(d.requests[0]?.messages)).toContain(ELEMENT);
   });
 
-  it('refuses before anything is read or sent unless every switch is on, one at a time', async () => {
+  it('refuses before anything is read or sent unless the switches are on and there is a key or trial left, one at a time', async () => {
     for (const settings of [{ ...ON, assistantEnabled: false }, { ...ON, agentsEnabled: false }, { ...ON, keySet: false }]) {
       const d = deps({ agentSettings: () => Promise.resolve(settings) });
       expect((await handleDesign(d, body)).status).toBe('not_enabled');
       expect(d.calls).toEqual([]);
     }
+  });
+
+  it('with no key of its own, runs on the free trial while runs are left, counted by a fresh run id', async () => {
+    let runId: string | undefined;
+    const d = deps({ agentSettings: () => Promise.resolve({ ...ON, keySet: false }), trialRunsLeft: () => Promise.resolve(2), createClient: (_org, id) => { runId = id; return { complete: () => Promise.resolve({ text: 'x', inputTokens: 0, outputTokens: 0 }) }; } });
+    expect((await handleDesign(d, body)).status).toBe('done');
+    expect(runId).toBe('run-1');
+  });
+
+  it('with no key and the trial used up, says so plainly and sends nothing', async () => {
+    const d = deps({ agentSettings: () => Promise.resolve({ ...ON, keySet: false }), trialRunsLeft: () => Promise.resolve(0) });
+    const outcome = await handleDesign(d, body);
+    expect(outcome.status === 'not_enabled' && outcome.message).toContain('free trial');
+    expect(d.calls).toEqual([]);
+  });
+
+  it('never asks about the trial when the organisation has its own key', async () => {
+    const d = deps({ trialRunsLeft: () => Promise.reject(new Error('must not be asked')) });
+    expect((await handleDesign(d, body)).status).toBe('done');
   });
 
   it('never falls back to another key: the client is only built after the gates, and only for the model\'s own organisation', async () => {

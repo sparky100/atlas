@@ -5,10 +5,13 @@ import { runDesigner, type DesignerDraft } from '../../db/designAgent';
 import { DESIGNER_MAX_FINDING_CHARS } from '../../tools/designPrompt';
 import { Button } from '../components/Button/Button';
 import { useMembership } from '../orgs/useMembership';
+import { useMembers } from '../orgs/useMembers';
+import { profileLabel } from '../comments/profileLabel';
 import { Chip } from '../components/Chip/Chip';
 import { Text } from '../components/Text/Text';
 import { supabase } from '../supabaseClient';
-import { designerCostLine } from './designerRequest';
+import { designerCostLine, designerTrialLine } from './designerRequest';
+import { useDesignerTrial } from './useDesignerTrial';
 import { clockNow, loadPending, pendingKey, savePending, type PendingOption } from './pendingOptions';
 import formStyles from './DecisionsView.module.css';
 import styles from './DesignerSuggestions.module.css';
@@ -56,12 +59,17 @@ function newCards(draft: DesignerDraft, draftedAt: string): SuggestionCard[] {
 export function DesignerSuggestions({ orgId, userId, modelId, elementId, brief, scope, onChange }: DesignerSuggestionsProps) {
   // What a run cost is the organisation owner's business, not every contributor's (Simon, 2026-11-20).
   const { role } = useMembership(orgId, userId);
+  const trial = useDesignerTrial(orgId, 'panel');
+  const { members } = useMembers(orgId);
+  const ownerNames = members.filter((m) => m.member.role === 'owner').map((m) => profileLabel(m.profile));
+  const [ranOnTrial, setRanOnTrial] = useState(0);
+  const onTrial = trial !== null && !trial.keySet;
   const heldKey = pendingKey(orgId, userId, `designer-${scope}`);
   const [state, setState] = useState<'idle' | 'running' | 'failed' | 'stopped'>('idle');
   const [message, setMessage] = useState('');
   const [cards, setCards] = useState<SuggestionCard[]>([]);
   const [earlier, setEarlier] = useState<SuggestionCard[]>([]);
-  const [meta, setMeta] = useState<Pick<DesignerDraft, 'gaps' | 'stayNote' | 'problems' | 'citedNames' | 'grounded' | 'usage'> | null>(null);
+  const [meta, setMeta] = useState<Omit<Pick<DesignerDraft, 'gaps' | 'stayNote' | 'problems' | 'citedNames' | 'grounded' | 'usage'>, 'usage'> & { usage: DesignerDraft['usage'] & { trial?: boolean } } | null>(null);
   const [held, setHeld] = useState<SuggestionCard[]>(() => loadPending(localStorage, heldKey, clockNow()) as SuggestionCard[]);
   const abort = useRef<AbortController | null>(null);
   const runNo = useRef(0);
@@ -87,6 +95,9 @@ export function DesignerSuggestions({ orgId, userId, modelId, elementId, brief, 
     [],
   );
 
+  const trialLeft = trial === null ? null : Math.max(0, trial.runsLeft - ranOnTrial);
+  const trialLine = trial !== null && trialLeft !== null ? designerTrialLine({ keySet: trial.keySet, trial: { runsLeft: trialLeft, runsUsed: trial.runsUsed + ranOnTrial }, ownerNames }) : null;
+  const trialSpent = onTrial && trialLeft === 0;
   const briefText = brief.trim();
   const tooLong = briefText.length > DESIGNER_MAX_FINDING_CHARS;
 
@@ -102,8 +113,9 @@ export function DesignerSuggestions({ orgId, userId, modelId, elementId, brief, 
       if (mine !== runNo.current) return;
       setEarlier((prev) => [...cards, ...prev]);
       setCards(newCards(draft, new Date().toISOString()));
-      setMeta({ gaps: draft.gaps, stayNote: draft.stayNote, problems: draft.problems, citedNames: draft.citedNames, grounded: draft.grounded, usage: draft.usage });
+      setMeta({ gaps: draft.gaps, stayNote: draft.stayNote, problems: draft.problems, citedNames: draft.citedNames, grounded: draft.grounded, usage: { ...draft.usage, trial: onTrial } });
       setState('idle');
+      if (onTrial) setRanOnTrial((n) => n + 1);
     } catch (e) {
       if (mine !== runNo.current) return;
       setMessage(e instanceof Error ? e.message : 'The Designer could not suggest options. Try again.');
@@ -151,7 +163,7 @@ export function DesignerSuggestions({ orgId, userId, modelId, elementId, brief, 
         </div>
       )}
       <div className={styles.actions}>
-        <Button type="button" variant="secondary" disabled={state === 'running' || briefText === '' || tooLong} onClick={() => { void run(); }}>
+        <Button type="button" variant="secondary" disabled={state === 'running' || briefText === '' || tooLong || trialSpent} onClick={() => { void run(); }}>
           {state === 'running' ? 'Suggesting options…' : cards.length > 0 || earlier.length > 0 ? 'Suggest again' : 'Suggest options'}
         </Button>
         {state === 'running' && (
@@ -160,6 +172,11 @@ export function DesignerSuggestions({ orgId, userId, modelId, elementId, brief, 
           </Button>
         )}
       </div>
+      {trialLine !== null && (
+        <div role="status" data-testid="designer-trial-line">
+          <Text as="p" size="sm">{trialLine}</Text>
+        </div>
+      )}
       <Text as="p" tone="muted" size="sm">
         {state === 'running'
           ? "Reading what Atlas holds about this. You can keep editing what you have written while it works."

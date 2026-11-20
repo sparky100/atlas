@@ -8,6 +8,7 @@
 import type { Client } from './client';
 import type { LlmProxyRequestRow } from './types';
 import type { UUID } from '../contracts/delta';
+import { summariseTrial, type TrialUse } from '../contracts/trialAllowance';
 
 /** Member-scoped (`llm_proxy_requests_select`'s RLS) — reverse-chronological. */
 export async function listLlmProxyUsage(supabase: Client, orgId: UUID): Promise<LlmProxyRequestRow[]> {
@@ -50,4 +51,23 @@ export async function agentUseThisMonth(supabase: Client, orgId: UUID, now: Date
     .gte('created_at', since.toISOString());
   if (error) throw new Error(`agentUseThisMonth: ${error.message}`);
   return summariseAgentUse(data, since);
+}
+
+export interface DesignerTrialStatus extends TrialUse {
+  /** Whether the organisation has saved its own AI key. With one, the trial no longer applies. */
+  keySet: boolean;
+}
+
+/**
+ * The Designer's free trial for an organisation: runs and tokens used and runs left (member-scoped by RLS;
+ * counts only, never content). The proxy enforces the same rule itself, so this only decides what the page says.
+ */
+export async function designerTrialStatus(supabase: Client, orgId: UUID): Promise<DesignerTrialStatus> {
+  const [{ data: rows, error }, { data: org, error: orgError }] = await Promise.all([
+    supabase.from('llm_proxy_requests').select('key_source, status, run_id, input_tokens, output_tokens').eq('org_id', orgId).eq('key_source', 'trial').limit(2000),
+    supabase.from('organisations').select('ai_agent_key_set').eq('id', orgId).maybeSingle(),
+  ]);
+  if (error) throw new Error(`designerTrialStatus: ${error.message}`);
+  if (orgError) throw new Error(`designerTrialStatus: ${orgError.message}`);
+  return { ...summariseTrial(rows), keySet: (org as { ai_agent_key_set?: boolean } | null)?.ai_agent_key_set === true };
 }

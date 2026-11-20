@@ -477,6 +477,12 @@ async function loadVaultApiKey(supabaseUrl: string, serviceRoleKey: string): Pro
  * present; the env var is the last resort, not a second source of truth to
  * reconcile.
  */
+/** Designer free trial (src/contracts/trialAllowance.ts): runs and tokens per organisation, and a platform-wide daily token cap. */
+const TRIAL_RUNS = 5;
+const TRIAL_TOKENS = 300_000;
+const DEFAULT_TRIAL_DAILY_TOKENS = 2_000_000;
+const UUID_SHAPE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
 async function loadConfig(supabaseUrl: string, serviceRoleKey: string): Promise<LlmProxyConfig> {
   const envDefaults: LlmProxyConfig = {
     model: Deno.env.get('LLM_PROXY_MODEL') || DEFAULT_MODEL,
@@ -520,14 +526,16 @@ interface LogRequestInput {
   inputTokens?: number;
   outputTokens?: number;
   /** Which key paid: the organisation's own (`org`, agents) or the platform's (`app`). */
-  keySource?: 'app' | 'org';
+  keySource?: 'app' | 'org' | 'trial';
+  /** The Designer's id for one run (trial calls), so the allowance counts runs. */
+  runId?: string | null;
 }
 
 async function logRequest(input: LogRequestInput): Promise<void> {
-  const { serviceClient, orgId, model, status, latencyMs, inputTokens, outputTokens, keySource } = input;
+  const { serviceClient, orgId, model, status, latencyMs, inputTokens, outputTokens, keySource, runId } = input;
   const { error } = await serviceClient
     .from('llm_proxy_requests')
-    .insert({ id: crypto.randomUUID(), org_id: orgId, model, status, latency_ms: latencyMs, input_tokens: inputTokens ?? null, output_tokens: outputTokens ?? null, key_source: keySource ?? 'app' });
+    .insert({ id: crypto.randomUUID(), org_id: orgId, model, status, latency_ms: latencyMs, input_tokens: inputTokens ?? null, output_tokens: outputTokens ?? null, key_source: keySource ?? 'app', run_id: runId ?? null });
   // Logging is best-effort observability, not the authorization check
   // (that's the membership read below) — a failure here must never turn
   // an otherwise-successful proxy call into an error response.
@@ -582,13 +590,19 @@ Deno.serve(async (req: Request) => {
     const proxyRequest = normalizeRequest(body);
     if (proxyRequest instanceof Response) return proxyRequest;
 
-    // Agents run on the organisation's OWN key (Phase D, Simon 2026-11-19), never the platform key.
-    // `useOrgKey: true` is allowed only when every switch is on (assistant, agents, a saved key) and
-    // the caller is an owner, architect or contributor of the organisation (a viewer is refused, as is anyone outside it). Otherwise it is refused outright: it
-    // never falls back to the platform key, so an organisation without a key cannot spend ours.
+    // Agents run on the organisation's OWN key (Phase D, Simon 2026-11-19), never the platform key,
+    // with ONE exception: the Designer's free trial (Simon, 2026-11-20). `useOrgKey: true` is allowed
+    // only when the assistant and agents switches are on and the caller is an owner, architect or
+    // contributor of the organisation (a viewer is refused, as is anyone outside it). With a saved
+    // key it uses that key. With none it may use the platform key for a limited number of Designer
+    // runs (TRIAL_RUNS, counted by `runId`) and a token backstop, plus a platform-wide daily cap
+    // against organisations created only to farm trials. Every lookup that fails refuses: it never
+    // spends the platform key on an error. Keep these numbers and the counting in step with
+    // `src/contracts/trialAllowance.ts`, which this runtime cannot import.
     let orgApiKey: string | null = null;
+    let trialRunId: string | null = null;
     if (bodyRecord.useOrgKey === true) {
-      const refuse = () => jsonResponse({ status: 'error', message: 'Agents are not available for this organisation: an owner needs to switch them on and save an AI key, and only an owner, architect or contributor can run them.' }, 403);
+      const refuse = () => jsonResponse({ status: 'error', message: 'Agents are not available for this organisation: an owner needs to switch them on, and only an owner, architect or contributor can run them.' }, 403);
       const { data: userData, error: userError } = await callerClient.auth.getUser();
       if (userError || !userData.user) return refuse();
       const { data: own, error: ownError } = await callerClient.from('members').select('role').eq('org_id', orgId).eq('user_id', userData.user.id).maybeSingle();
@@ -596,13 +610,37 @@ Deno.serve(async (req: Request) => {
       if (ownError || (role !== 'owner' && role !== 'architect' && role !== 'contributor')) return refuse();
       const { data: orgRow, error: orgError } = await serviceClient.from('organisations').select('ai_assistant_enabled, ai_agents_enabled, ai_agent_key_set').eq('id', orgId).maybeSingle();
       const flags = orgRow as { ai_assistant_enabled?: boolean; ai_agents_enabled?: boolean; ai_agent_key_set?: boolean } | null;
-      if (orgError || flags?.ai_assistant_enabled !== true || flags.ai_agents_enabled !== true || flags.ai_agent_key_set !== true) return refuse();
-      const { data: savedKey, error: keyError } = await serviceClient.schema('atlas').rpc('org_ai_api_key', { p_org: orgId });
-      if (keyError || typeof savedKey !== 'string' || savedKey === '') return refuse();
-      orgApiKey = savedKey;
+      if (orgError || flags?.ai_assistant_enabled !== true || flags.ai_agents_enabled !== true) return refuse();
+      if (flags.ai_agent_key_set === true) {
+        const { data: savedKey, error: keyError } = await serviceClient.schema('atlas').rpc('org_ai_api_key', { p_org: orgId });
+        if (keyError || typeof savedKey !== 'string' || savedKey === '') return refuse();
+        orgApiKey = savedKey;
+      } else {
+        const trialRefuse = (message: string) => jsonResponse({ status: 'error', message }, 403);
+        if (Deno.env.get('LLM_TRIAL_ENABLED') === 'false') return trialRefuse('The free trial of the Designer is not available on this installation. An owner needs to add the organisation\'s AI key in organisation settings.');
+        const runId = typeof bodyRecord.runId === 'string' && UUID_SHAPE.test(bodyRecord.runId) ? bodyRecord.runId : null;
+        if (runId === null) return trialRefuse('The free trial needs a run id.');
+        const { data: trialRows, error: trialError } = await serviceClient.from('llm_proxy_requests').select('status, run_id, input_tokens, output_tokens').eq('org_id', orgId).eq('key_source', 'trial').limit(2000);
+        if (trialError) return refuse();
+        const okRows = ((trialRows as { status: string; run_id: string | null; input_tokens: number | null; output_tokens: number | null }[] | null) ?? []).filter((r) => r.status === 'ok');
+        const runsSeen = new Set(okRows.flatMap((r) => (r.run_id !== null ? [r.run_id] : [])));
+        const tokensUsed = okRows.reduce((sum, r) => sum + (r.input_tokens ?? 0) + (r.output_tokens ?? 0), 0);
+        const started = runsSeen.has(runId);
+        if (!started) {
+          if (runsSeen.size >= TRIAL_RUNS || tokensUsed >= TRIAL_TOKENS) return trialRefuse('The free trial of the Designer is used up. An owner needs to add the organisation\'s AI key in organisation settings.');
+          const startOfDay = new Date();
+          startOfDay.setUTCHours(0, 0, 0, 0);
+          const { data: dayRows, error: dayError } = await serviceClient.from('llm_proxy_requests').select('input_tokens, output_tokens').eq('key_source', 'trial').eq('status', 'ok').gte('created_at', startOfDay.toISOString()).limit(10000);
+          if (dayError) return refuse();
+          const dayTokens = ((dayRows as { input_tokens: number | null; output_tokens: number | null }[] | null) ?? []).reduce((sum, r) => sum + (r.input_tokens ?? 0) + (r.output_tokens ?? 0), 0);
+          const dailyCap = Number(Deno.env.get('LLM_TRIAL_DAILY_TOKENS')) || DEFAULT_TRIAL_DAILY_TOKENS;
+          if (dayTokens >= dailyCap) return trialRefuse('The free trial of the Designer is busy today. Try again tomorrow, or ask an owner to add the organisation\'s AI key in organisation settings.');
+        }
+        trialRunId = runId;
+      }
     }
 
-    const keySource: 'app' | 'org' = orgApiKey !== null ? 'org' : 'app';
+    const keySource: 'app' | 'org' | 'trial' = orgApiKey !== null ? 'org' : trialRunId !== null ? 'trial' : 'app';
     const config = await loadConfig(supabaseUrl, serviceRoleKey);
     const { model, rateLimitPerHour } = config;
     const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000).toISOString();
@@ -613,13 +651,14 @@ Deno.serve(async (req: Request) => {
       .gte('created_at', oneHourAgo);
     if (countError) console.error('[llm-proxy] rate-limit count failed', countError.message);
     if (!countError && (count ?? 0) >= rateLimitPerHour) {
-      await logRequest({ serviceClient, orgId, model, status: 'rate_limited', latencyMs: Date.now() - startedAt, keySource });
+      await logRequest({ serviceClient, orgId, model, status: 'rate_limited', latencyMs: Date.now() - startedAt, keySource, runId: trialRunId });
       return jsonResponse({ status: 'error', message: `Rate limit exceeded for this organisation (${String(rateLimitPerHour)} requests/hour).` }, 429);
     }
 
+    // Platform key: the app's own features, or an organisation inside its Designer trial (checked above).
     const apiKey = orgApiKey ?? config.apiKey;
     if (!apiKey) {
-      await logRequest({ serviceClient, orgId, model, status: 'error', latencyMs: Date.now() - startedAt, keySource });
+      await logRequest({ serviceClient, orgId, model, status: 'error', latencyMs: Date.now() - startedAt, keySource, runId: trialRunId });
       return jsonResponse({ status: 'error', message: 'LLM proxy is not configured — no API key in platform_config\'s "llm" row or ANTHROPIC_API_KEY. See docs/EDGE-FUNCTIONS.md.' }, 503);
     }
 
@@ -633,7 +672,7 @@ Deno.serve(async (req: Request) => {
       // fire-and-forget `.then()` when that global isn't present (e.g. a
       // local test runner), since a best-effort audit log must never block
       // or fail the response itself (`logRequest`'s own comment).
-      const logAfterStream = passthrough.logged.then((outcome) => logRequest({ serviceClient, orgId, model, status: outcome.status, latencyMs: Date.now() - startedAt, inputTokens: outcome.inputTokens, outputTokens: outcome.outputTokens, keySource }));
+      const logAfterStream = passthrough.logged.then((outcome) => logRequest({ serviceClient, orgId, model, status: outcome.status, latencyMs: Date.now() - startedAt, inputTokens: outcome.inputTokens, outputTokens: outcome.outputTokens, keySource, runId: trialRunId }));
       const runtime = (globalThis as { EdgeRuntime?: { waitUntil: (p: Promise<unknown>) => void } }).EdgeRuntime;
       if (runtime) runtime.waitUntil(logAfterStream);
       return passthrough.response;
@@ -643,11 +682,11 @@ Deno.serve(async (req: Request) => {
     const latencyMs = Date.now() - startedAt;
 
     if (!result.ok) {
-      await logRequest({ serviceClient, orgId, model, status: 'error', latencyMs, keySource });
+      await logRequest({ serviceClient, orgId, model, status: 'error', latencyMs, keySource, runId: trialRunId });
       return jsonResponse({ status: 'error', message: result.text }, result.status);
     }
 
-    await logRequest({ serviceClient, orgId, model, status: 'ok', latencyMs, inputTokens: result.inputTokens, outputTokens: result.outputTokens, keySource });
+    await logRequest({ serviceClient, orgId, model, status: 'ok', latencyMs, inputTokens: result.inputTokens, outputTokens: result.outputTokens, keySource, runId: trialRunId });
     return jsonResponse(
       {
         status: 'ok',

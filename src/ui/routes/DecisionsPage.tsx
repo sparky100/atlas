@@ -9,6 +9,7 @@ import { Text } from '../components/Text/Text';
 import { WORK_COPY } from '../work/workCopy';
 import { parseDecisionPrefillFromSearchParams } from '../decisions/decisionPrefill';
 import { DecisionsView } from '../decisions/DecisionsView';
+import { useDesignerTrial } from '../decisions/useDesignerTrial';
 import { canOfferDesigner, designerUnavailableReason } from '../decisions/designerRequest';
 import { useAuth } from '../auth/useAuth';
 import { EditingBranchBanner } from '../branches/EditingBranchBanner/EditingBranchBanner';
@@ -48,6 +49,8 @@ export function DecisionsPage() {
   const { role } = useMembership(organisation?.id ?? null, userId);
   const { members } = useMembers(organisation?.id ?? null);
   const ownerNames = members.filter((m) => m.member.role === 'owner').map((m) => profileLabel(m.profile));
+  const trialStatus = useDesignerTrial(organisation?.id ?? null);
+  const designerArgs = { role, assistantEnabled: organisation?.ai_assistant_enabled === true, agentsEnabled: organisation?.ai_agents_enabled === true, keySet: organisation?.ai_agent_key_set === true, ...(trialStatus ? { trial: trialStatus } : {}) };
   const canCreate = canStartDecision(role);
 
   if (orgLoading || modelsLoading || !model) {
@@ -78,7 +81,7 @@ export function DecisionsPage() {
             </Text>
           </div>
           <PageIntro>{WORK_COPY.decision}</PageIntro>
-          <DecisionsView modelId={model.id} orgId={organisation?.id ?? ''} userId={userId} orgSlug={orgSlug ?? ''} modelSlug={model.slug} canCreate={canCreate} prefill={prefill} designerAvailable={canOfferDesigner({ role, assistantEnabled: organisation?.ai_assistant_enabled === true, agentsEnabled: organisation?.ai_agents_enabled === true, keySet: organisation?.ai_agent_key_set === true })} designerUnavailable={designerUnavailableReason({ role, assistantEnabled: organisation?.ai_assistant_enabled === true, agentsEnabled: organisation?.ai_agents_enabled === true, keySet: organisation?.ai_agent_key_set === true, ownerNames })} />
+          <DecisionsView modelId={model.id} orgId={organisation?.id ?? ''} userId={userId} orgSlug={orgSlug ?? ''} modelSlug={model.slug} canCreate={canCreate} prefill={prefill} designerAvailable={canOfferDesigner(designerArgs)} designerUnavailable={designerUnavailableReason({ ...designerArgs, ownerNames })} />
         </main>
       </div>
     </div>

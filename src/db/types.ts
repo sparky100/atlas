@@ -331,7 +331,9 @@ export interface LlmProxyRequestRow {
   status: LlmProxyRequestStatus;
   latency_ms: number | null;
   /** Which key paid: `org` is the organisation's own (agents), `app` the platform's (everything else). */
-  key_source: 'app' | 'org';
+  key_source: 'app' | 'org' | 'trial';
+  /** The Designer's id for one run (trial calls only), so a run counts once however many model calls it makes. */
+  run_id: UUID | null;
   created_at: string;
 }
 

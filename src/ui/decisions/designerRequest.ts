@@ -18,8 +18,14 @@ export function canRunDesignerRole(role: string | null): boolean {
 }
 
 /** The same rule the function enforces, so the button is only offered when it can work. The function still checks every part. */
-export function canOfferDesigner(args: { role: string | null; assistantEnabled: boolean; agentsEnabled: boolean; keySet: boolean }): boolean {
-  return canRunDesignerRole(args.role) && args.assistantEnabled && args.agentsEnabled && args.keySet;
+export function canOfferDesigner(args: { role: string | null; assistantEnabled: boolean; agentsEnabled: boolean; keySet: boolean; trial?: DesignerTrialArg }): boolean {
+  return canRunDesignerRole(args.role) && args.assistantEnabled && args.agentsEnabled && (args.keySet || (args.trial?.runsLeft ?? 0) > 0);
+}
+
+/** The free trial (Simon, 2026-11-20): runs left and used on the platform key. Absent means not known yet, treated as none left. */
+export interface DesignerTrialArg {
+  runsLeft: number;
+  runsUsed: number;
 }
 
 function whoCanSwitchOn(ownerNames: readonly string[]): string {
@@ -33,7 +39,7 @@ function whoCanSwitchOn(ownerNames: readonly string[]): string {
  * owner, because only owners can change these settings, so the page links to
  * them only for an owner and names the owners for everyone else.
  */
-export function designerUnavailableReason(args: { role: string | null; assistantEnabled: boolean; agentsEnabled: boolean; keySet: boolean; ownerNames?: readonly string[] }): { text: string; canFix: boolean } | null {
+export function designerUnavailableReason(args: { role: string | null; assistantEnabled: boolean; agentsEnabled: boolean; keySet: boolean; trial?: DesignerTrialArg; ownerNames?: readonly string[] }): { text: string; canFix: boolean } | null {
   if (canOfferDesigner(args)) return null;
   if (!canRunDesignerRole(args.role)) {
     return { text: 'Suggesting options with AI is for contributors, architects and owners. Ask one of them to draft the options, or add them by hand.', canFix: false };
@@ -42,12 +48,25 @@ export function designerUnavailableReason(args: { role: string | null; assistant
   const owners = whoCanSwitchOn(args.ownerNames ?? []);
   if (!args.assistantEnabled) return { text: isOwner ? 'Suggesting options with AI is off. Turn on Ask Atlas in organisation settings to use it.' : `Suggesting options with AI is off. ${owners} can turn on Ask Atlas in organisation settings. You can add options by hand meanwhile.`, canFix: isOwner };
   if (!args.agentsEnabled) return { text: isOwner ? 'Suggesting options with AI is off. Allow AI agents in organisation settings to use it.' : `Suggesting options with AI is off. ${owners} can allow AI agents in organisation settings. You can add options by hand meanwhile.`, canFix: isOwner };
-  return { text: isOwner ? "Suggesting options with AI needs your organisation's AI key. Save one in organisation settings to use it." : `Suggesting options with AI needs the organisation's AI key. ${owners} can save one in organisation settings. You can add options by hand meanwhile.`, canFix: isOwner };
+  const usedUp = (args.trial?.runsUsed ?? 0) > 0;
+  if (usedUp) {
+    return { text: isOwner ? 'The free trial of the Designer is used up. Save your organisation\'s AI key in organisation settings to keep using it.' : `The free trial of the Designer is used up. Ask ${owners.charAt(0).toLowerCase()}${owners.slice(1)} to add the organisation's AI key in organisation settings. You can add options by hand meanwhile.`, canFix: isOwner };
+  }
+  return { text: isOwner ? "Suggesting options with AI needs your organisation's AI key. Save one in organisation settings to use it." : `Suggesting options with AI needs the organisation's AI key. Ask ${owners.charAt(0).toLowerCase()}${owners.slice(1)} to add one in organisation settings. You can add options by hand meanwhile.`, canFix: isOwner };
+}
+
+/** The line shown beside the Designer button while it is running on the free trial; `null` once the organisation has its own key. Names the owners, who are the people who can add the key. */
+export function designerTrialLine(args: { keySet: boolean; trial: DesignerTrialArg; ownerNames?: readonly string[] }): string | null {
+  if (args.keySet) return null;
+  const n = args.trial.runsLeft;
+  const who = args.ownerNames && args.ownerNames.length > 0 ? `an owner (${args.ownerNames.join(', ')})` : 'an owner';
+  if (n <= 0) return `The free trial of the Designer is used up. Ask ${who} to add the organisation's AI key in organisation settings. You can add options by hand meanwhile.`;
+  return `Free trial: ${String(n)} ${n === 1 ? 'draft' : 'drafts'} left. After that, ${who} needs to add the organisation's AI key in organisation settings.`;
 }
 
 /** "What did this cost": tokens and lookups, in words. No money figure, because Atlas holds no price list and a guessed price would read as a fact. */
-export function designerCostLine(usage: { inputTokens: number; outputTokens: number; lookups: number }): string {
+export function designerCostLine(usage: { inputTokens: number; outputTokens: number; lookups: number; trial?: boolean }): string {
   const n = (v: number) => v.toLocaleString('en-GB');
   const lookups = usage.lookups === 1 ? '1 lookup' : `${n(usage.lookups)} lookups`;
-  return `This run used ${n(usage.inputTokens)} tokens in and ${n(usage.outputTokens)} out, with ${lookups}, on your organisation's AI key.`;
+  return `This run used ${n(usage.inputTokens)} tokens in and ${n(usage.outputTokens)} out, with ${lookups}, on ${usage.trial === true ? "Atlas's free trial" : "your organisation's AI key"}.`;
 }

@@ -3,9 +3,9 @@
  * its collaborators injected so it is tested without a Deno runtime (the same
  * split `ask-model` uses). Order matters and is the point of this file: the
  * model must be readable by the caller, the organisation must have Ask Atlas
- * on, the agents switch on and an AI key saved, and only then is anything sent
- * to a provider. It then runs the Designer on the organisation's own key
- * (never the platform key) with run cost withheld unless the owner shares it.
+ * on and the agents switch on, and either an AI key saved or free-trial runs left,
+ * and only then is anything sent to a provider. It then runs the Designer on the
+ * organisation's own key (or the free trial, never the platform key otherwise) with run cost withheld unless the owner shares it.
  *
  * The Designer writes nothing. Its draft is text for a person to read and edit.
  */
@@ -33,8 +33,12 @@ export interface DesignHandlerDeps {
   shareRunCost: (orgId: UUID) => Promise<boolean>;
   mainCommit: (modelId: UUID) => Promise<UUID | null>;
   createContext: (model: DesignModelInfo, commitId: UUID, runCost: RunCostSharing) => ToolContext;
-  /** A client that uses the organisation's own key (`useOrgKey`), never the platform key. */
-  createClient: (orgId: UUID) => AskModelClient;
+  /** Runs the organisation has left on the platform key's free trial (0 once used up). Only asked when it has no key of its own. */
+  trialRunsLeft: (orgId: UUID) => Promise<number>;
+  /** A fresh id for this run, so the trial counts a run once however many model calls it makes. */
+  newRunId: () => string;
+  /** A client that uses the organisation's own key when it has one, otherwise the free trial (`useOrgKey` + `runId`), never the platform key outside the trial. */
+  createClient: (orgId: UUID, runId: string) => AskModelClient;
 }
 
 export type DesignOutcome =
@@ -75,8 +79,12 @@ export async function handleDesign(deps: DesignHandlerDeps, body: unknown): Prom
   if (role !== 'owner' && role !== 'architect' && role !== 'contributor') return { status: 'forbidden', message: 'Only an owner, architect or contributor can run the Designer.' };
 
   const settings = await deps.agentSettings(model.orgId);
-  if (!settings.assistantEnabled || !settings.agentsEnabled || !settings.keySet) {
-    return { status: 'not_enabled', message: 'Agents are not switched on for this organisation, or it has no AI key saved. An owner can set this in organisation settings.' };
+  if (!settings.assistantEnabled || !settings.agentsEnabled) {
+    return { status: 'not_enabled', message: 'Agents are not switched on for this organisation. An owner can switch them on in organisation settings.' };
+  }
+  // No key of its own: the free trial, until it is used up. The proxy checks the same thing and is the real gate.
+  if (!settings.keySet && (await deps.trialRunsLeft(model.orgId)) <= 0) {
+    return { status: 'not_enabled', message: "The free trial of the Designer is used up. An owner needs to add the organisation's AI key in organisation settings." };
   }
 
   const commitId = await deps.mainCommit(model.id);
@@ -85,7 +93,7 @@ export async function handleDesign(deps: DesignHandlerDeps, body: unknown): Prom
   const runCost: RunCostSharing = (await deps.shareRunCost(model.orgId)) ? 'share' : 'exclude';
   const ctx = deps.createContext(model, commitId, runCost);
   const result = await runAsk({
-    client: deps.createClient(model.orgId),
+    client: deps.createClient(model.orgId, deps.newRunId()),
     ctx,
     history: [],
     question: designerBrief({ elementId: parsed.elementId, finding: parsed.finding }),

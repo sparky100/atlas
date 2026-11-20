@@ -16,6 +16,7 @@ import { useModels } from '../models/useModels';
 import { useMembers } from '../orgs/useMembers';
 import { profileLabel } from '../comments/profileLabel';
 import { useMembership } from '../orgs/useMembership';
+import { useDesignerTrial } from '../decisions/useDesignerTrial';
 import { canOfferDesigner, designerUnavailableReason } from '../decisions/designerRequest';
 import { useOrganisationBySlug } from '../orgs/useOrganisationBySlug';
 import styles from './ViewPage.module.css';
@@ -41,7 +42,8 @@ export function ProjectPage() {
   // Overdue is relative to today's date; read once per render, never stored.
   const today = new Date().toISOString().slice(0, 10);
 
-  const designerArgs = { role, assistantEnabled: organisation?.ai_assistant_enabled === true, agentsEnabled: organisation?.ai_agents_enabled === true, keySet: organisation?.ai_agent_key_set === true };
+  const trialStatus = useDesignerTrial(organisation?.id ?? null);
+  const designerArgs = { role, assistantEnabled: organisation?.ai_assistant_enabled === true, agentsEnabled: organisation?.ai_agents_enabled === true, keySet: organisation?.ai_agent_key_set === true, ...(trialStatus ? { trial: trialStatus } : {}) };
 
   if (orgLoading || modelsLoading || !model) {
     return (

@@ -4,11 +4,12 @@
  * What is here: read the caller's session, build collaborators that all use
  * the caller's own forwarded token (so row-level security is the authorisation
  * check for every read), and call the model through `llm-proxy` on the
- * organisation's OWN key (`useOrgKey`), which the proxy refuses unless agents
- * are switched on, a key is saved and the caller is an owner or architect.
+ * organisation's OWN key (`useOrgKey`), or the free trial when no key is saved
+ * (counted by `runId`). The proxy refuses unless agents are switched on and the
+ * caller is an owner, architect or contributor.
  *
- * It never reads `SUPABASE_SERVICE_ROLE_KEY`, nothing here writes, and it never
- * falls back to the platform key.
+ * It never reads `SUPABASE_SERVICE_ROLE_KEY` and nothing here writes. The platform
+ * key is used only inside the proxy's free trial.
  *
  * Response: JSON. `{ status: 'done', result, stamp }`, or `{ status }` with
  * `invalid`, `not_found`, `forbidden`, `not_enabled`, `empty_model` or `error`.
@@ -21,6 +22,7 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.115.0';
 import { corsHeaders } from '../../_shared/cors.ts';
 import { handleDesign } from '../../../../src/tools/designHandler.ts';
 import { createToolContext } from '../../../../src/tools/loadContext.ts';
+import { summariseTrial, type TrialRow } from '../../../../src/contracts/trialAllowance.ts';
 import { AskProviderError, createProxyAskClient } from '../../../../src/tools/proxyClient.ts';
 
 function jsonResponse(body: unknown, status: number): Response {
@@ -75,13 +77,20 @@ Deno.serve(async (req: Request) => {
           if (error) throw new Error('Could not read the organisation.');
           return (data as { ai_share_run_cost?: boolean } | null)?.ai_share_run_cost === true;
         },
+        trialRunsLeft: async (orgId) => {
+          // Member-scoped read of the call log (counts only). Any failure reads as "none left": fail closed.
+          const { data, error } = await supabase.from('llm_proxy_requests').select('key_source, status, run_id, input_tokens, output_tokens').eq('org_id', orgId).eq('key_source', 'trial').limit(2000);
+          if (error) return 0;
+          return summariseTrial((data as TrialRow[] | null) ?? []).runsLeft;
+        },
+        newRunId: () => crypto.randomUUID(),
         mainCommit: async (modelId) => {
           const { data, error } = await supabase.from('branches').select('head_commit_id').eq('model_id', modelId).eq('kind', 'main').maybeSingle();
           if (error) throw new Error('Could not read the main line.');
           return (data as { head_commit_id?: string | null } | null)?.head_commit_id ?? null;
         },
         createContext: (model, commitId, runCost) => createToolContext(supabase, { id: model.id, name: model.name }, commitId, { runCost }),
-        createClient: (orgId) => createProxyAskClient({ proxyUrl: `${supabaseUrl}/functions/v1/llm-proxy`, authorization: authHeader, anonKey: supabaseAnonKey, orgId, useOrgKey: true }),
+        createClient: (orgId, runId) => createProxyAskClient({ proxyUrl: `${supabaseUrl}/functions/v1/llm-proxy`, authorization: authHeader, anonKey: supabaseAnonKey, orgId, useOrgKey: true, runId }),
       },
       body,
     );
