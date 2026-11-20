@@ -35,11 +35,10 @@ test('add and remove a uses relationship, then promote a secondary supports edge
   await addSystemFromHome(page, { name: 'Dual Support System', description: 'Supports two capabilities.', capabilityName: 'Capability Two' });
   await addSupportsRelationship(page, 'Capability One', false);
 
-  // A system's very first supports edge is always created secondary,
-  // never asked (`useElementCreate.ts`'s own "never asked, created
-  // secondary outright" doc comment) — so both start secondary here, not
-  // one primary/one secondary; promoting Capability One below still
-  // demonstrates the real action even with no existing primary to demote.
+  // A capability's first supporter is its main one (`roleForNewSupporter`):
+  // Capability Two had none, so Dual Support System is created Main there.
+  // Capability One is added afterwards through the relationship form as
+  // "Also"; promoting it below demotes Capability Two in the same commit.
   // Scoped to `RelationshipsSection.tsx`'s own `.rowGroup` wrapper (the one
   // ancestor that contains both the row's own text and its "Show
   // attributes" toggle as siblings) — a bare `li, div` filter matches
@@ -50,7 +49,7 @@ test('add and remove a uses relationship, then promote a secondary supports edge
   const capOneRow = capabilityRow('Capability One');
   const capTwoRow = capabilityRow('Capability Two');
   await expect(capOneRow.getByText('Also', { exact: true })).toBeVisible();
-  await expect(capTwoRow.getByText('Also', { exact: true })).toBeVisible();
+  await expect(capTwoRow.getByText('Main', { exact: true })).toBeVisible();
 
   await capOneRow.getByRole('button', { name: 'Show attributes' }).click();
   await capOneRow.getByRole('button', { name: 'Edit', exact: true }).click();

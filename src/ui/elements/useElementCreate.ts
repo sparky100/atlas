@@ -4,6 +4,8 @@ import { defaultCreateAttributes } from '../../contracts/attributeSchema';
 import type { CommitEnvelope, Delta, ElementType, UUID } from '../../contracts/delta';
 import type { Json } from '../../contracts/rows';
 import { getBranch, getMainBranch } from '../../db/branches';
+import { listAllSupportsEdgeRows } from '../../db/landscape';
+import { roleForNewSupporter } from './firstSupporterRole';
 import { commitToBranch } from '../../db/commits';
 import { describeEnvelope } from '../../engine/describeEnvelope';
 import { getOrCreateManualSource } from '../../db/sources';
@@ -116,6 +118,13 @@ export function useElementCreate(input: UseElementCreateInput): UseElementCreate
 
         const deltas: Delta[] = [createDelta];
         if (options?.supportsCapabilityId) {
+          // The capability's first supporter is its main one. If the lookup fails the link is still made, as secondary (what it always was).
+          let role: 'primary' | 'secondary' = 'secondary';
+          try {
+            role = roleForNewSupporter(await listAllSupportsEdgeRows(supabase, currentHeadCommitId), options.supportsCapabilityId);
+          } catch {
+            role = 'secondary';
+          }
           deltas.push({
             kind: 'relationship.create',
             id: crypto.randomUUID(),
@@ -130,7 +139,7 @@ export function useElementCreate(input: UseElementCreateInput): UseElementCreate
             // one-and-only link against yet, and `computeLandscapeLayout`'s
             // "no primary -> most recently added decides" fallback places
             // it correctly regardless.
-            attributes: { role: 'secondary' },
+            attributes: { role },
             sourceId: source.id,
             confidence: 1,
           });
