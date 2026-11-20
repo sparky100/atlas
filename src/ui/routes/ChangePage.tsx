@@ -1,3 +1,10 @@
+import { Link } from 'react-router';
+import { useQuery } from '@tanstack/react-query';
+import { getDecisionForOption } from '../../db/decisions';
+import { getProject } from '../../db/projects';
+import type { BranchRow } from '../../db/types';
+import { supabase } from '../supabaseClient';
+import { Text } from '../components/Text/Text';
 import { Loading } from '../components/Loading/Loading';
 import { useParams, useSearchParams } from 'react-router';
 import { AppHeader } from '../components/AppHeader/AppHeader';
@@ -55,6 +62,28 @@ import styles from './ViewPage.module.css';
  * has none of Landscape/CapabilityMap/ElementPage's own edit affordances
  * to hide).
  */
+/** The change is a child: its project and, for an option, its decision come first, above its own title. */
+function ChangeParents({ branch, orgSlug, modelSlug }: { branch: BranchRow; orgSlug: string; modelSlug: string }) {
+  const projectId = branch.project_id;
+  const project = useQuery({ queryKey: ['changePageProject', projectId], enabled: projectId !== null, queryFn: () => getProject(supabase, projectId!) });
+  const decision = useQuery({ queryKey: ['changes', 'originDecision', branch.id], queryFn: () => getDecisionForOption(supabase, branch.id), enabled: branch.kind === 'change' });
+  if (!project.data && !decision.data) return null;
+  return (
+    <div data-testid="change-parents">
+      {project.data && (
+        <Text as="p" size="md">
+          Part of project: <Link to={`/o/${orgSlug}/m/${modelSlug}/projects/${project.data.id}`}>{project.data.title}</Link> ({project.data.status})
+        </Text>
+      )}
+      {decision.data && (
+        <Text as="p" size="md">
+          Option for decision: <Link to={`/o/${orgSlug}/m/${modelSlug}/decisions/${decision.data.id}`}>{decision.data.title}</Link>
+        </Text>
+      )}
+    </div>
+  );
+}
+
 export function ChangePage() {
   const { orgSlug, modelSlug, branchId } = useParams<{ orgSlug: string; modelSlug: string; branchId: string }>();
   const [searchParams] = useSearchParams();
@@ -98,6 +127,7 @@ export function ChangePage() {
             <EditingBranchBanner activeRef={ref} modelId={model.id} orgSlug={orgSlug ?? ''} modelSlug={model.slug} showModeShortcuts={false} showSubmitForReview={false} />
           )}
           <Breadcrumb org={{ label: organisation?.name ?? '', href: `/o/${orgSlug ?? ''}` }} model={{ label: model.name, href: `/o/${orgSlug ?? ''}/m/${model.slug}` }} refLabel={refLabel} />
+          {branch && <ChangeParents branch={branch} orgSlug={orgSlug ?? ''} modelSlug={model.slug} />}
           <ChangeView
             orgId={organisation?.id ?? ''}
             modelId={model.id}
