@@ -12,7 +12,7 @@ describe('capabilityProblems', () => {
     const [withReason] = capabilityProblems({ supporters: [sys({ fit: 'poor', note: ' Quotes are keyed by hand. ' })], missingFactsText: '' });
     expect(withReason).toMatchObject({ kind: 'poor-fit', text: 'Quote Tool is a poor fit.', reason: 'Quotes are keyed by hand.', systemId: 's1' });
     const [without] = capabilityProblems({ supporters: [sys({ fit: 'poor' })], missingFactsText: '' });
-    expect(without).toMatchObject({ text: 'Quote Tool is rated a poor fit, but no reason is recorded.', reason: null });
+    expect(without).toMatchObject({ text: 'Quote Tool is rated a poor fit, but no reason is recorded. Add it under Relationships.', reason: null });
   });
 
   it('adequate is not a problem', () => {

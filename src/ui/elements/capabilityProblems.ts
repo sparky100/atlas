@@ -35,7 +35,7 @@ export function capabilityProblems(args: { supporters: readonly CapabilitySuppor
     const note = s.note.trim();
     problems.push({
       kind: 'poor-fit',
-      text: note !== '' ? `${s.name} is a poor fit.` : `${s.name} is rated a poor fit, but no reason is recorded.`,
+      text: note !== '' ? `${s.name} is a poor fit.` : `${s.name} is rated a poor fit, but no reason is recorded. Add it under Relationships.`,
       reason: note !== '' ? note : null,
       systemId: s.systemId,
       systemName: s.name,

@@ -7,6 +7,7 @@ import { RELATIONSHIP_ATTRIBUTE_SCHEMA_BY_TYPE } from '../../../contracts/relati
 import type { BranchRow, SourceRow } from '../../../db/types';
 import { attributesRecord } from '../../elements/attributesRecord';
 import { fitForPurposeToneFor, isFitForPurpose } from '../../elements/fitForPurposeTone';
+import { fitReasonField } from '../../elements/fitReasonPrompt';
 import { useRelationshipEditor } from '../../elements/useRelationshipEditor';
 import { AttributeEditRow } from '../AttributeEditRow/AttributeEditRow';
 import { AttributeRow } from '../AttributeRow/AttributeRow';
@@ -520,10 +521,12 @@ function RelationshipAttributesPanel({ relationship, facts, sources, via, orgSlu
                     </div>
                   );
                 }
+                const shown = fitReasonField(field, editor.values.fitForPurpose, editor.values.fitForPurposeNotes);
+                if (shown === null) return null;
                 return (
                   <AttributeEditRow
                     key={field.key}
-                    field={field}
+                    field={shown}
                     value={editor.values[field.key] ?? ''}
                     onChange={(value) => {
                       editor.setValue(field.key, value);
