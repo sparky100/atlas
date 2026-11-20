@@ -26,8 +26,12 @@ export interface ProxyAskClientOptions {
   authorization: string;
   anonKey: string;
   orgId: string;
-  /** Phase D: run on the organisation's own key, never the platform key. The proxy refuses unless agents are switched on, a key is saved and the caller is an owner or architect. */
+  /** Run on the organisation's key when present; Designer may use its limited trial. */
   useOrgKey?: boolean;
+  /** Refuse the trial and platform key on every call, even if the saved key is removed mid-run. */
+  requireOrgKey?: boolean;
+  /** Only the light tier may be requested; the proxy picks its configured model. */
+  modelTier?: 'light';
   /** The Designer's id for this run. With no saved key the proxy runs the free trial and counts runs by this id. */
   runId?: string;
   fetchFn?: typeof fetch;
@@ -53,7 +57,7 @@ export function createProxyAskClient(options: ProxyAskClientOptions): AskModelCl
       const res = await doFetch(options.proxyUrl, {
         method: 'POST',
         headers: { 'content-type': 'application/json', authorization: options.authorization, apikey: options.anonKey },
-        body: JSON.stringify({ orgId: options.orgId, ...(options.useOrgKey === true ? { useOrgKey: true } : {}), ...(options.runId !== undefined ? { runId: options.runId } : {}), ...proxyRequest }),
+        body: JSON.stringify({ orgId: options.orgId, ...(options.useOrgKey === true ? { useOrgKey: true } : {}), ...(options.requireOrgKey === true ? { requireOrgKey: true } : {}), ...(options.modelTier === 'light' ? { modelTier: 'light' } : {}), ...(options.runId !== undefined ? { runId: options.runId } : {}), ...proxyRequest }),
       });
       const body = (await res.json().catch(() => null)) as (Partial<LlmProxyResponse> & { status?: string; message?: string }) | null;
       if (!res.ok || !body || body.status === 'error') {

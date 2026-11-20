@@ -414,8 +414,9 @@ export function DashboardView({ dashboard, orgId, modelId, modelName, userId, ro
               <Text as="p" size="sm" tone="muted">Preview</Text>
               <ReportRunner source={addSpec.spec.source} modelId={modelId} orgId={orgId} commitId={main.headCommitId}>
                 {(rows, knownFields) => {
-                  const report = reportsById.get(add.reportId)!;
-                  const kind = add.kind === '' ? suggestedTileKind(addSpec.spec) : (add.kind as DashboardTileKind);
+                  const report = reportsById.get(add.reportId);
+                  if (!report) return null;
+                  const kind = add.kind === '' ? suggestedTileKind(addSpec.spec) : add.kind;
                   const syntheticTile = { id: 'preview', dashboard_id: dashboard.id, report_id: report.id, kind, size: add.size, position: 0, row_limit: null } as DashboardTileRow;
                   return <DashboardTileCard tile={syntheticTile} report={report} rows={rows} knownFields={knownFields} basePath={basePath} />;
                 }}

@@ -3,6 +3,7 @@
  */
 import type { GoalCapabilityRow, GoalRow } from '../../contracts/goals';
 import type { ElementsHeadRow, RelationshipsHeadRow } from '../../contracts/rows';
+export { goalTitlesServedBy } from '../../engine/decisionDigest/relatedContext';
 
 export interface GoalCapabilityRef {
   capabilityId: string;
@@ -76,11 +77,3 @@ export function countGoalsWithoutCapability(goals: readonly GoalRow[], links: re
 }
 
 /** The titles of the active goals served by any of these capabilities (a decision's concerns), A to Z, each once. */
-export function goalTitlesServedBy(capabilityIds: readonly string[], goals: readonly GoalRow[], links: readonly GoalCapabilityRow[]): string[] {
-  const wanted = new Set(capabilityIds);
-  const goalIds = new Set(links.filter((l) => wanted.has(l.capability_id)).map((l) => l.goal_id));
-  return goals
-    .filter((g) => g.status === 'active' && goalIds.has(g.id))
-    .map((g) => g.title)
-    .sort((a, b) => a.localeCompare(b));
-}

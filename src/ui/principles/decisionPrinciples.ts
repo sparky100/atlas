@@ -2,6 +2,7 @@
  * Pure logic for principles on a decision (ADR-034 PR 3). No I/O.
  */
 import type { DecisionPrincipleRow, PrincipleRow, PrincipleStance } from '../../contracts/principles';
+export { adrPrincipleItems } from '../../engine/decisionDigest/relatedContext';
 
 /** A stance being saved now: `null` means the person is taking their view back. */
 export type PendingStances = ReadonlyMap<string, { stance: PrincipleStance | null; reason: string }>;
@@ -44,13 +45,6 @@ export function decisionPrincipleLines(principles: readonly PrincipleRow[], link
 }
 
 /** The decision's cited principles as the ADR export lists them: follows first, then departures, each A to Z. */
-export function adrPrincipleItems(principles: readonly PrincipleRow[], links: readonly DecisionPrincipleRow[]): { title: string; stance: PrincipleStance; reason: string }[] {
-  const byId = new Map(principles.map((p) => [p.id, p]));
-  return links
-    .map((l) => ({ title: byId.get(l.principle_id)?.title, stance: l.stance, reason: l.reason }))
-    .filter((x): x is { title: string; stance: PrincipleStance; reason: string } => x.title !== undefined)
-    .sort((a, b) => Number(a.stance === 'departs') - Number(b.stance === 'departs') || a.title.localeCompare(b.title));
-}
 
 /**
  * How many decisions depart from at least one principle. A cancelled decision (`rejected`) no longer counts: it
