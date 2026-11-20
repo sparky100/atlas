@@ -116,6 +116,13 @@
   padding-top: var(--space-4);
 }
 
+.preview {
+  margin-top: var(--space-3);
+  padding: var(--space-3);
+  border: var(--border-width) solid var(--border);
+  border-radius: var(--radius-md, 0.5rem);
+}
+
 .field {
   display: flex;
   flex-direction: column;
