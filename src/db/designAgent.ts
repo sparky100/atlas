@@ -37,6 +37,16 @@ interface DesignerBody {
   result?: { answer?: string; citations?: string[]; citationNames?: Record<string, string>; grounded?: boolean; inputTokens?: number; outputTokens?: number; toolUses?: unknown[] };
 }
 
+const CITATION = /\[\[element:([0-9a-f-]{36})\]\]/g;
+
+/** Pure: the Designer cites elements as [[element:<id>]]. A person editing the text must see the name, never the id. */
+export function citationsToNames(text: string, names: Record<string, string>): string {
+  return text.replace(CITATION, (_m, id: string) => {
+    const name = names[id];
+    return typeof name === 'string' && name !== '' ? name : 'an element in the model';
+  });
+}
+
 /** Pure: the one place the function's reply is read, so the page never shows a raw provider message. */
 export function interpretDesignerReply(body: unknown): DesignerDraft {
   const r = (typeof body === 'object' && body !== null ? body : {}) as DesignerBody;
@@ -44,17 +54,18 @@ export function interpretDesignerReply(body: unknown): DesignerDraft {
     const names = r.result.citationNames ?? {};
     const citedNames = (r.result.citations ?? []).map((id) => names[id]).filter((n): n is string => typeof n === 'string' && n !== '');
     const count = (n: unknown) => (typeof n === 'number' && Number.isFinite(n) && n >= 0 ? Math.round(n) : 0);
-    const strings = (v: unknown) => (Array.isArray(v) ? v.filter((x): x is string => typeof x === 'string') : []);
+    const strings = (v: unknown) => (Array.isArray(v) ? v.filter((x): x is string => typeof x === 'string').map((x) => citationsToNames(x, names)) : []);
+    const plain = (v: string) => citationsToNames(v, names);
     const options = (Array.isArray(r.design.options) ? r.design.options : []).flatMap((o): DesignerOptionDraft[] => {
       const x = typeof o === 'object' && o !== null ? (o as Record<string, unknown>) : {};
-      return typeof x.title === 'string' && typeof x.summary === 'string' ? [{ title: x.title, summary: x.summary, toWeigh: typeof x.toWeigh === 'string' ? x.toWeigh : '' }] : [];
+      return typeof x.title === 'string' && typeof x.summary === 'string' ? [{ title: plain(x.title), summary: plain(x.summary), toWeigh: typeof x.toWeigh === 'string' ? plain(x.toWeigh) : '' }] : [];
     });
     const problems = strings(r.design.problems);
     if (options.length === 0 && problems.length === 0) problems.push('The Designer gave no usable options.');
     return {
       options,
       gaps: strings(r.design.gaps),
-      stayNote: typeof r.design.stayNote === 'string' ? r.design.stayNote : '',
+      stayNote: typeof r.design.stayNote === 'string' ? plain(r.design.stayNote) : '',
       problems,
       citedNames,
       grounded: r.result.grounded === true,

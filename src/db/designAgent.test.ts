@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { DesignerError, interpretDesignerReply } from './designAgent';
+import { citationsToNames, DesignerError, interpretDesignerReply } from './designAgent';
 
 describe('interpretDesignerReply', () => {
   const design = { options: [{ title: 'Configure', summary: 'Use it as is.', toWeigh: 'Fit.' }, { title: 'Replace', summary: 'Buy one.' }], gaps: ['No owner recorded'], stayNote: 'Slow.', problems: [] };
@@ -45,5 +45,23 @@ describe('interpretDesignerReply', () => {
     expect(() => interpretDesignerReply({ status: 'forbidden', message: 'Only an owner, architect or contributor can run the Designer.' })).toThrow('Only an owner, architect or contributor can run the Designer.');
     expect(() => interpretDesignerReply(null)).toThrow(DesignerError);
     expect(() => interpretDesignerReply({ status: 'error' })).toThrow(/could not be reached/);
+  });
+});
+
+describe('citations become names, never ids', () => {
+  const A = '486e1fef-f5d4-4635-a6fa-124d8c2852b0';
+  const B = '22cddb73-6439-4b1f-ac7a-fe72b44364d8';
+  it('replaces a cited id with its name, and an unknown id with plain words', () => {
+    expect(citationsToNames(`Keep [[element:${A}]] for [[element:${B}]] and [[element:${'0'.repeat(8)}-0000-0000-0000-${'0'.repeat(12)}]].`, { [A]: 'Quote Tool', [B]: 'Connection Quotations' })).toBe('Keep Quote Tool for Connection Quotations and an element in the model.');
+  });
+  it('the options, gaps and stay note a person edits carry names', () => {
+    const draft = interpretDesignerReply({
+      status: 'done',
+      design: { options: [{ title: 'Keep', summary: `Keep [[element:${A}]].`, toWeigh: `Check [[element:${B}]].` }], gaps: [`No owner for [[element:${A}]]`], stayNote: `[[element:${A}]] stays poor.`, problems: [] },
+      result: { answer: 'x', citations: [A, B], citationNames: { [A]: 'Quote Tool', [B]: 'Connection Quotations' }, grounded: true },
+    });
+    expect(draft.options[0]).toEqual({ title: 'Keep', summary: 'Keep Quote Tool.', toWeigh: 'Check Connection Quotations.' });
+    expect(draft.gaps).toEqual(['No owner for Quote Tool']);
+    expect(draft.stayNote).toBe('Quote Tool stays poor.');
   });
 });
