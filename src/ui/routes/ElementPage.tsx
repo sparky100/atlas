@@ -159,6 +159,8 @@ export function ElementPage() {
   // `DecisionsView.tsx`'s own `prefill`-seeded state uses — never cleared
   // from the URL afterward, so the link stays valid if revisited.
   const mergePrefill = parseMergePrefillFromSearchParams(searchParams);
+  const sourcingPrefill = searchParams.get('sourcing');
+  const defaultSourcing = sourcingPrefill === 'product' || sourcingPrefill === 'custom_build' ? sourcingPrefill : undefined;
   // E7's own "Merge into…" — same inline-panel convention as `retiring`/
   // `removingFromModel` above.
   const [merging, setMerging] = useState(() => mergePrefill !== null);
@@ -510,6 +512,7 @@ export function ElementPage() {
                   void navigate(`/o/${orgSlug ?? ''}/m/${model.slug}/e/${newElementId}?${refQueryParam(ref, viewing)}`);
                 }}
                 onCancel={() => { setRetiring(false); }}
+                defaultSourcing={defaultSourcing}
               />
             )}
             {removingFromModel && (

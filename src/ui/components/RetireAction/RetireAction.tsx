@@ -1,6 +1,6 @@
 import { useId, useState } from 'react';
 import type { ElementsHeadRow, FactsRow, RelationshipsHeadRow } from '../../../contracts/rows';
-import type { UUID } from '../../../contracts/delta';
+import type { Sourcing, UUID } from '../../../contracts/delta';
 import type { BranchRow } from '../../../db/types';
 import { attributesRecord } from '../../elements/attributesRecord';
 import { buildReplaceWithNewElementDeltas } from '../../elements/buildReplaceWithNewElementDeltas';
@@ -31,6 +31,8 @@ export interface RetireActionProps {
   /** A brand-new replacement was created in the same commit (`buildReplaceWithNewElementDeltas.ts`'s own doc comment explains the gap this closes) — the caller almost certainly wants to navigate there, the same way `useElementCreate.ts`'s own `onCreated` already does, rather than reloading in place the way plain `onRetired` does (A itself is still here, just retiring — nothing to navigate away from for that case). */
   onReplacedWithNew: (newElementId: UUID) => void;
   onCancel: () => void;
+  /** Sourcing to record on a brand-new replacement created here (e.g. `custom_build` for a "Build ourselves" option). */
+  defaultSourcing?: Sourcing | undefined;
 }
 
 /**
@@ -64,6 +66,7 @@ export function RetireAction({
   onRetired,
   onReplacedWithNew,
   onCancel,
+  defaultSourcing,
 }: RetireActionProps) {
   const currentPlannedEnd = attributesRecord(element.attributes).plannedEnd;
   const [plannedEnd, setPlannedEnd] = useState(typeof currentPlannedEnd === 'string' ? currentPlannedEnd : '');
@@ -163,6 +166,7 @@ export function RetireAction({
             copyEdgeIds,
             sourceId: 'preview',
             onMain: branch.kind === 'main',
+            sourcing: defaultSourcing,
           });
           const copiedCount = deltas.filter((d) => d.kind === 'relationship.create' && (d as unknown as { relationshipType: string }).relationshipType !== 'replaces').length;
           return { copiedCount };
@@ -324,7 +328,7 @@ export function RetireAction({
       <div className={styles.actions}>
         <Button
           variant="primary"
-          onClick={() => (mode === 'creating' ? void replace(plannedEnd, newReplacementName, copyEdgeIds) : void retire(plannedEnd, replacement, copyEdgeIds))}
+          onClick={() => (mode === 'creating' ? void replace(plannedEnd, newReplacementName, copyEdgeIds, defaultSourcing) : void retire(plannedEnd, replacement, copyEdgeIds))}
           disabled={busy || plannedEnd.trim() === '' || (mode === 'creating' && newReplacementName.trim() === '')}
         >
           {busy ? 'Retiring…' : 'Retire'}

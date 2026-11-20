@@ -47,6 +47,8 @@ export type SynonymOnlyColumnRole =
   | 'aiAutonomy'
   // Uses AI: what this product's own export writes for a system's `aiUse` — a second owner-approved importer exception (Simon, 2026-11-16), one synonym, so the field round-trips.
   | 'aiUse'
+  // Sourcing: product vs custom build — what this product's own export writes for a system's/container's `sourcing`.
+  | 'sourcing'
   // Fit: the fit rating of this row's capability link(s) — a third owner-approved importer exception (Simon, 2026-11-17), so the spreadsheet can say what the JSON file already could.
   | 'fit';
 
@@ -97,6 +99,7 @@ const COLUMN_SYNONYMS_RAW: Readonly<Record<ColumnRole, readonly string[]>> = {
   transformation: ['Transformation'],
   aiAutonomy: ['AI agent: how it acts'],
   aiUse: ['Uses AI'],
+  sourcing: ['Sourcing'],
   fit: ['Fit', 'Fit for purpose'],
 };
 

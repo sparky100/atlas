@@ -30,6 +30,7 @@ import type {
   ElementType,
   Importance,
   InterfaceType,
+  Sourcing,
   SystemAttributes,
   ValueStreamAttributes,
 } from './delta';
@@ -228,6 +229,16 @@ export const DISPOSITION_LABELS: Readonly<Record<Disposition, string>> = Object.
 
 export const DISPOSITION_HELP = 'What we intend to do with this: keep it as it is, invest in it, move it to another system, or switch it off.';
 
+/** Product vs custom build — keys stored, labels in code. */
+export const SOURCING_LEVELS = [
+  { key: 'product', label: 'Product' },
+  { key: 'custom_build', label: 'Custom build' },
+] as const satisfies readonly { key: Sourcing; label: string }[];
+
+export const SOURCING_OPTIONS = SOURCING_LEVELS.map((level) => level.key) as readonly Sourcing[];
+
+export const SOURCING_LABELS: Readonly<Record<Sourcing, string>> = Object.fromEntries(SOURCING_LEVELS.map((level) => [level.key, level.label])) as Readonly<Record<Sourcing, string>>;
+
 /** What the "Outside our organisation" field means — shown under the edit control (`AttributeFieldMeta.help`). */
 export const EXTERNAL_HELP = 'Yes if another party runs it, such as a regulator, supplier or industry body. A tool a vendor hosts for you is still ours: leave this as No.';
 
@@ -249,6 +260,7 @@ const SYSTEM_META: Record<keyof SystemAttributes, AttributeFieldMeta> = {
   // "Not entered" empty state all via the meta members added for it.
   annualRunCost: { label: 'Run cost', required: false, kind: 'enum', options: ANNUAL_RUN_COST_OPTIONS, optionLabels: ANNUAL_RUN_COST_LABELS, help: ANNUAL_RUN_COST_HELP, emptyLabel: 'Not entered' },
   disposition: { label: 'Planned action', required: false, kind: 'enum', options: DISPOSITION_OPTIONS, optionLabels: DISPOSITION_LABELS, help: DISPOSITION_HELP, emptyLabel: 'Not assessed' },
+  sourcing: { label: 'Sourcing', required: false, kind: 'enum', options: SOURCING_OPTIONS, optionLabels: SOURCING_LABELS, emptyLabel: 'Not recorded' },
   hostingModel: { label: 'Hosting model', required: false, kind: 'enum', options: HOSTING_MODEL_OPTIONS, optionLabels: HOSTING_MODEL_LABELS },
   hostingProvider: { label: 'Hosting provider', required: false, kind: 'text' },
   domain: { label: 'Domain', required: false, kind: 'enum', options: DOMAIN_OPTIONS, optionLabels: DOMAIN_LABELS },
@@ -272,6 +284,7 @@ const SYSTEM_ORDER: (keyof SystemAttributes)[] = [
   'criticality',
   'annualRunCost',
   'disposition',
+  'sourcing',
   'hostingModel',
   'hostingProvider',
   'kind',
@@ -316,6 +329,7 @@ const CONTAINER_META: Record<keyof ContainerAttributes, AttributeFieldMeta> = {
   // F11: a module's own disposition, never inherited from its platform —
   // so, like run cost, not labelled "(module override)" of an inherited value.
   disposition: { label: 'Planned action', required: false, kind: 'enum', options: DISPOSITION_OPTIONS, optionLabels: DISPOSITION_LABELS, help: DISPOSITION_HELP, emptyLabel: 'Not assessed' },
+  sourcing: { label: 'Sourcing', required: false, kind: 'enum', options: SOURCING_OPTIONS, optionLabels: SOURCING_LABELS, emptyLabel: 'Not recorded' },
   hostingModel: { label: 'Hosting model (module override)', required: false, kind: 'enum', options: HOSTING_MODEL_OPTIONS, optionLabels: HOSTING_MODEL_LABELS },
   hostingProvider: { label: 'Hosting provider (module override)', required: false, kind: 'text' },
   domain: { label: 'Domain (module override)', required: false, kind: 'enum', options: DOMAIN_OPTIONS, optionLabels: DOMAIN_LABELS },
@@ -339,6 +353,7 @@ const CONTAINER_ORDER: (keyof ContainerAttributes)[] = [
   'criticality',
   'annualRunCost',
   'disposition',
+  'sourcing',
   'hostingModel',
   'hostingProvider',
   'domain',

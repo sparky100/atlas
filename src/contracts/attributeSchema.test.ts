@@ -91,7 +91,7 @@ describe('ATTRIBUTE_SCHEMA_BY_TYPE', () => {
     for (const type of ELEMENT_TYPES) {
       for (const field of ATTRIBUTE_SCHEMA_BY_TYPE[type]) {
         if (field.key !== 'annualRunCost' && field.key !== 'disposition' && field.key !== 'isExternal' && field.key !== 'aiAutonomy' && field.key !== 'aiUse') expect(field.help, `${type}.${field.key}`).toBeUndefined();
-        if (field.key !== 'annualRunCost' && field.key !== 'importance' && field.key !== 'disposition' && field.key !== 'aiAutonomy' && field.key !== 'aiUse') expect(field.emptyLabel, `${type}.${field.key}`).toBeUndefined();
+        if (field.key !== 'annualRunCost' && field.key !== 'importance' && field.key !== 'disposition' && field.key !== 'sourcing' && field.key !== 'aiAutonomy' && field.key !== 'aiUse') expect(field.emptyLabel, `${type}.${field.key}`).toBeUndefined();
       }
     }
   });

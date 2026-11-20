@@ -212,6 +212,20 @@ export type AnnualRunCost = 'none_included' | 'under_50k' | '50k_250k' | '250k_1
 export type Disposition = 'tolerate' | 'invest' | 'migrate' | 'eliminate';
 
 /**
+ * Whether an element is a bought product or something we built ourselves —
+ * a judged fact about the element, recorded so the estate can later be
+ * filtered/reported by sourcing. Keys stored, labels in code
+ * (`attributeSchema.ts`'s `SOURCING_LEVELS`). Absent means "Not recorded".
+ *
+ * Restricted to `SystemAttributes` and `ContainerAttributes` structurally.
+ * Deliberately not inferred from `vendor` (a vendor can build bespoke, and an
+ * in-house product can have no vendor) and not part of
+ * `effectiveModuleAttributes`'s inheritance set (a module records its own).
+ * Carries over in `convertSystemToModule` (the same software's sourcing).
+ */
+export type Sourcing = 'product' | 'custom_build';
+
+/**
  * How much a capability matters, judged by its own business owner or an
  * architect — ordered `low < medium < high`, but the *opposite* direction
  * from every other ordered enum here (`Criticality`, `FitForPurpose`,
@@ -335,6 +349,8 @@ export interface SystemAttributes {
   annualRunCost?: AnnualRunCost;
   /** F11: TIME disposition — see `Disposition`'s own doc comment. Optional: absent means "Not assessed". */
   disposition?: Disposition;
+  /** Product vs custom build — see `Sourcing`'s own doc comment. Optional: absent means "Not recorded". */
+  sourcing?: Sourcing;
 }
 
 export interface ContainerAttributes {
@@ -389,6 +405,8 @@ export interface ContainerAttributes {
   annualRunCost?: AnnualRunCost;
   /** F11: a module's own disposition — an override that is NOT inherited from its platform (see `Disposition`'s own doc comment). Absent means "Not assessed" for this module. */
   disposition?: Disposition;
+  /** Product vs custom build — see `Sourcing`'s own doc comment. A module records its own, never inherited from its platform. Absent means "Not recorded". */
+  sourcing?: Sourcing;
 }
 
 export interface ActorAttributes {
