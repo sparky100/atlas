@@ -67,6 +67,12 @@ test('an empty Build option offers to retire the existing system and replace it 
   await link.click();
   await expect(page).toHaveURL(/action=retire/);
   await expect(page.getByLabel('Planned end', { exact: true })).toBeVisible();
+
+  // Editing an option, the banner leads back to the decision, and offers no Submit of its own.
+  const banner = page.getByRole('status').filter({ hasText: 'Editing in change' });
+  await expect(banner.getByRole('button', { name: 'Submit for review' })).toHaveCount(0);
+  await banner.getByRole('link', { name: 'Back to the decision' }).click();
+  await expect(page).toHaveURL(/\/decisions\//);
 });
 
 test('an empty Keep option offers no starter edit', async ({ page }) => {

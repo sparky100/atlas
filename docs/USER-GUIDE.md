@@ -139,7 +139,7 @@ On a phone, the bar at the bottom shows Home, Capabilities, Landscape and Change
 
 **Zooming in.** Atlas is one continuous zoom through four levels: **capability map** (all your capabilities) → **landscape** (systems grouped by the capability they support) → **system context** (one system and its neighbours) → **containers** (inside one system).
 
-**The breadcrumb** at the top of a page shows where you are: `Org › Model › [ref] › …`. The `[ref]` chip says which state of the model you're looking at — the live model (shown as **live model**), a version like `v2026-Q1`, or a change like `Change: Housing CRM replacement`. Click it to switch. **Back to the live model** (in the banner shown while you look at a version or a change) returns you to the live model.
+**The breadcrumb** at the top of a page shows where you are: `Org › Model › [ref] › …`. The `[ref]` chip says which state of the model you're looking at — the live model (shown as **live model**), a version like `v2026-Q1`, or a change like `Change: Housing CRM replacement`. Click it to switch. **Back to the live model** (in the banner shown while you look at a version or a change) returns you to the live model. While you edit an option of a decision, the banner offers **Back to the decision** instead of Submit, because an option is finished from its decision.
 
 **Keyboard shortcuts.** Number keys and **j**/**k** are only used where you work through a queue of items one after another: **Gaps → Fill in** and the import review. Everywhere else — change forms, decisions, planned actions, Retire — you click. In both queues, **j** moves to the next item, **k** goes back, and a number picks that numbered answer.
 
