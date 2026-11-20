@@ -72,7 +72,9 @@ import { interfaceTypeLabelOf, isIntegrationInterface, isIntegrationPlatform, is
 import { useRouteTiming } from '../perf/useRouteTiming';
 import { useValueStreamImpact } from '../valueStreams/useValueStreamImpact';
 import { CompletenessChip } from '../gaps/CompletenessChip';
-import { completenessOf, firstWalkableKind, sumCompleteness } from '../gaps/gaps';
+import { bandAction, capabilityProblems } from '../elements/capabilityProblems';
+import { CapabilityProblemsBand } from '../elements/CapabilityProblemsBand';
+import { completenessOf, firstWalkableKind, missingFactsText, sumCompleteness } from '../gaps/gaps';
 import { usePortfolio } from '../portfolio/usePortfolio';
 import styles from './ElementPage.module.css';
 
@@ -339,6 +341,8 @@ export function ElementPage() {
   const wantsCompleteness = completenessType === 'system' || completenessType === 'container' || completenessType === 'capability';
   const { state: portfolioState } = usePortfolio(wantsCompleteness ? (model?.id ?? '') : '', ref, mainBranch?.head_commit_id ?? null, { inlineErrors: true });
   let completenessNode: ReactNode = null;
+  let problemsNode: ReactNode = null;
+  let bandOwnsStartProject = false;
   if (wantsCompleteness && data && model && portfolioState.status === 'ready') {
     const rows = portfolioState.data.rows;
     const gapsBase = `/o/${orgSlug ?? ''}/m/${model.slug}/gaps`;
@@ -350,6 +354,26 @@ export function ElementPage() {
     if (completenessType === 'capability') {
       const supporters = rows.filter((row) => row.capabilities.some((link) => link.capabilityId === data.element.element_id));
       const rolled = sumCompleteness(supporters);
+      const problems = capabilityProblems({
+        supporters: supporters.map((row) => {
+          const link = row.capabilities.find((l) => l.capabilityId === data.element.element_id);
+          const note = attributesRecord(link?.relationship.attributes ?? null).fitForPurposeNotes;
+          return { systemId: row.element.element_id, name: row.name, fit: link?.fit ?? null, note: typeof note === 'string' ? note : '' };
+        }),
+        missingFactsText: supporters.length > 0 ? missingFactsText(rolled) : '',
+      });
+      const projectHref = canStartProject(role) ? startProjectFromElementHref(`/o/${orgSlug ?? ''}/m/${model.slug}/projects`, { id: data.element.element_id, name: data.element.name, type: 'capability' }) : null;
+      const fillKind = firstWalkableKind(rolled);
+      problemsNode = (
+        <CapabilityProblemsBand
+          problems={problems}
+          systemHref={(systemId) => `/o/${orgSlug ?? ''}/m/${model.slug}/e/${systemId}?${refQueryParam(ref, viewing)}`}
+          startProjectHref={projectHref}
+          startProjectLabel={canStartProjectActive(role) ? 'Start a project' : 'Propose a project'}
+          fillInHref={canEdit && fillKind !== null ? q({ kind: fillKind, capability: data.element.element_id }) : null}
+        />
+      );
+      bandOwnsStartProject = bandAction(problems) === 'project' && projectHref !== null;
       completenessNode = <CompletenessChip completeness={rolled} scope={`across ${String(supporters.length)} supporting ${supporters.length === 1 ? 'system' : 'systems'}`} fillInHref={supporters.length > 0 && firstWalkableKind(rolled) !== null && canEdit ? q({ kind: firstWalkableKind(rolled) ?? 'fit', capability: data.element.element_id }) : undefined} />;
     } else {
       const row = rows.find((r) => r.element.element_id === data.element.element_id);
@@ -445,12 +469,13 @@ export function ElementPage() {
                   : undefined
               }
               startProjectHref={
-                canStartProject(role) && (state.data.element.element_type === 'capability' || state.data.element.element_type === 'system' || state.data.element.element_type === 'container')
+                !bandOwnsStartProject && canStartProject(role) && (state.data.element.element_type === 'capability' || state.data.element.element_type === 'system' || state.data.element.element_type === 'container')
                   ? startProjectFromElementHref(`/o/${orgSlug ?? ''}/m/${model.slug}/projects`, { id: state.data.element.element_id, name: state.data.element.name, type: state.data.element.element_type })
                   : undefined
               }
               startProjectLabel={canStartProjectActive(role) ? undefined : 'Propose a project…'}
             />
+            {problemsNode}
             {attestation.error !== null && (
               <div role="alert">
                 <Text as="p" size="sm">

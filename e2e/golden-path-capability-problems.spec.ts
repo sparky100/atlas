@@ -1,0 +1,47 @@
+/**
+ * Simon, 2026-11-20: a capability page shows what needs attention first, and
+ * "Start a project" is a visible button there, not buried in the ⋯ menu.
+ * A poor fit is a prompt, never a verdict. Click-only from Home, at 1280 and 390.
+ */
+import { expect, test } from '@playwright/test';
+import { addCapability, addSystemFromHome, goToModelHome, signUpCreateOrgAndModel } from './fixtures/goldenPath';
+
+test('a capability page leads with its problem and starts a project from it', async ({ page }) => {
+  test.slow();
+  await signUpCreateOrgAndModel(page, 'capproblems');
+
+  await addCapability(page, 'Connection Quotations');
+  await addCapability(page, 'Handle a fault');
+  await goToModelHome(page);
+  await addSystemFromHome(page, { name: 'Quote Tool', description: 'Issues connection quotes.', capabilityName: 'Connection Quotations' });
+  await expect(page.getByRole('heading', { name: 'Quote Tool' })).toBeVisible();
+
+  // Rate the supports link a poor fit.
+  await page.getByRole('button', { name: 'Show attributes' }).click();
+  await page.getByRole('button', { name: 'Edit', exact: true }).click();
+  await page.getByLabel('Fit for purpose').selectOption('poor');
+  await page.getByRole('button', { name: 'Save', exact: true }).click();
+  await expect(page.getByText('Fit for purpose: poor', { exact: false })).toBeVisible();
+
+  // Open the capability: the problem comes first, in plain words, and never says replace or retire.
+  await page.getByRole('link', { name: 'Connection Quotations' }).first().click();
+  const band = page.getByTestId('capability-problems');
+  await expect(band.getByRole('heading', { name: 'What needs attention' })).toBeVisible();
+  await expect(band.getByRole('link', { name: 'Quote Tool' })).toBeVisible();
+  await expect(band).toContainText('rated a poor fit, but no reason is recorded');
+  await expect(band).not.toContainText(/replace|retire/i);
+
+  // One visible button, not only in the ⋯ menu; the capability is already the scope.
+  await band.getByRole('link', { name: 'Start a project', exact: true }).click();
+  await expect(page.getByRole('heading', { name: 'Start a project' })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Remove Connection Quotations' })).toBeVisible();
+
+  // A capability nothing supports says so, with the same button.
+  await goToModelHome(page);
+  await page.getByRole('link', { name: 'Handle a fault' }).first().click();
+  await expect(page.getByTestId('capability-problems')).toContainText('No system is recorded as supporting this capability.');
+  await expect(page.getByTestId('capability-problems').getByRole('link', { name: 'Start a project', exact: true })).toBeVisible();
+
+  const overflow = await page.evaluate(() => document.documentElement.scrollWidth > document.documentElement.clientWidth + 1);
+  expect(overflow).toBe(false);
+});
