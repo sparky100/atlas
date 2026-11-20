@@ -8,7 +8,6 @@ import { deriveCapabilitiesForScope } from '../../db/healthFindings';
 import { listSupportsEdgesForSystems } from '../../db/landscape';
 import { listSupportsEdgesForCapabilities } from '../../db/capabilityMap';
 import { lifecycleStateOf } from '../../engine/elementRead/fitAndExposure';
-import type { JourneyCapability } from './projectJourney';
 import { projectIsOpen } from './projectModel';
 import { containerParentIds } from '../elements/moduleDisplayName';
 import { listEvidenceForModel } from '../../db/evidence';
@@ -24,6 +23,14 @@ import {
 import type { BranchRow, DecisionRow, EvidenceRow, ProjectLinkRow, ProjectRow } from '../../db/types';
 import { reportError } from '../errors/errorBannerStore';
 import { supabase } from '../supabaseClient';
+
+/** A capability in a project's declared scope with the live systems that already support it (an estate query, never stored). */
+export interface JourneyCapability {
+  id: string;
+  name: string;
+  /** Names of systems we run today that support this capability. */
+  supporters: readonly string[];
+}
 
 export interface ProjectData {
   project: ProjectRow;
@@ -44,7 +51,7 @@ export interface ProjectData {
   scopeHasCapability: boolean;
   /** A1b: capabilities the project's scoped systems and modules already support, offered to add to the scope in one click — empty when there is nothing to derive, or when the scope already names a capability. */
   derivedCapabilityCandidates: { id: UUID; name: string }[];
-  /** B1 (journey strip, "how it might be met"): each capability in the declared scope with the live systems that already support it — an estate query, never stored. */
+  /** B1 ("how it might be met"): each capability in the declared scope with the live systems that already support it — an estate query, never stored. */
   journeyCapabilities: JourneyCapability[];
 }
 

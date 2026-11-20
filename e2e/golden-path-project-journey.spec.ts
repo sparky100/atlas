@@ -1,6 +1,6 @@
 /**
- * Plan B1, "Connect a new customer": a project page shows the journey from
- * need to choice. The estate query says what we already run that supports
+ * Plan B1, "Connect a new customer": a project page shows, per capability, what
+ * we already run that supports it. The estate query says what we already run that supports
  * the capability — and says plainly when nothing does. Click-only from Home
  * at 1280 and 390.
  */
@@ -20,7 +20,7 @@ async function startProject(page: Page, title: string, purpose: string, capabili
   await expect(page.getByRole('heading', { name: title, level: 1 })).toBeVisible();
 }
 
-test('project journey: requirement, what it touches, how it might be met from the estate, choosing', async ({ page }) => {
+test('project page: what supports each capability today, from the estate', async ({ page }) => {
   test.slow();
   await signUpCreateOrgAndModel(page, 'projectjourney');
 
@@ -32,14 +32,6 @@ test('project journey: requirement, what it touches, how it might be met from th
   // Something we run already supports the capability.
   await goToModelHome(page);
   await startProject(page, 'Faster connection quotes', 'Cut the time to issue a connection quote.', 'Connect a new customer');
-  const journey = page.getByRole('list', { name: 'Project journey' });
-  await expect(journey.getByText('Cut the time to issue a connection quote.')).toBeVisible();
-  await expect(journey.getByText('1 capability in scope, no change drafted yet.')).toBeVisible();
-  await expect(journey.getByText('Every capability is already supported by something we run (1).')).toBeVisible();
-  await expect(journey.getByText('No decision started yet.')).toBeVisible();
-  // The first step not done reads "Next", in words.
-  await expect(journey.getByText('Next', { exact: true })).toBeVisible();
-
   // Before and after, per capability: what supports it today, and no change to compare yet.
   const beforeAfter = page.getByTestId('project-before-after');
   await expect(beforeAfter.getByRole('heading', { name: 'What this changes, capability by capability' })).toBeVisible();
@@ -62,8 +54,7 @@ test('project journey: requirement, what it touches, how it might be met from th
   // Nothing we run supports this one: said plainly, not an error.
   await goToModelHome(page);
   await startProject(page, 'Fault response', 'Respond to supply faults faster.', 'Handle a fault');
-  await expect(page.getByRole('list', { name: 'Project journey' }).getByText('Nothing we run supports Handle a fault — a buy or build option is needed.')).toBeVisible();
-  await expect(page.getByTestId('project-before-after').getByText('Nothing we run supports this. A buy or build option is needed.')).toBeVisible();
+    await expect(page.getByTestId('project-before-after').getByText('Nothing we run supports this. A buy or build option is needed.')).toBeVisible();
 
   const overflow = await page.evaluate(() => document.documentElement.scrollWidth > document.documentElement.clientWidth + 1);
   expect(overflow).toBe(false);
