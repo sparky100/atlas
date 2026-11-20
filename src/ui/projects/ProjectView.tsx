@@ -3,7 +3,9 @@ import { useState } from 'react';
 import { Link, useNavigate } from 'react-router';
 import type { UUID } from '../../contracts/delta';
 import { createChangeBranch } from '../../db/branches';
-import { createDecision, createDecisionLink } from '../../db/decisions';
+import { createDecision, createDecisionLink, listDecisionOptionLinksForModel } from '../../db/decisions';
+import { useQuery } from '@tanstack/react-query';
+import { orderOpenWork } from './openWorkOrder';
 import { createEvidence } from '../../db/evidence';
 import { addProjectLink, removeProjectLink, setProjectStatus, updateProject } from '../../db/projects';
 import type { BranchIntent, BranchRow, DecisionRow, MemberRole, ProjectRow } from '../../db/types';
@@ -877,6 +879,8 @@ function ProjectStatusPanel({ project, changes, decisions, base, acceptance, isP
   const [error, setError] = useState<string | null>(null);
   const open = openItemsBlockingClose(changes, decisions);
   const blocked = open.changes.length > 0 || open.decisions.length > 0;
+  const links = useQuery({ queryKey: ['projectOptionLinks', project.model_id], enabled: blocked, queryFn: () => listDecisionOptionLinksForModel(supabase, project.model_id) });
+  const ordered = orderOpenWork(open.decisions, open.changes, links.data ?? []);
   // Whoever drafted a proposal withdraws it (cancel); someone else turning it down declines it. Both record the same status and reason.
   const withdrawing = project.status === 'proposed' && isProposer;
   const proposalVerb = withdrawing ? 'Cancel' : 'Decline';
@@ -992,14 +996,23 @@ function ProjectStatusPanel({ project, changes, decisions, base, acceptance, isP
             To close or cancel this project, first finish or cancel what is still open in it:
           </Text>
           <ul className={styles.inlineList}>
-            {open.changes.map((c) => (
-              <li key={c.id}>
-                <Link to={`${base}/changes/${c.id}`}>{c.title ?? c.name}</Link> (change, {c.status})
+            {ordered.groups.map((g) => (
+              <li key={g.decision.id}>
+                <Link to={`${base}/decisions/${g.decision.id}`}>{g.decision.title}</Link> (decision, proposed)
+                {g.changes.length > 0 && (
+                  <ul className={styles.inlineList}>
+                    {g.changes.map((c) => (
+                      <li key={c.id}>
+                        <Link to={`${base}/changes/${c.id}`}>{c.title ?? c.name}</Link> (option, {c.status})
+                      </li>
+                    ))}
+                  </ul>
+                )}
               </li>
             ))}
-            {open.decisions.map((d) => (
-              <li key={d.id}>
-                <Link to={`${base}/decisions/${d.id}`}>{d.title}</Link> (decision, proposed)
+            {ordered.standalone.map((c) => (
+              <li key={c.id}>
+                <Link to={`${base}/changes/${c.id}`}>{c.title ?? c.name}</Link> (change, {c.status})
               </li>
             ))}
           </ul>
