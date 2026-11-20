@@ -216,7 +216,8 @@ export function ModelHome() {
           )}
         </Panel>
 
-        {canShowSearch && <GetStarted modelId={model.id} commitId={searchCommitId} orgId={organisation?.id ?? ''} isOwner={role === 'owner' && organisation?.is_personal !== true} orgSlug={organisation?.slug ?? ''} modelSlug={model.slug} onAddApplication={() => { setAddApplicationRequest((n) => n + 1); }} />}
+        {/* Setting up the model (capabilities, applications, links, planned actions) is the owner's and architect's job; a contributor works through changes, so the checklist is not theirs to see (Simon, 2026-11-20). */}
+        {canEditOnMain(role) && <GetStarted modelId={model.id} commitId={searchCommitId} orgId={organisation?.id ?? ''} isOwner={role === 'owner' && organisation?.is_personal !== true} orgSlug={organisation?.slug ?? ''} modelSlug={model.slug} onAddApplication={() => { setAddApplicationRequest((n) => n + 1); }} />}
         <FirstVisit modelId={model.id} commitId={searchCommitId} orgId={organisation?.id ?? ''} role={role} orgSlug={organisation?.slug ?? ''} modelSlug={model.slug} />
 
         <div className={styles.doorLinks}>
