@@ -16,6 +16,12 @@ import { createChangeBranch, getMainBranch } from './branches';
 import { markOptionEdited } from './decisionOptionMarks';
 import { addOptionWithCatalogueSources, catalogueToRows, catalogueSnapshotFromRows, listCatalogueSources } from './productCatalogue';
 
+function at<T>(items: readonly T[], index = 0): T {
+  const value = items[index];
+  if (value === undefined) throw new Error('Missing test fixture item');
+  return value;
+}
+
 const env = loadEnv();
 const service = createServiceRoleClient(env);
 const anon = createSupabaseClient(env);
@@ -42,7 +48,7 @@ function sqlSession() {
   child.stderr.on('data', (v: Buffer) => { errors += v.toString(); });
   const done = new Promise<{ code: number | null; output: string; errors: string }>((resolve, reject) => {
     child.on('error', reject);
-    child.on('close', (code) => resolve({ code, output, errors }));
+    child.on('close', (code) => { resolve({ code, output, errors }); });
   });
   return {
     done,
@@ -88,7 +94,7 @@ describe('product catalogue and option evidence, real database', () => {
     if (seedMap) {
       check(await service.from('capability_maps').insert({ id: mapId, sector: rows.catalogue.sector, version: content.capabilityMapVersion,
         status: 'draft', source_description: 'Test map' }));
-      const capabilities = content.entries[0]!.capabilities;
+      const capabilities = at(content.entries).capabilities;
       check(await service.from('capability_map_items').insert(capabilities.map((c, i) => ({ id: randomUUID(), map_id: mapId, code: c.code,
         name: c.name, level: 1, parent_code: null, item_order: (i + 1) * 10 }))));
       check(await service.from('capability_maps').update({ status: 'published', published_at: '2026-11-20T10:00:00Z' }).eq('id', mapId));
@@ -97,8 +103,8 @@ describe('product catalogue and option evidence, real database', () => {
     check(await service.from('catalogue_entries').insert(rows.entries));
     check(await service.from('catalogue_entry_capabilities').insert(rows.capabilities));
     check(await service.from('catalogue_claims').insert(rows.claims));
-    return { rows, mapId, id: rows.catalogue.id, entryId: rows.entries[0]!.id,
-      citation: { sector: rows.catalogue.sector, version: content.version, entryCode: content.entries[0]!.code } satisfies CatalogueCitation };
+    return { rows, mapId, id: rows.catalogue.id, entryId: at(rows.entries).id,
+      citation: { sector: rows.catalogue.sector, version: content.version, entryCode: at(content.entries).code } satisfies CatalogueCitation };
   }
   const publish = (id: string) => service.from('product_catalogues').update({ status: 'published', published_at: '2026-11-20T10:00:00Z' }).eq('id', id);
   async function option(as = owner) {
@@ -118,14 +124,14 @@ describe('product catalogue and option evidence, real database', () => {
     const scope = [s.id, s.entryId, s.entryId, s.entryId];
     const cols = ['id', 'id', 'entry_id', 'entry_id'];
     for (const [i, table] of tables.entries()) {
-      const r = await owner.client.from(table).select('*').eq(cols[i]!, scope[i]!);
+      const r = await owner.client.from(table).select('*').eq(at(cols, i), at(scope, i));
       check(r); expect(r.data).toEqual([]);
       expect((await anon.from(table).select('*')).error).not.toBeNull();
     }
     check(await publish(s.id));
     for (const u of [owner, contributor, viewer, outsider]) {
       for (const [i, table] of tables.entries()) {
-        const r = await u.client.from(table).select('*').eq(cols[i]!, scope[i]!);
+        const r = await u.client.from(table).select('*').eq(at(cols, i), at(scope, i));
         check(r); expect(r.data).toHaveLength(1);
       }
     }
@@ -133,21 +139,21 @@ describe('product catalogue and option evidence, real database', () => {
 
   it('refuses every organisation write to the four platform tables', async () => {
     const s = await seed();
-    const values = [s.rows.catalogue, s.rows.entries[0]!, s.rows.capabilities[0]!, s.rows.claims[0]!];
+    const values = [s.rows.catalogue, at(s.rows.entries), at(s.rows.capabilities), at(s.rows.claims)];
     for (const [i, table] of tables.entries()) {
-      expect((await owner.client.from(table).insert({ ...values[i]! })).error).not.toBeNull();
-      expect((await owner.client.from(table).update(values[i]!).eq(i > 1 ? 'entry_id' : 'id', i === 0 ? s.id : s.entryId)).error).not.toBeNull();
+      expect((await owner.client.from(table).insert({ ...at(values, i) })).error).not.toBeNull();
+      expect((await owner.client.from(table).update(at(values, i)).eq(i > 1 ? 'entry_id' : 'id', i === 0 ? s.id : s.entryId)).error).not.toBeNull();
       expect((await owner.client.from(table).delete().eq(i > 1 ? 'entry_id' : 'id', i === 0 ? s.id : s.entryId)).error).not.toBeNull();
     }
   });
 
   it('validates review dates, HTTPS, no-price text, uniqueness and map identity in the database', async () => {
-    const s = await seed(); const q = s.rows.claims[0]!;
+    const s = await seed(); const q = at(s.rows.claims);
     for (const update of [{ reviewed_by: '' }, { source_url: 'http://example.com/x' }, { reviewed_at: '2026-01-01' },
       { statement: 'Pricing is available' }, { source_url: 'https://example.com/pricing' }, { reviewed_by: 'USD' }]) {
       expect((await service.from('catalogue_claims').update(update).eq('id', q.id)).error).not.toBeNull();
     }
-    expect((await service.from('catalogue_entries').insert({ ...s.rows.entries[0]!, id: randomUUID() })).error).not.toBeNull();
+    expect((await service.from('catalogue_entries').insert({ ...at(s.rows.entries), id: randomUUID() })).error).not.toBeNull();
     check(await service.from('catalogue_entry_capabilities').update({ capability_name: 'Another capability' }).eq('entry_id', s.entryId));
     expect((await publish(s.id)).error?.message).toContain('pinned starter map');
     check(await service.from('catalogue_entry_capabilities').update({ capability_name: 'Connection Quotations' }).eq('entry_id', s.entryId));
@@ -163,11 +169,26 @@ describe('product catalogue and option evidence, real database', () => {
     check(await service.from('catalogue_entries').delete().eq('id', empty.entryId));
     expect((await publish(empty.id)).error?.message).toContain('needs an entry');
     const big = structuredClone(catalogueFixture);
-    big.entries[0]!.claims = Array.from({ length: 8 }, (_, i) => ({ ...big.entries[0]!.claims[0]!, position: i + 1,
-      sourceUrl: `https://example.com/${'x'.repeat(1700)}/${i}` }));
+    at(big.entries).claims = Array.from({ length: 8 }, (_, i) => ({ ...at(at(big.entries).claims), position: i + 1,
+      sourceUrl: `https://example.com/${'x'.repeat(1700)}/${String(i)}` }));
     const oversized = await seed(big);
     expect((await publish(oversized.id)).error?.message).toContain('8000 bytes');
     expect((await service.from('product_catalogues').insert({ ...s.rows.catalogue, id: randomUUID(), version: 2, status: 'published', published_at: new Date().toISOString() })).error).not.toBeNull();
+  });
+
+  it('refuses publication behind an existing version and derives fallback after withdrawal', async () => {
+    const first = await seed();
+    const content = structuredClone(catalogueFixture); content.version = 2;
+    const second = await seed(content, first.citation.sector, false);
+    expect((await publish(first.id)).error?.message).toContain('exceed every other version');
+    check(await service.from('product_catalogues').delete().eq('id', second.id));
+    check(await publish(first.id));
+    const latest = await seed(content, first.citation.sector, false); check(await publish(latest.id));
+    const current = () => owner.client.from('product_catalogues').select('version').eq('sector', first.citation.sector)
+      .eq('status', 'published').is('withdrawn_at', null).order('version', { ascending: false }).limit(1).single();
+    const before = await current(); check(before); expect(before.data?.version).toBe(2);
+    check(await service.from('product_catalogues').update({ withdrawn_at: '2026-11-21T10:00:00Z', withdrawn_reason: 'Incorrect evidence' }).eq('id', latest.id));
+    const after = await current(); check(after); expect(after.data?.version).toBe(1);
   });
 
   it('makes published content immutable, refuses reparenting, and cascades only drafts', async () => {
@@ -235,6 +256,14 @@ describe('product catalogue and option evidence, real database', () => {
     const s = await seed(); check(await publish(s.id)); const m = await option();
     for (const client of [viewer.client, outsider.client, anon]) await expect(addOptionWithCatalogueSources(client, m, [s.citation])).rejects.toThrow();
     await expect(addOptionWithCatalogueSources(owner.client, { ...m, branchId: randomUUID() }, [s.citation])).rejects.toThrow();
+    await expect(addOptionWithCatalogueSources(owner.client, { ...m, editedBy: outsider.id, editedAt: '2026-11-20T10:02:00Z' }, [s.citation])).rejects.toThrow();
+    const otherModelId = randomUUID();
+    await createModel(owner.client, { id: otherModelId, orgId, name: 'Other model', slug: `cat-${otherModelId}`, createdBy: owner.id });
+    const otherMain = await getMainBranch(owner.client, otherModelId);
+    if (!otherMain?.head_commit_id) throw new Error('Missing other main');
+    const wrongBranch = await createChangeBranch(owner.client, { id: randomUUID(), orgId, modelId: otherModelId, name: `Other ${randomUUID()}`,
+      intent: 'explore', createdBy: owner.id, mainHeadCommitId: otherMain.head_commit_id });
+    await expect(addOptionWithCatalogueSources(owner.client, { ...m, branchId: wrongBranch.id }, [s.citation])).rejects.toThrow();
     await addOptionWithCatalogueSources(owner.client, m, [s.citation]);
     expect(await listCatalogueSources(outsider.client, m.decisionId)).toEqual([]);
     expect((await anon.from('option_catalogue_sources').select('*')).error).not.toBeNull();
@@ -246,7 +275,7 @@ describe('product catalogue and option evidence, real database', () => {
     const s = await seed(); check(await publish(s.id)); const m = await option();
     await addOptionWithCatalogueSources(owner.client, m, [s.citation]);
     const before = await listCatalogueSources(owner.client, m.decisionId);
-    const content = structuredClone(catalogueFixture); content.version = 2; content.entries[0]!.summary = 'Revised summary';
+    const content = structuredClone(catalogueFixture); content.version = 2; at(content.entries).summary = 'Revised summary';
     const replacement = await seed(content, s.citation.sector, false); check(await publish(replacement.id));
     expect(await listCatalogueSources(owner.client, m.decisionId)).toEqual(before);
     check(await service.from('product_catalogues').update({ withdrawn_at: '2026-11-21T10:00:00Z', withdrawn_reason: 'The evidence was incorrect' }).eq('id', s.id));
