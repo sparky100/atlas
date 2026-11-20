@@ -28,3 +28,17 @@ export function decisionStatusTone(status: DecisionStatus): ChipTone {
 export function decisionStatusLabel(status: DecisionStatus): string {
   return status === 'rejected' ? 'cancelled' : status;
 }
+
+/** One plain sentence on what the status means, shown beside it so the state is never just a small grey word. */
+export function decisionStatusMeaning(status: DecisionStatus): string {
+  switch (status) {
+    case 'proposed':
+      return 'Open: no option has been chosen yet.';
+    case 'accepted':
+      return 'Chosen: an option was chosen and the reasons are recorded.';
+    case 'rejected':
+      return 'Cancelled: closed without choosing an option.';
+    case 'superseded':
+      return 'Superseded: a later decision replaces this one.';
+  }
+}

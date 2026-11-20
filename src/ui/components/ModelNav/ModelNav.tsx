@@ -30,7 +30,7 @@ const NAV_GROUPS: { caption: string; sections: RealSection[] }[] = [
   { caption: 'Model', sections: ['home', 'capability-map', 'landscape', 'value-streams', 'elements'] },
   { caption: 'Analyse', sections: ['portfolio', 'roadmap', 'reports', 'ask'] },
   { caption: 'Direction', sections: ['goals', 'principles'] },
-  { caption: 'Work', sections: ['work', 'projects', 'changes', 'decisions', 'capture'] },
+  { caption: 'Work', sections: ['work', 'projects', 'decisions', 'changes', 'capture'] },
   { caption: 'Record', sections: ['versions'] },
 ];
 

@@ -1,3 +1,4 @@
+import { cancelReasonText } from './cancelReasonText';
 import { Loading } from '../components/Loading/Loading';
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router';
@@ -444,7 +445,7 @@ function ChangeRow({
             on the change's own page. */}
         {branch.status === 'cancelled' && branch.cancel_reason && (
           <Text as="p" tone="muted" size="sm">
-            Cancelled: {branch.cancel_reason}
+            Cancelled: {cancelReasonText(branch.cancel_reason)}
           </Text>
         )}
         {/* Item 3's own one-liner — distinct from the free-text description
