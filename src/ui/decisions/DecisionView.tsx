@@ -35,7 +35,7 @@ import { useDecisionPrinciples } from '../principles/useDecisionPrinciples';
 import { goalTitlesServedBy } from '../goals/goalModel';
 import { useModelGoals } from '../goals/useModelGoals';
 import { canLinkDecisionPrinciples } from '../orgs/roleGates';
-import { decisionStatusLabel, decisionStatusTone } from './decisionStatus';
+import { decisionStatusLabel, decisionStatusMeaning, decisionStatusTone } from './decisionStatus';
 import { cancelDecision, createDecisionLink, updateDecision } from '../../db/decisions';
 import { getElementsByIds } from '../../db/elements';
 import type { ElementsHeadRow } from '../../contracts/rows';
@@ -204,7 +204,12 @@ export function DecisionView({ modelId, decisionId, orgId, orgSlug, modelSlug, r
   return (
     <div>
       <div className={styles.meta}>
-        <Chip tone={decisionStatusTone(decision.status)}>{decisionStatusLabel(decision.status)}</Chip>
+        <div className={styles.statusBar} data-testid="decision-status">
+          <Chip tone={decisionStatusTone(decision.status)}>{decisionStatusLabel(decision.status)}</Chip>
+          <Text as="span" size="md">
+            {decisionStatusMeaning(decision.status)}
+          </Text>
+        </div>
         {decision.needed_by !== null && (
           <Text as="span" tone="muted" size="sm">
             Needed by: {decision.needed_by}

@@ -1,3 +1,4 @@
+import { cancelReasonText } from './cancelReasonText';
 import { Loading } from '../components/Loading/Loading';
 import { useState, type ReactNode } from 'react';
 import { Link, useNavigate } from 'react-router';
@@ -400,7 +401,7 @@ export function ChangeView({ orgId, modelId, branchId, orgSlug, modelSlug, role,
           </Text>
           {branch.cancel_reason && (
             <Text as="p" tone="muted" size="sm">
-              {branch.cancel_reason}
+              {cancelReasonText(branch.cancel_reason)}
             </Text>
           )}
           <Button variant="secondary" disabled={duplicating} onClick={() => void duplicateIntoNewDraft()}>
