@@ -91,7 +91,8 @@ test('an element page finds an existing element to relate after adding a relatio
   await page.getByRole('button', { name: '+ Add supported by' }).click();
   await page.getByPlaceholder('Search…').fill('Billing');
   await page.getByRole('button', { name: /Billing Service/ }).click();
-  await expect(page.getByRole('link', { name: 'Billing Service' })).toBeVisible();
+  // The capability page's "What needs attention" band can name the same system, so this link may appear twice.
+  await expect(page.getByRole('link', { name: 'Billing Service' }).first()).toBeVisible();
 
   // Second add, same page, no reload/navigation in between: Payment Gateway
   // was already on `main` before either add — before this fix, this search
@@ -103,8 +104,8 @@ test('an element page finds an existing element to relate after adding a relatio
   // would time out rather than find a stale match.
   await page.getByRole('button', { name: /Payment Gateway/ }).click();
 
-  await expect(page.getByRole('link', { name: 'Billing Service' })).toBeVisible();
-  await expect(page.getByRole('link', { name: 'Payment Gateway' })).toBeVisible();
+  await expect(page.getByRole('link', { name: 'Billing Service' }).first()).toBeVisible();
+  await expect(page.getByRole('link', { name: 'Payment Gateway' }).first()).toBeVisible();
 });
 
 test('the landscape finds a just-created system when adding a second one', async ({ page }) => {
