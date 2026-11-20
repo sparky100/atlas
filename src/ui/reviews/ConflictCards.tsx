@@ -12,7 +12,7 @@ import type { ConflictFinding } from '../../engine/merge';
 import type { CardinalityChoice, DuplicateRelationshipChoice, FieldConflictChoice, RetractionChoice } from '../../engine/mergeResolution';
 import type { PairCardData, RetractionCardData } from '../../engine/structuralFindingGroups';
 import type { ThreeWayDiff } from '../../engine/branch';
-import { computeVersionDiff } from '../../engine/versionDiff';
+import { cleanChangeList } from './cleanChangeList';
 import { elementBreadcrumb, subjectName } from './elementBreadcrumb';
 import { formatFactValue } from './factValueFormat';
 import styles from './ConflictCards.module.css';
@@ -373,10 +373,7 @@ export function IdentityWarningCard({
 }
 
 export function CleanChanges({ base, ours, cleanIds, commentsSlotFor }: { base: Head; ours: Head; cleanIds: readonly UUID[]; commentsSlotFor?: (subjectId: UUID) => ReactNode }) {
-  const diff = computeVersionDiff(base, ours);
-  const cleanIdSet = new Set(cleanIds);
-  const elements = diff.elements.filter((e) => cleanIdSet.has(e.elementId) && e.state !== 'unchanged');
-  const relationships = diff.relationships.filter((r) => cleanIdSet.has(r.relationshipId) && r.state !== 'unchanged');
+  const { elements, relationships } = cleanChangeList(base, ours, cleanIds);
 
   if (elements.length === 0 && relationships.length === 0) {
     return <EmptyState>No clean changes — every touched subject has a conflict or warning above.</EmptyState>;

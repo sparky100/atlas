@@ -14,6 +14,7 @@ import { canApproveOrMergeRequest, canReviewMergeRequest, useMembership } from '
 import { useAuth } from '../auth/useAuth';
 import { branchStatusTone } from '../changes/branchStatus';
 import { groupStructuralFindings } from '../../engine/structuralFindingGroups';
+import { cleanChangeCount } from './cleanChangeList';
 import { CleanChanges, FieldConflictCard, IdentityWarningCard, PairConflictCard, RetractionConflictCard } from './ConflictCards';
 import { subjectAnchorType } from './elementBreadcrumb';
 import { mergeRequestStatusTone } from './mergeRequestStatus';
@@ -287,7 +288,7 @@ export function ReviewRequestView({ modelId, mergeRequestId, orgId, orgSlug, mod
         <details>
           <summary>
             <Text as="span" size="lg">
-              Clean changes — no conflicts or warnings ({classification.clean.length})
+              Clean changes — no conflicts or warnings ({cleanChangeCount(threeWay.base, threeWay.ours, classification.clean)})
             </Text>
           </summary>
           <CleanChanges base={threeWay.base} ours={threeWay.ours} cleanIds={classification.clean} commentsSlotFor={renderCardComments} />
