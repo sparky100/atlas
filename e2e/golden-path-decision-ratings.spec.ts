@@ -143,5 +143,5 @@ test('rate decision options on judgement criteria, leave some unrated, choose on
   // page itself offers — never a second, invented mechanism.
   await optionAHeader.getByRole('button', { name: 'Work on this as a change' }).click();
   await expect(page).toHaveURL(/\/changes\//);
-  await expect(page.getByRole('button', { name: 'Editing this option' })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Editing in this change' })).toBeVisible();
 });
