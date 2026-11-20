@@ -3,7 +3,7 @@
  * cannot find does not exist for them). One next step, derived from what the
  * project already holds, with the single action that does it. Pure and
  * stored nowhere (CLAUDE.md rules 2 and 3). It never gates anything: the
- * journey strip and every form below stay as they are.
+ * forms below stay as they are.
  *
  * The action says who can do it. When the person's role cannot, the card
  * still names the step and says who needs to do it, so the page never goes

@@ -45,7 +45,6 @@ import { loadProjectPack } from '../exports/loadProjectPack';
 import { markdownToPdfBytes } from '../exports/markdownPdf';
 import { buildProjectPackMarkdown, projectPackFilename } from '../exports/projectPack';
 import { downloadBlob, exportDate } from '../exports/viewExport';
-import { buildProjectJourney } from './projectJourney';
 import { projectNextStep } from './projectNextStep';
 import { findingLabel } from '../decisions/findingLabels';
 import { suggestDecisionTitle } from '../decisions/optionSuggestions';
@@ -169,34 +168,6 @@ export function ProjectView({ data, modelName, orgId, modelId, orgSlug, modelSlu
           {nextStep.action.kind === 'open-change' && <Link to={`${base}/changes/${nextStep.action.id}`}>{nextStep.action.label}</Link>}
         </Panel>
       )}
-
-      <Panel>
-        <Text as="h2" size="lg">
-          From need to choice
-        </Text>
-        <ol className={styles.journey} aria-label="Project journey">
-          {buildProjectJourney({
-            purpose: project.purpose,
-            capabilities: data.journeyCapabilities,
-            changeCount: changes.length,
-            decisionCount: decisions.length,
-            chosenCount: decisions.filter((d) => d.status === 'accepted').length,
-            projectStatus: project.status,
-          }).map((step) => (
-            <li key={step.key} className={styles.journeyStep} data-state={step.state}>
-              <Text as="span" size="xs" tone="muted">
-                {step.state === 'done' ? 'Done' : step.state === 'next' ? 'Next' : 'Not started'}
-              </Text>
-              <Text as="span" size="sm">
-                {step.title}
-              </Text>
-              <Text as="span" size="xs" tone="muted">
-                {step.detail}
-              </Text>
-            </li>
-          ))}
-        </ol>
-      </Panel>
 
       <ProjectBeforeAfter modelId={modelId} projectId={project.id} mainHeadCommitId={main?.head_commit_id ?? null} changes={changes} capabilities={data.journeyCapabilities.map((c) => ({ id: c.id, name: c.name }))} scopeSystemIds={scopeSystemIds} base={base} />
 
