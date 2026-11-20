@@ -3,6 +3,7 @@ import type { BranchRow, DecisionRow, ProjectRow } from '../../db/types';
 import {
   proposalAcceptance,
   proposalHistoryLines,
+  projectsWaitingForAcceptance,
   formatProjectProgress,
   groupChangesByStage,
   groupProjectsByStatus,
@@ -247,5 +248,15 @@ describe('proposalHistoryLines', () => {
   it('says so when the proposer was the only one who could accept', () => {
     const lines = proposalHistoryLines({ ...base, created_by: 'alex', status: 'active', accepted_by: 'alex', accepted_at: '2026-11-20T10:00:00+00:00' }, name);
     expect(lines[1]).toBe('Accepted by Alex, who proposed it (the only owner or architect) on 2026-11-20.');
+  });
+});
+
+describe('projectsWaitingForAcceptance', () => {
+  const ps = [project({ id: 'a', status: 'proposed', created_by: 'sam' }), project({ id: 'b', status: 'proposed', created_by: 'alex' }), project({ id: 'c', status: 'active', created_by: 'sam' })];
+  it('counts proposals from other people for an owner or architect', () => {
+    expect(projectsWaitingForAcceptance(ps, true, 'alex')).toBe(1);
+  });
+  it('is zero for someone who cannot accept', () => {
+    expect(projectsWaitingForAcceptance(ps, false, 'alex')).toBe(0);
   });
 });
