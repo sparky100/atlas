@@ -35,6 +35,14 @@ test('an empty Replace option offers to retire the system the decision concerns'
   await startDecisionOnQuoteTool(page, 'optionpredraft');
   await openOptionDraft(page, 'Replace with a product');
 
+  // The option page leads with what the option is and one way to start; review waits until there are edits.
+  await expect(page.getByRole('heading', { name: 'Replace with a product' })).toBeVisible();
+  await expect(page.getByText('Nothing in the model changes unless the decision chooses this option')).toBeVisible();
+  await expect(page.getByRole('link', { name: "Draft this option's changes" })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Remove this option…' })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Submit for review' })).toHaveCount(0);
+  await expect(page.getByRole('button', { name: 'View this change' })).toHaveCount(0);
+
   const card = page.getByTestId('option-draft-card');
   await expect(card.getByRole('link', { name: 'Retire Quote Tool and replace it with a new system' })).toBeVisible();
   await expect(card.getByText('no AI')).toBeVisible();

@@ -48,7 +48,7 @@
 /* One column per top-level area; they flow to as many columns as fit, so the whole map is one page on a wide screen and a stack on a phone. */
 .grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(210px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(min(210px, 100%), 1fr));
   gap: var(--space-3);
   align-items: start;
 }

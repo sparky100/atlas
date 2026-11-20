@@ -1,6 +1,8 @@
 .text {
   font-family: var(--font-sans);
   margin: 0;
+  /* A long address or name breaks instead of pushing the page sideways. */
+  overflow-wrap: anywhere;
 }
 
 .mono {

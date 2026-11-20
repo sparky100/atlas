@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { citationsToNames, DesignerError, interpretDesignerReply } from './designAgent';
+import { citationIds, citationsToNames, DesignerError, interpretDesignerReply } from './designAgent';
 
 describe('interpretDesignerReply', () => {
   const design = { options: [{ title: 'Configure', summary: 'Use it as is.', toWeigh: 'Fit.' }, { title: 'Replace', summary: 'Buy one.' }], gaps: ['No owner recorded'], stayNote: 'Slow.', problems: [] };
@@ -53,6 +53,10 @@ describe('citations become names, never ids', () => {
   const B = '22cddb73-6439-4b1f-ac7a-fe72b44364d8';
   it('replaces a cited id with its name, and an unknown id with plain words', () => {
     expect(citationsToNames(`Keep [[element:${A}]] for [[element:${B}]] and [[element:${'0'.repeat(8)}-0000-0000-0000-${'0'.repeat(12)}]].`, { [A]: 'Quote Tool', [B]: 'Connection Quotations' })).toBe('Keep Quote Tool for Connection Quotations and an element in the model.');
+  });
+  it('lists each id a saved text still cites, once', () => {
+    expect(citationIds(`Replace [[element:${A}]] and again [[element:${A}]], keep [[element:${B}]].`)).toEqual([A, B]);
+    expect(citationIds('No citations here.')).toEqual([]);
   });
   it('the options, gaps and stay note a person edits carry names', () => {
     const draft = interpretDesignerReply({
