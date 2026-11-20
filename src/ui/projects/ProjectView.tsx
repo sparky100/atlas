@@ -125,6 +125,7 @@ export function ProjectView({ data, modelName, orgId, modelId, orgSlug, modelSlu
     decisions,
     changes,
     canStartDecision: canDecide,
+    canChoose: role === 'owner' || role === 'architect',
     canCreateChange: canCreateChangeBranch(role) && userId !== null,
     canDraftChange: Boolean(main?.head_commit_id),
   });
@@ -140,7 +141,7 @@ export function ProjectView({ data, modelName, orgId, modelId, orgSlug, modelSlu
 
       {canEdit && <ProjectEditPanel project={project} members={members.map((m) => ({ id: m.member.user_id, label: profileLabel(m.profile) }))} onSaved={reload} />}
 
-      {canEdit && <ProjectStatusPanel project={project} changes={changes} decisions={decisions} base={base} acceptance={proposalAcceptance({ isApprover: canAcceptProject(role), userId, proposedBy: project.created_by, approvers: members.filter((m) => m.member.role === 'owner' || m.member.role === 'architect').map((m) => ({ userId: m.member.user_id, name: profileLabel(m.profile) })) })} onChanged={reload} />}
+      {canEdit && <ProjectStatusPanel project={project} changes={changes} decisions={decisions} base={base} isProposer={userId !== null && userId === project.created_by} acceptance={proposalAcceptance({ isApprover: canAcceptProject(role), userId, proposedBy: project.created_by, approvers: members.filter((m) => m.member.role === 'owner' || m.member.role === 'architect').map((m) => ({ userId: m.member.user_id, name: profileLabel(m.profile) })) })} onChanged={reload} />}
 
       {!isOpen && (
         <Panel>
@@ -872,7 +873,7 @@ function ProjectEditPanel({ project, members, onSaved }: { project: ProjectRow; 
  * each linking to its own page where its own existing action ends it — the
  * project never cancels anything itself.
  */
-function ProjectStatusPanel({ project, changes, decisions, base, acceptance, onChanged }: { project: ProjectRow; changes: BranchRow[]; decisions: DecisionRow[]; base: string; acceptance: ProposalAcceptance; onChanged: () => void }) {
+function ProjectStatusPanel({ project, changes, decisions, base, acceptance, isProposer, onChanged }: { project: ProjectRow; changes: BranchRow[]; decisions: DecisionRow[]; base: string; isProposer: boolean; acceptance: ProposalAcceptance; onChanged: () => void }) {
   const [reason, setReason] = useState('');
   const [mode, setMode] = useState<'idle' | 'cancelling'>('idle');
   const [error, setError] = useState<string | null>(null);
@@ -880,6 +881,9 @@ function ProjectStatusPanel({ project, changes, decisions, base, acceptance, onC
   const blocked = open.changes.length > 0 || open.decisions.length > 0;
   const links = useQuery({ queryKey: ['projectOptionLinks', project.model_id], enabled: blocked, queryFn: () => listDecisionOptionLinksForModel(supabase, project.model_id) });
   const ordered = orderOpenWork(open.decisions, open.changes, links.data ?? []);
+  // Whoever drafted a proposal withdraws it (cancel); someone else turning it down declines it. Both record the same status and reason.
+  const withdrawing = project.status === 'proposed' && isProposer;
+  const proposalVerb = withdrawing ? 'Cancel' : 'Decline';
 
   const run = (status: ProjectRow['status'], why?: string) => {
     setError(null);
@@ -955,7 +959,7 @@ function ProjectStatusPanel({ project, changes, decisions, base, acceptance, onC
               setMode('cancelling');
             }}
           >
-            {project.status === 'proposed' ? 'Decline proposal…' : 'Cancel project…'}
+            {project.status === 'proposed' ? `${proposalVerb} proposal…` : 'Cancel project…'}
           </Button>
         )}
       </div>
@@ -971,10 +975,10 @@ function ProjectStatusPanel({ project, changes, decisions, base, acceptance, onC
             run('cancelled', reason.trim());
           }}
         >
-          <input className={styles.input} type="text" aria-label="Why is this project being cancelled?" placeholder={project.status === 'proposed' ? 'Why is this proposal being declined?' : 'Why is this project being cancelled?'} value={reason} onChange={(e) => { setReason(e.target.value); }} />
+          <input className={styles.input} type="text" aria-label="Why is this project being cancelled?" placeholder={project.status === 'proposed' ? withdrawing ? 'Why is this proposal being withdrawn?' : 'Why is this proposal being declined?' : 'Why is this project being cancelled?'} value={reason} onChange={(e) => { setReason(e.target.value); }} />
           <div className={styles.meta}>
             <Button variant="primary" type="submit">
-              {project.status === 'proposed' ? 'Decline proposal' : 'Cancel project'}
+              {project.status === 'proposed' ? `${proposalVerb} proposal` : 'Cancel project'}
             </Button>
             <Button
               onClick={() => {

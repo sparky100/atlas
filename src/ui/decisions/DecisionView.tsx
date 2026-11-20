@@ -19,6 +19,7 @@ import { useSelectedRef } from '../branches/useSelectedRef';
 import type { BranchRow, DecisionLinkRow, DecisionRow, MemberRole } from '../../db/types';
 import { intentHeaderLine } from '../changes/branchIntent';
 import { profileLabel } from '../comments/profileLabel';
+import { chooseNote } from './chooseNote';
 import { canAddDecisionConcern, canCancelDecision, canChooseDecisionOption, canCreateChangeBranch, canEditDecision, canRateDecisionOption } from '../orgs/useMembership';
 import { useMembers } from '../orgs/useMembers';
 import type { AlsoAffectedElement } from './alsoAffected';
@@ -453,6 +454,7 @@ export function DecisionView({ modelId, decisionId, orgId, orgSlug, modelSlug, r
                     setChoosingBranchId(branchId);
                     setReasons('');
                   }}
+                  chooseNote={decision.status === 'proposed' && !canChooseDecisionOption(role) ? chooseNote(members.filter((m) => m.member.role === 'owner' || m.member.role === 'architect').map((m) => profileLabel(m.profile))) : null}
                   canWorkOnChange={canCreateChangeBranch(role)}
                   onWorkOnThisChange={(branchId) => {
                     setRef({ kind: 'branch', branchId });
