@@ -4,6 +4,7 @@ import { DESIGNER_SUMMARY_MAX, DESIGNER_TITLE_MAX, DESIGNER_WEIGH_MAX } from '..
 import { runDesigner, type DesignerDraft } from '../../db/designAgent';
 import { DESIGNER_MAX_FINDING_CHARS } from '../../tools/designPrompt';
 import { Button } from '../components/Button/Button';
+import { useMembership } from '../orgs/useMembership';
 import { Chip } from '../components/Chip/Chip';
 import { Text } from '../components/Text/Text';
 import { supabase } from '../supabaseClient';
@@ -53,6 +54,8 @@ function newCards(draft: DesignerDraft, draftedAt: string): SuggestionCard[] {
  * a visit to another page does not lose them.
  */
 export function DesignerSuggestions({ orgId, userId, modelId, elementId, brief, scope, onChange }: DesignerSuggestionsProps) {
+  // What a run cost is the organisation owner's business, not every contributor's (Simon, 2026-11-20).
+  const { role } = useMembership(orgId, userId);
   const heldKey = pendingKey(orgId, userId, `designer-${scope}`);
   const [state, setState] = useState<'idle' | 'running' | 'failed' | 'stopped'>('idle');
   const [message, setMessage] = useState('');
@@ -208,9 +211,11 @@ export function DesignerSuggestions({ orgId, userId, modelId, elementId, brief, 
       {meta !== null && (
         <>
           <Text as="p" tone="muted" size="sm">{meta.grounded ? `Based on: ${meta.citedNames.join(', ')}.` : 'Not tied to specific records Atlas holds, so check it carefully.'}</Text>
-          <div data-testid="designer-cost">
-            <Text as="p" tone="muted" size="sm">{designerCostLine(meta.usage)}</Text>
-          </div>
+          {role === 'owner' && (
+            <div data-testid="designer-cost">
+              <Text as="p" tone="muted" size="sm">{designerCostLine(meta.usage)}</Text>
+            </div>
+          )}
         </>
       )}
       {all.length > 0 && (

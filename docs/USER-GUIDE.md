@@ -330,7 +330,7 @@ On the decision form (in a project, from a finding, or on the Decisions page onc
 - **Incomplete answers say so.** If the Designer's answer was cut short or fewer options came back than expected, a notice says **This draft may be incomplete**. A suggestion is never shown as finished when it is not.
 - **Marks.** The decision remembers that an agent helped: it shows **AI helped with this: Drafted by the Designer on <date>**, and says whether a person edited it, on the decision page, in the approval pack and in the ADR export. Each suggested option also says so. (The marks are recorded by your browser, so they tell readers what you declared; they aren't tamper-proof evidence. Edits you make to an option later, on its change page, are not recorded.) A decision written entirely by people shows nothing.
 - **If it isn't offered**, the form says why in one line and who can act: it is for contributors, architects and owners; or Ask Atlas is off, or agents aren't allowed, or no AI key is saved. Only an owner can change those, so the form names the owners (and links to settings if you are one). You can always add options by hand.
-- It says which records it was based on. If it cites none, it says so: check it carefully. It runs on the organisation's own AI key (organisation settings, **Agents**), not Atlas's. Under each run it says what it used: tokens in and out and how many lookups (tokens, not money).
+- It says which records it was based on. If it cites none, it says so: check it carefully. It runs on the organisation's own AI key (organisation settings, **Agents**), not Atlas's. Under each run, the organisation owner (only) is told what it used: tokens in and out and how many lookups (tokens, not money).
 
 ## Ask Atlas
 
