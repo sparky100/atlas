@@ -17,7 +17,8 @@ import { randomUUID } from 'node:crypto';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import type { Client } from './client';
 import { createServiceRoleClient, createSupabaseClient } from './client';
-import { listLlmProxyUsage } from './llmProxyRequests';
+import { designerTrialStatus, listLlmProxyUsage } from './llmProxyRequests';
+import { TRIAL_RUNS } from '../contracts/trialAllowance';
 import { createOrganisation } from './organisations';
 import { loadEnv } from './env';
 
@@ -111,6 +112,30 @@ describe('llm_proxy_requests against a real local Supabase', () => {
     expect(bad.error).not.toBeNull();
     // A signed-in user from another organisation sees none of it.
     expect(await listLlmProxyUsage(outsider.client, orgId)).toEqual([]);
+  });
+
+  it('Designer free trial: accepts trial rows with a run id, counts runs not calls, and shows another organisation nothing', async () => {
+    const trialOrg = randomUUID();
+    await createOrganisation(owner.client, { id: trialOrg, name: 'Trial Org', slug: `trial-${trialOrg.slice(0, 8)}`, createdBy: owner.id });
+    try {
+      const run = randomUUID();
+      const base = { org_id: trialOrg, model: 'claude-opus-5', status: 'ok', input_tokens: 100, output_tokens: 10, latency_ms: 5, key_source: 'trial' };
+      // Two calls in one run, then a second run. Inserted one at a time (postgrest-js null-fills keys a row omits).
+      for (const run_id of [run, run, randomUUID()]) {
+        const { error } = await service.from('llm_proxy_requests').insert({ id: randomUUID(), ...base, run_id });
+        expect(error).toBeNull();
+      }
+      const status = await designerTrialStatus(owner.client, trialOrg);
+      expect(status).toMatchObject({ runsUsed: 2, runsLeft: TRIAL_RUNS - 2, keySet: false });
+      // A signed-in user from a different organisation sees no trial use for this one.
+      expect(await listLlmProxyUsage(outsider.client, trialOrg)).toEqual([]);
+      expect(await designerTrialStatus(outsider.client, trialOrg)).toMatchObject({ runsUsed: 0, keySet: false });
+      // Still no client write path, trial or not.
+      const { error: denied } = await owner.client.from('llm_proxy_requests').insert({ id: randomUUID(), ...base, run_id: randomUUID() });
+      expect(denied).not.toBeNull();
+    } finally {
+      await service.from('organisations').delete().eq('id', trialOrg);
+    }
   });
 
   it('has no prompt/response column to retain a payload in — the "no payload retention" design is a real schema constraint, not just a convention the edge function happens to follow', async () => {

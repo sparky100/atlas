@@ -271,7 +271,7 @@ export function OrganisationSettingsView({ organisation, role, userId, onChanged
         {error !== null && <Text as="p">{error}</Text>}
       </SettingsSection>
 
-      <SettingsSection id="agents" title="Agents" summary={organisation.ai_agents_enabled ? 'On' : organisation.ai_agent_key_set ? 'Key set · off' : 'Off · no key'}>
+      <SettingsSection id="agents" title="Agents" summary={organisation.ai_agents_enabled ? (organisation.ai_agent_key_set ? 'On' : 'On · free trial') : organisation.ai_agent_key_set ? 'Key set · off' : 'Off · no key'}>
         <AgentsPanel organisation={organisation} canManage={canManage} saving={status === 'saving'} onChanged={onChanged} onToggleAgents={(enabled) => { void update({ aiAgentsEnabled: enabled }); }} />
       </SettingsSection>
 

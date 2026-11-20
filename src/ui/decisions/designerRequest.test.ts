@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { DESIGNER_MAX_FINDING_CHARS } from '../../tools/designPrompt';
 import { prefillFromSystemWithoutCapability } from './decisionPrefill';
-import { canOfferDesigner, designerCostLine, designerInputFromPrefill, designerUnavailableReason } from './designerRequest';
+import { canOfferDesigner, designerCostLine, designerTrialLine, designerInputFromPrefill, designerUnavailableReason } from './designerRequest';
 
 const ID = '00000000-0000-4000-8000-000000000001';
 
@@ -72,5 +72,35 @@ describe('designerUnavailableReason', () => {
     const r = designerUnavailableReason({ role: 'architect', ...on, agentsEnabled: false, ownerNames: ['Alex', 'Priya'] });
     expect(r?.text).toContain('An owner (Alex, Priya) can allow AI agents');
     expect(designerUnavailableReason({ role: 'contributor', ...on, assistantEnabled: false })?.text).toContain('An owner can turn on Ask Atlas');
+  });
+});
+
+describe('the free trial', () => {
+  const noKey = { assistantEnabled: true, agentsEnabled: true, keySet: false };
+  it('offers the Designer without a key while trial runs are left, and not once they are gone', () => {
+    expect(canOfferDesigner({ role: 'contributor', ...noKey, trial: { runsLeft: 3, runsUsed: 2 } })).toBe(true);
+    expect(canOfferDesigner({ role: 'contributor', ...noKey, trial: { runsLeft: 0, runsUsed: 5 } })).toBe(false);
+    expect(canOfferDesigner({ role: 'contributor', ...noKey })).toBe(false);
+    expect(canOfferDesigner({ role: 'viewer', ...noKey, trial: { runsLeft: 3, runsUsed: 2 } })).toBe(false);
+  });
+  it('names the owners to a member when the trial is used up, and links only an owner to settings', () => {
+    const member = designerUnavailableReason({ role: 'contributor', ...noKey, trial: { runsLeft: 0, runsUsed: 5 }, ownerNames: ['Sam Owner', 'Pat Owner'] });
+    expect(member?.text).toContain('free trial');
+    expect(member?.text).toContain('Sam Owner, Pat Owner');
+    expect(member?.canFix).toBe(false);
+    const owner = designerUnavailableReason({ role: 'owner', ...noKey, trial: { runsLeft: 0, runsUsed: 5 } });
+    expect(owner?.canFix).toBe(true);
+  });
+  it('names the owners when there is no key and no trial was ever used', () => {
+    expect(designerUnavailableReason({ role: 'architect', ...noKey, ownerNames: ['Sam Owner'] })?.text).toContain('Ask an owner (Sam Owner)');
+  });
+  it('shows runs left beside the button, and nothing once the organisation has its own key', () => {
+    expect(designerTrialLine({ keySet: false, trial: { runsLeft: 3, runsUsed: 2 }, ownerNames: ['Sam Owner'] })).toContain('3 drafts left');
+    expect(designerTrialLine({ keySet: false, trial: { runsLeft: 1, runsUsed: 4 } })).toContain('1 draft left');
+    expect(designerTrialLine({ keySet: false, trial: { runsLeft: 0, runsUsed: 5 }, ownerNames: ['Sam Owner'] })).toContain('Sam Owner');
+    expect(designerTrialLine({ keySet: true, trial: { runsLeft: 3, runsUsed: 2 } })).toBeNull();
+  });
+  it('says a trial run used the free trial, not the organisation key', () => {
+    expect(designerCostLine({ inputTokens: 1, outputTokens: 1, lookups: 1, trial: true })).toContain("Atlas's free trial");
   });
 });

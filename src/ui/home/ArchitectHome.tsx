@@ -31,6 +31,9 @@ import { PrincipleDeparturesNote } from '../principles/PrincipleDeparturesNote';
 import { attributesRecord } from '../elements/attributesRecord';
 import { canAcceptProject, canStartProject } from '../orgs/roleGates';
 import { useOrganisationBySlug } from '../orgs/useOrganisationBySlug';
+import { useDesignerTrial } from '../decisions/useDesignerTrial';
+import { useMembers } from '../orgs/useMembers';
+import { profileLabel } from '../comments/profileLabel';
 import { canOfferDesigner, designerUnavailableReason } from '../decisions/designerRequest';
 import { selectRecentActivity, splitActivitySubjects, type GroupedActivityItem } from './groupRecentActivity';
 import { checksClearLabel, partitionHealthChecks, type HealthCheck } from './healthChecks';
@@ -185,9 +188,12 @@ function resolveCardAction(check: HealthCheck): FindingCardAction | null {
 export function ArchitectHome({ data, modelId, mainCommitIdHint, insights, role, orgSlug, modelSlug, onShowOverview }: ArchitectHomeProps) {
   // The Designer lives one click on, in a decision started from a finding. Say so here, so it can be found from where the findings are (Simon, 2026-11-19).
   const { organisation } = useOrganisationBySlug(orgSlug);
-  const designerArgs = { role, assistantEnabled: organisation?.ai_assistant_enabled === true, agentsEnabled: organisation?.ai_agents_enabled === true, keySet: organisation?.ai_agent_key_set === true };
+  const trialStatus = useDesignerTrial(organisation?.id ?? null);
+  const { members: orgMembers } = useMembers(organisation?.id ?? null);
+  const designerOwnerNames = orgMembers.filter((m) => m.member.role === 'owner').map((m) => profileLabel(m.profile));
+  const designerArgs = { role, assistantEnabled: organisation?.ai_assistant_enabled === true, agentsEnabled: organisation?.ai_agents_enabled === true, keySet: organisation?.ai_agent_key_set === true, ...(trialStatus ? { trial: trialStatus } : {}) };
   const designerOffered = canOfferDesigner(designerArgs);
-  const designerWhyNot = designerUnavailableReason(designerArgs);
+  const designerWhyNot = designerUnavailableReason({ ...designerArgs, ownerNames: designerOwnerNames });
   const now = new Date();
   const { userId: homeUserId } = useAuth();
   const waitingProjects = projectsWaitingForAcceptance(data.allProjects, canAcceptProject(role), homeUserId);

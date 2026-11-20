@@ -58,11 +58,12 @@ export function AgentsPanel({ organisation, canManage, onToggleAgents, saving, o
   }
 
   const keySet = organisation.ai_agent_key_set;
-  const ready = organisation.ai_assistant_enabled && keySet;
+  // Agents can be switched on without a key: the Designer then runs on Atlas's free trial until an owner adds the organisation's own key.
+  const ready = organisation.ai_assistant_enabled;
   return (
     <>
       <Text as="p" tone="muted" size="sm">
-        Agents draft on your organisation's own AI key, because they use a lot of AI time. The first is the Designer, which owners and architects can run from a decision started from a finding. Ask Atlas, document import and help keep using Atlas's own key and are not affected. The key is stored securely, is never shown again, and can be replaced or removed here. Removing it turns agents off.
+        Agents draft on your organisation's own AI key, because they use a lot of AI time. The first is the Designer, which owners, architects and contributors can run from a decision started from a finding. Until you add a key, each organisation can try the Designer a few times on Atlas's free trial, so people can see what it does; after that it needs your key. Ask Atlas, document import and help keep using Atlas's own key and are not affected. The key is stored securely, is never shown again, and can be replaced or removed here. Removing it turns agents off.
       </Text>
       <Text as="p" size="sm">
         AI key: <Chip tone="neutral">{keySet ? 'Set' : 'Not set'}</Chip>
@@ -106,7 +107,7 @@ export function AgentsPanel({ organisation, canManage, onToggleAgents, saving, o
       </label>
       {!ready && (
         <Text as="p" tone="muted" size="sm">
-          Needs Ask Atlas switched on and an AI key saved.
+          Needs Ask Atlas switched on. An AI key is not needed to start, but without one only the free trial is available.
         </Text>
       )}
       {!canManage && (

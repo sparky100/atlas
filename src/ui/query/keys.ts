@@ -23,6 +23,7 @@ export const queryKeys = {
   sampleModels: () => ['sampleModels'] as const,
   mainBranch: (modelId: UUID | null) => ['branch', 'main', modelId] as const,
   editingBranch: (modelId: UUID | null, ref: Ref) => ['branch', 'editing', modelId, ref.kind, ref.kind === 'branch' ? ref.branchId : null] as const,
+  designerTrial: (orgId: UUID | null) => ['designerTrial', orgId] as const,
   membership: (orgId: UUID | null, userId: UUID | null) => ['membership', orgId, userId] as const,
   ownProfile: (userId: string | null) => ['profile', 'own', userId] as const,
   orgMemberProfiles: (orgId: UUID | null) => ['profiles', 'forOrg', orgId] as const,
