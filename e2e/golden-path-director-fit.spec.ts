@@ -40,7 +40,7 @@ test('rate a primary supporter a poor fit; the Director door flags the capabilit
   // system's own page, so its own "Show attributes" toggle is unambiguous.
   await page.getByRole('button', { name: 'Show attributes' }).click();
   await page.getByRole('button', { name: 'Edit', exact: true }).click();
-  await page.getByLabel('Role').selectOption('primary');
+  // The capability's first supporter is already its main one, so Role is locked (and needs no change).
   await page.getByLabel('Fit for purpose').selectOption('poor');
   await page.getByRole('button', { name: 'Save', exact: true }).click();
   // The edit panel closes once the save lands — its own History entry
@@ -94,7 +94,7 @@ test('an adequate fit is a weakness on Overview, named as adequate, and is not r
 
   await page.getByRole('button', { name: 'Show attributes' }).click();
   await page.getByRole('button', { name: 'Edit', exact: true }).click();
-  await page.getByLabel('Role').selectOption('primary');
+  // The capability's first supporter is already its main one, so Role is locked (and needs no change).
   await page.getByLabel('Fit for purpose').selectOption('adequate');
   await page.getByRole('button', { name: 'Save', exact: true }).click();
   await expect(page.getByText('Fit for purpose: adequate', { exact: false })).toBeVisible();
