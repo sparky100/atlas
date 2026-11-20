@@ -77,6 +77,11 @@ export function DecisionBaselineCard({ stayRisk, stayReason, canEdit, canChoose,
             Save baseline
           </Button>
         )}
+        {canEdit && (
+          <Text as="span" size="sm" tone="muted" role="status">
+            {busy ? 'Saving…' : dirty ? 'Not saved yet.' : stayRisk !== '' || stayReason !== '' ? 'Saved. Change either answer above to save again.' : 'Nothing written yet.'}
+          </Text>
+        )}
         {canChoose && (
           <Button variant="secondary" disabled={busy} onClick={onChoose}>
             Go with staying as we are
