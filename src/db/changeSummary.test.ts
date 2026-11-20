@@ -265,6 +265,16 @@ describe('summarizeOwnDeltas', () => {
       expect(result.subjects[0]?.name).toBe('uses ESCOMS → GIS');
     });
 
+    it('names an element created and retracted on the same change from its own create delta, not its raw id', () => {
+      const { asIs, toBe } = escomsAndGis();
+      const create: Delta = { kind: 'element.create', id: 'd1', elementId: 'el-gone', elementType: 'system', name: 'New Quote Tool', parentId: null, attributes: {}, sourceId: 'src', confidence: 1 } as Delta;
+      const retract: Delta = { kind: 'element.retract', id: 'd2', elementId: 'el-gone', previousDeltaId: 'd1', sourceId: 'src', confidence: 1 } as Delta;
+
+      const result = summarizeOwnDeltas([create, retract], asIs, toBe);
+
+      expect(result.subjects[0]?.name).toBe('New Quote Tool');
+    });
+
     it('a supports edge of its own names its capability, without reaching the system\'s other capabilities', () => {
       const { asIs, toBe } = escomsAndGis();
       toBe.relationships.set('s-new', supports('gis', 'cap-wayleaves'));
