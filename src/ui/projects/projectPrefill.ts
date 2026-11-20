@@ -11,10 +11,10 @@ export interface ProjectFormPrefill {
 }
 
 /** F10 step 7: the element page's "Start a project…" — that element as the declared scope, its name as a starting title, no finding key. The element's type rides along so the form (plan A1) knows whether a capability is already named. */
-export function startProjectFromElementHref(projectsHref: string, element: { id: UUID; name: string; type?: ElementType }): string {
+export function startProjectFromElementHref(projectsHref: string, element: { id: UUID; name: string; type?: ElementType }, purpose = ''): string {
   const params = new URLSearchParams();
   params.set('startTitle', element.name);
-  params.set('startStatement', '');
+  params.set('startStatement', purpose);
   params.set('startFindingKey', '');
   params.append('startElementId', element.id);
   params.append('startElementName', element.name);
