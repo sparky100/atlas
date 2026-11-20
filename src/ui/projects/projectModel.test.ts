@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import type { BranchRow, DecisionRow, ProjectRow } from '../../db/types';
 import {
+  proposalAcceptance,
+  proposalHistoryLines,
   formatProjectProgress,
   groupChangesByStage,
   groupProjectsByStatus,
@@ -87,6 +89,8 @@ function project(overrides: Partial<ProjectRow>): ProjectRow {
     close_reason: null,
     created_by: 'u',
     created_at: '2026-10-01T00:00:00Z',
+    accepted_by: null,
+    accepted_at: null,
     ...overrides,
   };
 }
@@ -197,5 +201,51 @@ describe('scopeHasCapability (plan A1: a project must name a capability)', () =>
 
   it('treats a pick whose type is unknown as not a capability, so the person is asked to name one', () => {
     expect(scopeHasCapability([{ elementId: 'x', name: 'From an old prefill link' }])).toBe(false);
+  });
+});
+
+describe('proposalAcceptance', () => {
+  const alex = { userId: 'alex', name: 'Alex' };
+  const priya = { userId: 'priya', name: 'Priya' };
+
+  it('a contributor cannot accept, and is told who can', () => {
+    const r = proposalAcceptance({ isApprover: false, userId: 'sam', proposedBy: 'sam', approvers: [alex, priya] });
+    expect(r.canAccept).toBe(false);
+    expect(r.message).toBe('Waiting for an owner or architect to accept this proposal (Alex, Priya).');
+  });
+
+  it('an owner or architect may accept someone else’s proposal', () => {
+    expect(proposalAcceptance({ isApprover: true, userId: 'alex', proposedBy: 'sam', approvers: [alex, priya] })).toEqual({ canAccept: true, message: null });
+  });
+
+  it('nobody accepts their own proposal while another owner or architect exists, and the others are named', () => {
+    const r = proposalAcceptance({ isApprover: true, userId: 'alex', proposedBy: 'alex', approvers: [alex, priya] });
+    expect(r.canAccept).toBe(false);
+    expect(r.message).toBe('You proposed this project, so another owner or architect has to accept it (Priya).');
+  });
+
+  it('the only owner or architect may accept their own proposal, and the page says it is recorded', () => {
+    const r = proposalAcceptance({ isApprover: true, userId: 'alex', proposedBy: 'alex', approvers: [alex] });
+    expect(r.canAccept).toBe(true);
+    expect(r.message).toContain('only owner or architect');
+  });
+});
+
+describe('proposalHistoryLines', () => {
+  const name = (id: string) => (id === 'sam' ? 'Sam' : id === 'alex' ? 'Alex' : 'Someone');
+  const base = { created_by: 'sam', created_at: '2026-11-20T09:00:00+00:00' };
+
+  it('says nothing for a project that was started active', () => {
+    expect(proposalHistoryLines({ ...base, status: 'active', accepted_by: null, accepted_at: null }, name)).toEqual([]);
+  });
+  it('names who proposed a project still waiting', () => {
+    expect(proposalHistoryLines({ ...base, status: 'proposed', accepted_by: null, accepted_at: null }, name)).toEqual(['Proposed by Sam on 2026-11-20.']);
+  });
+  it('names who accepted it and when', () => {
+    expect(proposalHistoryLines({ ...base, status: 'active', accepted_by: 'alex', accepted_at: '2026-11-21T10:00:00+00:00' }, name)).toEqual(['Proposed by Sam on 2026-11-20.', 'Accepted by Alex on 2026-11-21.']);
+  });
+  it('says so when the proposer was the only one who could accept', () => {
+    const lines = proposalHistoryLines({ ...base, created_by: 'alex', status: 'active', accepted_by: 'alex', accepted_at: '2026-11-20T10:00:00+00:00' }, name);
+    expect(lines[1]).toBe('Accepted by Alex, who proposed it (the only owner or architect) on 2026-11-20.');
   });
 });

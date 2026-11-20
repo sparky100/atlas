@@ -75,6 +75,8 @@ function project(overrides: Partial<ProjectRow>): ProjectRow {
     close_reason: null,
     created_by: 'u',
     created_at: '2026-10-01T00:00:00Z',
+    accepted_by: null,
+    accepted_at: null,
     ...overrides,
   };
 }

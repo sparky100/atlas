@@ -692,6 +692,10 @@ export interface ProjectRow {
   close_reason: string | null;
   created_by: UUID;
   created_at: string;
+  /** Who accepted this project when it was proposed. Null for one started active or still proposed; equal to `created_by` when the proposer was the only owner or architect. Set by `atlas.set_project_status` only. */
+  accepted_by: UUID | null;
+  /** When it was accepted; null exactly when `accepted_by` is. */
+  accepted_at: string | null;
 }
 
 /** The literal shape of a row in `project_links` — primary key `(project_id, linked_type, linked_id)`, so no `id` of its own. */

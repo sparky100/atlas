@@ -69,7 +69,7 @@ create policy project_links_delete on project_links
   using (exists (select 1 from projects p where p.id = project_links.project_id and p.status in ('proposed', 'active', 'on_hold') and atlas.can_edit_project(p)));
 
 -- Same rules as before for active, on_hold, closed and cancelled, plus:
---   proposed -> active   only an org owner or architect (never the proposer alone)
+--   proposed -> active   only an org owner or architect (the proposer-cannot-accept rule was NOT enforced here; 20261120020000 adds it)
 --   proposed -> cancelled  declining, with a reason; still refused while anything is open (P4)
 --   proposed -> on_hold or closed   refused: accept or decline first
 --   anything -> proposed   refused: a project is only proposed when created

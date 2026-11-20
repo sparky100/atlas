@@ -119,8 +119,13 @@ describe('projects (ADR-024) against a real local Supabase', () => {
     await service.from('organisations').delete().eq('id', orgId);
   });
 
+  /** An active project created by `by`. A contributor can only propose, so theirs is proposed and then accepted by the architect (the rule under test in "proposed projects"). */
   async function newProject(by: TestUser, title = `Project ${randomUUID().slice(0, 8)}`) {
-    return createProject(by.client, { id: randomUUID(), orgId, modelId, title, purpose: 'Replace the housing CRM.', ownerId: by.id, createdBy: by.id });
+    const started = by.id === owner.id || by.id === architect.id;
+    const project = await createProject(by.client, { id: randomUUID(), orgId, modelId, title, purpose: 'Replace the housing CRM.', ownerId: by.id, createdBy: by.id, ...(started ? {} : { status: 'proposed' as const }) });
+    if (started) return project;
+    await setProjectStatus(architect.client, project.id, 'active');
+    return (await getProject(by.client, project.id)) ?? project;
   }
 
   async function newChange(by: TestUser, projectId: string | null, intent: 'propose' | 'explore' = 'propose'): Promise<BranchRow> {
@@ -134,8 +139,8 @@ describe('projects (ADR-024) against a real local Supabase', () => {
   }
 
   describe('create and read (RLS)', () => {
-    it('a contributor creates a project, always active; members read it; a viewer cannot create; an outsider sees nothing', async () => {
-      const project = await newProject(contributor);
+    it('an architect starts a project active; members read it; a viewer cannot create; an outsider sees nothing', async () => {
+      const project = await newProject(architect);
       expect(project.status).toBe('active');
       expect(project.closed_at).toBeNull();
 
@@ -449,6 +454,54 @@ describe('projects (ADR-024) against a real local Supabase', () => {
       expect((await setProjectStatus(architect.client, project.id, 'active')).status).toBe('updated');
       expect((await getProject(viewer.client, project.id))?.status).toBe('active');
       await expect(setProjectStatus(architect.client, project.id, 'proposed')).rejects.toThrow(/unknown status/);
+    });
+
+    it('a contributor can only propose: an active insert is refused, a proposed one is allowed; an owner or architect may start either; nothing is inserted already accepted', async () => {
+      const row = (by: TestUser, extra: Record<string, unknown>) => ({ id: randomUUID(), org_id: orgId, model_id: modelId, title: `Rule ${randomUUID().slice(0, 8)}`, purpose: '', owner_id: by.id, created_by: by.id, ...extra });
+      expect((await contributor.client.from('projects').insert(row(contributor, { status: 'active' })).select('id')).error).not.toBeNull();
+      expect((await contributor.client.from('projects').insert(row(contributor, {})).select('id')).error).not.toBeNull(); // the column default is active
+      expect((await contributor.client.from('projects').insert(row(contributor, { status: 'proposed' })).select('id')).error).toBeNull();
+      expect((await architect.client.from('projects').insert(row(architect, { status: 'active' })).select('id')).error).toBeNull();
+      expect((await owner.client.from('projects').insert(row(owner, { status: 'proposed' })).select('id')).error).toBeNull();
+      // A project cannot arrive already accepted, whoever inserts it.
+      const accepted = { accepted_by: owner.id, accepted_at: new Date().toISOString() };
+      expect((await architect.client.from('projects').insert(row(architect, { status: 'active', ...accepted })).select('id')).error).not.toBeNull();
+    });
+
+    it('nobody accepts their own proposal while another owner or architect exists; the acceptance records who and when', async () => {
+      const mine = await newProposal(architect);
+      await expect(setProjectStatus(architect.client, mine.id, 'active')).rejects.toThrow(/another owner or architect has to accept/);
+      expect((await getProject(viewer.client, mine.id))?.status).toBe('proposed');
+      // The owner is a different person, so the owner may accept it.
+      expect((await setProjectStatus(owner.client, mine.id, 'active')).status).toBe('updated');
+      const accepted = await getProject(viewer.client, mine.id);
+      expect(accepted?.status).toBe('active');
+      expect(accepted?.accepted_by).toBe(owner.id);
+      expect(accepted?.accepted_at).not.toBeNull();
+      expect(accepted?.created_by).toBe(architect.id);
+
+      // A project started active was never accepted by anyone.
+      const started = await newProject(architect);
+      expect(started.accepted_by).toBeNull();
+      expect(started.accepted_at).toBeNull();
+    });
+
+    it('a sole owner may accept their own proposal, and the record shows they did; another organisation cannot accept it', async () => {
+      const solo = await createSignedInUser('projects-solo-owner');
+      const soloOrg = randomUUID();
+      await createOrganisation(solo.client, { id: soloOrg, name: 'Solo Org', slug: `solo-${soloOrg.slice(0, 8)}`, createdBy: solo.id });
+      const soloModel = randomUUID();
+      await createModel(solo.client, { id: soloModel, orgId: soloOrg, name: 'Solo Model', slug: `solo-model-${soloModel.slice(0, 8)}`, createdBy: solo.id });
+      const proposal = await createProject(solo.client, { id: randomUUID(), orgId: soloOrg, modelId: soloModel, title: 'Solo proposal', purpose: '', ownerId: solo.id, status: 'proposed', createdBy: solo.id });
+      // A signed-in user from a different organisation (the main test org's architect) cannot accept it.
+      await expect(setProjectStatus(architect.client, proposal.id, 'active')).rejects.toThrow();
+      const accepted = await setProjectStatus(solo.client, proposal.id, 'active');
+      expect(accepted.status).toBe('updated');
+      const after = await getProject(solo.client, proposal.id);
+      expect(after?.status).toBe('active');
+      expect(after?.accepted_by).toBe(solo.id);
+      expect(after?.accepted_by).toBe(after?.created_by);
+      await service.from('organisations').delete().eq('id', soloOrg);
     });
 
     it('declining needs a reason and becomes cancelled; a project cannot be inserted proposed by a viewer, nor flipped to proposed by a plain update', async () => {

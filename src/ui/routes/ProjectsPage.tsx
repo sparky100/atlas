@@ -16,7 +16,7 @@ import { useSelectedRef } from '../branches/useSelectedRef';
 import { refLabelOf } from '../../db/ref';
 import { useModels } from '../models/useModels';
 import { useMembership } from '../orgs/useMembership';
-import { canStartProject } from '../orgs/roleGates';
+import { canStartProject, canStartProjectActive } from '../orgs/roleGates';
 import { useOrganisationBySlug } from '../orgs/useOrganisationBySlug';
 import styles from './ViewPage.module.css';
 
@@ -70,7 +70,7 @@ export function ProjectsPage() {
             </Text>
           </div>
           <PageIntro>{WORK_COPY.project}</PageIntro>
-          <ProjectsView modelId={model.id} orgId={organisation?.id ?? ''} userId={userId} orgSlug={orgSlug ?? ''} modelSlug={model.slug} canCreate={canCreate} prefill={prefill} />
+          <ProjectsView modelId={model.id} orgId={organisation?.id ?? ''} userId={userId} orgSlug={orgSlug ?? ''} modelSlug={model.slug} canCreate={canCreate} canStartActive={canStartProjectActive(role)} prefill={prefill} />
         </main>
       </div>
     </div>

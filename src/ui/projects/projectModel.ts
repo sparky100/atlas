@@ -195,3 +195,48 @@ export function openItemsBlockingClose(changes: readonly BranchRow[], decisions:
     decisions: decisions.filter((d) => d.status === 'proposed'),
   };
 }
+
+/** The people who could accept a proposed project: org owners and architects. */
+export interface ProjectApprover {
+  userId: UUID;
+  name: string;
+}
+
+export interface ProposalAcceptance {
+  /** This person can accept it now. */
+  canAccept: boolean;
+  /** Why not, or a note about accepting, in plain words. Null when nothing needs saying. */
+  message: string | null;
+}
+
+function namesOf(approvers: readonly ProjectApprover[]): string {
+  return approvers.length > 0 ? ` (${approvers.map((a) => a.name).join(', ')})` : '';
+}
+
+/**
+ * Who may accept a proposed project, mirroring `atlas.set_project_status`: an
+ * owner or architect, and not the person who proposed it unless nobody else
+ * could. `approvers` is every owner and architect in the organisation.
+ */
+export function proposalAcceptance(args: { isApprover: boolean; userId: UUID | null; proposedBy: UUID; approvers: readonly ProjectApprover[] }): ProposalAcceptance {
+  const { isApprover, userId, proposedBy, approvers } = args;
+  const others = approvers.filter((a) => a.userId !== userId);
+  if (!isApprover) return { canAccept: false, message: `Waiting for an owner or architect to accept this proposal${namesOf(approvers)}.` };
+  if (userId !== null && userId === proposedBy) {
+    if (others.length > 0) return { canAccept: false, message: `You proposed this project, so another owner or architect has to accept it${namesOf(others)}.` };
+    return { canAccept: true, message: 'You are the only owner or architect, so you can accept your own proposal. The project will record that you did.' };
+  }
+  return { canAccept: true, message: null };
+}
+
+/** What a person needs to know about how this project came to be active or proposed, for the project page. Empty for a project that was started active. */
+export function proposalHistoryLines(project: Pick<ProjectRow, 'created_by' | 'created_at' | 'status' | 'accepted_by' | 'accepted_at'>, nameOf: (id: UUID) => string): string[] {
+  const proposed = project.status === 'proposed' || project.accepted_by !== null;
+  if (!proposed) return [];
+  const lines = [`Proposed by ${nameOf(project.created_by)} on ${project.created_at.slice(0, 10)}.`];
+  if (project.accepted_by !== null && project.accepted_at !== null) {
+    const who = project.accepted_by === project.created_by ? `${nameOf(project.accepted_by)}, who proposed it (the only owner or architect)` : nameOf(project.accepted_by);
+    lines.push(`Accepted by ${who} on ${project.accepted_at.slice(0, 10)}.`);
+  }
+  return lines;
+}
