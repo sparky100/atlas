@@ -33,8 +33,12 @@ describe('optionDraftActions', () => {
     expect(labels('configure', [], [quote], [])).toEqual([]);
   });
 
-  it('build: create a new system for the capability, with no existing system named', () => {
-    expect(labels('build', [], [quote], ['Connection Quotations'])).toEqual(['Create a new system for Connection Quotations']);
+  it('build: retire the existing system and replace it with a custom-built app', () => {
+    expect(labels('build', [], [quote], ['Connection Quotations'])).toEqual(['Retire Quote Tool and replace it with a custom-built app']);
+  });
+
+  it('build: create a new system only when no existing system is known', () => {
+    expect(labels('build', [], [], ['Connection Quotations'])).toEqual(['Create a new system for Connection Quotations']);
     expect(labels('build', [], [], [])).toEqual(['Create a new system']);
   });
 
