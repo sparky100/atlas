@@ -259,4 +259,7 @@ describe('projectsWaitingForAcceptance', () => {
   it('is zero for someone who cannot accept', () => {
     expect(projectsWaitingForAcceptance(ps, false, 'alex')).toBe(0);
   });
+  it('counts their own proposal too when they are the only owner or architect', () => {
+    expect(projectsWaitingForAcceptance(ps, true, 'alex', false)).toBe(2);
+  });
 });

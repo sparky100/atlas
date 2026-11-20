@@ -4,7 +4,7 @@
  * work in hand, and an owner accepts it, after which it is Active.
  */
 import { expect, test } from '@playwright/test';
-import { addCapability, clickNavItem, signUpCreateOrgAndModel } from './fixtures/goldenPath';
+import { addCapability, clickNavItem, goToModelHome, signUpCreateOrgAndModel } from './fixtures/goldenPath';
 
 test('a project can be proposed and then accepted by an owner', async ({ page }) => {
   test.slow();
@@ -22,6 +22,12 @@ test('a project can be proposed and then accepted by an owner', async ({ page })
   await expect(page.getByRole('heading', { name: 'Repairs improvement', level: 1 })).toBeVisible();
   await expect(page.getByText('This is a proposal.', { exact: false })).toBeVisible();
   await expect(page.getByText('Proposed', { exact: true }).first()).toBeVisible();
+
+  // The proposal is not invisible: Home says it is waiting (this person is the only owner, so can accept their own).
+  await goToModelHome(page);
+  await expect(page.getByTestId('projects-waiting-for-you')).toContainText('1 project is waiting for you to accept it');
+  await page.getByTestId('projects-waiting-for-you').getByRole('link').click();
+  await page.getByRole('link', { name: 'Repairs improvement' }).first().click();
 
   await page.getByRole('button', { name: 'Accept proposal' }).click();
   await expect(page.getByText('This is a proposal.', { exact: false })).toHaveCount(0);

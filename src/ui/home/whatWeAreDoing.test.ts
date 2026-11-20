@@ -89,15 +89,16 @@ const TODAY = '2026-10-04';
 const NO_PROFILES = new Map<string, ProfileRow>();
 
 describe('buildWhatWeAreDoing', () => {
-  it('lists projects in hand only — active, then on hold — never closed or cancelled ones', () => {
+  it('lists projects in hand only — proposed, then active, then on hold — never closed or cancelled ones', () => {
     const projects = [
+      project({ id: 'p-proposed', title: 'Proposed', status: 'proposed' }),
       project({ id: 'p-held', title: 'Held', status: 'on_hold' }),
       project({ id: 'p-closed', title: 'Closed', status: 'closed' }),
       project({ id: 'p-cancelled', title: 'Cancelled', status: 'cancelled' }),
       project({ id: 'p-active', title: 'Active', status: 'active' }),
     ];
     const result = buildWhatWeAreDoing(projects, [], [], NO_PROFILES, TODAY);
-    expect(result.projects.map((p) => p.project.id)).toEqual(['p-active', 'p-held']);
+    expect(result.projects.map((p) => p.project.id)).toEqual(['p-proposed', 'p-active', 'p-held']);
   });
 
   it('orders projects of the same status by target date, none last, then title', () => {

@@ -8,6 +8,7 @@ import { useModels } from '../../models/useModels';
 import { useOrganisationBySlug } from '../../orgs/useOrganisationBySlug';
 import { useOpenChangeCount } from '../../changes/useOpenChangeCount';
 import { useProposedDecisionCount } from '../../decisions/useProposedDecisionCount';
+import { useProposedProjectCount } from '../../projects/useProposedProjectCount';
 import { SearchDialog } from '../../search/SearchDialog';
 import { useSelectedRef } from '../../branches/useSelectedRef';
 import { isViewingMode } from '../../branches/viewingMode';
@@ -146,6 +147,7 @@ export function ModelNav({ orgSlug, modelSlug }: ModelNavProps) {
   const modelId = models.find((m) => m.slug === modelSlug)?.id ?? null;
   const openChangeCount = useOpenChangeCount(modelId);
   const proposedDecisionCount = useProposedDecisionCount(modelId);
+  const proposedProjectCount = useProposedProjectCount(modelId);
   const viewing = isViewingMode(searchParams);
   const refParam = refQueryParam(ref, false);
   const refParamViewing = refQueryParam(ref, viewing);
@@ -215,8 +217,8 @@ export function ModelNav({ orgSlug, modelSlug }: ModelNavProps) {
   const navRef = useRef<HTMLElement>(null);
   // The More button names the current section when it's one of the sheet's.
   const moreCurrentLabel = activeSection !== null && !BAR_SECTIONS.includes(activeSection) ? SECTION_LABELS[activeSection] : null;
-  // A count on a section behind More (today only Decisions) puts a dot on the More button, so a phone user can see there's something inside.
-  const moreHasCount = !BAR_SECTIONS.includes('decisions') && proposedDecisionCount !== null && proposedDecisionCount > 0;
+  // A count on a section behind More (Decisions, Projects) puts a dot on the More button, so a phone user can see there's something inside.
+  const moreHasCount = (!BAR_SECTIONS.includes('decisions') && proposedDecisionCount !== null && proposedDecisionCount > 0) || (!BAR_SECTIONS.includes('projects') && proposedProjectCount !== null && proposedProjectCount > 0);
 
   useEffect(() => {
     if (!moreOpen) return;
@@ -264,6 +266,7 @@ export function ModelNav({ orgSlug, modelSlug }: ModelNavProps) {
           </span>
         )}
         {section === 'changes' && openChangeCount !== null && openChangeCount > 0 && <CountBadge count={openChangeCount} singular="change" plural="changes" />}
+        {section === 'projects' && proposedProjectCount !== null && proposedProjectCount > 0 && <CountBadge count={proposedProjectCount} singular="proposed" plural="proposed" />}
         {section === 'decisions' && proposedDecisionCount !== null && proposedDecisionCount > 0 && <CountBadge count={proposedDecisionCount} singular="proposed" plural="proposed" />}
       </Link>
     );

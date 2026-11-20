@@ -13,8 +13,8 @@ import { isDecisionOverdue, projectProgress, type ProjectProgress } from '../pro
  * proposal — is My work's and the Changes page's, not a briefing's.
  */
 
-/** Projects still in hand: active ones, and on-hold ones (paused, not finished). */
-const IN_HAND_PROJECT_STATUSES: readonly ProjectRow['status'][] = ['active', 'on_hold'];
+/** Projects still in hand: proposed ones (waiting for someone to accept them), active ones, and on-hold ones (paused, not finished). */
+const IN_HAND_PROJECT_STATUSES: readonly ProjectRow['status'][] = ['proposed', 'active', 'on_hold'];
 
 export interface ProjectSummary {
   project: ProjectRow;
@@ -75,7 +75,7 @@ export function buildWhatWeAreDoing(
         nextDecisionDue: upcoming[0] ?? null,
       };
     })
-    // Active before on hold; then by target date (none last), then title.
+    // Proposed first (they are waiting), then active, then on hold; then by target date (none last), then title.
     .sort(
       (a, b) =>
         IN_HAND_PROJECT_STATUSES.indexOf(a.project.status) - IN_HAND_PROJECT_STATUSES.indexOf(b.project.status) ||

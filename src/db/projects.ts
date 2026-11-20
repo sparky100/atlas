@@ -253,3 +253,11 @@ export async function isDecisionOption(supabase: Client, branchId: UUID): Promis
   if (error) throw new Error(`isDecisionOption: ${error.message}`);
   return (count ?? 0) > 0;
 }
+
+/** How many projects on this model are proposed and still waiting for someone to accept them — the Projects nav item's badge. */
+export async function countProposedProjects(supabase: Client, modelId: UUID): Promise<number> {
+  assertRealId('countProposedProjects', 'model_id', modelId);
+  const { count, error } = await supabase.from('projects').select('id', { count: 'exact', head: true }).eq('model_id', modelId).eq('status', 'proposed');
+  if (error) throw new Error(`countProposedProjects: ${error.message}`);
+  return count ?? 0;
+}
