@@ -61,7 +61,7 @@ export function SavedReportView({ report, modelName, orgId, modelId, userId, rol
         </Text>
       )}
       <Text as="p" size="sm" tone="muted">
-        {report.visibility === 'organisation' ? 'Shared with the organisation' : 'Private to you'} · read from the live model
+        {report.visibility === 'organisation' ? 'Shared with the organisation' : 'Private to you'} · live model · last edited {new Date(report.updated_at).toLocaleDateString()}
       </Text>
       <ReportRunner key={main.headCommitId} source={parsed.spec.source} modelId={modelId} orgId={orgId} commitId={main.headCommitId}>
         {(rows, knownFields) => (

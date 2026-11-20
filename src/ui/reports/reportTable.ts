@@ -25,6 +25,7 @@ const FIELD_LABELS: Readonly<Record<string, string>> = {
   fit: 'Fit',
   capabilities: 'Capabilities served',
   signals: 'Signals',
+  sourcing: 'Sourcing',
   from: 'From',
   to: 'To',
   description: 'Description',
