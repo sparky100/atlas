@@ -79,6 +79,6 @@ test('an empty Keep option offers no starter edit', async ({ page }) => {
   test.slow();
   await startDecisionOnQuoteTool(page, 'optionkeep');
   await openOptionDraft(page, 'Keep and tidy up');
-  await expect(page.getByText('Nothing has been changed yet.')).toBeVisible();
+  await expect(page.getByText('No change to the landscape recorded.')).toBeVisible();
   await expect(page.getByTestId('option-draft-card')).toHaveCount(0);
 });

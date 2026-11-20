@@ -22,6 +22,7 @@ import { supabase } from '../supabaseClient';
 import { refQueryParam } from '../../db/ref';
 import { ElementNamedText } from './ElementNamedText';
 import { OptionAiMark } from './OptionAiMark';
+import { optionKindOf } from './optionDraftActions';
 import { OptionDraftCard } from './OptionDraftCard';
 import { dateFieldLabelForIntent, intentReviewWeight, isDateRequiredForIntent } from './branchIntent';
 import { branchStatusTone } from './branchStatus';
@@ -202,6 +203,9 @@ export function ChangeView({ orgId, modelId, branchId, orgSlug, modelSlug, role,
   // An "explore" change is an option of a decision, not a change proposal: it leads with what it is and one way to start,
   // and review (submit, the approval track) only appears once it has edits to review.
   const isOption = branch.intent === 'explore';
+  // "Keep and tidy up" and "Configure what we already run" often change nothing in the model; say so rather than imply something is missing.
+  const optionKind = isOption ? optionKindOf(branch.title ?? branch.name) : null;
+  const noLandscapeChange = optionKind === 'keep' || optionKind === 'configure';
   const showSubmit = canSubmit && (!isOption || hasEdits);
   const submitIsPrimary = canSubmit && hasEdits;
   const editIsPrimary = canEdit && branch.status === 'draft' && !isSelected && !submitIsPrimary;
@@ -551,12 +555,25 @@ export function ChangeView({ orgId, modelId, branchId, orgSlug, modelSlug, role,
           )}
           {summaryState.status === 'ready' && summaryState.summary.subjects.length === 0 && importSummary.state.status === 'none' && canEdit && branch.status === 'draft' && (
             <div className={styles.nextStep}>
-              <Text as="p" size="lg">
-                Nothing has been changed yet.
-              </Text>
-              <Text as="p" tone="muted" size="sm">
-                Open a system, make your edit and save it. It will appear here, together with what it affects.
-              </Text>
+              {noLandscapeChange ? (
+                <>
+                  <Text as="p" size="lg">
+                    No change to the landscape recorded.
+                  </Text>
+                  <Text as="p" tone="muted" size="sm">
+                    This option works with what we already run, so it may need no change to the model. If it does, open a system, make your edit and save it, and it will appear here, together with what it affects.
+                  </Text>
+                </>
+              ) : (
+                <>
+                  <Text as="p" size="lg">
+                    Nothing has been changed yet.
+                  </Text>
+                  <Text as="p" tone="muted" size="sm">
+                    Open a system, make your edit and save it. It will appear here, together with what it affects.
+                  </Text>
+                </>
+              )}
               <OptionDraftCard branch={branch} mainHeadCommitId={branch.head_commit_id} orgSlug={orgSlug} modelSlug={modelSlug} />
               <LinkButton to={editInLandscapeHref} variant={isSelected ? 'primary' : 'secondary'}>
                 {isSelected ? 'Carry on editing' : 'Open the landscape to edit'}
