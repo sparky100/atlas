@@ -52,7 +52,7 @@ import { DraftWithAi } from '../changes/DraftWithAi';
 import { ProposeChangePicker } from '../home/ProposeChangePicker';
 import { useModels } from '../models/useModels';
 import { canCreateChangeBranch, canEditBranch, canEditValueStreamStructure, useMembership } from '../orgs/useMembership';
-import { canEditGoals, canEditOnMain, canStartProject } from '../orgs/roleGates';
+import { canEditGoals, canEditOnMain, canStartProject, canStartProjectActive } from '../orgs/roleGates';
 import { canStartDecision } from '../orgs/useMembership';
 import { startDecisionFromElementHref } from '../decisions/decisionPrefill';
 import { startProjectFromElementHref } from '../projects/projectPrefill';
@@ -449,6 +449,7 @@ export function ElementPage() {
                   ? startProjectFromElementHref(`/o/${orgSlug ?? ''}/m/${model.slug}/projects`, { id: state.data.element.element_id, name: state.data.element.name, type: state.data.element.element_type })
                   : undefined
               }
+              startProjectLabel={canStartProjectActive(role) ? undefined : 'Propose a project…'}
             />
             {attestation.error !== null && (
               <div role="alert">

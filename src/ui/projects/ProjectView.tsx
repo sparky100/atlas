@@ -37,6 +37,9 @@ import {
   scopeDifference,
   projectIsOpen,
   PROPOSED_PROJECT_EXPLAINER,
+  proposalAcceptance,
+  proposalHistoryLines,
+  type ProposalAcceptance,
 } from './projectModel';
 import { loadProjectPack } from '../exports/loadProjectPack';
 import { markdownToPdfBytes } from '../exports/markdownPdf';
@@ -130,13 +133,13 @@ export function ProjectView({ data, modelName, orgId, modelId, orgSlug, modelSlu
 
   return (
     <div className={styles.page}>
-      <ProjectHeader project={project} ownerName={nameOfUser(project.owner_id)} managerName={project.project_manager_id ? nameOfUser(project.project_manager_id) : project.project_manager_name} progress={progress} />
+      <ProjectHeader project={project} ownerName={nameOfUser(project.owner_id)} managerName={project.project_manager_id ? nameOfUser(project.project_manager_id) : project.project_manager_name} progress={progress} proposalHistory={proposalHistoryLines(project, nameOfUser)} />
 
       <ProjectPackActions data={data} modelId={modelId} modelName={modelName} nameOfUser={nameOfUser} />
 
       {canEdit && <ProjectEditPanel project={project} members={members.map((m) => ({ id: m.member.user_id, label: profileLabel(m.profile) }))} onSaved={reload} />}
 
-      {canEdit && <ProjectStatusPanel project={project} changes={changes} decisions={decisions} base={base} canAccept={canAcceptProject(role)} onChanged={reload} />}
+      {canEdit && <ProjectStatusPanel project={project} changes={changes} decisions={decisions} base={base} acceptance={proposalAcceptance({ isApprover: canAcceptProject(role), userId, proposedBy: project.created_by, approvers: members.filter((m) => m.member.role === 'owner' || m.member.role === 'architect').map((m) => ({ userId: m.member.user_id, name: profileLabel(m.profile) })) })} onChanged={reload} />}
 
       {!isOpen && (
         <Panel>
@@ -436,7 +439,7 @@ function ProjectPackActions({ data, modelId, modelName, nameOfUser }: { data: Pr
   );
 }
 
-function ProjectHeader({ project, ownerName, managerName, progress }: { project: ProjectRow; ownerName: string; managerName: string | null; progress: ReturnType<typeof projectProgress> }) {
+function ProjectHeader({ project, ownerName, managerName, progress, proposalHistory }: { project: ProjectRow; ownerName: string; managerName: string | null; progress: ReturnType<typeof projectProgress>; proposalHistory: readonly string[] }) {
   return (
     <div className={styles.header}>
       <div className={styles.meta}>
@@ -462,6 +465,15 @@ function ProjectHeader({ project, ownerName, managerName, progress }: { project:
         <Text as="p" size="sm">
           This is a proposal. {PROPOSED_PROJECT_EXPLAINER}
         </Text>
+      )}
+      {proposalHistory.length > 0 && (
+        <div data-testid="project-proposal-history">
+          {proposalHistory.map((line) => (
+            <Text key={line} as="p" size="sm" tone="muted">
+              {line}
+            </Text>
+          ))}
+        </div>
       )}
       {project.purpose !== '' && <Text as="p">{project.purpose}</Text>}
       {findingLabel(project.source_finding_key) !== null && (
@@ -887,7 +899,7 @@ function ProjectEditPanel({ project, members, onSaved }: { project: ProjectRow; 
  * each linking to its own page where its own existing action ends it — the
  * project never cancels anything itself.
  */
-function ProjectStatusPanel({ project, changes, decisions, base, canAccept, onChanged }: { project: ProjectRow; changes: BranchRow[]; decisions: DecisionRow[]; base: string; canAccept: boolean; onChanged: () => void }) {
+function ProjectStatusPanel({ project, changes, decisions, base, acceptance, onChanged }: { project: ProjectRow; changes: BranchRow[]; decisions: DecisionRow[]; base: string; acceptance: ProposalAcceptance; onChanged: () => void }) {
   const [reason, setReason] = useState('');
   const [mode, setMode] = useState<'idle' | 'cancelling'>('idle');
   const [error, setError] = useState<string | null>(null);
@@ -919,7 +931,7 @@ function ProjectStatusPanel({ project, changes, decisions, base, canAccept, onCh
         Status
       </Text>
       <div className={styles.meta}>
-        {project.status === 'proposed' && canAccept && (
+        {project.status === 'proposed' && acceptance.canAccept && (
           <Button
             variant="primary"
             onClick={() => {
@@ -929,9 +941,9 @@ function ProjectStatusPanel({ project, changes, decisions, base, canAccept, onCh
             Accept proposal
           </Button>
         )}
-        {project.status === 'proposed' && !canAccept && (
+        {project.status === 'proposed' && acceptance.message !== null && (
           <Text as="p" size="sm" tone="muted">
-            Waiting for an owner or architect to accept this proposal.
+            {acceptance.message}
           </Text>
         )}
         {project.status === 'active' && (

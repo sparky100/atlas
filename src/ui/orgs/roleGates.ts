@@ -150,6 +150,11 @@ export function canStartProject(role: MemberRole | null): boolean {
   return canCreateChangeBranch(role);
 }
 
+/** Mirrors `projects_insert` (Simon, 2026-11-20): only an owner or architect starts a project outright; a contributor can only propose one. */
+export function canStartProjectActive(role: MemberRole | null): boolean {
+  return role === 'owner' || role === 'architect';
+}
+
 /** F10 (ADR-024 §4): mirrors `atlas.can_edit_project` — the project's creator or owner, or an org owner/architect, while the project is open. */
 export function canEditProject(role: MemberRole | null, project: ProjectRow, userId: UUID | null): boolean {
   if (role === null || role === 'viewer') return false;
@@ -157,7 +162,7 @@ export function canEditProject(role: MemberRole | null, project: ProjectRow, use
   return role === 'owner' || role === 'architect' || (userId !== null && (project.created_by === userId || project.owner_id === userId));
 }
 
-/** Phase B2: mirrors `atlas.set_project_status`'s accept rule: only an org owner or architect accepts a proposed project, never the proposer alone. */
+/** Phase B2: mirrors `atlas.set_project_status`'s accept rule: only an org owner or architect accepts a proposed project, and not the proposer unless nobody else could (see `proposalAcceptance`). */
 export function canAcceptProject(role: MemberRole | null): boolean {
   return role === 'owner' || role === 'architect';
 }

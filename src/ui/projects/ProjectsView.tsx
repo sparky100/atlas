@@ -30,6 +30,8 @@ export interface ProjectsViewProps {
   modelSlug: string;
   /** `projects_insert`'s floor — the form is omitted, not disabled, when false. */
   canCreate: boolean;
+  /** Owner or architect: may start a project outright. Anyone else who can create one (a contributor) can only propose it. Defaults to true. */
+  canStartActive?: boolean;
   /** F10 step 7: "Start a project" from a health finding or an element page opens the form filled in. */
   prefill: DecisionPrefill | null;
 }
@@ -39,7 +41,7 @@ export interface ProjectsViewProps {
  * work first — and the "Start a project" form (title, purpose, owner,
  * dates, optional declared scope).
  */
-export function ProjectsView({ modelId, orgId, userId, orgSlug, modelSlug, canCreate, prefill }: ProjectsViewProps) {
+export function ProjectsView({ modelId, orgId, userId, orgSlug, modelSlug, canCreate, canStartActive = true, prefill }: ProjectsViewProps) {
   const navigate = useNavigate();
   const { status, projects, error, createProjectWithScope } = useProjects(modelId, orgId, userId);
   const { branch: main } = useMainBranch(modelId);
@@ -52,7 +54,9 @@ export function ProjectsView({ modelId, orgId, userId, orgSlug, modelSlug, canCr
   const [startDate, setStartDate] = useState('');
   const [targetDate, setTargetDate] = useState('');
   const [scope, setScope] = useState<ProjectScopeItem[]>(() => initial?.scope ?? []);
-  const [asProposal, setAsProposal] = useState(false);
+  const [proposalChoice, setAsProposal] = useState(false);
+  // A contributor can only propose; an owner or architect chooses.
+  const asProposal = !canStartActive || proposalChoice;
   const supportNotices = useSupportedCapabilities(main?.head_commit_id ?? null, scope, setScope);
   const groups = groupProjectsByStatus(projects);
   // Plan A1 / Simon's rule: a project must name at least one capability.
@@ -63,7 +67,7 @@ export function ProjectsView({ modelId, orgId, userId, orgSlug, modelSlug, canCr
       {canCreate && (
         <Panel>
           <Text as="h2" size="lg">
-            Start a project
+            {canStartActive ? 'Start a project' : 'Propose a project'}
           </Text>
           <form
             className={styles.form}
@@ -194,21 +198,25 @@ export function ProjectsView({ modelId, orgId, userId, orgSlug, modelSlug, canCr
                 Name at least one capability this project serves — a project can’t stand apart from a capability.
               </Text>
             )}
-            <label>
-              <input
-                type="checkbox"
-                checked={asProposal}
-                onChange={(e) => {
-                  setAsProposal(e.target.checked);
-                }}
-              />{' '}
-              <Text as="span" size="sm">
-                Start as a proposal
+            {canStartActive && (
+              <label>
+                <input
+                  type="checkbox"
+                  checked={asProposal}
+                  onChange={(e) => {
+                    setAsProposal(e.target.checked);
+                  }}
+                />{' '}
+                <Text as="span" size="sm">
+                  Start as a proposal
+                </Text>
+              </label>
+            )}
+            <div data-testid="project-proposal-note">
+              <Text as="p" size="sm" tone="muted">
+                {canStartActive ? PROPOSED_PROJECT_EXPLAINER : `You can propose a project; an owner or architect decides whether it goes ahead. ${PROPOSED_PROJECT_EXPLAINER}`}
               </Text>
-            </label>
-            <Text as="p" size="sm" tone="muted">
-              {PROPOSED_PROJECT_EXPLAINER}
-            </Text>
+            </div>
             <Button variant="primary" type="submit" disabled={status === 'creating' || !ownerId || title.trim().length === 0 || !hasCapability}>
               {status === 'creating' ? 'Starting…' : asProposal ? 'Propose project' : 'Start project'}
             </Button>

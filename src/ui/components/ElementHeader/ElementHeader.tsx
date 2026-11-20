@@ -103,6 +103,8 @@ export interface ElementHeaderProps {
   startDecisionHref?: string | undefined;
   /** F10 step 7 (ADR-024 §6.4): "Start a project…" with this element as declared scope — a `/projects?…` link, present only for a capability, system or container and a role that may start one. */
   startProjectHref?: string | null | undefined;
+  /** What the menu item says; "Propose a project…" for a role that can only propose one. Defaults to "Start a project…". */
+  startProjectLabel?: string | undefined;
   /**
    * ADR-023/F6's "a stream is deactivated, never deleted" — a value stream
    * only (never a stage; a stage follows its own stream), same
@@ -188,7 +190,7 @@ export interface ElementHeaderProps {
  * and adds "Retire…" (`onRetire`, system only) — both live in this same
  * overflow menu, not a standalone row.
  */
-export function ElementHeader({ element, existsFact, existsSource, onEdit, onConfirmStillAccurate, confirming, onProposeChange, rename, onRetire, onRemoveFromModel, onMerge, onConvertToModule, onDeactivate, onReactivate, readOnlyReason, interfacePlatform, lifecycleTag, completeness, contextHref, roadmapHref, startProjectHref, startDecisionHref }: ElementHeaderProps) {
+export function ElementHeader({ element, existsFact, existsSource, onEdit, onConfirmStillAccurate, confirming, onProposeChange, rename, onRetire, onRemoveFromModel, onMerge, onConvertToModule, onDeactivate, onReactivate, readOnlyReason, interfacePlatform, lifecycleTag, completeness, contextHref, roadmapHref, startProjectHref, startProjectLabel, startDecisionHref }: ElementHeaderProps) {
   const [menuOpen, setMenuOpen] = useState(false);
   const menuId = useId();
   const menuRef = useRef<HTMLDivElement>(null);
@@ -358,7 +360,7 @@ export function ElementHeader({ element, existsFact, existsSource, onEdit, onCon
                   setMenuOpen(false);
                 }}
               >
-                <Text as="span">Start a project…</Text>
+                <Text as="span">{startProjectLabel ?? 'Start a project…'}</Text>
               </Link>
             )}
             {(startProjectHref ?? startDecisionHref) && (onRetire ?? onMerge ?? onConvertToModule) && <div className={styles.menuDivider} role="separator" />}

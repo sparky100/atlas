@@ -13,7 +13,8 @@ import type { ElementsHeadRow } from '../../contracts/rows';
 import type { BranchRow, MemberRole } from '../../db/types';
 import type { BoundaryCrossing, ExternalInterfaceCrossing, ExternalOrganisationAccess, PlatformFlowEndpoint, UnlabeledVerbRelationship } from '../../db/healthFindings';
 import { formatDate, formatRelativeTime } from '../time';
-import { formatProjectProgress, projectStatusLabel, projectStatusTone } from '../projects/projectModel';
+import { formatProjectProgress, projectStatusLabel, projectStatusTone, projectsWaitingForAcceptance } from '../projects/projectModel';
+import { useAuth } from '../auth/useAuth';
 import { branchStatusTone } from '../changes/branchStatus';
 import { buildMyWorkRows, decisionOptions, myWorkDetail, projectChildren } from './myWork';
 import {
@@ -28,7 +29,7 @@ import { canStartDecision } from '../orgs/useMembership';
 import { GoalsWithoutCapabilityNote } from '../goals/GoalsWithoutCapabilityNote';
 import { PrincipleDeparturesNote } from '../principles/PrincipleDeparturesNote';
 import { attributesRecord } from '../elements/attributesRecord';
-import { canStartProject } from '../orgs/roleGates';
+import { canAcceptProject, canStartProject } from '../orgs/roleGates';
 import { useOrganisationBySlug } from '../orgs/useOrganisationBySlug';
 import { canOfferDesigner, designerUnavailableReason } from '../decisions/designerRequest';
 import { selectRecentActivity, splitActivitySubjects, type GroupedActivityItem } from './groupRecentActivity';
@@ -188,6 +189,8 @@ export function ArchitectHome({ data, modelId, mainCommitIdHint, insights, role,
   const designerOffered = canOfferDesigner(designerArgs);
   const designerWhyNot = designerUnavailableReason(designerArgs);
   const now = new Date();
+  const { userId: homeUserId } = useAuth();
+  const waitingProjects = projectsWaitingForAcceptance(data.allProjects, canAcceptProject(role), homeUserId);
   // E8 item (4): `null` while Health findings/Recent activity are still
   // loading (or failed) — every array below built from it defaults to
   // empty in that case, and the panels that show them render a muted
@@ -624,6 +627,15 @@ export function ArchitectHome({ data, modelId, mainCommitIdHint, insights, role,
 
   return (
     <div>
+      {waitingProjects > 0 ? (
+        <div data-testid="projects-waiting-for-you">
+          <Text as="p">
+            <Link to={`${modelHref}/projects`}>
+              {waitingProjects === 1 ? '1 project is waiting for you to accept it →' : `${String(waitingProjects)} projects are waiting for you to accept them →`}
+            </Link>
+          </Text>
+        </div>
+      ) : null}
       {/* Item 1: the same big-number/muted-label stat style the director
           door's own `.statsRow` uses — see this component's own module
           comment for what each of the four numbers counts and why. */}
