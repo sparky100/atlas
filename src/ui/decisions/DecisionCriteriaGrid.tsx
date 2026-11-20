@@ -39,6 +39,8 @@ export interface DecisionCriteriaGridProps {
   /** The model's head commit, used to read the names of elements an older saved description still cites. */
   commitId?: UUID | null;
   onChoose: (branchId: UUID) => void;
+  /** Shown above the grid when this person cannot choose (not an owner or architect), so a missing Choose button is explained. `null` when they can, or the decision is no longer open. */
+  chooseNote?: string | null;
   /** `canCreateChangeBranch(role)` at the call site, ungated by `decision.status` (unlike `canAddOption`/`canChoose`) — this action is only ever offered on the *chosen* option, which by definition means the decision has already moved past `proposed`. */
   canWorkOnChange: boolean;
   /** Selects this branch as the session's editing ref and navigates to its change page — the exact "Edit in this change" mechanism `ChangePage.tsx` already offers, reused rather than reinvented (item 5: "using the existing 'Work in this change' flow"). */
@@ -91,7 +93,7 @@ function stripExploringPrefix(label: string): string {
  * only ever gets the person *into* the change workspace, never repeats
  * that flip.
  */
-export function DecisionCriteriaGrid({ decisionId, options, canRate, userId, neededBy, orgSlug, modelSlug, commitId, onChoose, canWorkOnChange, onWorkOnThisChange, ratingsState }: DecisionCriteriaGridProps) {
+export function DecisionCriteriaGrid({ decisionId, options, canRate, userId, neededBy, orgSlug, modelSlug, commitId, onChoose, chooseNote, canWorkOnChange, onWorkOnThisChange, ratingsState }: DecisionCriteriaGridProps) {
   const ratings = ratingsState.ratings;
   const [editing, setEditing] = useState<EditingCell | null>(null);
   const [levelDraft, setLevelDraft] = useState<DecisionRatingLevel | null>(null);
@@ -128,6 +130,11 @@ export function DecisionCriteriaGrid({ decisionId, options, canRate, userId, nee
 
   return (
     <div className={styles.wrap} data-testid="decision-criteria-grid">
+      {chooseNote !== undefined && chooseNote !== null && (
+        <Text as="p" size="sm" tone="muted" data-testid="choose-note">
+          {chooseNote}
+        </Text>
+      )}
       <div className={styles.tableWrap}>
         <table className={styles.grid}>
           <thead>

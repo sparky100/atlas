@@ -35,6 +35,8 @@ export interface NextStepInput {
   decisions: readonly { id: string; title: string; status: string }[];
   changes: readonly { id: string; title: string | null; name: string; status: string }[];
   canStartDecision: boolean;
+  /** Owners and architects choose; others compare and hand over. Defaults to true. */
+  canChoose?: boolean;
   canCreateChange: boolean;
   /** The live model has a head to branch from; a change can't be drafted without one. */
   canDraftChange: boolean;
@@ -61,7 +63,9 @@ export function projectNextStep(input: NextStepInput): NextStep | null {
   }
   const firstProposed = proposed[0];
   if (chosen.length === 0 && firstProposed) {
-    return { kind: 'compare', title: 'Compare your options and choose', body: `No option is chosen yet. ${proposed.length === 1 ? 'One decision is' : `${String(proposed.length)} decisions are`} open. Add options, compare what each changes, then choose and give your reasons.`, action: { kind: 'open-decision', id: firstProposed.id, label: `Open ${firstProposed.title}` } };
+    const open = proposed.length === 1 ? 'One decision is' : `${String(proposed.length)} decisions are`;
+    const canChoose = input.canChoose ?? true;
+    return { kind: 'compare', title: canChoose ? 'Compare your options and choose' : 'Compare your options', body: canChoose ? `No option is chosen yet. ${open} open. Add options, compare what each changes, then choose and give your reasons.` : `No option is chosen yet. ${open} open. Add options and compare what each changes. An owner or architect makes the choice.`, action: { kind: 'open-decision', id: firstProposed.id, label: `Open ${firstProposed.title}` } };
   }
   if (chosen.length === 0) {
     // Decisions exist but every one was rejected, superseded or cancelled: nothing was chosen, so there is no choice to carry out.
