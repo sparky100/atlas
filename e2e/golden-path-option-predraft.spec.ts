@@ -6,7 +6,7 @@
  * the Retire panel on that change (with its "Replaced by…" choice) and saves nothing.
  */
 import { expect, test, type Page } from '@playwright/test';
-import { addCapability, addSystemFromHome, goToModelHome, signUpCreateOrgAndModel } from './fixtures/goldenPath';
+import { addCapability, addSystemFromHome, clickNavItem, goToModelHome, signUpCreateOrgAndModel } from './fixtures/goldenPath';
 
 async function startDecisionOnQuoteTool(page: Page, handle: string) {
   await signUpCreateOrgAndModel(page, handle);
@@ -73,6 +73,25 @@ test('an empty Build option offers to retire the existing system and replace it 
   await expect(banner.getByRole('button', { name: 'Submit for review' })).toHaveCount(0);
   await banner.getByRole('link', { name: 'Back to the decision' }).click();
   await expect(page).toHaveURL(/\/decisions\//);
+
+  // Back at the decision, the option's editing context is left behind: no
+  // editing banner, and no "Back to the decision" button pointing at this
+  // same page (the loop this regression exists for).
+  await expect(page.getByRole('heading', { name: 'Keep, link or retire Quote Tool?' })).toBeVisible();
+  await expect(page.getByRole('status').filter({ hasText: 'Editing in change' })).toHaveCount(0);
+  await expect(page.getByRole('link', { name: 'Back to the decision' })).toHaveCount(0);
+
+  // Arriving by nav with the option selected lands the same way: re-open the
+  // option for editing (the banner's back link is still offered there), then
+  // return via the Decisions nav instead of the banner.
+  await page.getByRole('button', { name: 'Edit this change' }).click();
+  await expect(page).toHaveURL(/\/changes\//);
+  await expect(page.getByRole('status').filter({ hasText: 'Editing in change' }).getByRole('link', { name: 'Back to the decision' })).toBeVisible();
+  await clickNavItem(page, 'Decisions');
+  await page.getByRole('link', { name: 'Open →' }).first().click();
+  await expect(page.getByRole('heading', { name: 'Keep, link or retire Quote Tool?' })).toBeVisible();
+  await expect(page.getByRole('status').filter({ hasText: 'Editing in change' })).toHaveCount(0);
+  await expect(page.getByRole('link', { name: 'Back to the decision' })).toHaveCount(0);
 });
 
 test('an empty Keep option offers no starter edit', async ({ page }) => {

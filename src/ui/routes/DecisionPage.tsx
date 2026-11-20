@@ -1,3 +1,4 @@
+import { useEffect } from 'react';
 import { Loading } from '../components/Loading/Loading';
 import { Link, useParams } from 'react-router';
 import { useQuery } from '@tanstack/react-query';
@@ -28,7 +29,7 @@ import styles from './ViewPage.module.css';
 export function DecisionPage() {
   const { orgSlug, modelSlug, decisionId } = useParams<{ orgSlug: string; modelSlug: string; decisionId: string }>();
   const { userId } = useAuth();
-  const { ref } = useSelectedRef();
+  const { ref, clearRef } = useSelectedRef();
   const { label: branchLabel } = useBranchLabel(ref);
 
   const { organisation, loading: orgLoading } = useOrganisationBySlug(orgSlug ?? '');
@@ -44,6 +45,25 @@ export function DecisionPage() {
   const projectId = state.status === 'ready' ? state.decision.project_id : null;
   const project = useQuery({ queryKey: ['decisionPageProject', projectId], enabled: projectId !== null, queryFn: () => (projectId === null ? Promise.resolve(null) : getProject(supabase, projectId)) });
   const title = state.status === 'ready' ? state.decision.title : 'Decision';
+
+  // The decision page is main-context by design ("decisions are model-wide,
+  // never branch-scoped" — `useDecision.ts`'s own comment). Arriving here
+  // with one of this decision's own options still selected used to leave
+  // that editing ref in place, so the shared banner offered "Back to the
+  // decision" — a primary button linking to the page already on screen.
+  // Leave the option's editing context on arrival instead: comparing and
+  // choosing options happens against main, and the option stays one click
+  // away in the grid ("Edit this change"). An option of *another* decision
+  // keeps its ref — the banner's "Back to the decision" still means
+  // something for those. Every setRef on this page navigates away to the
+  // option's own change page, so this never fights a deliberate selection.
+  const ownOptionSelected =
+    state.status === 'ready' &&
+    ref.kind === 'branch' &&
+    state.links.some((l) => l.linked_type === 'branch' && l.linked_id === ref.branchId);
+  useEffect(() => {
+    if (ownOptionSelected) clearRef();
+  }, [ownOptionSelected, clearRef]);
 
   if (orgLoading || modelsLoading || !model) {
     return (
@@ -65,7 +85,7 @@ export function DecisionPage() {
       <div className={navStyles.body}>
         <ModelNav orgSlug={orgSlug ?? ''} modelSlug={modelSlug ?? ''} />
         <main className={styles.main}>
-          <EditingBranchBanner activeRef={ref} modelId={model.id} orgSlug={orgSlug ?? ''} modelSlug={model.slug} showModeShortcuts={false} />
+          <EditingBranchBanner activeRef={ref} modelId={model.id} orgSlug={orgSlug ?? ''} modelSlug={model.slug} showModeShortcuts={false} currentDecisionId={decisionId} />
           <Breadcrumb org={{ label: organisation?.name ?? '', href: `/o/${orgSlug ?? ''}` }} model={{ label: model.name, href: `/o/${orgSlug ?? ''}/m/${model.slug}` }} refLabel={refLabelOf(ref, branchLabel)} />
           {project.data && (
             <Text as="p" size="md" data-testid="decision-parent-project">
