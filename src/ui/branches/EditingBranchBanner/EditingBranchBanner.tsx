@@ -42,6 +42,16 @@ export interface EditingBranchBannerProps {
    * `true`, same convention as `showModeShortcuts` above.
    */
   showSubmitForReview?: boolean;
+  /**
+   * The decision page passes its own decision's id. When the selected
+   * option belongs to that very decision, the banner must not offer
+   * "Back to the decision" — the link would point at the page already on
+   * screen. `DecisionPage` also clears its own option's editing ref on
+   * arrival, so this is the render-time guard for the moment before that
+   * effect runs (and for any future caller that renders the banner on a
+   * decision page without the clearing policy).
+   */
+  currentDecisionId?: UUID | undefined;
 }
 
 /**
@@ -80,7 +90,7 @@ export interface EditingBranchBannerProps {
  * being able to edit into it at all; the banner's job is orientation, not
  * a promise that this exact page is writable).
  */
-export function EditingBranchBanner({ activeRef, modelId, orgSlug, modelSlug, showModeShortcuts = true, showSubmitForReview = true }: EditingBranchBannerProps) {
+export function EditingBranchBanner({ activeRef, modelId, orgSlug, modelSlug, showModeShortcuts = true, showSubmitForReview = true, currentDecisionId }: EditingBranchBannerProps) {
   const [, setSearchParams] = useSearchParams();
   const navigate = useNavigate();
   const { ref, clearRef } = useSelectedRef();
@@ -108,7 +118,9 @@ export function EditingBranchBanner({ activeRef, modelId, orgSlug, modelSlug, sh
   });
 
   if (activeRef.kind !== 'branch') return null;
-  const backToDecision = isOption && optionDecision ? optionDecision : null;
+  // Never offer "Back to the decision" while already on that decision — the
+  // link would point at the page on screen (see `currentDecisionId`).
+  const backToDecision = isOption && optionDecision && optionDecision.id !== currentDecisionId ? optionDecision : null;
 
   const setMode = (mode: ViewMode) => {
     setSearchParams((prev) => {
@@ -175,7 +187,11 @@ export function EditingBranchBanner({ activeRef, modelId, orgSlug, modelSlug, sh
           Back to the decision
         </LinkButton>
       )}
-      {showSubmitForReview && backToDecision === null && branch?.status === 'draft' && (
+      {/* Options never submit from the banner — keyed on `isOption`, not on
+          the back link's presence, so suppressing the link (already on the
+          decision) or waiting for the option's decision to load can never
+          flash a Submit button. */}
+      {showSubmitForReview && !isOption && branch?.status === 'draft' && (
         <Button variant="primary" onClick={submitForReview} disabled={submission.status === 'submitting'}>
           {submission.status === 'submitting' ? 'Submitting…' : 'Submit for review'}
         </Button>
