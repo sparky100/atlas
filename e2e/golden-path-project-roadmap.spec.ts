@@ -44,7 +44,8 @@ test('roadmap grouped by project: the project\'s change lands under the project,
   await page.getByLabel('New change intent').selectOption('record');
   await page.getByLabel('Delivered date').fill(isoDateDaysFromNow(120));
   await page.getByRole('button', { name: 'Start change' }).click();
-  await expect(page.getByRole('link', { name: 'CRM replacement' })).toBeVisible();
+  // The change page names its project twice (above the title and in the project row), so look at the one above the title.
+  await expect(page.getByTestId('change-parents').getByRole('link', { name: 'CRM replacement' })).toBeVisible();
   // "Start change" opens the new change already selected as the editing ref.
   await expect(page.getByRole('button', { name: 'Editing in this change' })).toBeVisible();
 
