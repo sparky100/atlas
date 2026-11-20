@@ -48,4 +48,5 @@ export const queryKeys = {
   /** A decision's sign-offs on its packs (`listDecisionApprovals`). */
   decisionApprovals: (decisionId: UUID) => ['decisions', 'approvals', decisionId] as const,
   proposedDecisionCount: (modelId: UUID | null) => ['decisions', 'proposedCount', modelId] as const,
+  proposedProjectCount: (modelId: UUID | null) => ['projects', 'proposedCount', modelId] as const,
 };

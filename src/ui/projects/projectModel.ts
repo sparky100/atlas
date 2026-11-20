@@ -242,10 +242,11 @@ export function proposalHistoryLines(project: Pick<ProjectRow, 'created_by' | 'c
 }
 
 /**
- * Home's "waiting for you" line for an owner or architect: proposed projects someone else put forward. The person's
- * own proposals are not counted here — they cannot accept them while another approver exists, and the project page says so.
+ * Home's "waiting for you" line for an owner or architect: proposed projects they can accept. Someone else's proposals
+ * always count. Their own count only when no other owner or architect exists, because then they may accept their own
+ * (the project page says so and records it); while another approver exists they cannot, so those are left out.
  */
-export function projectsWaitingForAcceptance(projects: readonly Pick<ProjectRow, 'status' | 'created_by'>[], canAccept: boolean, userId: UUID | null): number {
+export function projectsWaitingForAcceptance(projects: readonly Pick<ProjectRow, 'status' | 'created_by'>[], canAccept: boolean, userId: UUID | null, otherApproverExists = true): number {
   if (!canAccept) return 0;
-  return projects.filter((p) => p.status === 'proposed' && p.created_by !== userId).length;
+  return projects.filter((p) => p.status === 'proposed' && (p.created_by !== userId || !otherApproverExists)).length;
 }

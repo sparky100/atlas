@@ -196,7 +196,8 @@ export function ArchitectHome({ data, modelId, mainCommitIdHint, insights, role,
   const designerWhyNot = designerUnavailableReason({ ...designerArgs, ownerNames: designerOwnerNames });
   const now = new Date();
   const { userId: homeUserId } = useAuth();
-  const waitingProjects = projectsWaitingForAcceptance(data.allProjects, canAcceptProject(role), homeUserId);
+  const otherApproverExists = orgMembers.some((m) => (m.member.role === 'owner' || m.member.role === 'architect') && m.member.user_id !== homeUserId);
+  const waitingProjects = projectsWaitingForAcceptance(data.allProjects, canAcceptProject(role), homeUserId, otherApproverExists);
   // E8 item (4): `null` while Health findings/Recent activity are still
   // loading (or failed) — every array below built from it defaults to
   // empty in that case, and the panels that show them render a muted
