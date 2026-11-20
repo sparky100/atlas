@@ -86,7 +86,7 @@ export function HomeSearch({ modelId, orgId, userId, role, searchCommitId, activ
   const [createType, setCreateType] = useState<ElementType>('system');
   const [sheetOpen, setSheetOpen] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
-  const [addingApplication, setAddingApplication] = useState(false);
+  const [addingApplication, setAddingApplication] = useState(addApplicationRequest > 0);
   const [seenRequest, setSeenRequest] = useState(addApplicationRequest);
   // A new request from the checklist's button: adjust state during render (not in an effect), then move focus below.
   if (seenRequest !== addApplicationRequest) {

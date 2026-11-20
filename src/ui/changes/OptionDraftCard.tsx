@@ -11,7 +11,7 @@ import { LinkButton } from '../components/Button/LinkButton';
 import { Text } from '../components/Text/Text';
 import { reportError } from '../errors/errorBannerStore';
 import { supabase } from '../supabaseClient';
-import { optionDraftActions, optionDraftLabel, type DraftSystem } from './optionDraftActions';
+import { optionDraftActions, optionDraftLabel, optionKindOf, type DraftSystem } from './optionDraftActions';
 
 /** At most this many linked elements and supporters are read, so the lookups stay small (CLAUDE.md rule 8). */
 const MAX_IDS = 50;
@@ -19,11 +19,12 @@ const MAX_IDS = 50;
 /**
  * On an option change with no edits yet: offers the obvious first edits, read from what its decision
  * concerns. Nothing is saved here; each button opens the existing Retire panel (which asks what replaces
- * the system) or the system's edit form, on this change. No AI.
+ * the system), the system's edit form, or the add-a-system box on Home, all on this change. Which ones follow
+ * which option this is (see `optionDraftActions`). No AI.
  */
 export function OptionDraftCard({ branch, mainHeadCommitId, orgSlug, modelSlug }: { branch: BranchRow; mainHeadCommitId: UUID | null; orgSlug: string; modelSlug: string }) {
   const { data } = useQuery({
-    queryKey: ['changes', 'optionDraft', branch.id, mainHeadCommitId],
+    queryKey: ['changes', 'optionDraft', branch.id, branch.title, mainHeadCommitId],
     enabled: mainHeadCommitId !== null && branch.intent === 'explore',
     queryFn: async () => {
       try {
@@ -40,7 +41,7 @@ export function OptionDraftCard({ branch, mainHeadCommitId, orgSlug, modelSlug }
         const supporterIds = [...new Set(edges.map((e) => e.from_element_id))].slice(0, MAX_IDS);
         const supporters = supporterIds.length > 0 ? await getElementsByIds(supabase, commitId, supporterIds) : new Map<UUID, ElementsHeadRow>();
         const supporterSystems: DraftSystem[] = [...supporters.values()].filter((e) => lifecycleStateOf(e, supporters, now) === 'active').map((e) => ({ id: e.element_id, name: e.name }));
-        return optionDraftActions(concernedSystems, supporterSystems, capabilities.map((c) => c.name));
+        return optionDraftActions(optionKindOf(branch.title ?? branch.name), concernedSystems, supporterSystems, capabilities.map((c) => c.name));
       } catch (e) {
         reportError("Couldn't read what this option's decision concerns.", e);
         throw e;
@@ -57,7 +58,11 @@ export function OptionDraftCard({ branch, mainHeadCommitId, orgSlug, modelSlug }
       </Text>
       <div>
         {data.map((action) => (
-          <LinkButton key={`${action.kind}-${action.systemId}`} to={`${base}/e/${action.systemId}?${ref}&action=${action.kind === 'extend' ? 'edit' : 'retire'}`} variant="secondary">
+          <LinkButton
+            key={`${action.kind}-${action.systemId ?? 'new'}`}
+            to={action.systemId === null ? `${base}?${ref}&add=system` : `${base}/e/${action.systemId}?${ref}&action=${action.kind === 'extend' ? 'edit' : 'retire'}`}
+            variant="secondary"
+          >
             {optionDraftLabel(action)}
           </LinkButton>
         ))}

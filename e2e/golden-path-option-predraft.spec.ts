@@ -5,12 +5,11 @@
  * and is offered "Retire Quote Tool and replace it with a new system", which opens
  * the Retire panel on that change (with its "Replaced by…" choice) and saves nothing.
  */
-import { expect, test } from '@playwright/test';
+import { expect, test, type Page } from '@playwright/test';
 import { addCapability, addSystemFromHome, goToModelHome, signUpCreateOrgAndModel } from './fixtures/goldenPath';
 
-test('an empty option offers to retire the system the decision concerns', async ({ page }) => {
-  test.slow();
-  await signUpCreateOrgAndModel(page, 'optionpredraft');
+async function startDecisionOnQuoteTool(page: Page, handle: string) {
+  await signUpCreateOrgAndModel(page, handle);
   await addCapability(page, 'Connect a new customer');
   await goToModelHome(page);
   await addSystemFromHome(page, { name: 'Quote Tool', description: 'Issues connection quotes.' });
@@ -20,17 +19,21 @@ test('an empty option offers to retire the system the decision concerns', async 
   await page.getByRole('combobox').first().selectOption({ index: 1 });
   await page.getByRole('button', { name: 'Start decision' }).click();
   await expect(page.getByRole('heading', { name: 'Keep, link or retire Quote Tool?' })).toBeVisible();
+}
 
+async function openOptionDraft(page: Page, title: string) {
   await page.getByRole('button', { name: '+ Add an option' }).click();
-  await page.getByPlaceholder("What's this option? (e.g. Replace with Workday)").fill('Buy a new quoting product');
+  await page.getByPlaceholder("What's this option? (e.g. Replace with Workday)").fill(title);
   await page.getByRole('button', { name: 'Add option' }).click();
-  await expect(page.getByText('Buy a new quoting product').first()).toBeVisible();
-
-  // With no edits, the option's diagram says so and offers the way back to drafting them.
+  await expect(page.getByText(title).first()).toBeVisible();
   await page.getByRole('link', { name: 'View diagram →' }).first().click();
-  await expect(page.getByTestId('option-diagram-no-edits')).toContainText('No changes yet');
-  await expect(page.getByTestId('option-diagram-no-edits').getByRole('link', { name: 'Draft the obvious edits →' })).toBeVisible();
   await page.getByTestId('option-diagram-no-edits').getByRole('link', { name: 'Draft the obvious edits →' }).click();
+}
+
+test('an empty Replace option offers to retire the system the decision concerns', async ({ page }) => {
+  test.slow();
+  await startDecisionOnQuoteTool(page, 'optionpredraft');
+  await openOptionDraft(page, 'Replace with a product');
 
   const card = page.getByTestId('option-draft-card');
   await expect(card.getByRole('link', { name: 'Retire Quote Tool and replace it with a new system' })).toBeVisible();
@@ -41,4 +44,26 @@ test('an empty option offers to retire the system the decision concerns', async 
   await card.getByRole('link', { name: 'Retire Quote Tool and replace it with a new system' }).click();
   await expect(page).toHaveURL(/action=retire/);
   await expect(page.getByLabel('Planned end', { exact: true })).toBeVisible();
+});
+
+test('an empty Build option offers to create a new system, not to retire or extend one', async ({ page }) => {
+  test.slow();
+  await startDecisionOnQuoteTool(page, 'optionbuild');
+  await openOptionDraft(page, 'Build ourselves');
+
+  const card = page.getByTestId('option-draft-card');
+  await expect(card.getByRole('link', { name: 'Create a new system' })).toBeVisible();
+  await expect(card.getByRole('link', { name: /Retire|Extend/ })).toHaveCount(0);
+
+  await card.getByRole('link', { name: 'Create a new system' }).click();
+  await expect(page).toHaveURL(/add=system/);
+  await expect(page.getByText("Type the application's name.", { exact: false })).toBeVisible();
+});
+
+test('an empty Keep option offers no starter edit', async ({ page }) => {
+  test.slow();
+  await startDecisionOnQuoteTool(page, 'optionkeep');
+  await openOptionDraft(page, 'Keep and tidy up');
+  await expect(page.getByText('Nothing has been changed yet.')).toBeVisible();
+  await expect(page.getByTestId('option-draft-card')).toHaveCount(0);
 });
