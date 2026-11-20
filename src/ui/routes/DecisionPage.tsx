@@ -42,7 +42,7 @@ export function DecisionPage() {
   // worth removing, not just wasteful).
   const { state, applyNewOption, applyNewConcern, applyDecisionUpdate, refreshOptionsAndArguments } = useDecision(model?.id ?? '', decisionId ?? '');
   const projectId = state.status === 'ready' ? state.decision.project_id : null;
-  const project = useQuery({ queryKey: ['decisionPageProject', projectId], enabled: projectId !== null, queryFn: () => getProject(supabase, projectId!) });
+  const project = useQuery({ queryKey: ['decisionPageProject', projectId], enabled: projectId !== null, queryFn: () => (projectId === null ? Promise.resolve(null) : getProject(supabase, projectId)) });
   const title = state.status === 'ready' ? state.decision.title : 'Decision';
 
   if (orgLoading || modelsLoading || !model) {

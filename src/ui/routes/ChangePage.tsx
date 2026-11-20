@@ -65,7 +65,7 @@ import styles from './ViewPage.module.css';
 /** The change is a child: its project and, for an option, its decision come first, above its own title. */
 function ChangeParents({ branch, orgSlug, modelSlug }: { branch: BranchRow; orgSlug: string; modelSlug: string }) {
   const projectId = branch.project_id;
-  const project = useQuery({ queryKey: ['changePageProject', projectId], enabled: projectId !== null, queryFn: () => getProject(supabase, projectId!) });
+  const project = useQuery({ queryKey: ['changePageProject', projectId], enabled: projectId !== null, queryFn: () => (projectId === null ? Promise.resolve(null) : getProject(supabase, projectId)) });
   const decision = useQuery({ queryKey: ['changes', 'originDecision', branch.id], queryFn: () => getDecisionForOption(supabase, branch.id), enabled: branch.kind === 'change' });
   if (!project.data && !decision.data) return null;
   return (
