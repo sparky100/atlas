@@ -14,6 +14,7 @@ import { Text } from '../components/Text/Text';
 import type { DecisionPrefill } from '../decisions/decisionPrefill';
 import { DecisionLinkPicker } from '../decisions/DecisionLinkPicker';
 import { useMembers } from '../orgs/useMembers';
+import { CollapsibleSection } from '../components/CollapsibleSection/CollapsibleSection';
 import { groupProjectsByStatus, PROPOSED_PROJECT_EXPLAINER, projectStatusLabel, projectStatusTone, scopeHasCapability, type ProjectScopeItem } from './projectModel';
 import { ProjectManagerField } from './ProjectManagerField';
 import { NO_PROJECT_MANAGER, projectManagerToInput, type ProjectManagerValue } from './projectManagerValue';
@@ -230,15 +231,13 @@ export function ProjectsView({ modelId, orgId, userId, orgSlug, modelSlug, canCr
       {status === 'loading' && <Loading />}
       {projects.length === 0 && status !== 'loading' && <EmptyState>No projects yet. {canCreate ? 'Start one above.' : 'Nobody has started one.'}</EmptyState>}
       {groups.map((group) => (
-        <section key={group.status} className={styles.group} aria-label={`${projectStatusLabel(group.status)} projects`}>
-          <div className={styles.groupHeading}>
-            <Text as="h2" size="lg">
-              {projectStatusLabel(group.status)}
-            </Text>
-            <Text as="span" tone="muted" size="sm">
-              ({group.projects.length})
-            </Text>
-          </div>
+        <CollapsibleSection
+          key={group.status}
+          title={`${projectStatusLabel(group.status)} projects`}
+          meta={`(${String(group.projects.length)})`}
+          // Work in hand stays open; finished and cancelled projects are one click away.
+          defaultOpen={group.status !== 'cancelled' && group.status !== 'closed'}
+        >
           {group.status === 'proposed' && (
             <Text as="p" size="sm" tone="muted">
               {PROPOSED_PROJECT_EXPLAINER}
@@ -249,7 +248,7 @@ export function ProjectsView({ modelId, orgId, userId, orgSlug, modelSlug, canCr
               <ProjectRowItem key={project.id} project={project} orgSlug={orgSlug} modelSlug={modelSlug} />
             ))}
           </ul>
-        </section>
+        </CollapsibleSection>
       ))}
     </div>
   );
