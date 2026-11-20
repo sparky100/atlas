@@ -198,6 +198,10 @@ export function ChangeView({ orgId, modelId, branchId, orgSlug, modelSlug, role,
   const hasEdits = summaryReady && summaryState.summary.subjects.length > 0;
   const canSubmit = canEdit && branch.status === 'draft' && openRequest === null;
   // One clear main action for the stage the change is in.
+  // An "explore" change is an option of a decision, not a change proposal: it leads with what it is and one way to start,
+  // and review (submit, the approval track) only appears once it has edits to review.
+  const isOption = branch.intent === 'explore';
+  const showSubmit = canSubmit && (!isOption || hasEdits);
   const submitIsPrimary = canSubmit && hasEdits;
   const editIsPrimary = canEdit && branch.status === 'draft' && !isSelected && !submitIsPrimary;
   const oneStepApprove = openRequest && intentReviewWeight(intent) === 'single' && canApproveOrMergeRequest(role) && (openRequest.status === 'pending' || openRequest.status === 'approved');
@@ -217,8 +221,13 @@ export function ChangeView({ orgId, modelId, branchId, orgSlug, modelSlug, role,
         <div className={styles.headerTop}>
           <div className={styles.headerTitle}>
             <Text as="h1" size="2xl">
-              {heading}
+              {isOption ? (branch.title ?? branch.name) : heading}
             </Text>
+            {isOption && (
+              <Text as="p" tone="muted" size="sm">
+                An option for the decision. Nothing in the model changes unless the decision chooses this option and its changes are approved.
+              </Text>
+            )}
             <div className={styles.meta}>
               <Chip tone={branchStatusTone(branch.status)}>{branch.status}</Chip>
               {dateFieldLabel !== null && branch.target_date !== null && (
@@ -232,7 +241,18 @@ export function ChangeView({ orgId, modelId, branchId, orgSlug, modelSlug, role,
             </div>
           </div>
           <div className={styles.headerActions}>
-            {canEdit && branch.status === 'draft' && (
+            {isOption && canEdit && branch.status === 'draft' && (
+              isSelected ? (
+                <Button variant="secondary" disabled>
+                  Editing this option
+                </Button>
+              ) : (
+                <LinkButton to={editInLandscapeHref} variant="primary">
+                  {hasEdits ? 'Carry on editing' : "Draft this option's changes"}
+                </LinkButton>
+              )
+            )}
+            {!isOption && canEdit && branch.status === 'draft' && (
               <Button
                 variant={editIsPrimary ? 'primary' : 'secondary'}
                 disabled={isSelected}
@@ -243,7 +263,7 @@ export function ChangeView({ orgId, modelId, branchId, orgSlug, modelSlug, role,
                 {isSelected ? 'Editing in this change' : 'Edit in this change'}
               </Button>
             )}
-            {canSubmit && (
+            {showSubmit && (
               <Button
                 variant={submitIsPrimary ? 'primary' : 'secondary'}
                 disabled={submission.status === 'submitting'}
@@ -281,9 +301,11 @@ export function ChangeView({ orgId, modelId, branchId, orgSlug, modelSlug, role,
                 Open review →
               </LinkButton>
             )}
-            <Link to={`/o/${orgSlug}/m/${modelSlug}/landscape?${refQueryParam({ kind: 'branch', branchId }, true)}`}>
-              <Button variant="secondary">View this change</Button>
-            </Link>
+            {!isOption && (
+              <Link to={`/o/${orgSlug}/m/${modelSlug}/landscape?${refQueryParam({ kind: 'branch', branchId }, true)}`}>
+                <Button variant="secondary">View this change</Button>
+              </Link>
+            )}
             {canEdit && branch.status === 'draft' && !editing && (
               <Button variant="ghost" onClick={startEditing}>
                 Edit title and description
@@ -297,7 +319,7 @@ export function ChangeView({ orgId, modelId, branchId, orgSlug, modelSlug, role,
                   setCancelling(true);
                 }}
               >
-                Cancel this change…
+                {isOption ? 'Remove this option…' : 'Cancel this change…'}
               </Button>
             )}
           </div>
@@ -305,7 +327,7 @@ export function ChangeView({ orgId, modelId, branchId, orgSlug, modelSlug, role,
         {/* The stepper needs to know whether an open merge request exists;
             `undefined` means still loading, so it waits rather than rendering
             with a momentarily-wrong "no request" assumption. */}
-        {openRequest !== undefined && <Stepper derived={deriveChangeStep(branch, openRequest)} />}
+        {openRequest !== undefined && !(isOption && branch.status === 'draft' && openRequest === null) && <Stepper derived={deriveChangeStep(branch, openRequest)} />}
         {pickingReviewers && (
           <ReviewerPicker
             orgId={orgId}

@@ -45,8 +45,9 @@ test('replacing a costed system with a costed alternative on an option shows the
   await expect(page.getByText(optionTitle).first()).toBeVisible();
 
   await page.getByRole('link', { name: optionTitle }).click();
-  await page.getByRole('button', { name: 'Edit in this change' }).click();
-  await expect(page.getByRole('button', { name: 'Editing in this change' })).toBeVisible();
+  // An option leads with "Draft this option's changes", which opens the landscape on this option (it becomes the editing ref).
+  await page.getByRole('link', { name: "Draft this option's changes" }).click();
+  await expect(page).toHaveURL(/landscape/);
 
   // On the option's own branch: create and cost Hana equivalent, then
   // retire PM naming it as the real replacement.
