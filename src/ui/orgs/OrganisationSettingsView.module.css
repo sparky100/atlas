@@ -58,13 +58,59 @@
 .memberIdentity {
   display: flex;
   align-items: center;
+  flex-wrap: wrap;
   gap: var(--space-2);
+  min-width: 0;
+  flex: 1 1 16rem;
+}
+
+/* Long names and addresses break instead of pushing badges off screen. */
+.memberIdentity > * {
+  min-width: 0;
+  overflow-wrap: anywhere;
 }
 
 .memberActions {
   display: flex;
   align-items: center;
+  flex-wrap: wrap;
   gap: var(--space-2);
+}
+
+/* Phones: the name or address gets its own line, details wrap beneath it, and
+   the actions sit together on one row below. The form stacks full width. */
+@media (max-width: 600px) {
+  .memberRow {
+    align-items: flex-start;
+    gap: var(--space-2);
+  }
+
+  .memberIdentity {
+    flex-basis: 100%;
+  }
+
+  .memberIdentity > :first-child {
+    flex-basis: 100%;
+  }
+
+  .inviteForm {
+    flex-direction: column;
+    align-items: stretch;
+    gap: var(--space-1);
+  }
+
+  .inviteForm label {
+    margin-bottom: 0;
+  }
+
+  .inviteForm .roleSelect {
+    width: 100%;
+  }
+
+  .inviteForm button {
+    align-self: flex-start;
+    margin-top: var(--space-1);
+  }
 }
 
 .roleSelect {

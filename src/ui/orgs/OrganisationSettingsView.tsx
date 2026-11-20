@@ -337,7 +337,7 @@ export function OrganisationSettingsView({ organisation, role, userId, onChanged
       {canManage && (
         <SettingsSection id="invite" title="Invite by email" summary={invites.length > 0 ? `${String(invites.length)} waiting to join` : undefined}>
           <Text as="p" tone="muted" size="sm">
-            No email is sent. The invited address joins with the chosen role the moment they sign up or next sign in.
+            We try to email an invite to this address, but the email may not arrive. Either way, the person joins with the chosen role as soon as they sign up or next sign in, so you can also just tell them to sign in.
           </Text>
           <form
             className={styles.inviteForm}
