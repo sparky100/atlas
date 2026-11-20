@@ -1,6 +1,6 @@
 import { useQueryClient } from '@tanstack/react-query';
 import { useCallback, useState } from 'react';
-import type { UUID } from '../../contracts/delta';
+import type { Sourcing, UUID } from '../../contracts/delta';
 import { validateAttributeValue } from '../../contracts/attributeSchema';
 import type { ElementsHeadRow, FactsRow, RelationshipsHeadRow } from '../../contracts/rows';
 import { commitToBranch } from '../../db/commits';
@@ -28,7 +28,7 @@ export interface UseReplaceWithNewElementInput {
 export interface UseReplaceWithNewElementResult {
   status: ReplaceWithNewElementStatus;
   error: string | null;
-  replace: (plannedEnd: string, replacementName: string, copyEdgeIds?: ReadonlySet<UUID>) => Promise<void>;
+  replace: (plannedEnd: string, replacementName: string, copyEdgeIds?: ReadonlySet<UUID>, sourcing?: Sourcing) => Promise<void>;
 }
 
 /**
@@ -49,7 +49,7 @@ export function useReplaceWithNewElement(input: UseReplaceWithNewElementInput): 
   const queryClient = useQueryClient();
 
   const replace = useCallback(
-    async (plannedEnd: string, replacementName: string, copyEdgeIds?: ReadonlySet<UUID>) => {
+    async (plannedEnd: string, replacementName: string, copyEdgeIds?: ReadonlySet<UUID>, sourcing?: Sourcing) => {
       if (!userId) {
         setError('You must be signed in to replace this.');
         return;
@@ -82,6 +82,7 @@ export function useReplaceWithNewElement(input: UseReplaceWithNewElementInput): 
           replacementName: trimmedName,
           sourceId: source.id,
           onMain: branch.kind === 'main',
+          sourcing,
           branch,
           expectedHeadCommitId,
         });

@@ -1,4 +1,5 @@
 import { defaultCreateAttributes } from '../../contracts/attributeSchema';
+import type { Sourcing } from '../../contracts/delta';
 import type { CommitEnvelope, Delta, UUID } from '../../contracts/delta';
 import type { ElementsHeadRow, FactsRow, RelationshipsHeadRow } from '../../contracts/rows';
 import { buildReplacesDelta } from '../../engine/buildReplacesDelta';
@@ -21,6 +22,8 @@ export interface ReplaceWithNewElementInput {
   sourceId: UUID;
   /** `useElementCreate.ts`'s own `defaultCreateAttributes` context — `lifecycleStatus` defaults to `active` on main, `planned` on a change branch. */
   onMain: boolean;
+  /** Optional sourcing to record on the replacement (e.g. `custom_build` for a "Build ourselves" option). */
+  sourcing?: Sourcing | undefined;
 }
 
 export interface ReplaceWithNewElementResult {
@@ -63,7 +66,7 @@ export interface ReplaceWithNewElementResult {
  * for a comparably complex multi-delta operation.
  */
 export function buildReplaceWithNewElementDeltas(input: ReplaceWithNewElementInput): ReplaceWithNewElementResult {
-  const { element, facts, relationships, plannedEnd, replacementName, sourceId, onMain, copyEdgeIds } = input;
+  const { element, facts, relationships, plannedEnd, replacementName, sourceId, onMain, copyEdgeIds, sourcing } = input;
   const deltas: Delta[] = [];
   const newElementId = crypto.randomUUID();
 
@@ -73,6 +76,8 @@ export function buildReplaceWithNewElementDeltas(input: ReplaceWithNewElementInp
   // case, since a module's platform essentially never changes on
   // replacement) — a system's replacement has no parent at all (ADR-001).
   const parentId = element.element_type === 'container' ? element.parent_id : null;
+  const createAttributes = defaultCreateAttributes(element.element_type, { onMain });
+  if (sourcing !== undefined) createAttributes.sourcing = sourcing;
   deltas.push({
     kind: 'element.create',
     id: crypto.randomUUID(),
@@ -80,7 +85,7 @@ export function buildReplaceWithNewElementDeltas(input: ReplaceWithNewElementInp
     elementType: element.element_type,
     name: replacementName,
     parentId,
-    attributes: defaultCreateAttributes(element.element_type, { onMain }),
+    attributes: createAttributes,
     sourceId,
     confidence: 1,
   } as Delta);

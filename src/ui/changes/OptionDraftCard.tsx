@@ -60,7 +60,7 @@ export function OptionDraftCard({ branch, mainHeadCommitId, orgSlug, modelSlug }
         {data.map((action) => (
           <LinkButton
             key={`${action.kind}-${action.systemId ?? 'new'}`}
-            to={action.systemId === null ? `${base}?${ref}&add=system` : `${base}/e/${action.systemId}?${ref}&action=${action.kind === 'extend' ? 'edit' : 'retire'}`}
+            to={action.systemId === null ? `${base}?${ref}&add=system` : `${base}/e/${action.systemId}?${ref}&action=${action.kind === 'extend' ? 'edit' : 'retire'}${action.kind !== 'extend' && action.custom ? '&sourcing=custom_build' : ''}`}
             variant="secondary"
           >
             {optionDraftLabel(action)}

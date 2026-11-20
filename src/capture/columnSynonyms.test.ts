@@ -19,6 +19,7 @@ describe('the headers this product\'s own export writes', () => {
       'Hosting model (module override)': 'hostingModel', 'Hosting provider (module override)': 'hostingProvider', 'Domain (module override)': 'domain',
       'Actor type': 'actorType', Email: 'ownerEmail', 'Org unit': 'orgUnit', Reference: 'capabilityCode', Importance: 'importance',
       'Essential function (NIS/CAF)': 'essentialFunction', Order: 'ignore', 'Parent system': 'parent', 'Parent capability': 'parent', Parent: 'parent',
+       Sourcing: 'sourcing',
       Source: 'ignore', Age: 'ignore', 'Atlas ID': 'atlasId',
     };
     for (const [header, role] of Object.entries(exportHeaders)) expect([header, lookupColumnSynonym(header)]).toEqual([header, role]);
