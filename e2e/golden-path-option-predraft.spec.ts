@@ -54,18 +54,19 @@ test('an empty Replace option offers to retire the system the decision concerns'
   await expect(page.getByLabel('Planned end', { exact: true })).toBeVisible();
 });
 
-test('an empty Build option offers to create a new system, not to retire or extend one', async ({ page }) => {
+test('an empty Build option offers to retire the existing system and replace it with a custom-built app', async ({ page }) => {
   test.slow();
   await startDecisionOnQuoteTool(page, 'optionbuild');
   await openOptionDraft(page, 'Build ourselves');
 
   const card = page.getByTestId('option-draft-card');
-  await expect(card.getByRole('link', { name: 'Create a new system' })).toBeVisible();
-  await expect(card.getByRole('link', { name: /Retire|Extend/ })).toHaveCount(0);
+  const link = card.getByRole('link', { name: 'Retire Quote Tool and replace it with a custom-built app' });
+  await expect(link).toBeVisible();
+  await expect(card.getByRole('link', { name: /Extend|Create a new system/ })).toHaveCount(0);
 
-  await card.getByRole('link', { name: 'Create a new system' }).click();
-  await expect(page).toHaveURL(/add=system/);
-  await expect(page.getByText("Type the application's name.", { exact: false })).toBeVisible();
+  await link.click();
+  await expect(page).toHaveURL(/action=retire/);
+  await expect(page.getByLabel('Planned end', { exact: true })).toBeVisible();
 });
 
 test('an empty Keep option offers no starter edit', async ({ page }) => {
