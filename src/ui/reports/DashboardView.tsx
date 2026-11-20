@@ -409,6 +409,19 @@ export function DashboardView({ dashboard, orgId, modelId, modelName, userId, ro
               </Button>
             </form>
           )}
+          {addSpec?.ok && reportsById.get(add.reportId) !== undefined && (
+            <div className={styles.preview}>
+              <Text as="p" size="sm" tone="muted">Preview</Text>
+              <ReportRunner source={addSpec.spec.source} modelId={modelId} orgId={orgId} commitId={main.headCommitId}>
+                {(rows, knownFields) => {
+                  const report = reportsById.get(add.reportId)!;
+                  const kind = add.kind === '' ? suggestedTileKind(addSpec.spec) : (add.kind as DashboardTileKind);
+                  const syntheticTile = { id: 'preview', dashboard_id: dashboard.id, report_id: report.id, kind, size: add.size, position: 0, row_limit: null } as DashboardTileRow;
+                  return <DashboardTileCard tile={syntheticTile} report={report} rows={rows} knownFields={knownFields} basePath={basePath} />;
+                }}
+              </ReportRunner>
+            </div>
+          )}
           {addSpec?.ok && addSpec.spec.groupBy === undefined && (
             <Text as="p" size="sm" tone="muted">
               This report has no grouping, so it can only be a big number or a table. To show it as a bar chart, donut or stacked bar,{' '}
