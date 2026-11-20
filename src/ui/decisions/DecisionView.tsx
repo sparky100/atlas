@@ -532,7 +532,8 @@ export function DecisionView({ modelId, decisionId, orgId, orgSlug, modelSlug, r
             </div>
           )}
 
-          {canAddOption && estateSupporters !== null && concernedCapabilityIds.length > 0 && (
+          {/* Starting points are for beginning a list of options. Once there are options (the Designer's, or ones added by hand) they are already in the list, so they are not shown again (Simon, 2026-11-20). */}
+          {canAddOption && scoredLinks.length === 0 && estateSupporters !== null && concernedCapabilityIds.length > 0 && (
             <div data-testid="option-suggestions">
               <Text as="p" size="sm" tone="muted">
                 Starting points, read from what Atlas holds (no AI). They are only suggestions: add one, change it, or ignore them.
