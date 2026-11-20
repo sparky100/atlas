@@ -1,6 +1,6 @@
 import { Loading } from '../components/Loading/Loading';
 import { useId, useState } from 'react';
-import { Link, useParams } from 'react-router';
+import { Link, useParams, useSearchParams } from 'react-router';
 import type { UUID } from '../../contracts/delta';
 import type { MemberRole } from '../../db/types';
 import { AppHeader } from '../components/AppHeader/AppHeader';
@@ -117,7 +117,9 @@ export function ModelHome() {
   const { role } = useMembership(organisation?.id ?? null, userId);
   const { homeMode, setHomeMode } = useHomeMode(userId, canEditOnMain(role));
   const [settingsMenuOpen, setSettingsMenuOpen] = useState(false);
-  const [addApplicationRequest, setAddApplicationRequest] = useState(0);
+  // `?add=system` (from an option's "Create a new system" starter) opens Home as if "Add application" had been pressed.
+  const [searchParams] = useSearchParams();
+  const [addApplicationRequest, setAddApplicationRequest] = useState(() => (searchParams.get('add') === 'system' ? 1 : 0));
   const settingsMenuId = useId();
 
   // Handoff — Flow: Add a system, decision 5: the search box's create
@@ -216,7 +218,8 @@ export function ModelHome() {
           )}
         </Panel>
 
-        {canShowSearch && <GetStarted modelId={model.id} commitId={searchCommitId} orgId={organisation?.id ?? ''} isOwner={role === 'owner' && organisation?.is_personal !== true} orgSlug={organisation?.slug ?? ''} modelSlug={model.slug} onAddApplication={() => { setAddApplicationRequest((n) => n + 1); }} />}
+        {/* Setting up the model (capabilities, applications, links, planned actions) is the owner's and architect's job; a contributor works through changes, so the checklist is not theirs to see (Simon, 2026-11-20). */}
+        {canEditOnMain(role) && <GetStarted modelId={model.id} commitId={searchCommitId} orgId={organisation?.id ?? ''} isOwner={role === 'owner' && organisation?.is_personal !== true} orgSlug={organisation?.slug ?? ''} modelSlug={model.slug} onAddApplication={() => { setAddApplicationRequest((n) => n + 1); }} />}
         <FirstVisit modelId={model.id} commitId={searchCommitId} orgId={organisation?.id ?? ''} role={role} orgSlug={organisation?.slug ?? ''} modelSlug={model.slug} />
 
         <div className={styles.doorLinks}>

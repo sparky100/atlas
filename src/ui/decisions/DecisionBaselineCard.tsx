@@ -51,7 +51,7 @@ export function DecisionBaselineCard({ stayRisk, stayReason, canEdit, canChoose,
       </label>
       <label className={styles.label}>
         <Text as="span" size="sm" tone="muted">
-          Why can't or won't we change?
+          What speaks for staying as we are, or holds us back from changing?
         </Text>
         {canEdit ? (
           <textarea
