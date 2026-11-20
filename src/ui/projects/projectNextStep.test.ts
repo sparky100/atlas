@@ -25,6 +25,12 @@ describe('projectNextStep', () => {
     expect(step?.kind).toBe('compare');
     expect(step?.action).toEqual({ kind: 'open-decision', id: 'd1', label: 'Open Which system?' });
   });
+  it('does not tell someone who cannot choose to choose', () => {
+    const step = projectNextStep({ ...base, decisions: [decision('proposed')], canChoose: false });
+    expect(step?.title).toBe('Compare your options');
+    expect(step?.body).toMatch(/owner or architect makes the choice/);
+    expect(step?.body).not.toMatch(/then choose/);
+  });
   it('offers the change once something is chosen and no change exists', () => {
     expect(projectNextStep({ ...base, decisions: [decision('accepted')] })?.action).toEqual({ kind: 'start-change' });
     expect(projectNextStep({ ...base, decisions: [decision('accepted')], canDraftChange: false })?.action).toEqual({ kind: 'none' });
