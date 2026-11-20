@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { bandAction, capabilityProblems, type CapabilitySupporter } from './capabilityProblems';
+import { bandAction, capabilityProblems, purposeFromProblems, type CapabilitySupporter } from './capabilityProblems';
 
 const sys = (over: Partial<CapabilitySupporter> = {}): CapabilitySupporter => ({ systemId: 's1', name: 'Quote Tool', fit: 'good', note: '', ...over });
 
@@ -35,5 +35,21 @@ describe('bandAction', () => {
     expect(bandAction([])).toBeNull();
     expect(bandAction(capabilityProblems({ supporters: [sys()], missingFactsText: 'owner' }))).toBe('fill-in');
     expect(bandAction(capabilityProblems({ supporters: [], missingFactsText: '' }))).toBe('project');
+  });
+});
+
+describe('purposeFromProblems', () => {
+  it('starts the purpose from each written reason, with its source', () => {
+    const problems = capabilityProblems({
+      supporters: [
+        { systemId: 'a', name: 'Quote Tool', fit: 'poor', note: 'Quotes are keyed by hand.' },
+        { systemId: 'b', name: 'Mailer', fit: 'poor', note: '' },
+      ],
+      missingFactsText: '',
+    });
+    expect(purposeFromProblems(problems)).toBe('Quote Tool: Quotes are keyed by hand. (From the fit note on Quote Tool.)');
+  });
+  it('is empty when nobody wrote a reason', () => {
+    expect(purposeFromProblems(capabilityProblems({ supporters: [{ systemId: 'a', name: 'Quote Tool', fit: 'poor', note: '' }], missingFactsText: '' }))).toBe('');
   });
 });

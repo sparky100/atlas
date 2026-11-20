@@ -35,6 +35,8 @@ test('a capability page leads with its problem and starts a project from it', as
   await band.getByRole('link', { name: 'Start a project', exact: true }).click();
   await expect(page.getByRole('heading', { name: 'Start a project' })).toBeVisible();
   await expect(page.getByRole('button', { name: 'Remove Connection Quotations' })).toBeVisible();
+  // The reason already written is the starting purpose, with where it came from; nothing is retyped.
+  await expect(page.getByLabel('Purpose')).toHaveValue(/Quote Tool: Quotes are keyed by hand and take two days\. \(From the fit note on Quote Tool\.\)/);
 
   // A capability nothing supports says so, with the same button.
   await goToModelHome(page);

@@ -58,3 +58,14 @@ export function bandAction(problems: readonly CapabilityProblem[]): 'project' | 
   if (problems.length === 0) return null;
   return problems.some((p) => p.kind !== 'missing-facts') ? 'project' : 'fill-in';
 }
+
+/**
+ * The project purpose to start from: each poor-fit reason someone already wrote on the capability, one line per system,
+ * with where it came from, so nothing is retyped and it can be corrected at the source. Empty when nobody wrote a reason.
+ */
+export function purposeFromProblems(problems: readonly CapabilityProblem[]): string {
+  return problems
+    .filter((p) => p.kind === 'poor-fit' && p.reason !== null && p.systemName !== null)
+    .map((p) => `${p.systemName ?? ''}: ${p.reason ?? ''} (From the fit note on ${p.systemName ?? ''}.)`)
+    .join('\n');
+}
