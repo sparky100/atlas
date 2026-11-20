@@ -852,6 +852,10 @@ map.
 
 A published, versioned sample model a new organisation can copy into itself (`docs/ADR-033-sample-models.md`, `supabase/migrations/20261115120000_sample_models.sql`). Product content, like `capability_maps`: no `org_id`. `id`, `slug` (lowercase words joined by single hyphens), `version` (>= 1, unique with `slug`), `name`, `description`, `payload jsonb` (an object holding non-empty `elementsHead` and the arrays `relationshipsHead`, `facts`, `sources`, `aliases`; `src/contracts/sampleModel.ts`), `published_by` (indexed), `created_at`. Row-level security is on: select for any signed-in user; insert only by a platform admin publishing as themselves (`published_by = auth.uid()` and a row of their own in `platform_admins`). There is no update or delete policy and `update`, `delete` and `truncate` are revoked from `authenticated`, so a published version is never changed or removed (rule 5); a new publish is a new version. A payload holds no person's id (`asserted_by` is the nil id) and no link out (`uri` is null). No database function is involved.
 
+#### Reviewed product catalogue and option citations
+
+`product_catalogues`, `catalogue_entries`, `catalogue_entry_capabilities`, `catalogue_claims` and `option_catalogue_sources` are specified in [SPEC-product-catalogue.md](SPEC-product-catalogue.md), including grants, publication locks, immutable snapshots and the atomic save RPC. Product content has no organisation data; citations inherit tenancy from their decision. This addition changes no model-history tables.
+
 ### 3.11 Saved reports, saved copies and dashboards
 
 Workflow records on the same tier as `projects` and `decisions` (ADR-027, `supabase/migrations/20261106010000_saved_reports.sql`): never a delta, never folded into a head, never in a version. Deleting every row of all four tables loses no model information (ADR-011's litmus test for the definitions; see `report_snapshots` for the one table that is a record rather than a hint). Contract: `src/contracts/reportSpec.ts` (`ReportSpec`, `parseReportSpec`); evaluator: `src/engine/reportQuery.ts`; rows and queries: `src/db/types.ts`, `src/db/reports.ts`.

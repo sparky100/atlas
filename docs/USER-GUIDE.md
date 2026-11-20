@@ -389,3 +389,8 @@ Atlas is open source, licensed under the **GNU Affero General Public Licence, ve
 ## Getting help
 
 Click **Help** (the **?** in the top bar) from any organisation or model page to ask a question. It knows this guide, Atlas's list of words (the vocabulary behind it) and — on a model page — the name of the page you're on and a few counts about the model (capabilities, systems and open changes), so you can ask "what does this page show me?" as well as "how do I start a change?" It can't see your actual data (the names of your systems or capabilities), only that context. If you use an older word ("disposition", "TIME", "main"), it answers in the words the app uses now (**Planned action**, **live model**).
+
+
+### Reviewed product evidence — not yet available in the interface
+
+The catalogue storage foundation supports dated product claims and a permanent copy of the sources used for an option. It does not yet add products to capability pages or to Find options. Existing workflows are unchanged. Catalogue content and its user interface will be delivered separately; no products are recommended or approved by this foundation.
