@@ -145,7 +145,7 @@ export function DecisionCriteriaGrid({ decisionId, options, canRate, userId, nee
                       A change
                     </Text>
                     <Link to={`/o/${orgSlug}/m/${modelSlug}/changes/${o.branchId}`}>
-                      <Text as="span" size="md">
+                      <Text as="span" size="md" className={styles.optionTitle}>
                         {stripExploringPrefix(o.label)}
                       </Text>
                     </Link>

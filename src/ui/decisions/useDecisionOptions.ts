@@ -34,7 +34,7 @@ export interface UseDecisionOptionsResult {
   addOption: (input: AddOptionInput) => Promise<boolean>;
   /** Gives a decision that has none its "Stay as we are" baseline option (`addBaseline.ts`). */
   addBaselineOption: (input: AddBaselineInput) => Promise<boolean>;
-  /** Saves the baseline's two plain-text answers (operational risk of staying, why we can't or won't change). */
+  /** Saves the baseline's two plain-text answers (operational risk of staying, what speaks for staying, or holds us back from changing). */
   saveBaselineText: (decisionId: UUID, stayRisk: string, stayReason: string) => Promise<boolean>;
   /** F3's own "Choose" — `atlas.choose_decision_option` in one call (`src/db/decisions.ts`'s `chooseDecisionOption`). Optionally records what would make the choice be reconsidered, and a review date. */
   chooseOption: (decisionId: UUID, branchId: UUID, reasons: string, reconsider?: { reconsiderIf: string; reviewBy: string }) => Promise<boolean>;

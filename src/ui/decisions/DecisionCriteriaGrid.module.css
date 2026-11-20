@@ -46,6 +46,12 @@
   flex-direction: column;
   gap: var(--space-1);
   min-width: 160px;
+  /* A table header cell is bold by default; only the option's title should be, not the whole description. */
+  font-weight: 400;
+}
+
+.optionTitle {
+  font-weight: 600;
 }
 
 .optionHeaderTop {
