@@ -4,7 +4,7 @@
  * A poor fit is a prompt, never a verdict. Click-only from Home, at 1280 and 390.
  */
 import { expect, test } from '@playwright/test';
-import { addCapability, addSystemFromHome, goToModelHome, signUpCreateOrgAndModel } from './fixtures/goldenPath';
+import { addCapability, addSystemFromHome, goToModelHome, homeSearchResult, signUpCreateOrgAndModel } from './fixtures/goldenPath';
 
 test('a capability page leads with its problem and starts a project from it', async ({ page }) => {
   test.slow();
@@ -38,7 +38,9 @@ test('a capability page leads with its problem and starts a project from it', as
 
   // A capability nothing supports says so, with the same button.
   await goToModelHome(page);
-  await page.getByRole('link', { name: 'Handle a fault' }).first().click();
+  await page.getByPlaceholder('Search or create a capability, system, or actor…').fill('Handle a fault');
+  await homeSearchResult(page, 'Handle a fault').click();
+  await expect(page.getByRole('heading', { name: 'Handle a fault' })).toBeVisible();
   await expect(page.getByTestId('capability-problems')).toContainText('No system is recorded as supporting this capability.');
   await expect(page.getByTestId('capability-problems').getByRole('link', { name: 'Start a project', exact: true })).toBeVisible();
 
