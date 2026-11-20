@@ -59,7 +59,8 @@
 }
 
 .inlineFormWide {
-  max-width: 1100px;
+  /* Use the width the panel has: on a wide screen the form and the Designer's option cards fill it, so the page does not read as a narrow column inside a wide panel. */
+  max-width: none;
 }
 
 .input {
