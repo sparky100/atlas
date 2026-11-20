@@ -20,6 +20,35 @@ async function overflowBy(page: Page): Promise<number> {
   return page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
 }
 
+/** The widest few elements poking past the right edge, so a failure names what to fix. */
+async function offenders(page: Page): Promise<string> {
+  return page.evaluate(() => {
+    const limit = document.documentElement.clientWidth;
+    const found: { label: string; right: number }[] = [];
+    for (const el of Array.from(document.body.querySelectorAll('*'))) {
+      const r = el.getBoundingClientRect();
+      if (r.width === 0 || r.right <= limit + 1) continue;
+      // Skip anything inside a box that scrolls on its own.
+      let clipped = false;
+      for (let p = el.parentElement; p && p !== document.body; p = p.parentElement) {
+        const o = getComputedStyle(p).overflowX;
+        if (o === 'auto' || o === 'scroll' || o === 'hidden') {
+          clipped = true;
+          break;
+        }
+      }
+      if (clipped) continue;
+      const cls = typeof el.className === 'string' ? el.className.split(' ')[0] : '';
+      found.push({ label: `${el.tagName.toLowerCase()}${cls ? `.${cls}` : ''}`, right: Math.round(r.right) });
+    }
+    return found
+      .sort((a, b) => b.right - a.right)
+      .slice(0, 4)
+      .map((f) => `${f.label}→${String(f.right)}`)
+      .join(', ');
+  });
+}
+
 async function settle(page: Page): Promise<void> {
   await page.waitForLoadState('networkidle');
   // Open every settings section so hidden content is measured too.
@@ -75,7 +104,8 @@ test('no page scrolls sideways at any width, and resizing keeps it inside the sc
       await page.goto(path);
       await settle(page);
       const by = await overflowBy(page);
-      expect.soft(by, `${path} at ${String(width)}px scrolls sideways by ${String(by)}px`).toBeLessThanOrEqual(1);
+      const who = by > 1 ? await offenders(page) : '';
+      expect.soft(by, `${path} at ${String(width)}px scrolls sideways by ${String(by)}px. Widest: ${who}`).toBeLessThanOrEqual(1);
     }
   }
 
@@ -88,7 +118,8 @@ test('no page scrolls sideways at any width, and resizing keeps it inside the sc
       await page.setViewportSize({ width, height: 900 });
       await page.waitForTimeout(150);
       const by = await overflowBy(page);
-      expect.soft(by, `${path} resized to ${String(width)}px scrolls sideways by ${String(by)}px`).toBeLessThanOrEqual(1);
+      const who = by > 1 ? await offenders(page) : '';
+      expect.soft(by, `${path} resized to ${String(width)}px scrolls sideways by ${String(by)}px. Widest: ${who}`).toBeLessThanOrEqual(1);
     }
   }
 });
