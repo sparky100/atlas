@@ -49,7 +49,7 @@ test('project lifecycle: start from a finding, decide inside it, deliver the cho
   await nextStep.getByLabel('New decision title').fill('Which system supports repairs?');
   await page.getByRole('button', { name: 'Start decision' }).click();
   await expect(page.getByRole('heading', { name: 'Which system supports repairs?' })).toBeVisible();
-  await expect(page.getByRole('link', { name: PROJECT_TITLE })).toBeVisible();
+  await expect(page.getByRole('link', { name: PROJECT_TITLE }).first()).toBeVisible();
   await expect(page.getByTestId('decision-source-finding')).toContainText('Started from a health finding: a capability nothing supports.');
   // It starts from where the person came from: the project's purpose is the context, the project's capability is what it concerns, and the edit form is already open.
   await expect(page.getByPlaceholder('What needs deciding, and why now')).not.toHaveValue('');
@@ -91,7 +91,7 @@ test('project lifecycle: start from a finding, decide inside it, deliver the cho
   // 4. Design the chosen option: work on it as a change and add the system.
   await hubHeader.getByRole('button', { name: 'Work on this as a change' }).click();
   await expect(page.getByRole('button', { name: 'Editing in this change' })).toBeVisible();
-  await expect(page.getByRole('link', { name: PROJECT_TITLE })).toBeVisible();
+  await expect(page.getByRole('link', { name: PROJECT_TITLE }).first()).toBeVisible();
   await goToModelHome(page);
   await addSystemFromHome(page, { name: 'Repairs Hub', description: 'Schedules and tracks housing repairs.', capabilityName: 'Housing Repairs' });
 
