@@ -78,7 +78,7 @@ export function DecisionBaselineCard({ stayRisk, stayReason, canEdit, canChoose,
           </Button>
         )}
         {canEdit && (
-          <Text as="span" size="sm" tone="muted" role="status">
+          <Text as="span" size="sm" tone="muted">
             {busy ? 'Saving…' : dirty ? 'Not saved yet.' : stayRisk !== '' || stayReason !== '' ? 'Saved. Change either answer above to save again.' : 'Nothing written yet.'}
           </Text>
         )}
