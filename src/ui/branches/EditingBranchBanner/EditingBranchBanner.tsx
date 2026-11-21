@@ -171,7 +171,7 @@ export function EditingBranchBanner({ activeRef, modelId, orgSlug, modelSlug, sh
     <div className={styles.banner} role="status">
       <Text as="span" size="sm">
         Editing in change: {branch?.title ?? branch?.name ?? activeRef.branchId.slice(0, 8)}
-        {branch?.created_at ? ` · started ${new Date(branch.created_at).toLocaleDateString()}` : ''}
+        {branch?.updated_at ? ` · last updated ${new Date(branch.updated_at).toLocaleDateString()}` : ''}
       </Text>
       {showModeShortcuts && (
         <div className={styles.shortcuts}>
