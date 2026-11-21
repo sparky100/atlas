@@ -27,7 +27,7 @@ test('two like-for-like options with no commits of their own show the empty-stat
   const baseline = page.getByRole('region', { name: 'Stay as we are' });
   await expect(baseline).toBeVisible();
   await expect(baseline.getByText('Describe it; it is not scored.')).toBeVisible();
-  await baseline.getByLabel('What is the operational risk of staying as we are?').fill('The vendor ends support in March.');
+  await baseline.getByLabel('Operational risk of staying as we are').fill('The vendor ends support in March.');
   await expect(baseline.getByText('Not saved yet.')).toBeVisible();
   await baseline.getByRole('button', { name: 'Save baseline' }).click();
   await expect(baseline.getByText('Saved.', { exact: false })).toBeVisible();

@@ -32,6 +32,8 @@ export function SecondOpinion({ orgId, userId, decisionId, orgSlug, shareCost, a
   const [completed, setCompleted] = useState(false);
   const [message, setMessage] = useState<{ kind: 'failed' | 'stopped'; text: string } | null>(null);
   const [copied, setCopied] = useState<string | null>(null);
+  // Collapsible, but open by default: the section is long and pushes the evidence down.
+  const [open, setOpen] = useState(true);
   // Note ids (runId:index) already kept on this page, so the button reads "Kept".
   const [kept, setKept] = useState<ReadonlySet<string>>(new Set());
   const [keeping, setKeeping] = useState<string | null>(null);
@@ -130,17 +132,29 @@ export function SecondOpinion({ orgId, userId, decisionId, orgSlug, shareCost, a
   return (
     <Panel data-testid="second-opinion">
       <section id="second-opinion" aria-labelledby="second-opinion-title">
-        <Text as="h2" size="lg" id="second-opinion-title">Second opinion</Text>
+        <div className={styles.head}>
+          <Text as="h2" size="lg" id="second-opinion-title">Second opinion</Text>
+          <Button variant="ghost" aria-expanded={open} onClick={() => { setOpen((v) => !v); }}>
+            {open ? 'Hide' : 'Show'}
+          </Button>
+        </div>
         <Text as="p">Ask what might be missing before a person chooses. These are AI questions for you to weigh, not a review, clearance or sign-off.</Text>
-        <Text as="p" size="sm" tone="muted">The saved context, options, ratings, principles and visible changes go to your organisation's AI provider. Text you have not saved is not sent.</Text>
+        {!open && (
+          <Text as="p" size="sm" tone="muted">
+            {reviews.reduce((n, r) => n + r.notes.length, 0)} question(s) held for this visit.
+          </Text>
+        )}
+        {open && (
+          <>
+        <Text as="p" size="sm" tone="muted">The decision as it stands now (context, options, ratings, principles and visible changes) goes to your organisation's AI provider when you ask. Nothing you are still typing is sent.</Text>
         <details className={styles.details}>
           <summary>What is sent to the AI?</summary>
           <ul>
-            <li>Saved decision title and context, dates, linked capability and system names, and option titles and descriptions.</li>
-            <li>Saved ratings and their notes, principles, goals, visible “What changes” rows, and direct estate facts about the named systems.</li>
-            <li>{shareCost ? 'Your owner has allowed the Cost rating and Run cost row to be shared.' : 'Cost rating and Run cost are withheld. Obvious amounts of money in saved text block the request, but this check cannot find every cost reference.'}</li>
+            <li>The decision's title and context as they stand now, dates, linked capability and system names, and option titles and descriptions.</li>
+            <li>Ratings and their notes, principles, goals, visible “What changes” rows, and direct estate facts about the named systems.</li>
+            <li>{shareCost ? 'Your owner has allowed the Cost rating and Run cost row to be shared.' : 'Cost rating and Run cost are withheld. Obvious amounts of money in the decision block the request, but this check cannot find every cost reference.'}</li>
           </ul>
-          <Text as="p" size="sm">People's names, comments, approvals and frozen packs are not sent. Pasted source lines in an option description are sent as part of that saved text.</Text>
+          <Text as="p" size="sm">People's names, comments, approvals and frozen packs are not sent. Pasted source lines in an option description are sent as part of that text.</Text>
         </details>
         {!availability.available && <div data-testid="second-opinion-unavailable"><Text as="p" size="sm">{availability.reason} {availability.canFix && <Link to={`/o/${orgSlug}/settings`}>Open organisation settings</Link>}</Text></div>}
         {availability.available && (
@@ -148,7 +162,7 @@ export function SecondOpinion({ orgId, userId, decisionId, orgSlug, shareCost, a
             <div className={styles.actions}>
               {LENSES.map(({ lens, button }) => <Button key={lens} variant="secondary" disabled={running !== null} onClick={() => { void ask(lens); }}>{button}</Button>)}
             </div>
-            {running !== null && <div role="status" className={styles.progress}><Text as="p">The {LENSES.find((l) => l.lens === running)?.name} is reading the saved decision. This may take a while. You can stop waiting.</Text><Button onClick={stop}>Stop waiting</Button></div>}
+            {running !== null && <div role="status" className={styles.progress}><Text as="p">The {LENSES.find((l) => l.lens === running)?.name} is reading the decision as it stands. This may take a while. You can stop waiting.</Text><Button onClick={stop}>Stop waiting</Button></div>}
           </>
         )}
         {interrupted && <div role="status"><Text as="p">That run did not finish on this page. Ask again. Earlier questions are still here.</Text></div>}
@@ -172,9 +186,11 @@ export function SecondOpinion({ orgId, userId, decisionId, orgSlug, shareCost, a
                 </div>
               </li>;
             })}</ol>}
-            <Text as="p" size="sm" tone="muted">These questions reflect the saved decision at the time of this run. Ask again after changing it. This run used about {(review.inputTokens + review.outputTokens).toLocaleString('en-GB')} tokens. Saved on this device only, not for the team; expires after 24 hours. A question you keep is saved to the decision.</Text>
+            <Text as="p" size="sm" tone="muted">These questions reflect the decision as it stood when you asked. Ask again after changing it. This run used about {(review.inputTokens + review.outputTokens).toLocaleString('en-GB')} tokens. Held on this device only, not for the team; expires after 24 hours. A question you keep is saved to the decision.</Text>
           </div>;
         })}
+          </>
+        )}
       </section>
     </Panel>
   );

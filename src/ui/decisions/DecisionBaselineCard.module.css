@@ -16,7 +16,7 @@
 
 .textarea {
   width: 100%;
-  min-height: 4rem;
+  min-height: 2.5rem;
   box-sizing: border-box;
   font: inherit;
 }

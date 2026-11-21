@@ -35,11 +35,12 @@ export function DecisionBaselineCard({ stayRisk, stayReason, canEdit, canChoose,
       </Text>
       <label className={styles.label}>
         <Text as="span" size="sm" tone="muted">
-          What is the operational risk of staying as we are?
+          Operational risk of staying as we are
         </Text>
         {canEdit ? (
           <textarea
             className={styles.textarea}
+            rows={2}
             value={risk}
             onChange={(e) => {
               setRisk(e.target.value);
@@ -51,11 +52,12 @@ export function DecisionBaselineCard({ stayRisk, stayReason, canEdit, canChoose,
       </label>
       <label className={styles.label}>
         <Text as="span" size="sm" tone="muted">
-          What speaks for staying as we are, or holds us back from changing?
+What holds us back from changing
         </Text>
         {canEdit ? (
           <textarea
             className={styles.textarea}
+            rows={2}
             value={reason}
             onChange={(e) => {
               setReason(e.target.value);

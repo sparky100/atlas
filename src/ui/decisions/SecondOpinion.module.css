@@ -1,3 +1,4 @@
+.head { display: flex; align-items: center; justify-content: space-between; gap: var(--space-2); }
 .actions, .noteActions { display: flex; flex-wrap: wrap; gap: var(--space-2); margin: var(--space-3) 0; }
 .details { margin: var(--space-3) 0; }
 .details summary { cursor: pointer; text-decoration: underline; }

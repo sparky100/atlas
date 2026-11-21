@@ -116,6 +116,8 @@ export function DecisionView({ modelId, decisionId, orgId, orgSlug, modelSlug, r
   // mean two separate fetches/polling loops for the same table.
   const ratingsState = useDecisionRatings(modelId, decisionId);
   const principlesState = useDecisionPrinciples(modelId, decisionId, userId);
+  const principlesFollowed = principlesState.links.filter((l) => l.stance === 'follows').length;
+  const principlesDeparted = principlesState.links.filter((l) => l.stance === 'departs').length;
   const { data: keptNotes } = useQuery({ queryKey: ['decisionAgentNotes', decisionId], queryFn: () => listDecisionAgentNotes(supabase, decisionId) });
   const modelGoals = useModelGoals(modelId);
 
@@ -426,6 +428,13 @@ export function DecisionView({ modelId, decisionId, orgId, orgSlug, modelSlug, r
         )}
         </CollapsibleSection>
       </Panel>
+
+      {principlesFollowed + principlesDeparted > 0 && (
+        <Text as="p" size="sm" tone="muted">
+          Principles in view: {principlesFollowed} followed, {principlesDeparted} departed from.{' '}
+          <a href="#decision-principles">Review them</a>.
+        </Text>
+      )}
 
       {(branchLinks.length > 0 || canAddOption) && (
         <Panel>
@@ -814,15 +823,17 @@ export function DecisionView({ modelId, decisionId, orgId, orgSlug, modelSlug, r
         </Panel>
       )}
 
-      <DecisionPrinciplesPanel
-        principles={principlesState.principles}
-        links={principlesState.links}
-        editable={canLinkDecisionPrinciples(role, decision)}
-        savingIds={principlesState.savingIds}
-        error={principlesState.error}
-        principlesHref={`/o/${orgSlug}/m/${modelSlug}/principles`}
-        onSetStance={principlesState.setStance}
-      />
+      <div id="decision-principles">
+        <DecisionPrinciplesPanel
+          principles={principlesState.principles}
+          links={principlesState.links}
+          editable={canLinkDecisionPrinciples(role, decision)}
+          savingIds={principlesState.savingIds}
+          error={principlesState.error}
+          principlesHref={`/o/${orgSlug}/m/${modelSlug}/principles`}
+          onSetStance={principlesState.setStance}
+        />
+      </div>
 
 
       {args.length > 0 && (

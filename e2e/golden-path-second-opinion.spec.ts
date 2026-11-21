@@ -65,7 +65,7 @@ test('from Home: AI questions can be weighed, edited, kept for a return visit or
   await note.getByRole('button', { name: 'Copy question' }).click();
   await expect(note.getByRole('button', { name: 'Copied' })).toBeVisible();
   expect(await page.evaluate(() => navigator.clipboard.readText())).toBe('Who will test the two-day quote?');
-  await expect(panel.getByText('Saved on this device only')).toBeVisible();
+  await expect(panel.getByText('Held on this device only')).toBeVisible();
   await test.info().attach('second-opinion', { body: await panel.screenshot(), contentType: 'image/png' });
   await page.reload();
   panel = page.getByTestId('second-opinion');
@@ -94,7 +94,7 @@ test('failed and stopped runs keep no partial questions and do not create a clea
     try { await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ status: 'done', inputHash: 'hash', runId: 'late', inputTokens: 1, outputTokens: 1, notes: [] }) }); } catch { /* The browser stopped waiting. */ }
   });
   await panel.getByRole('button', { name: 'Ask the Steward: cyber' }).click();
-  await expect(panel.getByRole('status')).toContainText('reading the saved decision');
+  await expect(panel.getByRole('status')).toContainText('reading the decision as it stands');
   await panel.getByRole('button', { name: 'Stop waiting' }).click();
   await expect(panel.getByText('The request may already be with the AI provider')).toBeVisible();
   await expect(panel.getByTestId('review-cyber')).toHaveCount(0);
@@ -117,7 +117,7 @@ test('no organisation key, interrupted run and empty answer are explained withou
     try { await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ status: 'done', inputHash: 'hash', runId: 'late', inputTokens: 1, outputTokens: 1, notes: [] }) }); } catch { /* The page was left. */ }
   });
   await panel.getByRole('button', { name: 'Ask the Challenger' }).click();
-  await expect(panel.getByRole('status')).toContainText('reading the saved decision');
+  await expect(panel.getByRole('status')).toContainText('reading the decision as it stands');
   await page.reload();
   await expect(panel.getByText('That run did not finish on this page')).toBeVisible();
   await page.unroute('**/functions/v1/review-agent');
