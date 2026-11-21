@@ -19,13 +19,15 @@ describe('held second opinions', () => {
     expect(loadHeldReviews(storage, key, 1000 + REVIEW_NOTES_TTL_MS)).toEqual([]);
   });
 
-  it('rejects malformed notes and consumes a navigation interruption once', () => {
+  it('rejects malformed notes and reads an interruption without consuming it during render', () => {
     const storage = memory();
     const key = reviewStorageKey('org', 'alice', 'decision');
     storage.setItem(key, '{broken');
     expect(loadHeldReviews(storage, key, 1000)).toEqual([]);
     storage.setItem(`${key}:running`, '1000');
     expect(interruptedReview(storage, key, 1100)).toBe(true);
+    expect(interruptedReview(storage, key, 1100)).toBe(true);
+    storage.removeItem(`${key}:running`);
     expect(interruptedReview(storage, key, 1100)).toBe(false);
   });
 });

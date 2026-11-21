@@ -29,6 +29,10 @@ export function SecondOpinion({ orgId, userId, decisionId, orgSlug, shareCost, a
   const runNo = useRef(0);
 
   useEffect(() => { saveHeldReviews(localStorage, key, reviews); }, [key, reviews]);
+  useEffect(() => {
+    if (!interrupted) return;
+    try { sessionStorage.removeItem(`${key}:running`); } catch { /* Storage may be unavailable. */ }
+  }, [key, interrupted]);
   useEffect(() => () => { runNo.current += 1; abort.current?.abort(); }, []);
 
   async function ask(lens: ReviewLens) {

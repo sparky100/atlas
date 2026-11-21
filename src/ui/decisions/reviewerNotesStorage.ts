@@ -49,12 +49,11 @@ export function saveHeldReviews(storage: StorageLike, key: string, reviews: read
   } catch { /* Private browsing may refuse storage; the current page still keeps its notes. */ }
 }
 
-/** A marker only for a request abandoned by navigation, never for a completed or stopped request. */
+/** Read without consuming: React can call a state initializer twice in development. */
 export function interruptedReview(storage: StorageLike, key: string, now: number): boolean {
   try {
     const started = Number(storage.getItem(`${key}:running`));
     if (!Number.isFinite(started) || started <= 0) return false;
-    storage.removeItem(`${key}:running`);
-    return now - started < REVIEW_NOTES_TTL_MS;
+    return now >= started && now - started < REVIEW_NOTES_TTL_MS;
   } catch { return false; }
 }
