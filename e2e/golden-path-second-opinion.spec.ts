@@ -62,6 +62,7 @@ test('from Home: AI questions can be weighed, edited, kept for a return visit or
   await expect(note.getByText('Based on: Configure the CRM')).toBeVisible();
   await note.getByLabel('Question for you to act on').fill('Who will test the two-day quote?');
   await expect(panel.getByText('Saved on this device only')).toBeVisible();
+  await test.info().attach('second-opinion', { body: await panel.screenshot(), contentType: 'image/png' });
   await page.reload();
   panel = page.getByTestId('second-opinion');
   await expect(panel.getByLabel('Question for you to act on')).toHaveValue('Who will test the two-day quote?');
