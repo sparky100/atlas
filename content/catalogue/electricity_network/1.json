@@ -17,8 +17,8 @@
         { "code": "5.4", "name": "Complaints & Feedback", "howItSupports": "Records complaints and feedback as cases with an owner and history." }
       ],
       "claims": [
-        { "position": 1, "kind": "functional", "statement": "The vendor describes the product for customer service cases and contact across channels.", "sourceUrl": "https://www.salesforce.com/service/cloud/", "sourceDate": "2026-11-21", "reviewedBy": "Pending review", "reviewedAt": "2026-11-21" },
-        { "position": 2, "kind": "functional", "statement": "The vendor describes complaint and feedback handling as part of customer service.", "sourceUrl": "https://www.salesforce.com/service/cloud/", "sourceDate": "2026-11-21", "reviewedBy": "Pending review", "reviewedAt": "2026-11-21" }
+        { "position": 1, "kind": "functional", "statement": "The vendor describes the product for customer service cases and contact across channels.", "sourceUrl": "https://www.salesforce.com/service/cloud/", "sourceDate": "2026-11-21", "reviewedBy": "Simon Parkinson", "reviewedAt": "2026-11-21" },
+        { "position": 2, "kind": "functional", "statement": "The vendor describes complaint and feedback handling as part of customer service.", "sourceUrl": "https://www.salesforce.com/service/cloud/", "sourceDate": "2026-11-21", "reviewedBy": "Simon Parkinson", "reviewedAt": "2026-11-21" }
       ]
     },
     {
@@ -32,7 +32,7 @@
         { "code": "11.4", "name": "Connection Quotations", "howItSupports": "Can record and track a connection enquiry as a customer case." }
       ],
       "claims": [
-        { "position": 1, "kind": "functional", "statement": "The vendor describes the product for customer service and case management.", "sourceUrl": "https://www.microsoft.com/en-us/dynamics-365/products/customer-service", "sourceDate": "2026-11-21", "reviewedBy": "Pending review", "reviewedAt": "2026-11-21" }
+        { "position": 1, "kind": "functional", "statement": "The vendor describes the product for customer service and case management.", "sourceUrl": "https://www.microsoft.com/en-us/dynamics-365/products/customer-service", "sourceDate": "2026-11-21", "reviewedBy": "Simon Parkinson", "reviewedAt": "2026-11-21" }
       ]
     },
     {
@@ -44,7 +44,7 @@
         { "code": "5.1", "name": "Contact Channels", "howItSupports": "Routes voice and digital contact to the right queue or agent." }
       ],
       "claims": [
-        { "position": 1, "kind": "functional", "statement": "The vendor describes the product for contact-centre routing across voice and digital channels.", "sourceUrl": "https://www.genesys.com/genesys-cloud", "sourceDate": "2026-11-21", "reviewedBy": "Pending review", "reviewedAt": "2026-11-21" }
+        { "position": 1, "kind": "functional", "statement": "The vendor describes the product for contact-centre routing across voice and digital channels.", "sourceUrl": "https://www.genesys.com/genesys-cloud", "sourceDate": "2026-11-21", "reviewedBy": "Simon Parkinson", "reviewedAt": "2026-11-21" }
       ]
     },
     {
@@ -56,7 +56,7 @@
         { "code": "11.4", "name": "Connection Quotations", "howItSupports": "Positions connection enquiries and customer journeys as part of utility customer operations." }
       ],
       "claims": [
-        { "position": 1, "kind": "functional", "statement": "The vendor positions the product for energy and utility customer operations, including connection enquiries.", "sourceUrl": "https://www.salesforce.com/industries/energy-utilities/", "sourceDate": "2026-11-21", "reviewedBy": "Pending review", "reviewedAt": "2026-11-21" }
+        { "position": 1, "kind": "functional", "statement": "The vendor positions the product for energy and utility customer operations, including connection enquiries.", "sourceUrl": "https://www.salesforce.com/industries/energy-utilities/", "sourceDate": "2026-11-21", "reviewedBy": "Simon Parkinson", "reviewedAt": "2026-11-21" }
       ]
     },
     {
@@ -68,7 +68,7 @@
         { "code": "11.5", "name": "Billing & Settlement", "howItSupports": "The vendor describes billing as a core part of the product's utility customer care scope." }
       ],
       "claims": [
-        { "position": 1, "kind": "functional", "statement": "The vendor positions the product for utility customer care and billing.", "sourceUrl": "https://www.oracle.com/utilities/customer-care-and-billing/", "sourceDate": "2026-11-21", "reviewedBy": "Pending review", "reviewedAt": "2026-11-21" }
+        { "position": 1, "kind": "functional", "statement": "The vendor positions the product for utility customer care and billing.", "sourceUrl": "https://www.oracle.com/utilities/customer-care-and-billing/", "sourceDate": "2026-11-21", "reviewedBy": "Simon Parkinson", "reviewedAt": "2026-11-21" }
       ]
     },
     {
@@ -81,7 +81,7 @@
         { "code": "10.6", "name": "Control Room & Real-Time Operations", "howItSupports": "Describes real-time control-room operation of the distribution network." }
       ],
       "claims": [
-        { "position": 1, "kind": "functional", "statement": "The vendor describes the product for distribution management and outage operations.", "sourceUrl": "https://www.se.com/ww/en/product-range/65424-ecostruxure-adms/", "sourceDate": "2026-11-21", "reviewedBy": "Pending review", "reviewedAt": "2026-11-21" }
+        { "position": 1, "kind": "functional", "statement": "The vendor describes the product for distribution management and outage operations.", "sourceUrl": "https://www.se.com/ww/en/product-range/65424-ecostruxure-adms/", "sourceDate": "2026-11-21", "reviewedBy": "Simon Parkinson", "reviewedAt": "2026-11-21" }
       ]
     },
     {
@@ -94,7 +94,7 @@
         { "code": "10.6", "name": "Control Room & Real-Time Operations", "howItSupports": "Describes real-time operation of the distribution network." }
       ],
       "claims": [
-        { "position": 1, "kind": "functional", "statement": "The vendor describes the product for grid operations and outage management.", "sourceUrl": "https://www.gevernova.com/grid-solutions/", "sourceDate": "2026-11-21", "reviewedBy": "Pending review", "reviewedAt": "2026-11-21" }
+        { "position": 1, "kind": "functional", "statement": "The vendor describes the product for grid operations and outage management.", "sourceUrl": "https://www.gevernova.com/grid-solutions/", "sourceDate": "2026-11-21", "reviewedBy": "Simon Parkinson", "reviewedAt": "2026-11-21" }
       ]
     },
     {
@@ -106,7 +106,7 @@
         { "code": "9.5", "name": "Asset Inspection & Maintenance", "howItSupports": "Describes asset management, maintenance and inspection of physical assets." }
       ],
       "claims": [
-        { "position": 1, "kind": "functional", "statement": "The vendor describes the product for asset management and maintenance.", "sourceUrl": "https://www.ibm.com/products/maximo", "sourceDate": "2026-11-21", "reviewedBy": "Pending review", "reviewedAt": "2026-11-21" }
+        { "position": 1, "kind": "functional", "statement": "The vendor describes the product for asset management and maintenance.", "sourceUrl": "https://www.ibm.com/products/maximo", "sourceDate": "2026-11-21", "reviewedBy": "Simon Parkinson", "reviewedAt": "2026-11-21" }
       ]
     },
     {
@@ -118,7 +118,7 @@
         { "code": "9.5", "name": "Asset Inspection & Maintenance", "howItSupports": "Describes maintenance planning and asset inspection as part of enterprise asset management." }
       ],
       "claims": [
-        { "position": 1, "kind": "functional", "statement": "The vendor describes the product for enterprise asset management and maintenance.", "sourceUrl": "https://www.sap.com/products/erp/asset-management.html", "sourceDate": "2026-11-21", "reviewedBy": "Pending review", "reviewedAt": "2026-11-21" }
+        { "position": 1, "kind": "functional", "statement": "The vendor describes the product for enterprise asset management and maintenance.", "sourceUrl": "https://www.sap.com/products/erp/asset-management.html", "sourceDate": "2026-11-21", "reviewedBy": "Simon Parkinson", "reviewedAt": "2026-11-21" }
       ]
     },
     {
@@ -130,7 +130,7 @@
         { "code": "9.5", "name": "Asset Inspection & Maintenance", "howItSupports": "Describes maintenance and inspection of physical assets." }
       ],
       "claims": [
-        { "position": 1, "kind": "functional", "statement": "The vendor describes the product for enterprise asset management and maintenance.", "sourceUrl": "https://www.infor.com/products/eam", "sourceDate": "2026-11-21", "reviewedBy": "Pending review", "reviewedAt": "2026-11-21" }
+        { "position": 1, "kind": "functional", "statement": "The vendor describes the product for enterprise asset management and maintenance.", "sourceUrl": "https://www.infor.com/products/eam", "sourceDate": "2026-11-21", "reviewedBy": "Simon Parkinson", "reviewedAt": "2026-11-21" }
       ]
     },
     {
@@ -143,7 +143,7 @@
         { "code": "9", "name": "Asset Management", "howItSupports": "Records network assets and their connections in a geographic model." }
       ],
       "claims": [
-        { "position": 1, "kind": "functional", "statement": "The vendor positions the product for utility network management and planning.", "sourceUrl": "https://www.esri.com/en-us/industries/utilities/overview", "sourceDate": "2026-11-21", "reviewedBy": "Pending review", "reviewedAt": "2026-11-21" }
+        { "position": 1, "kind": "functional", "statement": "The vendor positions the product for utility network management and planning.", "sourceUrl": "https://www.esri.com/en-us/industries/utilities/overview", "sourceDate": "2026-11-21", "reviewedBy": "Simon Parkinson", "reviewedAt": "2026-11-21" }
       ]
     },
     {
@@ -156,7 +156,7 @@
         { "code": "9", "name": "Asset Management", "howItSupports": "Records network assets and their connections in a network model." }
       ],
       "claims": [
-        { "position": 1, "kind": "functional", "statement": "The vendor describes the product for utility network modelling and planning.", "sourceUrl": "https://www.gevernova.com/grid-solutions/", "sourceDate": "2026-11-21", "reviewedBy": "Pending review", "reviewedAt": "2026-11-21" }
+        { "position": 1, "kind": "functional", "statement": "The vendor describes the product for utility network modelling and planning.", "sourceUrl": "https://www.gevernova.com/grid-solutions/", "sourceDate": "2026-11-21", "reviewedBy": "Simon Parkinson", "reviewedAt": "2026-11-21" }
       ]
     },
     {
@@ -168,7 +168,7 @@
         { "code": "13.3", "name": "Field Workforce Scheduling & Dispatch", "howItSupports": "Describes scheduling and dispatch of field technicians and work orders." }
       ],
       "claims": [
-        { "position": 1, "kind": "functional", "statement": "The vendor describes the product for scheduling and dispatching field technicians.", "sourceUrl": "https://www.microsoft.com/en-us/dynamics-365/products/field-service", "sourceDate": "2026-11-21", "reviewedBy": "Pending review", "reviewedAt": "2026-11-21" }
+        { "position": 1, "kind": "functional", "statement": "The vendor describes the product for scheduling and dispatching field technicians.", "sourceUrl": "https://www.microsoft.com/en-us/dynamics-365/products/field-service", "sourceDate": "2026-11-21", "reviewedBy": "Simon Parkinson", "reviewedAt": "2026-11-21" }
       ]
     },
     {
@@ -180,7 +180,7 @@
         { "code": "13.3", "name": "Field Workforce Scheduling & Dispatch", "howItSupports": "Describes scheduling, dispatch and work orders for field service teams." }
       ],
       "claims": [
-        { "position": 1, "kind": "functional", "statement": "The vendor describes the product for field service scheduling and work orders.", "sourceUrl": "https://www.salesforce.com/products/field-service/overview/", "sourceDate": "2026-11-21", "reviewedBy": "Pending review", "reviewedAt": "2026-11-21" }
+        { "position": 1, "kind": "functional", "statement": "The vendor describes the product for field service scheduling and work orders.", "sourceUrl": "https://www.salesforce.com/products/field-service/overview/", "sourceDate": "2026-11-21", "reviewedBy": "Simon Parkinson", "reviewedAt": "2026-11-21" }
       ]
     },
     {
@@ -192,7 +192,7 @@
         { "code": "13.1", "name": "Capital Projects & Construction", "howItSupports": "Describes portfolio-level project controls and capital planning." }
       ],
       "claims": [
-        { "position": 1, "kind": "functional", "statement": "The vendor describes the product for capital project and programme controls.", "sourceUrl": "https://www.oracle.com/construction-engineering/primavera-unifier/", "sourceDate": "2026-11-21", "reviewedBy": "Pending review", "reviewedAt": "2026-11-21" }
+        { "position": 1, "kind": "functional", "statement": "The vendor describes the product for capital project and programme controls.", "sourceUrl": "https://www.oracle.com/construction-engineering/primavera-unifier/", "sourceDate": "2026-11-21", "reviewedBy": "Simon Parkinson", "reviewedAt": "2026-11-21" }
       ]
     },
     {
@@ -204,7 +204,7 @@
         { "code": "13.1", "name": "Capital Projects & Construction", "howItSupports": "Describes project scheduling and delivery for capital work." }
       ],
       "claims": [
-        { "position": 1, "kind": "functional", "statement": "The vendor describes the product for project scheduling and delivery.", "sourceUrl": "https://www.oracle.com/construction-engineering/primavera-p6/", "sourceDate": "2026-11-21", "reviewedBy": "Pending review", "reviewedAt": "2026-11-21" }
+        { "position": 1, "kind": "functional", "statement": "The vendor describes the product for project scheduling and delivery.", "sourceUrl": "https://www.oracle.com/construction-engineering/primavera-p6/", "sourceDate": "2026-11-21", "reviewedBy": "Simon Parkinson", "reviewedAt": "2026-11-21" }
       ]
     },
     {
@@ -216,7 +216,7 @@
         { "code": "13.1", "name": "Capital Projects & Construction", "howItSupports": "Describes project planning and scheduling for delivery teams." }
       ],
       "claims": [
-        { "position": 1, "kind": "functional", "statement": "The vendor describes the product for project planning and scheduling.", "sourceUrl": "https://www.microsoft.com/en-us/microsoft-365/project/project-management-software", "sourceDate": "2026-11-21", "reviewedBy": "Pending review", "reviewedAt": "2026-11-21" }
+        { "position": 1, "kind": "functional", "statement": "The vendor describes the product for project planning and scheduling.", "sourceUrl": "https://www.microsoft.com/en-us/microsoft-365/project/project-management-software", "sourceDate": "2026-11-21", "reviewedBy": "Simon Parkinson", "reviewedAt": "2026-11-21" }
       ]
     },
     {
@@ -228,7 +228,7 @@
         { "code": "11.1", "name": "Smart Metering Data", "howItSupports": "Describes collection and processing of smart meter data." }
       ],
       "claims": [
-        { "position": 1, "kind": "functional", "statement": "The vendor describes the product for smart metering data management.", "sourceUrl": "https://www.siemens.com/global/en/products/energy/energy-automation-and-smart-grid/energyip.html", "sourceDate": "2026-11-21", "reviewedBy": "Pending review", "reviewedAt": "2026-11-21" }
+        { "position": 1, "kind": "functional", "statement": "The vendor describes the product for smart metering data management.", "sourceUrl": "https://www.siemens.com/global/en/products/energy/energy-automation-and-smart-grid/energyip.html", "sourceDate": "2026-11-21", "reviewedBy": "Simon Parkinson", "reviewedAt": "2026-11-21" }
       ]
     },
     {
@@ -240,7 +240,7 @@
         { "code": "11.1", "name": "Smart Metering Data", "howItSupports": "Describes collection, validation and storage of meter readings." }
       ],
       "claims": [
-        { "position": 1, "kind": "functional", "statement": "The vendor describes the product for meter data management.", "sourceUrl": "https://www.oracle.com/utilities/meter-data-management/", "sourceDate": "2026-11-21", "reviewedBy": "Pending review", "reviewedAt": "2026-11-21" }
+        { "position": 1, "kind": "functional", "statement": "The vendor describes the product for meter data management.", "sourceUrl": "https://www.oracle.com/utilities/meter-data-management/", "sourceDate": "2026-11-21", "reviewedBy": "Simon Parkinson", "reviewedAt": "2026-11-21" }
       ]
     }
   ]
