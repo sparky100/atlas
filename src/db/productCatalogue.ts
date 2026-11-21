@@ -3,6 +3,7 @@ import type { CatalogueCitation, CatalogueSnapshot, ProductCatalogueContent, Pro
 import type { OptionSource } from '../contracts/optionSource';
 import { productCatalogueContentSchema } from '../contracts/productCatalogue';
 import type { Client } from './client';
+import { listOptionWebSources } from './optionWebSources';
 
 export type { CatalogueStanding };
 
@@ -167,12 +168,12 @@ export function optionSourcesFromRows(rows: readonly OptionCatalogueSourceRow[],
   }));
 }
 
-/** Every saved catalogue citation on a decision, ready for the option blocks and the pack. */
+/** Every source saved with a decision's options: reviewed catalogue claims first, then web pages. */
 export async function listOptionSources(client: Client, decisionId: string): Promise<OptionSource[]> {
-  const rows = await listCatalogueSources(client, decisionId);
-  if (rows.length === 0) return [];
+  const [rows, web] = await Promise.all([listCatalogueSources(client, decisionId), listOptionWebSources(client, decisionId)]);
+  if (rows.length === 0) return web;
   const standing = await catalogueStandingByCitation(client, rows.map((r) => ({ sector: r.catalogue_sector, version: r.catalogue_version })));
-  return optionSourcesFromRows(rows, standing);
+  return [...optionSourcesFromRows(rows, standing), ...web];
 }
 
 /** The map item a seeded capability came from, via `attributes.templateRef`. */

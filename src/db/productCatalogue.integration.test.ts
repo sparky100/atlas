@@ -15,6 +15,7 @@ import { createDecision, createDecisionLink } from './decisions';
 import { createChangeBranch, getMainBranch } from './branches';
 import { markOptionEdited } from './decisionOptionMarks';
 import { addOptionWithCatalogueSources, catalogueToRows, catalogueSnapshotFromRows, listCatalogueSources, listOptionSources } from './productCatalogue';
+import { listOptionWebSources } from './optionWebSources';
 
 function at<T>(items: readonly T[], index = 0): T {
   const value = items[index];
@@ -220,7 +221,9 @@ describe('product catalogue and option evidence, real database', () => {
     expect(sources[0]?.cited_by).toBe(contributor.id);
     const mapped = await listOptionSources(viewer.client, m.decisionId);
     expect(mapped[0]).toMatchObject({ kind: 'catalogue', branchId: m.branchId, product: 'Quotation Tool', standing: 'current' });
-    expect(mapped[0]?.claims).toHaveLength(1);
+    const first = mapped[0];
+    if (first?.kind !== 'catalogue') throw new Error('Expected a catalogue source');
+    expect(first.claims).toHaveLength(1);
     await markOptionEdited(owner.client, { decisionId: m.decisionId, branchId: m.branchId, editedBy: owner.id, editedAt: '2026-11-20T10:02:00Z' });
     await addOptionWithCatalogueSources(contributor.client, m, [s.citation]);
     expect(await listCatalogueSources(viewer.client, m.decisionId)).toHaveLength(1);
@@ -228,6 +231,23 @@ describe('product catalogue and option evidence, real database', () => {
     check(marks); expect(marks.data?.[0]?.edited_by).toBe(owner.id);
     await expect(addOptionWithCatalogueSources(contributor.client, { ...m, suggestedTitle: 'Different draft' }, [s.citation])).rejects.toThrow('different provenance');
     await expect(addOptionWithCatalogueSources(contributor.client, m, [{ ...s.citation, entryCode: 'different-entry' }])).rejects.toThrow('different provenance');
+  });
+
+  it('saves web sources append-only and only for decision members', async () => {
+    const m = await option();
+    await createDecisionLink(owner.client, { decisionId: m.decisionId, linkedType: 'branch', linkedId: m.branchId, createdBy: owner.id });
+    const base = { decision_id: m.decisionId, branch_id: m.branchId, url: 'https://example.com/evidence', title: 'Evidence', publisher: 'Example', excerpt: 'Says so.', retrieved_at: '2026-11-21T10:00:00Z', cited_by: contributor.id };
+    check(await contributor.client.from('option_web_sources').insert(base));
+    expect(await listOptionWebSources(viewer.client, m.decisionId)).toHaveLength(1);
+    expect(await listOptionWebSources(outsider.client, m.decisionId)).toEqual([]);
+    expect((await anon.from('option_web_sources').select('*')).error).not.toBeNull();
+    expect((await viewer.client.from('option_web_sources').insert({ ...base, url: 'https://example.com/viewer', cited_by: viewer.id })).error).not.toBeNull();
+    expect((await contributor.client.from('option_web_sources').insert({ ...base, url: 'https://example.com/spoof', cited_by: owner.id })).error).not.toBeNull();
+    expect((await contributor.client.from('option_web_sources').insert({ ...base, url: 'http://example.com/insecure' })).error).not.toBeNull();
+    expect((await contributor.client.from('option_web_sources').insert(base)).error).not.toBeNull();
+    expect((await owner.client.from('option_web_sources').update({ title: 'Changed' }).eq('decision_id', m.decisionId)).error).not.toBeNull();
+    expect((await owner.client.from('option_web_sources').delete().eq('decision_id', m.decisionId)).error).not.toBeNull();
+    expect((await service.from('option_web_sources').delete().eq('decision_id', m.decisionId)).error).not.toBeNull();
   });
 
   it('rolls back link and mark on a bad source, then safely retries with the same branch ID', async () => {

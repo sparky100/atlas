@@ -26,10 +26,14 @@ describe('optionSourcesFromRows', () => {
       kind: 'catalogue', branchId: 'branch-1', product: 'CRM X', vendor: 'Vendor Ltd', standing: 'replaced',
       id: 'branch-1\u0000electricity_network\u00001\u0000crm-x',
     });
-    expect(sources[0]?.claims[0]?.statement).toBe('Records complaints.');
+    const first = sources[0];
+    if (first?.kind !== 'catalogue') throw new Error('Expected a catalogue source');
+    expect(first.claims[0]?.statement).toBe('Records complaints.');
   });
 
   it('never presents a citation with no standing as current', () => {
-    expect(optionSourcesFromRows([row], new Map())[0]?.standing).toBe('withdrawn');
+    const first = optionSourcesFromRows([row], new Map())[0];
+    if (first?.kind !== 'catalogue') throw new Error('Expected a catalogue source');
+    expect(first.standing).toBe('withdrawn');
   });
 });
