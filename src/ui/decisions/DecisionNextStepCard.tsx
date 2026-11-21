@@ -10,10 +10,11 @@ export interface DecisionNextStepCardProps {
   /** Names of the people the handoff went to, once it has been sent. */
   askedNames: readonly string[] | null;
   error: string | null;
+  showSecondOpinion?: boolean;
 }
 
 /** "What to do next" at the top of a decision: one sentence, one button, for the role of whoever is looking. */
-export function DecisionNextStepCard({ step, onAction, busy, askedNames, error }: DecisionNextStepCardProps) {
+export function DecisionNextStepCard({ step, onAction, busy, askedNames, error, showSecondOpinion = false }: DecisionNextStepCardProps) {
   const asked = step.action === 'ask-to-choose' && askedNames !== null;
   return (
     <Panel>
@@ -30,6 +31,7 @@ export function DecisionNextStepCard({ step, onAction, busy, askedNames, error }
             {step.actionLabel}
           </Button>
         )}
+        {showSecondOpinion && <Text as="p" size="sm"><a href="#second-opinion">Want a second opinion first?</a></Text>}
         {error !== null && <Text as="p">{error}</Text>}
       </div>
     </Panel>

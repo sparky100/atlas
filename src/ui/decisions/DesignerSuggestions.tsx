@@ -6,7 +6,7 @@ import { DESIGNER_MAX_FINDING_CHARS } from '../../tools/designPrompt';
 import { Button } from '../components/Button/Button';
 import { useMembership } from '../orgs/useMembership';
 import { useMembers } from '../orgs/useMembers';
-import { profileLabel } from '../comments/profileLabel';
+import { ownerNames as namesOfOwners } from '../orgs/ownerNames';
 import { Chip } from '../components/Chip/Chip';
 import { Text } from '../components/Text/Text';
 import { supabase } from '../supabaseClient';
@@ -61,7 +61,7 @@ export function DesignerSuggestions({ orgId, userId, modelId, elementId, brief, 
   const { role } = useMembership(orgId, userId);
   const trial = useDesignerTrial(orgId, 'panel');
   const { members } = useMembers(orgId);
-  const ownerNames = members.filter((m) => m.member.role === 'owner').map((m) => profileLabel(m.profile));
+  const ownerNames = namesOfOwners(members);
   const [ranOnTrial, setRanOnTrial] = useState(0);
   const onTrial = trial !== null && !trial.keySet;
   const heldKey = pendingKey(orgId, userId, `designer-${scope}`);

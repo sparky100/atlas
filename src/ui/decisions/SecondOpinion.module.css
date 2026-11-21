@@ -1,0 +1,11 @@
+.actions, .noteActions { display: flex; flex-wrap: wrap; gap: var(--space-2); margin: var(--space-3) 0; }
+.details { margin: var(--space-3) 0; }
+.details summary { cursor: pointer; text-decoration: underline; }
+.details ul { padding-left: var(--space-5); }
+.progress { padding: var(--space-3); border: 1px solid var(--border); border-radius: var(--radius-sm); }
+.review { border-top: 1px solid var(--border); padding-top: var(--space-3); margin-top: var(--space-4); }
+.notes { padding-left: var(--space-5); }
+.note { padding: var(--space-3) 0; border-bottom: 1px solid var(--border); }
+.question { display: flex; flex-direction: column; gap: var(--space-1); font-weight: 600; }
+.question textarea { width: 100%; min-height: 4rem; box-sizing: border-box; padding: var(--space-2); border: 1px solid var(--border-strong); border-radius: var(--radius-sm); background: var(--surface); color: var(--text); font: inherit; font-weight: 400; resize: vertical; }
+@media (max-width: 420px) { .actions, .noteActions { flex-direction: column; } .actions button, .noteActions button { width: 100%; } }

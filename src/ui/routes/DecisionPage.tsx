@@ -35,7 +35,7 @@ export function DecisionPage() {
   const { organisation, loading: orgLoading } = useOrganisationBySlug(orgSlug ?? '');
   const { models, loading: modelsLoading } = useModels(organisation?.id ?? null);
   const model = models.find((m) => m.slug === modelSlug);
-  const { role } = useMembership(organisation?.id ?? null, userId);
+  const { role, loading: membershipLoading } = useMembership(organisation?.id ?? null, userId);
   // The one `useDecision` call for this page — `DecisionView` below reads
   // this same `state` and its write-result patches as props rather than
   // fetching its own second, independent copy (it used to; see
@@ -65,7 +65,7 @@ export function DecisionPage() {
     if (ownOptionSelected) clearRef();
   }, [ownOptionSelected, clearRef]);
 
-  if (orgLoading || modelsLoading || !model) {
+  if (orgLoading || modelsLoading || membershipLoading || !model) {
     return (
       <div>
         <AppHeader orgId={organisation?.id ?? null} />
@@ -99,12 +99,17 @@ export function DecisionPage() {
             </Text>
           </div>
           <DecisionView
+            key={decisionId}
             modelId={model.id}
             decisionId={decisionId ?? ''}
             orgId={organisation?.id ?? ''}
             orgSlug={orgSlug ?? ''}
             modelSlug={model.slug}
             role={role}
+            assistantEnabled={organisation?.ai_assistant_enabled === true}
+            agentsEnabled={organisation?.ai_agents_enabled === true}
+            keySet={organisation?.ai_agent_key_set === true}
+            shareCost={organisation?.ai_share_run_cost === true}
             state={state}
             applyNewOption={applyNewOption}
             applyNewConcern={applyNewConcern}
