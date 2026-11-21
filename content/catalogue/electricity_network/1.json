@@ -1,0 +1,138 @@
+{
+  "sector": "electricity_network",
+  "version": 1,
+  "capabilityMapVersion": 4,
+  "status": "draft",
+  "title": "Electricity network product catalogue, version 1",
+  "sourceDescription": "Drafted from public vendor product pages on 21 November 2026 for review. Every claim is a dated statement from the vendor's own page and is not yet signed; nothing here is published until a named reviewer signs each claim.",
+  "licence": "CC-BY-4.0",
+  "entries": [
+    {
+      "code": "oracle-ccb",
+      "product": "Oracle Utilities Customer Care and Billing",
+      "vendor": "Oracle",
+      "summary": "Customer care and billing software for utility accounts, positioned by the vendor for regulated and retail utility operations.",
+      "capabilities": [
+        { "code": "11.4", "name": "Connection Quotations", "howItSupports": "The vendor positions the product for utility customer operations, including quotation and customer account journeys." },
+        { "code": "11.5", "name": "Billing & Settlement", "howItSupports": "The vendor describes billing as a core part of the product's utility customer care scope." }
+      ],
+      "claims": [
+        { "position": 1, "kind": "functional", "statement": "The vendor positions the product for utility customer care and billing.", "sourceUrl": "https://www.oracle.com/utilities/customer-care-and-billing/", "sourceDate": "2026-11-21", "reviewedBy": "Pending review", "reviewedAt": "2026-11-21" },
+        { "position": 2, "kind": "integration", "statement": "The vendor describes the product as part of its wider suite of utility applications.", "sourceUrl": "https://www.oracle.com/utilities/", "sourceDate": "2026-11-21", "reviewedBy": "Pending review", "reviewedAt": "2026-11-21" }
+      ]
+    },
+    {
+      "code": "sap-s4hana-utilities",
+      "product": "SAP S/4HANA Utilities",
+      "vendor": "SAP",
+      "summary": "An industry solution for utility billing, customer service and meter-to-cash processes on the vendor's enterprise platform.",
+      "capabilities": [
+        { "code": "11.4", "name": "Connection Quotations", "howItSupports": "The vendor positions the industry solution for utility customer service and connection processes." },
+        { "code": "11.5", "name": "Billing & Settlement", "howItSupports": "The vendor describes utility billing and meter-to-cash as part of the industry solution." }
+      ],
+      "claims": [
+        { "position": 1, "kind": "functional", "statement": "The vendor positions the industry solution for utility customer service and billing processes.", "sourceUrl": "https://www.sap.com/industries/utilities.html", "sourceDate": "2026-11-21", "reviewedBy": "Pending review", "reviewedAt": "2026-11-21" },
+        { "position": 2, "kind": "integration", "statement": "The vendor describes the industry solution as running on its enterprise platform alongside other business applications.", "sourceUrl": "https://www.sap.com/products/erp/s4hana.html", "sourceDate": "2026-11-21", "reviewedBy": "Pending review", "reviewedAt": "2026-11-21" }
+      ]
+    },
+    {
+      "code": "salesforce-energy-utilities",
+      "product": "Salesforce Energy and Utilities Cloud",
+      "vendor": "Salesforce",
+      "summary": "A customer relationship platform configured for energy and utility customer operations, including quotations and service journeys.",
+      "capabilities": [
+        { "code": "11.4", "name": "Connection Quotations", "howItSupports": "The vendor positions the product for utility customer journeys, including quotation and service requests." }
+      ],
+      "claims": [
+        { "position": 1, "kind": "functional", "statement": "The vendor positions the product for energy and utility customer operations.", "sourceUrl": "https://www.salesforce.com/industries/energy-utilities/", "sourceDate": "2026-11-21", "reviewedBy": "Pending review", "reviewedAt": "2026-11-21" }
+      ]
+    },
+    {
+      "code": "kraken",
+      "product": "Kraken",
+      "vendor": "Kraken Technologies",
+      "summary": "A customer platform for energy retailers, covering account management, billing and customer service operations.",
+      "capabilities": [
+        { "code": "11.4", "name": "Connection Quotations", "howItSupports": "The vendor positions the platform for energy customer operations, including quotes and account journeys." },
+        { "code": "11.5", "name": "Billing & Settlement", "howItSupports": "The vendor describes billing and account management as part of the platform." }
+      ],
+      "claims": [
+        { "position": 1, "kind": "functional", "statement": "The vendor describes a customer platform for energy retailers.", "sourceUrl": "https://kraken.tech/", "sourceDate": "2026-11-21", "reviewedBy": "Pending review", "reviewedAt": "2026-11-21" },
+        { "position": 2, "kind": "functional", "statement": "The vendor describes billing and account management as part of the platform's customer operations.", "sourceUrl": "https://kraken.tech/", "sourceDate": "2026-11-21", "reviewedBy": "Pending review", "reviewedAt": "2026-11-21" }
+      ]
+    },
+    {
+      "code": "gentrack",
+      "product": "Gentrack",
+      "vendor": "Gentrack",
+      "summary": "Billing and customer management software for utilities, positioned for energy and water retailers.",
+      "capabilities": [
+        { "code": "11.4", "name": "Connection Quotations", "howItSupports": "The vendor positions the product for utility customer management, including quotations and onboarding." },
+        { "code": "11.5", "name": "Billing & Settlement", "howItSupports": "The vendor describes billing as a core part of the product." }
+      ],
+      "claims": [
+        { "position": 1, "kind": "functional", "statement": "The vendor describes billing and customer management software for utilities.", "sourceUrl": "https://www.gentrack.com/", "sourceDate": "2026-11-21", "reviewedBy": "Pending review", "reviewedAt": "2026-11-21" }
+      ]
+    },
+    {
+      "code": "microsoft-d365-field-service",
+      "product": "Microsoft Dynamics 365 Field Service",
+      "vendor": "Microsoft",
+      "summary": "Field service management for scheduling, dispatching and completing work orders for technicians.",
+      "capabilities": [
+        { "code": "13.3", "name": "Field Workforce Scheduling & Dispatch", "howItSupports": "The vendor describes scheduling and dispatch of field technicians and work orders." }
+      ],
+      "claims": [
+        { "position": 1, "kind": "functional", "statement": "The vendor describes the product for scheduling and dispatching field technicians.", "sourceUrl": "https://www.microsoft.com/en-us/dynamics-365/products/field-service", "sourceDate": "2026-11-21", "reviewedBy": "Pending review", "reviewedAt": "2026-11-21" }
+      ]
+    },
+    {
+      "code": "salesforce-field-service",
+      "product": "Salesforce Field Service",
+      "vendor": "Salesforce",
+      "summary": "Field service scheduling, dispatch and work-order management built on the vendor's customer platform.",
+      "capabilities": [
+        { "code": "13.3", "name": "Field Workforce Scheduling & Dispatch", "howItSupports": "The vendor describes scheduling, dispatch and work orders for field service teams." }
+      ],
+      "claims": [
+        { "position": 1, "kind": "functional", "statement": "The vendor describes the product for field service scheduling and work orders.", "sourceUrl": "https://www.salesforce.com/products/field-service/overview/", "sourceDate": "2026-11-21", "reviewedBy": "Pending review", "reviewedAt": "2026-11-21" }
+      ]
+    },
+    {
+      "code": "ifs-cloud-fsm",
+      "product": "IFS Cloud Field Service Management",
+      "vendor": "IFS",
+      "summary": "Field service planning, scheduling and dispatch for service organisations, within the vendor's enterprise suite.",
+      "capabilities": [
+        { "code": "13.3", "name": "Field Workforce Scheduling & Dispatch", "howItSupports": "The vendor describes field service planning and dispatch for service teams." }
+      ],
+      "claims": [
+        { "position": 1, "kind": "functional", "statement": "The vendor describes the product for field service planning and dispatch.", "sourceUrl": "https://www.ifs.com/en/products/field-service-management", "sourceDate": "2026-11-21", "reviewedBy": "Pending review", "reviewedAt": "2026-11-21" }
+      ]
+    },
+    {
+      "code": "ibm-maximo",
+      "product": "IBM Maximo Application Suite",
+      "vendor": "IBM",
+      "summary": "Asset management and maintenance software for physical assets, including inspection and work management.",
+      "capabilities": [
+        { "code": "9.5", "name": "Asset Inspection & Maintenance", "howItSupports": "The vendor describes asset management, maintenance and inspection of physical assets." }
+      ],
+      "claims": [
+        { "position": 1, "kind": "functional", "statement": "The vendor describes the product for asset management and maintenance.", "sourceUrl": "https://www.ibm.com/products/maximo", "sourceDate": "2026-11-21", "reviewedBy": "Pending review", "reviewedAt": "2026-11-21" }
+      ]
+    },
+    {
+      "code": "sap-asset-management",
+      "product": "SAP Asset Management",
+      "vendor": "SAP",
+      "summary": "Enterprise asset management for maintenance planning, work orders and asset inspection.",
+      "capabilities": [
+        { "code": "9.5", "name": "Asset Inspection & Maintenance", "howItSupports": "The vendor describes maintenance planning and asset inspection as part of enterprise asset management." }
+      ],
+      "claims": [
+        { "position": 1, "kind": "functional", "statement": "The vendor describes the product for enterprise asset management and maintenance.", "sourceUrl": "https://www.sap.com/products/erp/asset-management.html", "sourceDate": "2026-11-21", "reviewedBy": "Pending review", "reviewedAt": "2026-11-21" }
+      ]
+    }
+  ]
+}
