@@ -242,7 +242,7 @@ export function DecisionCriteriaGrid({ decisionId, options, canRate, userId, nee
                     <div className={styles.optionHeaderActions}>
                       <Link to={`/o/${orgSlug}/m/${modelSlug}/decisions/${decisionId}/options/${o.branchId}/landscape`}>
                         <Text as="span" size="sm">
-                          View diagram →
+                          Preview impact →
                         </Text>
                       </Link>
                       {canEditOption(o) && (
@@ -360,7 +360,7 @@ export function DecisionCriteriaGrid({ decisionId, options, canRate, userId, nee
               })}
             </div>
             <div className={styles.optionHeaderActions}>
-              <Link to={`/o/${orgSlug}/m/${modelSlug}/decisions/${decisionId}/options/${o.branchId}/landscape`}>View diagram →</Link>
+              <Link to={`/o/${orgSlug}/m/${modelSlug}/decisions/${decisionId}/options/${o.branchId}/landscape`}>Preview impact →</Link>
               {canEditOption(o) && <Button variant="secondary" onClick={() => { onWorkOnThisChange(o.branchId); }}>Edit this change</Button>}
               {o.canChoose && <Button variant="secondary" onClick={() => { onChoose(o.branchId); }}>Choose</Button>}
               {o.isChosen && canWorkOnChange && o.status === 'draft' && <Button variant="primary" onClick={() => { onWorkOnThisChange(o.branchId); }}>Work on this as a change</Button>}

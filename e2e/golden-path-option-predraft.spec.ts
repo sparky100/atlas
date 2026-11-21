@@ -26,7 +26,9 @@ async function openOptionDraft(page: Page, title: string) {
   await page.getByPlaceholder("What's this option? (e.g. Replace with Workday)").fill(title);
   await page.getByRole('button', { name: 'Add option' }).click();
   await expect(page.getByText(title).first()).toBeVisible();
-  await page.getByRole('link', { name: 'View diagram →' }).first().click();
+  await page.getByRole('link', { name: 'Preview impact →' }).first().click();
+  await expect(page.getByTestId('option-diagram-no-edits')).toContainText('there is no impact to preview');
+  await expect(page.locator('canvas')).toHaveCount(0);
   await page.getByTestId('option-diagram-no-edits').getByRole('link', { name: 'Draft the obvious edits →' }).click();
 }
 

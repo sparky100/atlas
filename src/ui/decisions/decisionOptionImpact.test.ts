@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import type { ElementsHeadRow, Json, RelationshipsHeadRow } from '../../contracts/rows';
 import type { ElementRow, RelationshipRow } from '../../engine/deltas';
 import type { ElementVersionDiff, RelationshipVersionDiff, VersionDiff } from '../../engine/versionDiff';
-import { impactedLaneKeys, scopeLaneKeys } from './decisionOptionImpact';
+import { impactedLaneKeys, optionImpactSystemIds, scopeLaneKeys } from './decisionOptionImpact';
 
 function capability(id: string, name: string): ElementsHeadRow {
   return { element_id: id, element_type: 'capability', name, parent_id: null, attributes: {}, exists_delta_id: `d-${id}` };
@@ -73,5 +73,18 @@ describe('scopeLaneKeys', () => {
 
   it('is empty when the decision names nothing in the landscape', () => {
     expect(scopeLaneKeys(new Set(), [sysA, sysB], supportsEdges, l1)).toEqual(new Set());
+  });
+});
+
+describe('optionImpactSystemIds', () => {
+  const ids = new Set(['sys-a', 'sys-b']);
+  it('does not turn a capability with many supporters into many touched systems', () => {
+    expect(optionImpactSystemIds({ elements: [elementDiff('sys-a', 'changed'), elementDiff('sys-b', 'unchanged')], relationships: [] }, ids)).toEqual(new Set());
+    const renamed = { ...elementDiff('sys-a', 'changed'), changedAttributes: ['name'], toBe: elementRow('Renamed') };
+    expect(optionImpactSystemIds({ elements: [renamed, elementDiff('sys-b', 'unchanged')], relationships: [] }, ids)).toEqual(new Set(['sys-a']));
+  });
+  it('includes both system ends of a changed connection and removed systems', () => {
+    const diff: VersionDiff = { elements: [elementDiff('sys-a', 'removed')], relationships: [relationshipDiff('edge', 'removed', 'sys-a', 'sys-b')] };
+    expect(optionImpactSystemIds(diff, ids)).toEqual(new Set(['sys-a', 'sys-b']));
   });
 });

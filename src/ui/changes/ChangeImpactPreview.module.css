@@ -1,0 +1,7 @@
+.summary {
+  cursor: pointer;
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+.body { padding-top: var(--space-3); }
+.body p { margin: var(--space-2) 0; }
