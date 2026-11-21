@@ -72,7 +72,7 @@ test('from Home: AI questions can be weighed, edited, kept for a return visit or
   expect(await page.evaluate(() => document.documentElement.scrollWidth > document.documentElement.clientWidth + 1)).toBe(false);
 });
 
-test('failed and stopped runs keep earlier questions and do not create a clearance', async ({ page }) => {
+test('failed and stopped runs keep no partial questions and do not create a clearance', async ({ page }) => {
   test.slow();
   await createDecisionWithOption(page);
   await enableReviewers(page);

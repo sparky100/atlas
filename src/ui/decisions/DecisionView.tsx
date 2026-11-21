@@ -672,7 +672,7 @@ export function DecisionView({ modelId, decisionId, orgId, orgSlug, modelSlug, r
         </Panel>
       )}
 
-      <SecondOpinion orgId={orgId} userId={userId} decisionId={decisionId} orgSlug={orgSlug} shareCost={shareCost} availability={secondOpinion} />
+      <SecondOpinion key={`${decisionId}:${userId ?? ''}`} orgId={orgId} userId={userId} decisionId={decisionId} orgSlug={orgSlug} shareCost={shareCost} availability={secondOpinion} />
 
       {decision.status === 'accepted' && chosenBranch !== undefined && (
         <DecisionGoLive
