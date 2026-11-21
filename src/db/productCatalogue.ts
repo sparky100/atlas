@@ -69,3 +69,147 @@ export function catalogueSnapshotFromRows(rows: CatalogueRows, entryId: string):
     catalogueTitle: content.title, licence: content.licence, entryCode: e.code, product: e.product, vendor: e.vendor,
     summary: e.summary, capabilities: [...e.capabilities].sort((a, b) => a.code.localeCompare(b.code)), claims: [...e.claims].sort((a, b) => a.position - b.position) };
 }
+
+/* eslint-disable @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-argument -- untyped Supabase client; see src/db/branches.ts's module comment. */
+
+// ---------------------------------------------------------------------------
+// D3 PR 3: reading the current published catalogue. The one query path the
+// capability-page section, the citation panel and (later) the Designer tool
+// use, so they cannot disagree about "the current version". "Current" is the
+// highest published, non-withdrawn version of a sector.
+// ---------------------------------------------------------------------------
+
+export interface CapabilityCatalogueMatch {
+  sector: string;
+  /** The catalogue's pinned starter-map version (not the catalogue's own version). */
+  capabilityMapVersion: number;
+  capabilityCode: string;
+  capabilityName: string;
+}
+
+export interface CatalogueClaim {
+  statement: string;
+  kind: 'functional' | 'deployment' | 'licensing_model' | 'support_end' | 'integration';
+  sourceUrl: string;
+  sourceDate: string;
+  reviewedBy: string;
+  reviewedAt: string;
+}
+
+export interface CatalogueEntry {
+  id: string;
+  code: string;
+  product: string;
+  vendor: string;
+  summary: string;
+  howItSupports: string;
+  claims: CatalogueClaim[];
+}
+
+export type CatalogueStanding = 'current' | 'replaced' | 'withdrawn';
+
+export interface CitedCatalogueEntry extends CatalogueEntry {
+  sector: string;
+  version: number;
+  title: string;
+  licence: string;
+  publishedAt: string | null;
+  standing: CatalogueStanding;
+  withdrawnReason: string | null;
+  newerVersion: number | null;
+}
+
+/** The map item a seeded capability came from, via `attributes.templateRef`. */
+export async function capabilityMapMatch(client: Client, templateRef: string): Promise<CapabilityCatalogueMatch | null> {
+  const item = await client.from('capability_map_items').select('map_id, code, name').eq('id', templateRef).maybeSingle();
+  if (item.error) throw new Error(`capabilityMapMatch: ${item.error.message}`);
+  const row = item.data;
+  if (!row) return null;
+  const map = await client.from('capability_maps').select('sector, version').eq('id', row.map_id).maybeSingle();
+  if (map.error) throw new Error(`capabilityMapMatch: ${map.error.message}`);
+  const mapRow = map.data;
+  if (!mapRow) return null;
+  return { sector: mapRow.sector, capabilityMapVersion: mapRow.version, capabilityCode: row.code, capabilityName: row.name };
+}
+
+async function currentCatalogue(client: Client, sector: string): Promise<{ id: string; version: number; title: string; published_at: string | null } | null> {
+  const { data, error } = await client
+    .from('product_catalogues')
+    .select('id, version, title, published_at')
+    .eq('sector', sector)
+    .eq('status', 'published')
+    .is('withdrawn_at', null)
+    .order('version', { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  if (error) throw new Error(`currentCatalogue: ${error.message}`);
+  return data;
+}
+
+async function claimsForEntries(client: Client, entryIds: readonly string[]): Promise<Map<string, CatalogueClaim[]>> {
+  const byEntry = new Map<string, CatalogueClaim[]>();
+  if (entryIds.length === 0) return byEntry;
+  const { data, error } = await client
+    .from('catalogue_claims')
+    .select('entry_id, statement, kind, source_url, source_date, reviewed_by, reviewed_at, position')
+    .in('entry_id', entryIds)
+    .order('position', { ascending: true });
+  if (error) throw new Error(`claimsForEntries: ${error.message}`);
+  for (const row of (data as { entry_id: string; statement: string; kind: CatalogueClaim['kind']; source_url: string; source_date: string; reviewed_by: string; reviewed_at: string }[] | null) ?? []) {
+    const list = byEntry.get(row.entry_id) ?? [];
+    list.push({ statement: row.statement, kind: row.kind, sourceUrl: row.source_url, sourceDate: row.source_date, reviewedBy: row.reviewed_by, reviewedAt: row.reviewed_at });
+    byEntry.set(row.entry_id, list);
+  }
+  return byEntry;
+}
+
+/** Current published entries that support this capability code, with their claims. */
+export async function listCurrentCatalogueEntriesForCapability(client: Client, match: { sector: string; capabilityCode: string }): Promise<CatalogueEntry[]> {
+  const catalogue = await currentCatalogue(client, match.sector);
+  if (!catalogue) return [];
+  const links = await client.from('catalogue_entry_capabilities').select('entry_id, how_it_supports').eq('capability_code', match.capabilityCode);
+  if (links.error) throw new Error(`listCurrentCatalogueEntriesForCapability: ${links.error.message}`);
+  const linkRows = (links.data as { entry_id: string; how_it_supports: string }[] | null) ?? [];
+  if (linkRows.length === 0) return [];
+  const entryIds = linkRows.map((l) => l.entry_id);
+  const entries = await client.from('catalogue_entries').select('id, code, product, vendor, summary').eq('catalogue_id', catalogue.id).in('id', entryIds);
+  if (entries.error) throw new Error(`listCurrentCatalogueEntriesForCapability: ${entries.error.message}`);
+  const entryRows = (entries.data as { id: string; code: string; product: string; vendor: string; summary: string }[] | null) ?? [];
+  const howByEntry = new Map(linkRows.map((l) => [l.entry_id, l.how_it_supports]));
+  const claims = await claimsForEntries(client, entryRows.map((e) => e.id));
+  return entryRows
+    .map((e) => ({ id: e.id, code: e.code, product: e.product, vendor: e.vendor, summary: e.summary, howItSupports: howByEntry.get(e.id) ?? '', claims: claims.get(e.id) ?? [] }))
+    .sort((a, b) => a.product.localeCompare(b.product));
+}
+
+/** One entry by the citation stored on an option or a pack, with its standing. */
+export async function catalogueEntryByCitation(client: Client, citation: CatalogueCitation): Promise<CitedCatalogueEntry | null> {
+  const catalogue = await client
+    .from('product_catalogues')
+    .select('id, version, title, licence, published_at, withdrawn_at, withdrawn_reason')
+    .eq('sector', citation.sector)
+    .eq('version', citation.version)
+    .eq('status', 'published')
+    .maybeSingle();
+  if (catalogue.error) throw new Error(`catalogueEntryByCitation: ${catalogue.error.message}`);
+  const cat = catalogue.data;
+  if (!cat) return null;
+  const entry = await client.from('catalogue_entries').select('id, code, product, vendor, summary').eq('catalogue_id', cat.id).eq('code', citation.entryCode).maybeSingle();
+  if (entry.error) throw new Error(`catalogueEntryByCitation: ${entry.error.message}`);
+  const row = entry.data;
+  if (!row) return null;
+  const link = await client.from('catalogue_entry_capabilities').select('how_it_supports').eq('entry_id', row.id).limit(1).maybeSingle();
+  if (link.error) throw new Error(`catalogueEntryByCitation: ${link.error.message}`);
+  const claims = (await claimsForEntries(client, [row.id])).get(row.id) ?? [];
+  const current = await currentCatalogue(client, citation.sector);
+  const newer = current !== null && current.version > cat.version ? current.version : null;
+  const standing: CatalogueStanding = cat.withdrawn_at !== null ? 'withdrawn' : newer !== null ? 'replaced' : 'current';
+  return {
+    id: row.id, code: row.code, product: row.product, vendor: row.vendor, summary: row.summary,
+    howItSupports: (link.data)?.how_it_supports ?? '', claims,
+    sector: citation.sector, version: cat.version, title: cat.title, licence: cat.licence, publishedAt: cat.published_at,
+    standing, withdrawnReason: cat.withdrawn_reason, newerVersion: newer,
+  };
+}
+
+/* eslint-enable @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-argument */
