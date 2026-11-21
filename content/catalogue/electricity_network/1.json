@@ -1,0 +1,247 @@
+{
+  "sector": "electricity_network",
+  "version": 1,
+  "capabilityMapVersion": 4,
+  "status": "draft",
+  "title": "Electricity network product catalogue, version 1",
+  "sourceDescription": "A first coverage slice for a distribution network operator, drafted from public vendor product pages on 21 November 2026 for review. Every claim is a dated statement from the vendor's own page and is not yet signed; nothing here is published until a named reviewer signs each claim. Coverage is deliberately a first slice: absence of a product is not a judgement that the capability does not matter.",
+  "licence": "CC-BY-4.0",
+  "entries": [
+    {
+      "code": "salesforce-service-cloud",
+      "product": "Salesforce Service Cloud",
+      "vendor": "Salesforce",
+      "summary": "Customer service and case management across contact channels, used by utilities to handle customer contact, complaints and outage enquiries.",
+      "capabilities": [
+        { "code": "5", "name": "Customer Contact", "howItSupports": "Holds the customer record and service cases across channels, including contact during an outage." },
+        { "code": "5.4", "name": "Complaints & Feedback", "howItSupports": "Records complaints and feedback as cases with an owner and history." }
+      ],
+      "claims": [
+        { "position": 1, "kind": "functional", "statement": "The vendor describes the product for customer service cases and contact across channels.", "sourceUrl": "https://www.salesforce.com/service/cloud/", "sourceDate": "2026-11-21", "reviewedBy": "Pending review", "reviewedAt": "2026-11-21" },
+        { "position": 2, "kind": "functional", "statement": "The vendor describes complaint and feedback handling as part of customer service.", "sourceUrl": "https://www.salesforce.com/service/cloud/", "sourceDate": "2026-11-21", "reviewedBy": "Pending review", "reviewedAt": "2026-11-21" }
+      ]
+    },
+    {
+      "code": "microsoft-d365-customer-service",
+      "product": "Microsoft Dynamics 365 Customer Service",
+      "vendor": "Microsoft",
+      "summary": "Customer service, case management and contact handling, positioned for organisations that need a single view of the customer.",
+      "capabilities": [
+        { "code": "5", "name": "Customer Contact", "howItSupports": "Holds the customer record and service cases across channels, including contact during an outage." },
+        { "code": "5.4", "name": "Complaints & Feedback", "howItSupports": "Records complaints and feedback as cases with an owner and history." },
+        { "code": "11.4", "name": "Connection Quotations", "howItSupports": "Can record and track a connection enquiry as a customer case." }
+      ],
+      "claims": [
+        { "position": 1, "kind": "functional", "statement": "The vendor describes the product for customer service and case management.", "sourceUrl": "https://www.microsoft.com/en-us/dynamics-365/products/customer-service", "sourceDate": "2026-11-21", "reviewedBy": "Pending review", "reviewedAt": "2026-11-21" }
+      ]
+    },
+    {
+      "code": "genesys-cloud-cx",
+      "product": "Genesys Cloud CX",
+      "vendor": "Genesys",
+      "summary": "Contact-centre routing across voice and digital channels, the channel layer beneath a customer service record.",
+      "capabilities": [
+        { "code": "5.1", "name": "Contact Channels", "howItSupports": "Routes voice and digital contact to the right queue or agent." }
+      ],
+      "claims": [
+        { "position": 1, "kind": "functional", "statement": "The vendor describes the product for contact-centre routing across voice and digital channels.", "sourceUrl": "https://www.genesys.com/genesys-cloud", "sourceDate": "2026-11-21", "reviewedBy": "Pending review", "reviewedAt": "2026-11-21" }
+      ]
+    },
+    {
+      "code": "salesforce-energy-utilities",
+      "product": "Salesforce Energy and Utilities Cloud",
+      "vendor": "Salesforce",
+      "summary": "A customer platform configured for energy and utility operations, including connection enquiries and customer service journeys.",
+      "capabilities": [
+        { "code": "11.4", "name": "Connection Quotations", "howItSupports": "Positions connection enquiries and customer journeys as part of utility customer operations." }
+      ],
+      "claims": [
+        { "position": 1, "kind": "functional", "statement": "The vendor positions the product for energy and utility customer operations, including connection enquiries.", "sourceUrl": "https://www.salesforce.com/industries/energy-utilities/", "sourceDate": "2026-11-21", "reviewedBy": "Pending review", "reviewedAt": "2026-11-21" }
+      ]
+    },
+    {
+      "code": "oracle-ccb",
+      "product": "Oracle Utilities Customer Care and Billing",
+      "vendor": "Oracle",
+      "summary": "Customer care and billing software for utility accounts, positioned by the vendor for regulated and retail utility operations.",
+      "capabilities": [
+        { "code": "11.5", "name": "Billing & Settlement", "howItSupports": "The vendor describes billing as a core part of the product's utility customer care scope." }
+      ],
+      "claims": [
+        { "position": 1, "kind": "functional", "statement": "The vendor positions the product for utility customer care and billing.", "sourceUrl": "https://www.oracle.com/utilities/customer-care-and-billing/", "sourceDate": "2026-11-21", "reviewedBy": "Pending review", "reviewedAt": "2026-11-21" }
+      ]
+    },
+    {
+      "code": "schneider-adms",
+      "product": "Schneider Electric EcoStruxure ADMS",
+      "vendor": "Schneider Electric",
+      "summary": "An advanced distribution management system for network operations, outage management and control-room work.",
+      "capabilities": [
+        { "code": "10.1", "name": "Outage & Fault Management", "howItSupports": "Describes distribution management and outage operations in one system." },
+        { "code": "10.6", "name": "Control Room & Real-Time Operations", "howItSupports": "Describes real-time control-room operation of the distribution network." }
+      ],
+      "claims": [
+        { "position": 1, "kind": "functional", "statement": "The vendor describes the product for distribution management and outage operations.", "sourceUrl": "https://www.se.com/ww/en/product-range/65424-ecostruxure-adms/", "sourceDate": "2026-11-21", "reviewedBy": "Pending review", "reviewedAt": "2026-11-21" }
+      ]
+    },
+    {
+      "code": "ge-gridos",
+      "product": "GE Vernova GridOS",
+      "vendor": "GE Vernova",
+      "summary": "Grid operations software covering distribution management, outage response and real-time network control.",
+      "capabilities": [
+        { "code": "10.1", "name": "Outage & Fault Management", "howItSupports": "Describes grid operations and outage response." },
+        { "code": "10.6", "name": "Control Room & Real-Time Operations", "howItSupports": "Describes real-time operation of the distribution network." }
+      ],
+      "claims": [
+        { "position": 1, "kind": "functional", "statement": "The vendor describes the product for grid operations and outage management.", "sourceUrl": "https://www.gevernova.com/grid-solutions/", "sourceDate": "2026-11-21", "reviewedBy": "Pending review", "reviewedAt": "2026-11-21" }
+      ]
+    },
+    {
+      "code": "ibm-maximo",
+      "product": "IBM Maximo Application Suite",
+      "vendor": "IBM",
+      "summary": "Asset management and maintenance software for physical assets, including inspection and work management.",
+      "capabilities": [
+        { "code": "9.5", "name": "Asset Inspection & Maintenance", "howItSupports": "Describes asset management, maintenance and inspection of physical assets." }
+      ],
+      "claims": [
+        { "position": 1, "kind": "functional", "statement": "The vendor describes the product for asset management and maintenance.", "sourceUrl": "https://www.ibm.com/products/maximo", "sourceDate": "2026-11-21", "reviewedBy": "Pending review", "reviewedAt": "2026-11-21" }
+      ]
+    },
+    {
+      "code": "sap-asset-management",
+      "product": "SAP Asset Management",
+      "vendor": "SAP",
+      "summary": "Enterprise asset management for maintenance planning, work orders and asset inspection.",
+      "capabilities": [
+        { "code": "9.5", "name": "Asset Inspection & Maintenance", "howItSupports": "Describes maintenance planning and asset inspection as part of enterprise asset management." }
+      ],
+      "claims": [
+        { "position": 1, "kind": "functional", "statement": "The vendor describes the product for enterprise asset management and maintenance.", "sourceUrl": "https://www.sap.com/products/erp/asset-management.html", "sourceDate": "2026-11-21", "reviewedBy": "Pending review", "reviewedAt": "2026-11-21" }
+      ]
+    },
+    {
+      "code": "infor-eam",
+      "product": "Infor EAM",
+      "vendor": "Infor",
+      "summary": "Enterprise asset management for maintenance, inspection and asset lifecycle records.",
+      "capabilities": [
+        { "code": "9.5", "name": "Asset Inspection & Maintenance", "howItSupports": "Describes maintenance and inspection of physical assets." }
+      ],
+      "claims": [
+        { "position": 1, "kind": "functional", "statement": "The vendor describes the product for enterprise asset management and maintenance.", "sourceUrl": "https://www.infor.com/products/eam", "sourceDate": "2026-11-21", "reviewedBy": "Pending review", "reviewedAt": "2026-11-21" }
+      ]
+    },
+    {
+      "code": "esri-arcgis-utility-network",
+      "product": "Esri ArcGIS Utility Network",
+      "vendor": "Esri",
+      "summary": "A geographic information system for utility networks, used to hold network connectivity and support planning.",
+      "capabilities": [
+        { "code": "9.4", "name": "Network Planning & Load Forecasting", "howItSupports": "Holds network connectivity and geography used in planning work." },
+        { "code": "9", "name": "Asset Management", "howItSupports": "Records network assets and their connections in a geographic model." }
+      ],
+      "claims": [
+        { "position": 1, "kind": "functional", "statement": "The vendor positions the product for utility network management and planning.", "sourceUrl": "https://www.esri.com/en-us/industries/utilities/overview", "sourceDate": "2026-11-21", "reviewedBy": "Pending review", "reviewedAt": "2026-11-21" }
+      ]
+    },
+    {
+      "code": "ge-smallworld",
+      "product": "GE Smallworld",
+      "vendor": "GE Vernova",
+      "summary": "Network modelling and geographic software for utilities, used to hold network data and support planning.",
+      "capabilities": [
+        { "code": "9.4", "name": "Network Planning & Load Forecasting", "howItSupports": "Holds network models and geography used in planning work." },
+        { "code": "9", "name": "Asset Management", "howItSupports": "Records network assets and their connections in a network model." }
+      ],
+      "claims": [
+        { "position": 1, "kind": "functional", "statement": "The vendor describes the product for utility network modelling and planning.", "sourceUrl": "https://www.gevernova.com/grid-solutions/", "sourceDate": "2026-11-21", "reviewedBy": "Pending review", "reviewedAt": "2026-11-21" }
+      ]
+    },
+    {
+      "code": "microsoft-d365-field-service",
+      "product": "Microsoft Dynamics 365 Field Service",
+      "vendor": "Microsoft",
+      "summary": "Field service management for scheduling, dispatching and completing work orders for technicians.",
+      "capabilities": [
+        { "code": "13.3", "name": "Field Workforce Scheduling & Dispatch", "howItSupports": "Describes scheduling and dispatch of field technicians and work orders." }
+      ],
+      "claims": [
+        { "position": 1, "kind": "functional", "statement": "The vendor describes the product for scheduling and dispatching field technicians.", "sourceUrl": "https://www.microsoft.com/en-us/dynamics-365/products/field-service", "sourceDate": "2026-11-21", "reviewedBy": "Pending review", "reviewedAt": "2026-11-21" }
+      ]
+    },
+    {
+      "code": "salesforce-field-service",
+      "product": "Salesforce Field Service",
+      "vendor": "Salesforce",
+      "summary": "Field service scheduling, dispatch and work-order management built on the vendor's customer platform.",
+      "capabilities": [
+        { "code": "13.3", "name": "Field Workforce Scheduling & Dispatch", "howItSupports": "Describes scheduling, dispatch and work orders for field service teams." }
+      ],
+      "claims": [
+        { "position": 1, "kind": "functional", "statement": "The vendor describes the product for field service scheduling and work orders.", "sourceUrl": "https://www.salesforce.com/products/field-service/overview/", "sourceDate": "2026-11-21", "reviewedBy": "Pending review", "reviewedAt": "2026-11-21" }
+      ]
+    },
+    {
+      "code": "oracle-primavera-unifier",
+      "product": "Oracle Primavera Unifier",
+      "vendor": "Oracle",
+      "summary": "Capital project and programme controls: planning, approval and reporting across a portfolio of projects.",
+      "capabilities": [
+        { "code": "13.1", "name": "Capital Projects & Construction", "howItSupports": "Describes portfolio-level project controls and capital planning." }
+      ],
+      "claims": [
+        { "position": 1, "kind": "functional", "statement": "The vendor describes the product for capital project and programme controls.", "sourceUrl": "https://www.oracle.com/construction-engineering/primavera-unifier/", "sourceDate": "2026-11-21", "reviewedBy": "Pending review", "reviewedAt": "2026-11-21" }
+      ]
+    },
+    {
+      "code": "oracle-primavera-p6",
+      "product": "Oracle Primavera P6",
+      "vendor": "Oracle",
+      "summary": "Project scheduling and delivery management for capital projects, including dependencies and milestones.",
+      "capabilities": [
+        { "code": "13.1", "name": "Capital Projects & Construction", "howItSupports": "Describes project scheduling and delivery for capital work." }
+      ],
+      "claims": [
+        { "position": 1, "kind": "functional", "statement": "The vendor describes the product for project scheduling and delivery.", "sourceUrl": "https://www.oracle.com/construction-engineering/primavera-p6/", "sourceDate": "2026-11-21", "reviewedBy": "Pending review", "reviewedAt": "2026-11-21" }
+      ]
+    },
+    {
+      "code": "microsoft-project",
+      "product": "Microsoft Project",
+      "vendor": "Microsoft",
+      "summary": "Project planning and scheduling, with tasks, dependencies and milestones for delivery teams.",
+      "capabilities": [
+        { "code": "13.1", "name": "Capital Projects & Construction", "howItSupports": "Describes project planning and scheduling for delivery teams." }
+      ],
+      "claims": [
+        { "position": 1, "kind": "functional", "statement": "The vendor describes the product for project planning and scheduling.", "sourceUrl": "https://www.microsoft.com/en-us/microsoft-365/project/project-management-software", "sourceDate": "2026-11-21", "reviewedBy": "Pending review", "reviewedAt": "2026-11-21" }
+      ]
+    },
+    {
+      "code": "siemens-energyip",
+      "product": "Siemens EnergyIP",
+      "vendor": "Siemens",
+      "summary": "Smart metering and meter data management, including collection and processing of meter readings.",
+      "capabilities": [
+        { "code": "11.1", "name": "Smart Metering Data", "howItSupports": "Describes collection and processing of smart meter data." }
+      ],
+      "claims": [
+        { "position": 1, "kind": "functional", "statement": "The vendor describes the product for smart metering data management.", "sourceUrl": "https://www.siemens.com/global/en/products/energy/energy-automation-and-smart-grid/energyip.html", "sourceDate": "2026-11-21", "reviewedBy": "Pending review", "reviewedAt": "2026-11-21" }
+      ]
+    },
+    {
+      "code": "oracle-mdm",
+      "product": "Oracle Utilities Meter Data Management",
+      "vendor": "Oracle",
+      "summary": "Meter data management for collecting, validating and storing readings from smart and traditional meters.",
+      "capabilities": [
+        { "code": "11.1", "name": "Smart Metering Data", "howItSupports": "Describes collection, validation and storage of meter readings." }
+      ],
+      "claims": [
+        { "position": 1, "kind": "functional", "statement": "The vendor describes the product for meter data management.", "sourceUrl": "https://www.oracle.com/utilities/meter-data-management/", "sourceDate": "2026-11-21", "reviewedBy": "Pending review", "reviewedAt": "2026-11-21" }
+      ]
+    }
+  ]
+}
