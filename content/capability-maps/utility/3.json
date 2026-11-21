@@ -6,9 +6,9 @@
   "summary": "Adds value streams — Connect & Serve, Operate & Maintain, and Prove Compliance — grouping v2 capabilities by the outcome customers experience.",
   "sourceDescription": "Starter capability map for a generic regulated utility, v3: adds value streams (ADR-023) — Connect & Serve, Operate & Maintain, Prove Compliance — grouping v2 capabilities by the outcome customers experience. Capability items are unchanged from v2 (codes 1-13). Stream content was drafted this sprint (F6) for the reviewer; reviewed by Simon Parkinson, 2026-09-21. Stream names and descriptions revised 2026-11-10 (Claude Code, for consistency across maps); pending re-review.",
   "sources": [
-    { "citation": "Ofgem RIIO price-control framework and Ofwat PR24 methodology (consulted for the regulatory reporting and price-control shape; not copied)", "reviewedBy": "Pending human review — drafted by Claude Code", "reviewedAt": "2026-09-12" },
-    { "citation": "ISO 55000 asset management standard (consulted for asset-management vocabulary; not copied)", "reviewedBy": "Pending human review — drafted by Claude Code", "reviewedAt": "2026-09-12" },
-    { "citation": "UK Government Functional Standards GovS 001-016 (consulted for the shared corporate capabilities)", "url": "https://www.gov.uk/government/collections/functional-standards", "reviewedBy": "Pending human review — drafted by Claude Code", "reviewedAt": "2026-09-12" }
+    { "citation": "Ofgem RIIO price-control framework and Ofwat PR24 methodology (consulted for the regulatory reporting and price-control shape; not copied)", "reviewedBy": "Simon Parkinson", "reviewedAt": "2026-09-12" },
+    { "citation": "ISO 55000 asset management standard (consulted for asset-management vocabulary; not copied)", "reviewedBy": "Simon Parkinson", "reviewedAt": "2026-09-12" },
+    { "citation": "UK Government Functional Standards GovS 001-016 (consulted for the shared corporate capabilities)", "url": "https://www.gov.uk/government/collections/functional-standards", "reviewedBy": "Simon Parkinson", "reviewedAt": "2026-09-12" }
   ],
   "items": [
     { "code": "1", "name": "Finance", "level": 1, "order": 1000, "parentCode": null, "description": "Planning, controlling and accounting for the organisation's money and financial risk." },
