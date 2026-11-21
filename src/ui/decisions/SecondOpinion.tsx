@@ -172,7 +172,7 @@ export function SecondOpinion({ orgId, userId, decisionId, orgSlug, shareCost, a
                 </div>
               </li>;
             })}</ol>}
-            <Text as="p" size="sm" tone="muted">These questions reflect the saved decision at the time of this run. Ask again after changing it. This run used about {(review.inputTokens + review.outputTokens).toLocaleString('en-GB')} tokens. Questions are held on this device only and expire after 24 hours; a question you keep is saved to the decision.</Text>
+            <Text as="p" size="sm" tone="muted">These questions reflect the saved decision at the time of this run. Ask again after changing it. This run used about {(review.inputTokens + review.outputTokens).toLocaleString('en-GB')} tokens. Saved on this device only, not for the team; expires after 24 hours. A question you keep is saved to the decision.</Text>
           </div>;
         })}
       </section>
