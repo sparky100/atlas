@@ -38,6 +38,15 @@ describe('createProxyAskClient', () => {
     const { client: c } = client(() => new Response('<html>', { status: 502 }));
     await expect(c.complete(REQUEST)).rejects.toThrow(/502/);
   });
+
+  it('forwards a web-search cap and returns the pages the proxy reported', async () => {
+    const webSearch = { requests: 1, results: [{ url: 'https://example.com/a', title: 'A', pageAge: null }], citations: [{ url: 'https://example.com/a', title: 'A', citedText: 'Says so.' }] };
+    const { seen, client: c } = client(() => Response.json({ status: 'ok', text: 'x', inputTokens: 1, outputTokens: 1, webSearch }));
+    const out = await c.complete({ ...REQUEST, webSearch: { maxUses: 2 } });
+    expect(out.webSearch).toEqual(webSearch);
+    const body = JSON.parse(seen[0]?.init.body as string) as Record<string, unknown>;
+    expect(body.webSearch).toEqual({ maxUses: 2 });
+  });
 });
 
 describe('createProxyAskClient on the organisation\'s own key', () => {

@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import type { UUID } from '../../contracts/delta';
-import { DESIGNER_SUMMARY_MAX, DESIGNER_TITLE_MAX, DESIGNER_WEIGH_MAX } from '../../contracts/designerOptions';
+import { DESIGNER_SUMMARY_MAX, DESIGNER_TITLE_MAX, DESIGNER_WEIGH_MAX, type DesignerWebRef } from '../../contracts/designerOptions';
 import { runDesigner, type DesignerDraft } from '../../db/designAgent';
 import { DESIGNER_MAX_FINDING_CHARS } from '../../tools/designPrompt';
 import { Button } from '../components/Button/Button';
@@ -19,6 +19,8 @@ import styles from './DesignerSuggestions.module.css';
 export interface SuggestionCard extends PendingOption {
   /** Carried into the decision when true. */
   included: boolean;
+  /** D4: pages the search returned for this option. Shown for review; saving them with the option is the next step. Absent on drafts saved before web search existed. */
+  webRefs?: DesignerWebRef[];
 }
 
 /** What the form needs to know: the options to carry in, and whether an agent helped. */
@@ -45,7 +47,7 @@ export interface DesignerSuggestionsProps {
 const isEdited = (c: PendingOption) => c.title.trim() !== c.suggestedTitle.trim() || c.summary.trim() !== c.suggestedSummary.trim();
 
 function newCards(draft: DesignerDraft, draftedAt: string): SuggestionCard[] {
-  return draft.options.map((o) => ({ id: crypto.randomUUID(), title: o.title, summary: o.summary, toWeigh: o.toWeigh, suggestedTitle: o.title, suggestedSummary: o.summary, draftedAt, catalogueRefs: o.catalogueRefs, included: true }));
+  return draft.options.map((o) => ({ id: crypto.randomUUID(), title: o.title, summary: o.summary, toWeigh: o.toWeigh, suggestedTitle: o.title, suggestedSummary: o.summary, draftedAt, catalogueRefs: o.catalogueRefs, webRefs: o.webRefs, included: true }));
 }
 
 /**
@@ -152,6 +154,18 @@ export function DesignerSuggestions({ orgId, userId, modelId, elementId, brief, 
         <input className={formStyles.input} type="text" aria-label="Option title" maxLength={DESIGNER_TITLE_MAX} value={c.title} onChange={(e) => { update(c.id, { title: e.target.value }); }} />
         <textarea className={formStyles.textarea} aria-label="What this option is" maxLength={DESIGNER_SUMMARY_MAX} value={c.summary} onChange={(e) => { update(c.id, { summary: e.target.value }); }} />
         <textarea className={formStyles.textarea} aria-label="What to weigh" placeholder="What to weigh" maxLength={DESIGNER_WEIGH_MAX} value={c.toWeigh} onChange={(e) => { update(c.id, { toWeigh: e.target.value }); }} />
+        {(c.webRefs ?? []).length > 0 && (
+          <div data-testid="suggestion-web-sources">
+            <Text as="p" size="xs" tone="muted">Web pages found for this option. They are not saved yet and are not reviewed; check them yourself.</Text>
+            <ul>
+              {(c.webRefs ?? []).map((ref) => (
+                <li key={ref.url}>
+                  <a href={ref.url} target="_blank" rel="noreferrer">{ref.title}</a>
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
       </li>
     );
   }

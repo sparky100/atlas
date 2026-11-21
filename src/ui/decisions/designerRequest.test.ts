@@ -47,6 +47,12 @@ describe('designerCostLine', () => {
   it('says 1 lookup in the singular', () => {
     expect(designerCostLine({ inputTokens: 1, outputTokens: 1, lookups: 1 })).toContain('with 1 lookup,');
   });
+  it('adds the billed web searches when the run used any, without a money figure', () => {
+    const line = designerCostLine({ inputTokens: 1, outputTokens: 1, lookups: 1, webSearches: 2 });
+    expect(line).toContain('with 1 lookup, 2 web searches,');
+    expect(designerCostLine({ inputTokens: 1, outputTokens: 1, lookups: 1, webSearches: 1 })).toContain('1 web search,');
+    expect(line).not.toMatch(/[£$€]/);
+  });
 });
 
 describe('designerUnavailableReason', () => {

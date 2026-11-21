@@ -65,8 +65,9 @@ export function designerTrialLine(args: { keySet: boolean; trial: DesignerTrialA
 }
 
 /** "What did this cost": tokens and lookups, in words. No money figure, because Atlas holds no price list and a guessed price would read as a fact. */
-export function designerCostLine(usage: { inputTokens: number; outputTokens: number; lookups: number; trial?: boolean }): string {
+export function designerCostLine(usage: { inputTokens: number; outputTokens: number; lookups: number; webSearches?: number; trial?: boolean }): string {
   const n = (v: number) => v.toLocaleString('en-GB');
   const lookups = usage.lookups === 1 ? '1 lookup' : `${n(usage.lookups)} lookups`;
-  return `This run used ${n(usage.inputTokens)} tokens in and ${n(usage.outputTokens)} out, with ${lookups}, on ${usage.trial === true ? "Atlas's free trial" : "your organisation's AI key"}.`;
+  const searches = (usage.webSearches ?? 0) === 0 ? '' : (usage.webSearches ?? 0) === 1 ? ', 1 web search' : `, ${n(usage.webSearches ?? 0)} web searches`;
+  return `This run used ${n(usage.inputTokens)} tokens in and ${n(usage.outputTokens)} out, with ${lookups}${searches}, on ${usage.trial === true ? "Atlas's free trial" : "your organisation's AI key"}.`;
 }

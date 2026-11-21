@@ -48,6 +48,28 @@ describe('runAsk', () => {
     expect(requests[0]?.tools.length).toBeGreaterThan(0);
   });
 
+  it('spends a web-search budget across rounds and accumulates the actual pages', async () => {
+    const first = {
+      ...call('t1', 'search_elements', { query: 'CRM' }),
+      webSearch: { requests: 2, results: [{ url: 'https://example.com/a', title: 'A', pageAge: null }], citations: [{ url: 'https://example.com/a', title: 'A', citedText: 'Says so.' }] },
+    };
+    const { client, requests } = scripted([first, say('Done.', { webSearch: { requests: 1, results: [{ url: 'https://example.com/b', title: 'B', pageAge: '2 days' }], citations: [] } })]);
+    const result = await runAsk({ client, ctx: estateContext(), history: [], question: 'q', webSearch: { maxUses: 3 } });
+    expect(requests[0]?.webSearch).toEqual({ maxUses: 3 });
+    expect(requests[1]?.webSearch).toEqual({ maxUses: 1 });
+    expect(result.webSearch.requests).toBe(3);
+    expect(result.webSearch.results.map((r) => r.url)).toEqual(['https://example.com/a', 'https://example.com/b']);
+    expect(result.webSearch.citations).toHaveLength(1);
+  });
+
+  it('stops offering web search once the run budget is spent', async () => {
+    const first = { ...call('t1', 'search_elements', { query: 'CRM' }), webSearch: { requests: 1, results: [], citations: [] } };
+    const { client, requests } = scripted([first, say('Done.')]);
+    await runAsk({ client, ctx: estateContext(), history: [], question: 'q', webSearch: { maxUses: 1 } });
+    expect(requests[0]?.webSearch).toEqual({ maxUses: 1 });
+    expect(requests[1]).not.toHaveProperty('webSearch');
+  });
+
   it('removes a citation no tool returned and marks the answer ungrounded when none survive', async () => {
     const invented = uid(777);
     const { client } = scripted([call('t1', 'search_elements', { query: 'CRM' }), say(`See [[element:${invented}]].`)]);
