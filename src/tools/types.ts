@@ -22,6 +22,12 @@ export interface CapabilityCatalogue {
   entries: readonly CatalogueEntry[];
 }
 
+/** What the lookup needs from a capability when its stored starter-map item may be stale. */
+export interface CapabilityCatalogueLookup {
+  templateRef: string;
+  code: string | null;
+}
+
 /** Everything the tools need from the model, read once per question. Plain arrays, so a test can build one by hand. */
 export interface ModelSnapshot {
   elements: readonly ElementsHeadRow[];
@@ -70,8 +76,8 @@ export interface ToolContext {
   principleLinks: () => Promise<readonly DecisionPrincipleRow[]>;
   /** What one change touches and who it affects, read from its own work against main; `null` when it has made no work yet or does not exist. */
   changeImpact: (change: BranchRow) => Promise<ChangeSummary | null>;
-  /** Current published catalogue products for a capability's starter-map item. Absent where the catalogue is not available to this caller. */
-  catalogueForCapability?: (templateRef: string) => Promise<CapabilityCatalogue | null>;
+  /** Current published catalogue products for a capability's starter-map item, or its code when that item is stale. Absent where the catalogue is not available to this caller. */
+  catalogueForCapability?: (capability: CapabilityCatalogueLookup) => Promise<CapabilityCatalogue | null>;
   /** The clock, passed in so findings that depend on today's date are testable (rule 6). */
   now: () => Date;
 }

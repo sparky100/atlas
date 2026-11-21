@@ -14,7 +14,7 @@ import { createModel } from './models';
 import { createDecision, createDecisionLink } from './decisions';
 import { createChangeBranch, getMainBranch } from './branches';
 import { markOptionEdited } from './decisionOptionMarks';
-import { addOptionWithCatalogueSources, catalogueToRows, catalogueSnapshotFromRows, listCatalogueSources, listOptionSources } from './productCatalogue';
+import { addOptionWithCatalogueSources, catalogueToRows, catalogueSnapshotFromRows, listCatalogueSources, listOptionSources, publishedCapabilityMatchForModel, publishedMapItemForCapability } from './productCatalogue';
 import { listOptionWebSources } from './optionWebSources';
 
 function at<T>(items: readonly T[], index = 0): T {
@@ -108,6 +108,16 @@ describe('product catalogue and option evidence, real database', () => {
       citation: { sector: rows.catalogue.sector, version: content.version, entryCode: at(content.entries).code } satisfies CatalogueCitation };
   }
   const publish = (id: string) => service.from('product_catalogues').update({ status: 'published', published_at: '2026-11-20T10:00:00Z' }).eq('id', id);
+
+  it('finds a capability by code in the current published map when its seeded item id is stale', async () => {
+    const s = await seed();
+    check(await service.from('sources').delete().eq('model_id', modelId).eq('kind', 'template'));
+    check(await service.from('sources').insert({ id: randomUUID(), org_id: orgId, model_id: modelId, kind: 'template', name: 'Test map', capability_map_id: s.mapId, created_by: owner.id }));
+    const match = await publishedCapabilityMatchForModel(owner.client, modelId, '11.1');
+    expect(match).toMatchObject({ sector: s.rows.catalogue.sector, capabilityMapVersion: 4, capabilityCode: '11.1' });
+    expect(await publishedMapItemForCapability(owner.client, s.rows.catalogue.sector, '11.1')).toMatchObject({ capabilityCode: '11.1' });
+    expect(await publishedCapabilityMatchForModel(owner.client, modelId, 'not-a-code')).toBeNull();
+  });
   async function option(as = owner) {
     const decision = await createDecision(owner.client, { id: randomUUID(), orgId, modelId, title: 'Connection quotations', statement: 'Issue quotes in two days', ownerId: owner.id, createdBy: owner.id });
     const main = await getMainBranch(owner.client, modelId);

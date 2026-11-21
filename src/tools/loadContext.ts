@@ -17,7 +17,7 @@ import { listGoalLinksForGoals, listGoalsForModel } from '../db/goals';
 import { getStaleAfterMonthsForModel } from '../db/organisations';
 import { listPrincipleLinksForPrinciples, listPrinciplesForModel } from '../db/principles';
 import { listProjectsForModel } from '../db/projects';
-import { capabilityMapMatch, currentCatalogue, listCurrentCatalogueEntriesForCapability } from '../db/productCatalogue';
+import { capabilityMapMatch, currentCatalogue, listCurrentCatalogueEntriesForCapability, publishedCapabilityMatchForModel } from '../db/productCatalogue';
 import { listSavedReports } from '../db/reports';
 import { selectAll } from '../db/selectAll';
 import { factsWithoutCost, snapshotWithoutCost } from './runCostExclusion';
@@ -81,8 +81,12 @@ export function createToolContext(supabase: Client, model: { id: UUID; name: str
     principles: () => (principles ??= listPrinciplesForModel(supabase, model.id)),
     principleLinks: async () => (principleLinks ??= listPrincipleLinksForPrinciples(supabase, (await (principles ??= listPrinciplesForModel(supabase, model.id))).map((p) => p.id))),
     changeImpact: (change) => loadChangeSummary(supabase, model.id, change),
-    catalogueForCapability: async (templateRef) => {
-      const match = await capabilityMapMatch(supabase, templateRef);
+    catalogueForCapability: async ({ templateRef, code }) => {
+      // A draft starter map can be reloaded and its item ids replaced. The
+      // capability's code and the model's template source are the durable
+      // parts, so fall back to the current published map for that sector.
+      const match = (await capabilityMapMatch(supabase, templateRef))
+        ?? (code === null ? null : await publishedCapabilityMatchForModel(supabase, model.id, code));
       if (!match) return null;
       const catalogue = await currentCatalogue(supabase, match.sector);
       if (!catalogue) return null;

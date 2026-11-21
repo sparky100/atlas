@@ -8,12 +8,15 @@
  * app, is the only writer.
  *
  * Run with `pnpm content:load-capability-maps`. Safe to re-run while a
- * map is still `draft`: it's looked up by its own (sector, version) and
- * replaced wholesale (its items/sources deleted and reinserted), never
- * duplicated. A map already `published` is skipped outright — it is fixed
- * history (SPEC §3.10, `capability_map_items_guard_immutable`,
- * 20260906190000), so a re-run has nothing to write for it and the fix
- * for wanting different content is a new version, not an edit.
+ * map is still `draft`: it's looked up by its own (sector, version), its
+ * item ids are kept for every code still in the file, and its sources and
+ * value streams are replaced, never duplicated. An item id is what a
+ * seeded capability stores as `templateRef`, so reusing it is what keeps
+ * existing models pointing at the right capability. A map already
+ * `published` is skipped outright — it is fixed history (SPEC §3.10,
+ * `capability_map_items_guard_immutable`, 20260906190000), so a re-run has
+ * nothing to write for it and the fix for wanting different content is a
+ * new version, not an edit.
  *
  * Node-only, not part of the Vite bundle or any Supabase edge function —
  * a one-off content-loading tool, run manually or from CI, the same
@@ -29,6 +32,7 @@ import { createServiceRoleClient } from '../src/db/client';
 import { loadEnv } from '../src/db/env';
 import { parseCapabilityMapContent, type CapabilityMapContent } from '../src/contracts/capabilityMapContent';
 import type { MapStatus } from '../src/db/capabilityMapTemplates';
+import { planCapabilityMapItemIds } from '../src/db/capabilityMapItemIds';
 import { isCliEntrypoint } from './isCliEntrypoint';
 
 const CONTENT_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', 'content', 'capability-maps');
@@ -121,11 +125,18 @@ async function loadOne(supabase: ReturnType<typeof createServiceRoleClient>, fil
   const { error: upsertError } = await supabase.from('capability_maps').upsert(mapRow, { onConflict: 'id' });
   if (upsertError) throw new Error(`${label}: ${upsertError.message}`);
 
-  // Wholesale replace, not a merge — the file is the source of truth for
-  // this version, and a removed item should actually disappear, not
-  // linger from a previous load.
-  const { error: deleteItemsError } = await supabase.from('capability_map_items').delete().eq('map_id', mapId);
-  if (deleteItemsError) throw new Error(`${label}: ${deleteItemsError.message}`);
+  // A capability stores its starter-map item id as `templateRef`. Replacing
+  // every item with a fresh id on each draft reload silently breaks every
+  // model seeded from that draft, so keep the id for each code still present
+  // and delete only the codes that really went. Sources and value streams
+  // have no such external identity and stay a wholesale replace.
+  const { data: existingItems, error: existingItemsError } = await supabase.from('capability_map_items').select('id, code').eq('map_id', mapId);
+  if (existingItemsError) throw new Error(`${label}: ${existingItemsError.message}`);
+  const idPlan = planCapabilityMapItemIds(existingItems, content.items.map((item) => item.code));
+  if (idPlan.removedIds.length > 0) {
+    const { error: deleteRemovedItemsError } = await supabase.from('capability_map_items').delete().in('id', [...idPlan.removedIds]);
+    if (deleteRemovedItemsError) throw new Error(`${label}: ${deleteRemovedItemsError.message}`);
+  }
   const { error: deleteSourcesError } = await supabase.from('capability_map_sources').delete().eq('map_id', mapId);
   if (deleteSourcesError) throw new Error(`${label}: ${deleteSourcesError.message}`);
   // F6 (ADR-023): value streams are part of the same wholesale replace —
@@ -140,7 +151,7 @@ async function loadOne(supabase: ReturnType<typeof createServiceRoleClient>, fil
   // every code→id is known, so a child's parent_code can resolve to a
   // real capability_map_items.id (the level/parent-chain trigger only
   // needs parent_code, but the row itself still needs its own real id).
-  const idByCode = new Map(content.items.map((item) => [item.code, randomUUID()]));
+  const idByCode = idPlan.idByCode;
   const itemRows = content.items.map((item) => ({
     id: idByCode.get(item.code),
     map_id: mapId,
@@ -151,14 +162,14 @@ async function loadOne(supabase: ReturnType<typeof createServiceRoleClient>, fil
     level: item.level,
     item_order: item.order,
   }));
-  // Insert parents before children so the level/parent-chain trigger
+  // Upsert parents before children so the level/parent-chain trigger
   // always finds the parent row it needs — items are already
   // level-ordered by construction (a child never has a lower level than
   // its parent), so sorting by level is sufficient.
   itemRows.sort((a, b) => a.level - b.level);
   if (itemRows.length > 0) {
-    const { error: insertItemsError } = await supabase.from('capability_map_items').insert(itemRows);
-    if (insertItemsError) throw new Error(`${label}: ${insertItemsError.message}`);
+    const { error: upsertItemsError } = await supabase.from('capability_map_items').upsert(itemRows, { onConflict: 'id' });
+    if (upsertItemsError) throw new Error(`${label}: ${upsertItemsError.message}`);
   }
 
   if (content.sources.length > 0) {

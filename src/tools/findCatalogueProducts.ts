@@ -8,6 +8,13 @@ export function capabilityTemplateRef(attributes: unknown): string | null {
   return typeof value === 'string' && value.trim() !== '' ? value : null;
 }
 
+/** The capability's own code, which stays stable when a draft map is reloaded and its item ids change. */
+export function capabilityCode(attributes: unknown): string | null {
+  if (typeof attributes !== 'object' || attributes === null || Array.isArray(attributes)) return null;
+  const value = (attributes as Record<string, unknown>).code;
+  return typeof value === 'string' && value.trim() !== '' ? value.trim() : null;
+}
+
 const schema = z.object({ capability_element_id: uuidInput }).strict();
 
 /**
@@ -33,9 +40,9 @@ export const findCatalogueProducts = defineTool({
     if (ctx.catalogueForCapability === undefined) {
       return failure('The reviewed product catalogue is not available to this run. Record that instead of naming a product from memory.');
     }
-    const catalogue = await ctx.catalogueForCapability(templateRef);
+    const catalogue = await ctx.catalogueForCapability({ templateRef, code: capabilityCode(element.attributes) });
     if (catalogue === null) {
-      return failure('No published catalogue covers this capability\'s sector yet. Record that as a gap instead of naming a product from memory.');
+      return failure('No published catalogue covers this capability\'s sector yet, or its starter-map link no longer resolves. Record that as a gap instead of naming a product from memory.');
     }
     const products = catalogue.entries.map((entry) => ({
       entryCode: entry.code,
