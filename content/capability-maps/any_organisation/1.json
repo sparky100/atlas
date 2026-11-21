@@ -8,13 +8,13 @@
   "sources": [
     {
       "citation": "APQC Process Classification Framework (consulted only to check scope coverage; it is a process model, nothing copied)",
-      "reviewedBy": "Pending human review — drafted by Claude Code",
+      "reviewedBy": "Simon Parkinson",
       "reviewedAt": "2026-11-17",
       "url": "https://www.apqc.org/process-performance-management/process-frameworks"
     },
     {
       "citation": "UK Government Functional Standards GovS 001-016 (consulted for the shared corporate capabilities)",
-      "reviewedBy": "Pending human review — drafted by Claude Code",
+      "reviewedBy": "Simon Parkinson",
       "reviewedAt": "2026-11-17",
       "url": "https://www.gov.uk/government/collections/functional-standards"
     }

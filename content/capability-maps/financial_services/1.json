@@ -1,14 +1,14 @@
 {
   "sector": "financial_services",
   "version": 1,
-  "status": "draft",
+  "status": "published",
   "title": "Financial Services (Retail Bank or Insurer)",
   "summary": "Capabilities of a UK retail bank or insurer: customer onboarding and KYC, products and pricing, payments, lending or claims, and financial-crime and regulatory risk.",
   "sourceDescription": "Starter capability map for a UK retail bank or general insurer. Vocabulary drawn from FCA and PRA handbook headings and BIAN service-domain names (consulted, not copied). Draft only: written by Claude for the Atlas demo and not yet reviewed by a domain expert.",
   "sources": [
     {
       "citation": "FCA and PRA handbook headings and the BIAN service landscape (consulted for vocabulary; not copied)",
-      "reviewedBy": "Pending review (drafted by Claude for the Atlas demo)",
+      "reviewedBy": "Simon Parkinson",
       "reviewedAt": "2026-11-08"
     }
   ],
