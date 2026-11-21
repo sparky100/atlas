@@ -9,6 +9,7 @@ import { CollapsibleSection } from '../components/CollapsibleSection/Collapsible
 import { CommentsSection } from '../components/CommentsSection/CommentsSection';
 import { ElementTypeGlyph } from '../components/ElementTypeGlyph/ElementTypeGlyph';
 import { LinkButton } from '../components/Button/LinkButton';
+import { PageIdentity } from '../components/PageIdentity/PageIdentity';
 import { Panel } from '../components/Panel/Panel';
 import { Text } from '../components/Text/Text';
 import { useAuth } from '../auth/useAuth';
@@ -226,9 +227,7 @@ export function ChangeView({ orgId, modelId, branchId, orgSlug, modelSlug, role,
       <div className={styles.header}>
         <div className={styles.headerTop}>
           <div className={styles.headerTitle}>
-            <Text as="h1" size="2xl">
-              {isOption ? (branch.title ?? branch.name) : heading}
-            </Text>
+            <PageIdentity kind="Change" name={isOption ? (branch.title ?? branch.name) : heading} />
             {isOption && (
               <Text as="p" tone="muted" size="sm">
                 An option for the decision. Nothing in the model changes unless the decision chooses this option and its changes are approved.

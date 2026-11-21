@@ -8,6 +8,7 @@ import { AppHeader } from '../components/AppHeader/AppHeader';
 import { Breadcrumb } from '../components/Breadcrumb/Breadcrumb';
 import { ModelNav } from '../components/ModelNav/ModelNav';
 import navStyles from '../components/ModelNav/ModelNav.module.css';
+import { PageIdentity } from '../components/PageIdentity/PageIdentity';
 import { Text } from '../components/Text/Text';
 import { DecisionView } from '../decisions/DecisionView';
 import { useDecision } from '../decisions/useDecision';
@@ -94,9 +95,7 @@ export function DecisionPage() {
             </Text>
           )}
           <div className={styles.headerRow}>
-            <Text as="h1" size="2xl">
-              {title}
-            </Text>
+            <PageIdentity kind="Decision" name={title} />
           </div>
           <DecisionView
             key={decisionId}
