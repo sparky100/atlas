@@ -14,11 +14,18 @@ export const DESIGNER_OPTIONS_MIN = 2;
 export const DESIGNER_OPTIONS_MAX = 6;
 /** A "Replace with a product" option may carry at most two reviewed products. */
 export const DESIGNER_CATALOGUE_REFS_MAX = 2;
+/** D4: and at most two web pages the search actually returned. */
+export const DESIGNER_WEB_REFS_MAX = 2;
 export const DESIGNER_TITLE_MAX = 120;
 export const DESIGNER_SUMMARY_MAX = 600;
 export const DESIGNER_WEIGH_MAX = 400;
 export const DESIGNER_GAPS_MAX = 8;
 export const DESIGNER_GAP_MAX = 240;
+
+export interface DesignerWebRef {
+  url: string;
+  title: string;
+}
 
 export interface DesignerOptionDraft {
   title: string;
@@ -28,6 +35,8 @@ export interface DesignerOptionDraft {
   toWeigh: string;
   /** Products the Designer actually read from the published catalogue for this option; empty for every other kind of option. */
   catalogueRefs: CatalogueCitation[];
+  /** Pages the web search actually returned and the Designer cited; empty when it did not search or found nothing suitable. */
+  webRefs: DesignerWebRef[];
 }
 
 export interface DesignerOptionsResult {
@@ -41,6 +50,10 @@ export interface DesignerOptionsResult {
 }
 
 const BASELINE = /^\s*stay(ing)? as we are\s*$/i;
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
 
 function text(value: unknown, max: number): string {
   return typeof value === 'string' ? value.trim().slice(0, max) : '';
@@ -74,6 +87,31 @@ function catalogueRefs(value: unknown): CatalogueCitation[] {
   return refs;
 }
 
+/** Shape-only check here; whether the search actually returned each page is checked by the run that searched. */
+function webRefs(value: unknown): DesignerWebRef[] {
+  if (!Array.isArray(value)) return [];
+  const refs: DesignerWebRef[] = [];
+  for (const raw of value) {
+    if (!isRecord(raw) || typeof raw.url !== 'string' || typeof raw.title !== 'string') continue;
+    const title = raw.title.trim().slice(0, 200);
+    if (title === '' || raw.url.length > 2000 || !isPublicHttpsUrl(raw.url)) continue;
+    if (refs.some((r) => r.url === raw.url)) continue;
+    refs.push({ url: raw.url, title });
+    if (refs.length >= DESIGNER_WEB_REFS_MAX) break;
+  }
+  return refs;
+}
+
+function isPublicHttpsUrl(value: string): boolean {
+  if (!value.startsWith('https://')) return false;
+  try {
+    const host = new URL(value).hostname.toLowerCase();
+    return host.includes('.') && !host.endsWith('.localhost') && !/^[0-9.]+$/.test(host) && !host.includes(':');
+  } catch {
+    return false;
+  }
+}
+
 /**
  * Reads the Designer's answer. It never throws and never guesses: an option
  * that fails a check is dropped and named in `problems`, and the result is
@@ -102,7 +140,7 @@ export function parseDesignerOptions(answer: string): DesignerOptionsResult {
       continue;
     }
     seen.add(key);
-    options.push({ title, summary, toWeigh: text(r.toWeigh, DESIGNER_WEIGH_MAX), catalogueRefs: catalogueRefs(r.catalogueRefs) });
+    options.push({ title, summary, toWeigh: text(r.toWeigh, DESIGNER_WEIGH_MAX), catalogueRefs: catalogueRefs(r.catalogueRefs), webRefs: webRefs(r.webRefs) });
   }
   if (dropped > 0 && rawOptions.length > 0) problems.push(dropped === 1 ? 'One suggested option was left out because it was incomplete.' : `${String(dropped)} suggested options were left out because they were incomplete.`);
   if (options.length < DESIGNER_OPTIONS_MIN) problems.push(options.length === 0 ? 'The Designer gave no usable options.' : 'The Designer gave fewer options than expected.');

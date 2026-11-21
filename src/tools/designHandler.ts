@@ -13,7 +13,7 @@ import type { UUID } from '../contracts/delta';
 import { parseDesignerOptions, type DesignerOptionsResult } from '../contracts/designerOptions';
 import { runAsk } from './askLoop';
 import type { AskModelClient, AskResult } from './askLoop';
-import { designerBrief, designerSystemPrompt, DESIGNER_MAX_FINDING_CHARS } from './designPrompt';
+import { designerBrief, designerSystemPrompt, DESIGNER_MAX_FINDING_CHARS, DESIGNER_MAX_WEB_SEARCHES } from './designPrompt';
 import { catalogueRefKey, capabilityTemplateRef } from './findCatalogueProducts';
 import { indexSnapshot } from './toolKit';
 import type { RunCostSharing, ToolContext, ToolStamp } from './types';
@@ -115,10 +115,25 @@ export async function handleDesign(deps: DesignHandlerDeps, body: unknown): Prom
     client: deps.createClient(model.orgId, deps.newRunId()),
     ctx,
     history: [],
-    question: designerBrief({ elementId: parsed.elementId, finding: parsed.finding }),
+    question: designerBrief({ elementId: parsed.elementId, finding: parsed.finding, webSearch: settings.keySet }),
     system: designerSystemPrompt(ctx.stamp.modelName, ctx.now().toISOString().slice(0, 10), { runCost }),
+    // D4: only the organisation's own key may pay for web search; the
+    // platform trial never does, and the proxy refuses it as well.
+    ...(settings.keySet ? { webSearch: { maxUses: DESIGNER_MAX_WEB_SEARCHES } } : {}),
   });
   const design = parseDesignerOptions(result.answer);
+  const returnedWebUrls = new Set([...(result.webSearch.results), ...(result.webSearch.citations)].map((source) => source.url));
+  let droppedWebRefs = 0;
+  for (const option of design.options) {
+    const kept = option.webRefs.filter((ref) => returnedWebUrls.has(ref.url));
+    droppedWebRefs += option.webRefs.length - kept.length;
+    option.webRefs = kept;
+  }
+  if (droppedWebRefs > 0) {
+    design.problems.push(droppedWebRefs === 1
+      ? 'One web page was left out because the search did not return it. Add it by hand only if you have checked it yourself.'
+      : `${String(droppedWebRefs)} web pages were left out because the search did not return them. Add one by hand only if you have checked it yourself.`);
+  }
   const allowedCatalogueRefs = await returnedCatalogueKeys(ctx, result.toolUses);
   let droppedCatalogueRefs = 0;
   for (const option of design.options) {

@@ -37,4 +37,13 @@ describe('parseDesignerOptions', () => {
     expect(r.options[0]?.catalogueRefs).toEqual([ref, { sector: 'electricity_network', version: 2, entryCode: 'other' }]);
     expect(parseDesignerOptions(JSON.stringify({ options: [{ title: 'Keep', summary: 'As is.' }] })).options[0]?.catalogueRefs).toEqual([]);
   });
+  it('keeps only well-formed web refs, dedupes and caps at two', () => {
+    const ref = { url: 'https://vendor.example/product', title: 'Product page' };
+    const r = parseDesignerOptions(JSON.stringify({
+      options: [{ title: 'Replace', summary: 'Buy.', webRefs: [ref, ref, { url: 'http://insecure.example/x', title: 'No' }, { url: 'https://vendor.example/other', title: '' }, { url: 'https://vendor.example/third', title: 'Third' }] }],
+      gaps: [], stayNote: '',
+    }));
+    expect(r.options[0]?.webRefs).toEqual([ref, { url: 'https://vendor.example/third', title: 'Third' }]);
+    expect(parseDesignerOptions(JSON.stringify({ options: [{ title: 'Keep', summary: 'As is.' }] })).options[0]?.webRefs).toEqual([]);
+  });
 });

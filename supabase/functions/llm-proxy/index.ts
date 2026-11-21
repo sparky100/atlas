@@ -90,6 +90,21 @@ interface ProxyToolCall {
   name: string;
   input: Record<string, unknown>;
 }
+interface ProxyWebSearchResult {
+  url: string;
+  title: string;
+  pageAge: string | null;
+}
+interface ProxyWebSearchCitation {
+  url: string;
+  title: string | null;
+  citedText: string | null;
+}
+interface ProxyWebSearch {
+  requests: number;
+  results: ProxyWebSearchResult[];
+  citations: ProxyWebSearchCitation[];
+}
 interface ProxyOutputConfig {
   effort: string;
   format: { type: 'json_schema'; schema: Record<string, unknown> };
@@ -106,6 +121,8 @@ interface ProxyRequestBody {
   streamToClient?: boolean;
   tools?: ProxyTool[];
   toolChoice?: 'auto' | 'none';
+  /** D4: Anthropic runs its own web search server-side, at most this many times. */
+  webSearch?: { maxUses: number };
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -142,6 +159,13 @@ function normalizeTools(raw: unknown): ProxyTool[] | undefined {
     }
   }
   return tools.length > 0 ? tools : undefined;
+}
+
+/** D4: a per-request cap, never a free-form provider tool definition from the caller. */
+function normalizeWebSearch(raw: unknown): { maxUses: number } | undefined {
+  if (!isRecord(raw)) return undefined;
+  const maxUses = raw.maxUses;
+  return typeof maxUses === 'number' && Number.isInteger(maxUses) && maxUses >= 1 && maxUses <= 5 ? { maxUses } : undefined;
 }
 
 /** The provider wants snake_case block keys; the proxy contract uses camelCase. */
@@ -205,10 +229,19 @@ function normalizeRequest(raw: unknown): ProxyRequestBody | Response {
   if (tools && outputConfig !== undefined) {
     return jsonResponse({ status: 'error', message: 'tools cannot be combined with outputConfig.' }, 400);
   }
+  const webSearch = normalizeWebSearch(r.webSearch);
+  if (r.webSearch !== undefined && webSearch === undefined) {
+    return jsonResponse({ status: 'error', message: 'webSearch.maxUses must be an integer from 1 to 5.' }, 400);
+  }
+  // The buffered path parses Anthropic's server-tool blocks; the streaming
+  // paths do not, so a request that asks for both would silently lose them.
+  if (webSearch && (stream || outputConfig !== undefined)) {
+    return jsonResponse({ status: 'error', message: 'webSearch requires the buffered path and no outputConfig.' }, 400);
+  }
   if (streamToClient && tools && toolChoice !== 'none') {
     return jsonResponse({ status: 'error', message: 'A streamed passthrough cannot carry tool calls; set toolChoice: "none".' }, 400);
   }
-  return { messages, maxTokens, responseFormat, ...(outputConfig ? { outputConfig } : {}), cacheControl, stream, ...(streamToClient ? { streamToClient: true } : {}), ...(tools ? { tools } : {}), ...(toolChoice ? { toolChoice } : {}) };
+  return { messages, maxTokens, responseFormat, ...(outputConfig ? { outputConfig } : {}), cacheControl, stream, ...(streamToClient ? { streamToClient: true } : {}), ...(tools ? { tools } : {}), ...(toolChoice ? { toolChoice } : {}), ...(webSearch ? { webSearch } : {}) };
 }
 
 interface AnthropicCallResult {
@@ -220,6 +253,7 @@ interface AnthropicCallResult {
   stopReason?: string;
   cacheReadTokens?: number;
   toolCalls?: ProxyToolCall[];
+  webSearch?: ProxyWebSearch;
 }
 
 /** Builds the upstream Messages API body — shared by the buffered and streaming paths so the two never drift on `system`/`output_config` shaping. */
@@ -239,8 +273,14 @@ function buildAnthropicBody(request: ProxyRequestBody, model: string, stream: bo
       : systemText || undefined;
 
   const body: Record<string, unknown> = { model, system, messages: userMessages, max_tokens: request.maxTokens, stream };
-  if (request.tools) {
-    body.tools = request.tools.map((t) => ({ name: t.name, description: t.description, input_schema: t.inputSchema }));
+  const tools: Record<string, unknown>[] = (request.tools ?? []).map((t) => ({ name: t.name, description: t.description, input_schema: t.inputSchema }));
+  // Anthropic executes this one server-side; it is not a custom function tool.
+  // `tool_choice: none` would forbid it too, so it is omitted on the closing round.
+  if (request.webSearch && request.toolChoice !== 'none') {
+    tools.push({ type: 'web_search_20250305', name: 'web_search', max_uses: request.webSearch.maxUses });
+  }
+  if (tools.length > 0) {
+    body.tools = tools;
     if (request.toolChoice === 'none') body.tool_choice = { type: 'none' };
   }
   if (request.outputConfig) {
@@ -256,34 +296,113 @@ function buildAnthropicBody(request: ProxyRequestBody, model: string, stream: bo
   return body;
 }
 
+/** A public HTTPS page only: no credentials, ports, localhost or bare IPs in a saved citation. */
+function isPublicHttpsUrl(value: unknown): value is string {
+  if (typeof value !== 'string' || !value.startsWith('https://')) return false;
+  try {
+    const host = new URL(value).hostname.toLowerCase();
+    return host.includes('.') && !host.endsWith('.localhost') && !/^[0-9.]+$/.test(host) && !host.includes(':');
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Reads Anthropic's server-tool blocks. `requests` is the billed count from
+ * `usage.server_tool_use`, falling back to the number of server tool uses
+ * when the provider omits it; pages and citations are deduplicated by URL.
+ */
+function parseWebSearch(data: unknown): ProxyWebSearch | undefined {
+  if (!isRecord(data)) return undefined;
+  const blocks = Array.isArray(data.content) ? data.content : [];
+  const results = new Map<string, ProxyWebSearchResult>();
+  const citations = new Map<string, ProxyWebSearchCitation>();
+  for (const block of blocks) {
+    if (!isRecord(block)) continue;
+    if (block.type === 'web_search_tool_result' && Array.isArray(block.content)) {
+      for (const raw of block.content) {
+        if (!isRecord(raw) || raw.type !== 'web_search_result' || !isPublicHttpsUrl(raw.url)) continue;
+        results.set(raw.url, {
+          url: raw.url,
+          title: typeof raw.title === 'string' && raw.title.trim() !== '' ? raw.title : raw.url,
+          pageAge: typeof raw.page_age === 'string' ? raw.page_age : null,
+        });
+      }
+    }
+    if (block.type === 'text' && Array.isArray(block.citations)) {
+      for (const raw of block.citations) {
+        if (!isRecord(raw) || raw.type !== 'web_search_result_location' || !isPublicHttpsUrl(raw.url)) continue;
+        citations.set(raw.url, {
+          url: raw.url,
+          title: typeof raw.title === 'string' ? raw.title : null,
+          citedText: typeof raw.cited_text === 'string' ? raw.cited_text : null,
+        });
+      }
+    }
+  }
+  const usage = isRecord(data.usage) && isRecord(data.usage.server_tool_use) ? data.usage.server_tool_use : null;
+  const requests = usage !== null && typeof usage.web_search_requests === 'number'
+    ? usage.web_search_requests
+    : blocks.filter((b) => isRecord(b) && b.type === 'server_tool_use' && b.name === 'web_search').length;
+  if (requests === 0 && results.size === 0 && citations.size === 0) return undefined;
+  return { requests, results: [...results.values()], citations: [...citations.values()] };
+}
+
 /** Non-streaming call — the original E4 path, unchanged in shape, now also surfacing `stop_reason` and cache-read tokens when the caller asked for `outputConfig`/`cacheControl`. */
 async function callAnthropicBuffered(request: ProxyRequestBody, apiKey: string, model: string): Promise<AnthropicCallResult> {
-  const upstream = await fetch(ANTHROPIC_API_URL, {
-    method: 'POST',
-    headers: { 'content-type': 'application/json', 'x-api-key': apiKey, 'anthropic-version': ANTHROPIC_VERSION },
-    body: JSON.stringify(buildAnthropicBody(request, model, false)),
-  });
+  let body = buildAnthropicBody(request, model, false);
+  let text = '';
+  let inputTokens = 0;
+  let outputTokens = 0;
+  let cacheReadTokens: number | undefined;
+  let stopReason: string | undefined;
+  const toolCalls: ProxyToolCall[] = [];
+  const webResults = new Map<string, ProxyWebSearchResult>();
+  const webCitations = new Map<string, ProxyWebSearchCitation>();
+  let webRequests = 0;
 
-  if (!upstream.ok) {
-    const detail = await upstream.text().catch(() => '');
-    return { ok: false, status: upstream.status, text: `Upstream ${String(upstream.status)}: ${detail || 'no body'}`, inputTokens: 0, outputTokens: 0 };
+  // A long-running server tool (web search) can pause the turn. The provider
+  // asks the caller to send the paused assistant message back unchanged; do
+  // that here, so the app sees one complete answer rather than an empty turn.
+  for (let attempt = 0; attempt < 3; attempt += 1) {
+    const upstream = await fetch(ANTHROPIC_API_URL, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', 'x-api-key': apiKey, 'anthropic-version': ANTHROPIC_VERSION },
+      body: JSON.stringify(body),
+    });
+
+    if (!upstream.ok) {
+      const detail = await upstream.text().catch(() => '');
+      return { ok: false, status: upstream.status, text: `Upstream ${String(upstream.status)}: ${detail || 'no body'}`, inputTokens: 0, outputTokens: 0 };
+    }
+
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment -- Deno runtime, no shared type-checking with src/.
+    const data = await upstream.json();
+    const contentBlocks: { type?: string; text?: string; id?: string; name?: string; input?: unknown }[] = Array.isArray(data.content) ? data.content : [];
+    for (const block of contentBlocks) {
+      if (block.type === 'tool_use' && typeof block.id === 'string' && typeof block.name === 'string') {
+        toolCalls.push({ id: block.id, name: block.name, input: isRecord(block.input) ? block.input : {} });
+      }
+      if (block.type === 'text') text += block.text ?? '';
+    }
+    inputTokens += typeof data.usage?.input_tokens === 'number' ? data.usage.input_tokens : 0;
+    outputTokens += typeof data.usage?.output_tokens === 'number' ? data.usage.output_tokens : 0;
+    cacheReadTokens = typeof data.usage?.cache_read_input_tokens === 'number' ? data.usage.cache_read_input_tokens : cacheReadTokens;
+    stopReason = typeof data.stop_reason === 'string' ? data.stop_reason : undefined;
+    const webSearch = parseWebSearch(data);
+    if (webSearch) {
+      webRequests += webSearch.requests;
+      for (const result of webSearch.results) webResults.set(result.url, result);
+      for (const citation of webSearch.citations) webCitations.set(citation.url, citation);
+    }
+    if (stopReason !== 'pause_turn' || !Array.isArray(data.content)) break;
+    body = { ...body, messages: [...(body.messages as unknown[]), { role: 'assistant', content: data.content }] };
   }
 
-  // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment -- Deno runtime, no shared type-checking with src/.
-  const data = await upstream.json();
-  const contentBlocks: { type?: string; text?: string; id?: string; name?: string; input?: unknown }[] = Array.isArray(data.content) ? data.content : [];
-  const toolCalls: ProxyToolCall[] = contentBlocks
-    .filter((b) => b.type === 'tool_use' && typeof b.id === 'string' && typeof b.name === 'string')
-    .map((b) => ({ id: b.id as string, name: b.name as string, input: isRecord(b.input) ? b.input : {} }));
-  const text = contentBlocks
-    .filter((b) => b.type === 'text')
-    .map((b) => b.text ?? '')
-    .join('');
-  const inputTokens = typeof data.usage?.input_tokens === 'number' ? data.usage.input_tokens : 0;
-  const outputTokens = typeof data.usage?.output_tokens === 'number' ? data.usage.output_tokens : 0;
-  const cacheReadTokens = typeof data.usage?.cache_read_input_tokens === 'number' ? data.usage.cache_read_input_tokens : undefined;
-  const stopReason = typeof data.stop_reason === 'string' ? data.stop_reason : undefined;
-  return { ok: true, status: upstream.status, text, inputTokens, outputTokens, stopReason, cacheReadTokens, ...(toolCalls.length > 0 ? { toolCalls } : {}) };
+  const webSearch: ProxyWebSearch | undefined = webRequests === 0 && webResults.size === 0 && webCitations.size === 0
+    ? undefined
+    : { requests: webRequests, results: [...webResults.values()], citations: [...webCitations.values()] };
+  return { ok: true, status: 200, text, inputTokens, outputTokens, stopReason, cacheReadTokens, ...(toolCalls.length > 0 ? { toolCalls } : {}), ...(webSearch ? { webSearch } : {}) };
 }
 
 /**
@@ -537,13 +656,15 @@ interface LogRequestInput {
   keySource?: 'app' | 'org' | 'trial';
   /** The caller's id for one run; trial allowance also counts runs by this id. */
   runId?: string | null;
+  /** D4: billed provider-side web searches in this call. */
+  webSearchRequests?: number;
 }
 
 async function logRequest(input: LogRequestInput): Promise<void> {
-  const { serviceClient, orgId, model, status, latencyMs, inputTokens, outputTokens, keySource, runId } = input;
+  const { serviceClient, orgId, model, status, latencyMs, inputTokens, outputTokens, keySource, runId, webSearchRequests } = input;
   const { error } = await serviceClient
     .from('llm_proxy_requests')
-    .insert({ id: crypto.randomUUID(), org_id: orgId, model, status, latency_ms: latencyMs, input_tokens: inputTokens ?? null, output_tokens: outputTokens ?? null, key_source: keySource ?? 'app', run_id: runId ?? null });
+    .insert({ id: crypto.randomUUID(), org_id: orgId, model, status, latency_ms: latencyMs, input_tokens: inputTokens ?? null, output_tokens: outputTokens ?? null, key_source: keySource ?? 'app', run_id: runId ?? null, web_search_requests: webSearchRequests ?? 0 });
   // Logging is best-effort observability, not the authorization check
   // (that's the membership read below) — a failure here must never turn
   // an otherwise-successful proxy call into an error response.
@@ -659,6 +780,12 @@ Deno.serve(async (req: Request) => {
     const model = bodyRecord.modelTier === 'light' && orgApiKey !== null ? config.lightModel : bodyRecord.requireOrgKey === true && orgApiKey !== null ? config.agentStandardModel : config.model;
     const { rateLimitPerHour } = config;
     const loggedRunId = orgApiKey !== null ? validatedRunId : trialRunId;
+    // D4: web search is only ever spent on the organisation's own key. The
+    // platform trial must not pay Anthropic's per-search fee.
+    if (proxyRequest.webSearch !== undefined && orgApiKey === null) {
+      await logRequest({ serviceClient, orgId, model, status: 'error', latencyMs: Date.now() - startedAt, keySource, runId: loggedRunId });
+      return jsonResponse({ status: 'error', message: "Web search needs the organisation's own AI key. An owner can add it in organisation settings." }, 403);
+    }
     const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000).toISOString();
     const { count, error: countError } = await serviceClient
       .from('llm_proxy_requests')
@@ -702,7 +829,7 @@ Deno.serve(async (req: Request) => {
       return jsonResponse({ status: 'error', message: result.text }, result.status);
     }
 
-    await logRequest({ serviceClient, orgId, model, status: 'ok', latencyMs, inputTokens: result.inputTokens, outputTokens: result.outputTokens, keySource, runId: loggedRunId });
+    await logRequest({ serviceClient, orgId, model, status: 'ok', latencyMs, inputTokens: result.inputTokens, outputTokens: result.outputTokens, keySource, runId: loggedRunId, webSearchRequests: result.webSearch?.requests ?? 0 });
     return jsonResponse(
       {
         status: 'ok',
@@ -712,6 +839,7 @@ Deno.serve(async (req: Request) => {
         ...(result.stopReason !== undefined ? { stopReason: result.stopReason } : {}),
         ...(result.cacheReadTokens !== undefined ? { cacheReadTokens: result.cacheReadTokens } : {}),
         ...(result.toolCalls ? { toolCalls: result.toolCalls } : {}),
+        ...(result.webSearch ? { webSearch: result.webSearch } : {}),
       },
       200,
     );

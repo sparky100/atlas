@@ -41,7 +41,7 @@ describe('the evaluation set', () => {
 });
 
 function result(over: Partial<AskResult>): AskResult {
-  return { status: 'answered', answer: '', citations: [], citationNames: {}, grounded: false, unverifiedRemoved: 0, toolUses: [], rounds: 1, inputTokens: 0, outputTokens: 0, ...over };
+  return { status: 'answered', answer: '', citations: [], citationNames: {}, grounded: false, unverifiedRemoved: 0, toolUses: [], webSearch: { requests: 0, results: [], citations: [] }, rounds: 1, inputTokens: 0, outputTokens: 0, ...over };
 }
 const use = (name: string) => ({ name, input: {}, ok: true, total: 1, truncated: false });
 

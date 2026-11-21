@@ -6,7 +6,7 @@
  * injected so this is tested without a network.
  */
 import { buildLlmProxyRequest } from '../contracts/llmProxy';
-import type { LlmProxyResponse, LlmProxyToolCall } from '../contracts/llmProxy';
+import type { LlmProxyResponse, LlmProxyToolCall, LlmProxyWebSearch } from '../contracts/llmProxy';
 import type { AskModelClient, AskModelResponse } from './askLoop';
 
 /** A failure from the proxy or the provider, with the HTTP status the proxy gave (429 = the organisation's hourly cap). */
@@ -43,6 +43,13 @@ function isToolCall(value: unknown): value is LlmProxyToolCall {
   return typeof v.id === 'string' && typeof v.name === 'string' && typeof v.input === 'object' && v.input !== null;
 }
 
+/** Only the shared shape is checked here; the proxy (our own function) built the contents. */
+function isWebSearch(value: unknown): value is LlmProxyWebSearch {
+  if (typeof value !== 'object' || value === null) return false;
+  const v = value as Record<string, unknown>;
+  return typeof v.requests === 'number' && Array.isArray(v.results) && Array.isArray(v.citations);
+}
+
 export function createProxyAskClient(options: ProxyAskClientOptions): AskModelClient {
   const doFetch = options.fetchFn ?? fetch;
   return {
@@ -52,6 +59,7 @@ export function createProxyAskClient(options: ProxyAskClientOptions): AskModelCl
         maxTokens: request.maxTokens,
         tools: request.tools,
         toolChoice: request.toolChoice,
+        ...(request.webSearch !== undefined ? { webSearch: request.webSearch } : {}),
         cacheControl: true,
       });
       const res = await doFetch(options.proxyUrl, {
@@ -67,6 +75,7 @@ export function createProxyAskClient(options: ProxyAskClientOptions): AskModelCl
         text: body.text ?? '',
         ...(body.stopReason !== undefined ? { stopReason: body.stopReason } : {}),
         ...(body.toolCalls ? { toolCalls: body.toolCalls.filter(isToolCall) } : {}),
+        ...(isWebSearch(body.webSearch) ? { webSearch: body.webSearch } : {}),
         inputTokens: body.inputTokens ?? 0,
         outputTokens: body.outputTokens ?? 0,
       };

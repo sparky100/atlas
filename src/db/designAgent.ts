@@ -1,5 +1,5 @@
 import type { UUID } from '../contracts/delta';
-import { DESIGNER_CATALOGUE_REFS_MAX, type DesignerOptionDraft } from '../contracts/designerOptions';
+import { DESIGNER_CATALOGUE_REFS_MAX, DESIGNER_WEB_REFS_MAX, type DesignerOptionDraft, type DesignerWebRef } from '../contracts/designerOptions';
 import { catalogueCitationSchema, type CatalogueCitation } from '../contracts/productCatalogue';
 import type { Client } from './client';
 
@@ -21,7 +21,7 @@ export interface DesignerDraft {
   citedNames: string[];
   grounded: boolean;
   /** What the run used, shown to the person who asked. Tokens, not money: Atlas holds no price list. */
-  usage: { inputTokens: number; outputTokens: number; lookups: number };
+  usage: { inputTokens: number; outputTokens: number; lookups: number; webSearches: number };
 }
 
 export class DesignerError extends Error {
@@ -35,7 +35,7 @@ interface DesignerBody {
   status?: string;
   message?: string;
   design?: { options?: unknown; gaps?: unknown; stayNote?: unknown; problems?: unknown };
-  result?: { answer?: string; citations?: string[]; citationNames?: Record<string, string>; grounded?: boolean; inputTokens?: number; outputTokens?: number; toolUses?: unknown[] };
+  result?: { answer?: string; citations?: string[]; citationNames?: Record<string, string>; grounded?: boolean; inputTokens?: number; outputTokens?: number; toolUses?: unknown[]; webSearch?: { requests?: number } };
 }
 
 const CITATION = /\[\[element:([0-9a-f-]{36})\]\]/g;
@@ -51,6 +51,17 @@ export function citationsToNames(text: string, names: Record<string, string>): s
 /** Pure: the element ids a saved text still cites as [[element:<id>]] (options saved before names were substituted). */
 export function citationIds(text: string): string[] {
   return [...new Set([...text.matchAll(CITATION)].map((m) => m[1] ?? ''))].filter((id) => id !== '');
+}
+
+/** Only a public HTTPS page can be a saved web source. */
+function isPublicHttpsUrl(value: string): boolean {
+  if (!value.startsWith('https://')) return false;
+  try {
+    const host = new URL(value).hostname.toLowerCase();
+    return host.includes('.') && !host.endsWith('.localhost') && !/^[0-9.]+$/.test(host) && !host.includes(':');
+  } catch {
+    return false;
+  }
 }
 
 /** Pure: the one place the function's reply is read, so the page never shows a raw provider message. */
@@ -72,9 +83,21 @@ export function interpretDesignerReply(body: unknown): DesignerDraft {
       }
       return out;
     };
+    const webRefs = (v: unknown): DesignerWebRef[] => {
+      if (!Array.isArray(v)) return [];
+      const out: DesignerWebRef[] = [];
+      for (const raw of v) {
+        if (typeof raw !== 'object' || raw === null) continue;
+        const x = raw as Record<string, unknown>;
+        if (typeof x.url !== 'string' || typeof x.title !== 'string' || x.title.trim() === '' || !isPublicHttpsUrl(x.url)) continue;
+        out.push({ url: x.url, title: x.title });
+        if (out.length >= DESIGNER_WEB_REFS_MAX) break;
+      }
+      return out;
+    };
     const options = (Array.isArray(r.design.options) ? r.design.options : []).flatMap((o): DesignerOptionDraft[] => {
       const x = typeof o === 'object' && o !== null ? (o as Record<string, unknown>) : {};
-      return typeof x.title === 'string' && typeof x.summary === 'string' ? [{ title: plain(x.title), summary: plain(x.summary), toWeigh: typeof x.toWeigh === 'string' ? plain(x.toWeigh) : '', catalogueRefs: refs(x.catalogueRefs) }] : [];
+      return typeof x.title === 'string' && typeof x.summary === 'string' ? [{ title: plain(x.title), summary: plain(x.summary), toWeigh: typeof x.toWeigh === 'string' ? plain(x.toWeigh) : '', catalogueRefs: refs(x.catalogueRefs), webRefs: webRefs(x.webRefs) }] : [];
     });
     const problems = strings(r.design.problems);
     if (options.length === 0 && problems.length === 0) problems.push('The Designer gave no usable options.');
@@ -85,7 +108,7 @@ export function interpretDesignerReply(body: unknown): DesignerDraft {
       problems,
       citedNames,
       grounded: r.result.grounded === true,
-      usage: { inputTokens: count(r.result.inputTokens), outputTokens: count(r.result.outputTokens), lookups: Array.isArray(r.result.toolUses) ? r.result.toolUses.length : 0 },
+      usage: { inputTokens: count(r.result.inputTokens), outputTokens: count(r.result.outputTokens), lookups: Array.isArray(r.result.toolUses) ? r.result.toolUses.length : 0, webSearches: count(r.result.webSearch?.requests) },
     };
   }
   if (r.status === 'done' && r.design === undefined) throw new DesignerError('The Designer is being updated and cannot suggest options yet. Add the options by hand, or try again later.');

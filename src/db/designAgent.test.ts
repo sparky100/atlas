@@ -7,19 +7,19 @@ describe('interpretDesignerReply', () => {
   it('returns the options, the gaps and the names of what it cites', () => {
     const draft = interpretDesignerReply({ status: 'done', design, result: { answer: '{}', citations: ['a', 'b'], citationNames: { a: 'Quote Tool' }, grounded: true, inputTokens: 1200, outputTokens: 340, toolUses: [{}, {}, {}] } });
     expect(draft).toEqual({
-      options: [{ title: 'Configure', summary: 'Use it as is.', toWeigh: 'Fit.', catalogueRefs: [] }, { title: 'Replace', summary: 'Buy one.', toWeigh: '', catalogueRefs: [] }],
+      options: [{ title: 'Configure', summary: 'Use it as is.', toWeigh: 'Fit.', catalogueRefs: [], webRefs: [] }, { title: 'Replace', summary: 'Buy one.', toWeigh: '', catalogueRefs: [], webRefs: [] }],
       gaps: ['No owner recorded'],
       stayNote: 'Slow.',
       problems: [],
       citedNames: ['Quote Tool'],
       grounded: true,
-      usage: { inputTokens: 1200, outputTokens: 340, lookups: 3 },
+      usage: { inputTokens: 1200, outputTokens: 340, lookups: 3, webSearches: 0 },
     });
   });
 
   it('reads missing or odd usage as zero rather than showing nonsense', () => {
     const draft = interpretDesignerReply({ status: 'done', design, result: { answer: 'x', inputTokens: -5, outputTokens: 'lots', toolUses: 'none' } });
-    expect(draft.usage).toEqual({ inputTokens: 0, outputTokens: 0, lookups: 0 });
+    expect(draft.usage).toEqual({ inputTokens: 0, outputTokens: 0, lookups: 0, webSearches: 0 });
   });
 
   it('marks a draft with no verified citation as not grounded', () => {
@@ -64,7 +64,7 @@ describe('citations become names, never ids', () => {
       design: { options: [{ title: 'Keep', summary: `Keep [[element:${A}]].`, toWeigh: `Check [[element:${B}]].` }], gaps: [`No owner for [[element:${A}]]`], stayNote: `[[element:${A}]] stays poor.`, problems: [] },
       result: { answer: 'x', citations: [A, B], citationNames: { [A]: 'Quote Tool', [B]: 'Connection Quotations' }, grounded: true },
     });
-    expect(draft.options[0]).toEqual({ title: 'Keep', summary: 'Keep Quote Tool.', toWeigh: 'Check Connection Quotations.', catalogueRefs: [] });
+    expect(draft.options[0]).toEqual({ title: 'Keep', summary: 'Keep Quote Tool.', toWeigh: 'Check Connection Quotations.', catalogueRefs: [], webRefs: [] });
     expect(draft.gaps).toEqual(['No owner for Quote Tool']);
     expect(draft.stayNote).toBe('Quote Tool stays poor.');
   });
@@ -76,5 +76,15 @@ describe('citations become names, never ids', () => {
       result: { answer: 'x' },
     });
     expect(draft.options[0]?.catalogueRefs).toEqual([ref]);
+  });
+  it('carries only well-formed web refs and reads the billed search count', () => {
+    const ref = { url: 'https://vendor.example/product', title: 'Product page' };
+    const draft = interpretDesignerReply({
+      status: 'done',
+      design: { options: [{ title: 'Replace', summary: 'Buy.', webRefs: [ref, { url: 'http://insecure.example', title: 'No' }, { url: 'https://vendor.example/other', title: '' }] }], gaps: [], stayNote: '', problems: [] },
+      result: { answer: 'x', webSearch: { requests: 2 } },
+    });
+    expect(draft.options[0]?.webRefs).toEqual([ref]);
+    expect(draft.usage.webSearches).toBe(2);
   });
 });

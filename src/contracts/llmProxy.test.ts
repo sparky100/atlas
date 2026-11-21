@@ -78,6 +78,26 @@ describe('buildLlmProxyRequest — F2 (full K1) additions', () => {
   });
 });
 
+describe('buildLlmProxyRequest — D4 web search', () => {
+  it('carries a valid per-request cap and round-trips through validation', () => {
+    const request = buildLlmProxyRequest({ messages: [{ role: 'user', content: 'x' }], webSearch: { maxUses: 3 } });
+    expect(request.webSearch).toEqual({ maxUses: 3 });
+    expect(isValidLlmProxyRequest(request)).toBe(true);
+  });
+
+  it('drops an invalid cap rather than sending it upstream', () => {
+    for (const maxUses of [0, 6, 1.5, Number.NaN]) {
+      expect(buildLlmProxyRequest({ messages: [{ role: 'user', content: 'x' }], webSearch: { maxUses } })).not.toHaveProperty('webSearch');
+    }
+  });
+
+  it('rejects web search with a provider stream or structured output, where its blocks would be lost', () => {
+    const base = buildLlmProxyRequest({ messages: [{ role: 'user', content: 'x' }], webSearch: { maxUses: 1 } });
+    expect(isValidLlmProxyRequest({ ...base, stream: true })).toBe(false);
+    expect(isValidLlmProxyRequest({ ...base, outputConfig: { effort: 'low', format: { type: 'json_schema', schema: { type: 'object' } } } })).toBe(false);
+  });
+});
+
 describe('buildLlmProxyRequest — streamToClient (in-app help passthrough)', () => {
   it('omits streamToClient when not given', () => {
     expect(buildLlmProxyRequest({ messages: [{ role: 'user', content: 'x' }] })).not.toHaveProperty('streamToClient');

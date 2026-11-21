@@ -4,7 +4,7 @@
  * itself is an injected `AskModelClient`, so it is tested without a network
  * and the edge function supplies a client that goes through `llm-proxy`.
  */
-import type { LlmProxyContentBlock, LlmProxyMessage, LlmProxyToolCall, LlmProxyToolDefinition } from '../contracts/llmProxy';
+import type { LlmProxyContentBlock, LlmProxyMessage, LlmProxyToolCall, LlmProxyToolDefinition, LlmProxyWebSearch } from '../contracts/llmProxy';
 import { ASK_LIMIT_NOTICE, askSystemPrompt } from './askPrompt';
 import { callTool, MODEL_TOOLS } from './index';
 import type { ToolContext } from './types';
@@ -23,12 +23,16 @@ export interface AskModelRequest {
   /** `'none'` on the closing round, so the model must write its answer. */
   toolChoice: 'auto' | 'none';
   maxTokens: number;
+  /** D4: how many provider-side web searches this round may still use. Omitted when the budget is spent or the caller did not ask for search. */
+  webSearch?: { maxUses: number };
 }
 
 export interface AskModelResponse {
   text: string;
   stopReason?: string;
   toolCalls?: LlmProxyToolCall[];
+  /** D4: actual search usage and pages for this round, when the provider ran a search. */
+  webSearch?: LlmProxyWebSearch;
   inputTokens: number;
   outputTokens: number;
 }
@@ -69,6 +73,8 @@ export interface AskResult {
   /** How many cited ids no tool returned (removed from the answer). */
   unverifiedRemoved: number;
   toolUses: AskToolUse[];
+  /** D4: actual provider-side web searches and the pages/citations returned across the run. Empty when search was not used. */
+  webSearch: LlmProxyWebSearch;
   rounds: number;
   /** Which limit ended the lookups, when one did. */
   limit?: 'rounds' | 'budget';
@@ -155,6 +161,8 @@ export interface RunAskInput {
   /** Replaces Ask Atlas's own instructions (the Designer agent brings its own). Absent: Ask Atlas's. */
   system?: string | undefined;
   onEvent?: ((event: AskEvent) => void) | undefined;
+  /** D4: total provider-side web searches this run may use. Omitted means none. */
+  webSearch?: { maxUses: number } | undefined;
 }
 
 export async function runAsk(input: RunAskInput): Promise<AskResult> {
@@ -172,6 +180,9 @@ export async function runAsk(input: RunAskInput): Promise<AskResult> {
   let inputTokens = 0;
   let outputTokens = 0;
   let limit: AskResult['limit'];
+  let webSearchUsed = 0;
+  const webSearchResults = new Map<string, LlmProxyWebSearch['results'][number]>();
+  const webSearchCitations = new Map<string, LlmProxyWebSearch['citations'][number]>();
 
   const finish = (status: AskStatus, text: string): AskResult => {
     // The model and commit ids appear in every result's stamp but are not elements.
@@ -188,6 +199,7 @@ export async function runAsk(input: RunAskInput): Promise<AskResult> {
       grounded: checked.citations.length > 0,
       unverifiedRemoved: checked.unverifiedRemoved,
       toolUses,
+      webSearch: { requests: webSearchUsed, results: [...webSearchResults.values()], citations: [...webSearchCitations.values()] },
       rounds,
       ...(limit ? { limit } : {}),
       inputTokens,
@@ -197,12 +209,24 @@ export async function runAsk(input: RunAskInput): Promise<AskResult> {
 
   for (;;) {
     const closing = limit !== undefined;
-    const response = await client.complete({ system, messages, tools, toolChoice: closing ? 'none' : 'auto', maxTokens: ASK_MAX_TOKENS_PER_ROUND });
+    const searchRemaining = (input.webSearch?.maxUses ?? 0) - webSearchUsed;
+    const response = await client.complete({
+      system, messages, tools, toolChoice: closing ? 'none' : 'auto', maxTokens: ASK_MAX_TOKENS_PER_ROUND,
+      ...(!closing && searchRemaining > 0 ? { webSearch: { maxUses: searchRemaining } } : {}),
+    });
     rounds += 1;
     inputTokens += response.inputTokens;
     outputTokens += response.outputTokens;
+    if (response.webSearch) {
+      webSearchUsed += response.webSearch.requests;
+      for (const result of response.webSearch.results) webSearchResults.set(result.url, result);
+      for (const citation of response.webSearch.citations) webSearchCitations.set(citation.url, citation);
+    }
 
     if (response.stopReason === 'refusal') return finish('refused', '');
+    // The proxy continues a paused server-tool turn itself; if it still pauses
+    // after its own retries, the answer is not complete.
+    if (response.stopReason === 'pause_turn') return finish('incomplete', response.text);
     const calls = response.toolCalls ?? [];
     if (calls.length === 0 || closing) {
       // `max_tokens` means the answer was cut off: return it, but say it is not complete.

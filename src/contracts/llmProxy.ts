@@ -66,6 +66,32 @@ export interface LlmProxyToolCall {
   input: Record<string, unknown>;
 }
 
+/** D4: Anthropic runs its own web search server-side; the caller only sets a per-request cap. */
+export interface LlmProxyWebSearchRequest {
+  maxUses: number;
+}
+
+/** One page Anthropic's web search returned. `pageAge` is what the provider reported, when it did. */
+export interface LlmProxyWebSearchResult {
+  url: string;
+  title: string;
+  pageAge: string | null;
+}
+
+/** A page the model actually cited in its text, with the supporting sentence when the provider gave one. */
+export interface LlmProxyWebSearchCitation {
+  url: string;
+  title: string | null;
+  citedText: string | null;
+}
+
+/** Actual search usage and what came back. `requests` is the billed count from the provider, not the model's claim. */
+export interface LlmProxyWebSearch {
+  requests: number;
+  results: LlmProxyWebSearchResult[];
+  citations: LlmProxyWebSearchCitation[];
+}
+
 export type LlmProxyResponseFormat = 'text' | 'json';
 
 /** Matches the provider's own `output_config.effort` values (SPEC-capture.md §6: prompt A/C `medium`, prompt B `high`). */
@@ -113,6 +139,12 @@ export interface LlmProxyRequest {
   tools?: LlmProxyToolDefinition[];
   /** Additive, ADR-028 §3: `'none'` keeps the tools declared but forbids calling one — used for the final, written-answer round. Default `'auto'`. */
   toolChoice?: 'auto' | 'none';
+  /**
+   * D4: ask Anthropic to run its own web search during this request, at most
+   * `maxUses` times. Requires the organisation's own key and the buffered
+   * path; it is never combined with `outputConfig` or a client stream.
+   */
+  webSearch?: LlmProxyWebSearchRequest;
 }
 
 export interface LlmProxyResponse {
@@ -132,6 +164,8 @@ export interface LlmProxyResponse {
   cacheReadTokens?: number;
   /** Additive, ADR-028 §3: the tool calls the model asked for, in order. Absent when it asked for none; `stopReason` is `tool_use` when present. */
   toolCalls?: LlmProxyToolCall[];
+  /** D4: actual web-search usage and the pages/citations Anthropic returned. Absent when the request did not ask for web search. */
+  webSearch?: LlmProxyWebSearch;
 }
 
 const MAX_TOKENS_CEILING = 16000;
@@ -207,6 +241,7 @@ export interface BuildLlmProxyRequestInput {
   streamToClient?: boolean;
   tools?: readonly LooseTool[];
   toolChoice?: 'auto' | 'none';
+  webSearch?: LlmProxyWebSearchRequest;
 }
 
 type LooseTool = LlmProxyToolDefinition;
@@ -228,7 +263,13 @@ export function buildLlmProxyRequest(input: BuildLlmProxyRequestInput): LlmProxy
     ...(input.streamToClient ? { streamToClient: true } : {}),
     ...(tools ? { tools } : {}),
     ...(tools && input.toolChoice === 'none' ? { toolChoice: 'none' as const } : {}),
+    ...(isValidWebSearchRequest(input.webSearch) ? { webSearch: input.webSearch } : {}),
   };
+}
+
+function isValidWebSearchRequest(value: unknown): value is LlmProxyWebSearchRequest {
+  if (!isRecord(value)) return false;
+  return typeof value.maxUses === 'number' && Number.isInteger(value.maxUses) && value.maxUses >= 1 && value.maxUses <= 5;
 }
 
 function isValidOutputConfig(value: unknown): value is LlmProxyOutputConfig {
@@ -271,6 +312,10 @@ export function isValidLlmProxyRequest(value: unknown): value is LlmProxyRequest
   if (v.toolChoice !== undefined && v.toolChoice !== 'auto' && v.toolChoice !== 'none') return false;
   if (v.toolChoice !== undefined && v.tools === undefined) return false;
   if (v.tools !== undefined && v.outputConfig !== undefined) return false;
+  if (v.webSearch !== undefined && !isValidWebSearchRequest(v.webSearch)) return false;
+  // The buffered path parses Anthropic's server-tool blocks; the streaming
+  // paths do not, so a request that asks for both would silently lose them.
+  if (v.webSearch !== undefined && (v.stream === true || v.outputConfig !== undefined)) return false;
   // A passthrough stream cannot hand tool calls back, so it may only carry tools with calling switched off.
   if (v.streamToClient === true && v.tools !== undefined && v.toolChoice !== 'none') return false;
   return true;

@@ -156,6 +156,38 @@ describe('handleDesign', () => {
     expect(outcome.design.options[1]?.catalogueRefs).toEqual([]);
     expect(outcome.design.problems.join(' ')).toContain('did not read');
   });
+
+  it('offers web search only when the organisation has its own key', async () => {
+    const offered: boolean[] = [];
+    const make = (keySet: boolean) => deps({
+      agentSettings: () => Promise.resolve({ ...ON, keySet }),
+      trialRunsLeft: () => Promise.resolve(1),
+      createClient: () => ({ complete: (request) => {
+        offered.push(request.webSearch !== undefined);
+        return Promise.resolve({ text: '{}', stopReason: 'end_turn', inputTokens: 1, outputTokens: 1 });
+      } }),
+    });
+    await handleDesign(make(true), body);
+    await handleDesign(make(false), body);
+    expect(offered).toEqual([true, false]);
+  });
+
+  it('keeps a web page only when the search returned it, and reports the billed searches', async () => {
+    const kept = { url: 'https://kept.example/a', title: 'Kept' };
+    const answer = JSON.stringify({ options: [{ title: 'Replace', summary: 'Buy.', webRefs: [kept, { url: 'https://dropped.example/b', title: 'Dropped' }] }, { title: 'Build', summary: 'Build it.' }], gaps: [], stayNote: '' });
+    const d = deps({
+      createClient: () => ({ complete: () => Promise.resolve({
+        text: answer, stopReason: 'end_turn', inputTokens: 1, outputTokens: 1,
+        webSearch: { requests: 1, results: [{ url: kept.url, title: kept.title, pageAge: null }], citations: [{ url: kept.url, title: kept.title, citedText: 'Says so.' }] },
+      }) }),
+    });
+    const outcome = await handleDesign(d, body);
+    expect(outcome.status).toBe('done');
+    if (outcome.status !== 'done') return;
+    expect(outcome.design.options[0]?.webRefs).toEqual([kept]);
+    expect(outcome.design.problems.join(' ')).toContain('did not return');
+    expect(outcome.result.webSearch.requests).toBe(1);
+  });
 });
 
 describe('parseDesignBody', () => {
@@ -182,7 +214,18 @@ describe('the Designer prompt', () => {
     expect(prompt).toMatch(/"Replace with a product" and "Build ourselves", say in the summary whether the existing system would be retired/);
     expect(prompt).toMatch(/something to investigate and never as the conclusion/);
   });
+  it('allows web pages only when the search returned them, at most two and never as reviewed evidence', () => {
+    const prompt = designerSystemPrompt('Estate', '2026-11-19');
+    expect(prompt).toContain('you may search the web. Search at most twice.');
+    expect(prompt).toContain('never invent a URL');
+    expect(prompt).toContain('Web pages are not reviewed');
+    expect(prompt).toContain('"webRefs"');
+  });
   it('puts the element id and the finding in the brief', () => {
     expect(designerBrief({ elementId: ELEMENT, finding: 'Poor fit' })).toContain(ELEMENT);
+  });
+  it('tells the Designer whether web search is available for this run', () => {
+    expect(designerBrief({ elementId: ELEMENT, finding: 'Poor fit', webSearch: true })).toContain('Web search is available for this run.');
+    expect(designerBrief({ elementId: ELEMENT, finding: 'Poor fit' })).toContain('Web search is not available for this run');
   });
 });
