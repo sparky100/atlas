@@ -106,6 +106,8 @@ interface ProxyRequestBody {
   streamToClient?: boolean;
   tools?: ProxyTool[];
   toolChoice?: 'auto' | 'none';
+  /** D2: `'light'` asks for a cheaper server-chosen model; honoured only with the organisation's own key. */
+  modelTier?: 'light';
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -208,7 +210,11 @@ function normalizeRequest(raw: unknown): ProxyRequestBody | Response {
   if (streamToClient && tools && toolChoice !== 'none') {
     return jsonResponse({ status: 'error', message: 'A streamed passthrough cannot carry tool calls; set toolChoice: "none".' }, 400);
   }
-  return { messages, maxTokens, responseFormat, ...(outputConfig ? { outputConfig } : {}), cacheControl, stream, ...(streamToClient ? { streamToClient: true } : {}), ...(tools ? { tools } : {}), ...(toolChoice ? { toolChoice } : {}) };
+  // D2: only the one known tier is accepted; anything else is refused rather than silently ignored.
+  if (r.modelTier !== undefined && r.modelTier !== 'light') {
+    return jsonResponse({ status: 'error', message: 'modelTier must be "light" when given.' }, 400);
+  }
+  return { messages, maxTokens, responseFormat, ...(outputConfig ? { outputConfig } : {}), cacheControl, stream, ...(streamToClient ? { streamToClient: true } : {}), ...(tools ? { tools } : {}), ...(toolChoice ? { toolChoice } : {}), ...(r.modelTier === 'light' ? { modelTier: 'light' as const } : {}) };
 }
 
 interface AnthropicCallResult {
@@ -446,6 +452,8 @@ function callAnthropicStreamingPassthrough(request: ProxyRequestBody, apiKey: st
 
 interface LlmProxyConfig {
   model: string;
+  /** D2: the cheaper model the `'light'` tier maps to, server-side only. */
+  lightModel: string;
   apiKey: string;
   rateLimitPerHour: number;
 }
@@ -486,6 +494,7 @@ const UUID_SHAPE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12
 async function loadConfig(supabaseUrl: string, serviceRoleKey: string): Promise<LlmProxyConfig> {
   const envDefaults: LlmProxyConfig = {
     model: Deno.env.get('LLM_PROXY_MODEL') || DEFAULT_MODEL,
+    lightModel: Deno.env.get('LLM_PROXY_LIGHT_MODEL') || 'claude-haiku-5-5',
     apiKey: Deno.env.get('ANTHROPIC_API_KEY') || '',
     rateLimitPerHour: Number(Deno.env.get('LLM_PROXY_RATE_LIMIT_PER_HOUR')) || DEFAULT_RATE_LIMIT_PER_HOUR,
   };
@@ -508,6 +517,7 @@ async function loadConfig(supabaseUrl: string, serviceRoleKey: string): Promise<
     const vaultKey = await loadVaultApiKey(supabaseUrl, serviceRoleKey);
     return {
       model: typeof cfg.model === 'string' && cfg.model !== '' ? cfg.model : envDefaults.model,
+      lightModel: typeof cfg.lightModel === 'string' && cfg.lightModel !== '' ? cfg.lightModel : envDefaults.lightModel,
       apiKey: vaultKey !== '' ? vaultKey : typeof cfg.apiKey === 'string' && cfg.apiKey !== '' ? cfg.apiKey : envDefaults.apiKey,
       rateLimitPerHour: typeof cfg.rateLimitPerHour === 'number' && cfg.rateLimitPerHour > 0 ? cfg.rateLimitPerHour : envDefaults.rateLimitPerHour,
     };
@@ -601,6 +611,9 @@ Deno.serve(async (req: Request) => {
     // `src/contracts/trialAllowance.ts`, which this runtime cannot import.
     let orgApiKey: string | null = null;
     let trialRunId: string | null = null;
+    // D2: the validated run id is recorded for organisation-key calls too, not only trial calls, so owners can count runs as well as calls.
+    const bodyRunId = typeof bodyRecord.runId === 'string' && UUID_SHAPE.test(bodyRecord.runId) ? bodyRecord.runId : null;
+    let logRunId: string | null = null;
     if (bodyRecord.useOrgKey === true) {
       const refuse = () => jsonResponse({ status: 'error', message: 'Agents are not available for this organisation: an owner needs to switch them on, and only an owner, architect or contributor can run them.' }, 403);
       const { data: userData, error: userError } = await callerClient.auth.getUser();
@@ -611,14 +624,22 @@ Deno.serve(async (req: Request) => {
       const { data: orgRow, error: orgError } = await serviceClient.from('organisations').select('ai_assistant_enabled, ai_agents_enabled, ai_agent_key_set').eq('id', orgId).maybeSingle();
       const flags = orgRow as { ai_assistant_enabled?: boolean; ai_agents_enabled?: boolean; ai_agent_key_set?: boolean } | null;
       if (orgError || flags?.ai_assistant_enabled !== true || flags.ai_agents_enabled !== true) return refuse();
-      if (flags.ai_agent_key_set === true) {
+      // D2: some callers (the reviewers) must never fall back to the trial or platform key — a key removed mid-run ends the run instead.
+      const requireOrgKey = bodyRecord.requireOrgKey === true;
+      const needsOwnKey = () => jsonResponse({ status: 'error', message: "This needs the organisation's own AI key. An owner needs to add it in organisation settings." }, 403);
+      if (requireOrgKey) {
+        if (flags.ai_agent_key_set !== true) return needsOwnKey();
+        const { data: savedKey, error: keyError } = await serviceClient.schema('atlas').rpc('org_ai_api_key', { p_org: orgId });
+        if (keyError || typeof savedKey !== 'string' || savedKey === '') return needsOwnKey();
+        orgApiKey = savedKey;
+      } else if (flags.ai_agent_key_set === true) {
         const { data: savedKey, error: keyError } = await serviceClient.schema('atlas').rpc('org_ai_api_key', { p_org: orgId });
         if (keyError || typeof savedKey !== 'string' || savedKey === '') return refuse();
         orgApiKey = savedKey;
       } else {
         const trialRefuse = (message: string) => jsonResponse({ status: 'error', message }, 403);
         if (Deno.env.get('LLM_TRIAL_ENABLED') === 'false') return trialRefuse('The free trial of the Designer is not available on this installation. An owner needs to add the organisation\'s AI key in organisation settings.');
-        const runId = typeof bodyRecord.runId === 'string' && UUID_SHAPE.test(bodyRecord.runId) ? bodyRecord.runId : null;
+        const runId = bodyRunId;
         if (runId === null) return trialRefuse('The free trial needs a run id.');
         const { data: trialRows, error: trialError } = await serviceClient.from('llm_proxy_requests').select('status, run_id, input_tokens, output_tokens').eq('org_id', orgId).eq('key_source', 'trial').limit(2000);
         if (trialError) return refuse();
@@ -638,11 +659,18 @@ Deno.serve(async (req: Request) => {
         }
         trialRunId = runId;
       }
+      // The organisation-key run id is recorded too (D2), so a run counts once however many calls it makes.
+      logRunId = orgApiKey !== null ? bodyRunId : trialRunId;
+      // A tier is never a way to choose a cheaper model on the trial or platform key.
+      if (proxyRequest.modelTier === 'light' && orgApiKey === null) return refuse();
     }
 
     const keySource: 'app' | 'org' | 'trial' = orgApiKey !== null ? 'org' : trialRunId !== null ? 'trial' : 'app';
     const config = await loadConfig(supabaseUrl, serviceRoleKey);
-    const { model, rateLimitPerHour } = config;
+    const standardModel = config.model;
+    // D2: the light tier is honoured only with the organisation's own key (checked just above).
+    const model = orgApiKey !== null && proxyRequest.modelTier === 'light' ? config.lightModel : standardModel;
+    const { rateLimitPerHour } = config;
     const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000).toISOString();
     const { count, error: countError } = await serviceClient
       .from('llm_proxy_requests')
@@ -651,14 +679,14 @@ Deno.serve(async (req: Request) => {
       .gte('created_at', oneHourAgo);
     if (countError) console.error('[llm-proxy] rate-limit count failed', countError.message);
     if (!countError && (count ?? 0) >= rateLimitPerHour) {
-      await logRequest({ serviceClient, orgId, model, status: 'rate_limited', latencyMs: Date.now() - startedAt, keySource, runId: trialRunId });
+      await logRequest({ serviceClient, orgId, model, status: 'rate_limited', latencyMs: Date.now() - startedAt, keySource, runId: logRunId });
       return jsonResponse({ status: 'error', message: `Rate limit exceeded for this organisation (${String(rateLimitPerHour)} requests/hour).` }, 429);
     }
 
     // Platform key: the app's own features, or an organisation inside its Designer trial (checked above).
     const apiKey = orgApiKey ?? config.apiKey;
     if (!apiKey) {
-      await logRequest({ serviceClient, orgId, model, status: 'error', latencyMs: Date.now() - startedAt, keySource, runId: trialRunId });
+      await logRequest({ serviceClient, orgId, model, status: 'error', latencyMs: Date.now() - startedAt, keySource, runId: logRunId });
       return jsonResponse({ status: 'error', message: 'LLM proxy is not configured — no API key in platform_config\'s "llm" row or ANTHROPIC_API_KEY. See docs/EDGE-FUNCTIONS.md.' }, 503);
     }
 
@@ -672,7 +700,7 @@ Deno.serve(async (req: Request) => {
       // fire-and-forget `.then()` when that global isn't present (e.g. a
       // local test runner), since a best-effort audit log must never block
       // or fail the response itself (`logRequest`'s own comment).
-      const logAfterStream = passthrough.logged.then((outcome) => logRequest({ serviceClient, orgId, model, status: outcome.status, latencyMs: Date.now() - startedAt, inputTokens: outcome.inputTokens, outputTokens: outcome.outputTokens, keySource, runId: trialRunId }));
+      const logAfterStream = passthrough.logged.then((outcome) => logRequest({ serviceClient, orgId, model, status: outcome.status, latencyMs: Date.now() - startedAt, inputTokens: outcome.inputTokens, outputTokens: outcome.outputTokens, keySource, runId: logRunId }));
       const runtime = (globalThis as { EdgeRuntime?: { waitUntil: (p: Promise<unknown>) => void } }).EdgeRuntime;
       if (runtime) runtime.waitUntil(logAfterStream);
       return passthrough.response;
@@ -682,11 +710,11 @@ Deno.serve(async (req: Request) => {
     const latencyMs = Date.now() - startedAt;
 
     if (!result.ok) {
-      await logRequest({ serviceClient, orgId, model, status: 'error', latencyMs, keySource, runId: trialRunId });
+      await logRequest({ serviceClient, orgId, model, status: 'error', latencyMs, keySource, runId: logRunId });
       return jsonResponse({ status: 'error', message: result.text }, result.status);
     }
 
-    await logRequest({ serviceClient, orgId, model, status: 'ok', latencyMs, inputTokens: result.inputTokens, outputTokens: result.outputTokens, keySource, runId: trialRunId });
+    await logRequest({ serviceClient, orgId, model, status: 'ok', latencyMs, inputTokens: result.inputTokens, outputTokens: result.outputTokens, keySource, runId: logRunId });
     return jsonResponse(
       {
         status: 'ok',

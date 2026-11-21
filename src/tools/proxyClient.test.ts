@@ -53,5 +53,20 @@ describe('createProxyAskClient on the organisation\'s own key', () => {
     expect(sent[0]).not.toHaveProperty('useOrgKey');
     expect(sent[1]?.useOrgKey).toBe(true);
   });
+
+  it('sends requireOrgKey and the light tier when asked, and neither otherwise (D2)', async () => {
+    const sent: Record<string, unknown>[] = [];
+    const fetchFn: typeof fetch = (_url, init) => {
+      sent.push(JSON.parse(init?.body as string) as Record<string, unknown>);
+      return Promise.resolve(Response.json({ status: 'ok', text: 'x', inputTokens: 1, outputTokens: 1 }));
+    };
+    const base = { proxyUrl: 'https://x.test/functions/v1/llm-proxy', authorization: 'Bearer u', anonKey: 'anon', orgId: 'org-1', fetchFn };
+    await createProxyAskClient({ ...base, useOrgKey: true, requireOrgKey: true, modelTier: 'light' }).complete(REQUEST);
+    expect(sent[0]?.requireOrgKey).toBe(true);
+    expect(sent[0]?.modelTier).toBe('light');
+    await createProxyAskClient({ ...base, useOrgKey: true }).complete(REQUEST);
+    expect(sent[1]).not.toHaveProperty('requireOrgKey');
+    expect(sent[1]).not.toHaveProperty('modelTier');
+  });
 });
 

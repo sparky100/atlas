@@ -30,6 +30,10 @@ export interface ProxyAskClientOptions {
   useOrgKey?: boolean;
   /** The Designer's id for this run. With no saved key the proxy runs the free trial and counts runs by this id. */
   runId?: string;
+  /** D2: refuse unless the organisation has its own saved key — never fall back to the trial or platform key. */
+  requireOrgKey?: boolean;
+  /** D2: `'light'` asks for a cheaper server-chosen model; the proxy honours it only with the organisation's own key. */
+  modelTier?: 'light';
   fetchFn?: typeof fetch;
 }
 
@@ -49,11 +53,12 @@ export function createProxyAskClient(options: ProxyAskClientOptions): AskModelCl
         tools: request.tools,
         toolChoice: request.toolChoice,
         cacheControl: true,
+        ...(options.modelTier === 'light' ? { modelTier: 'light' as const } : {}),
       });
       const res = await doFetch(options.proxyUrl, {
         method: 'POST',
         headers: { 'content-type': 'application/json', authorization: options.authorization, apikey: options.anonKey },
-        body: JSON.stringify({ orgId: options.orgId, ...(options.useOrgKey === true ? { useOrgKey: true } : {}), ...(options.runId !== undefined ? { runId: options.runId } : {}), ...proxyRequest }),
+        body: JSON.stringify({ orgId: options.orgId, ...(options.useOrgKey === true ? { useOrgKey: true } : {}), ...(options.requireOrgKey === true ? { requireOrgKey: true } : {}), ...(options.runId !== undefined ? { runId: options.runId } : {}), ...proxyRequest }),
       });
       const body = (await res.json().catch(() => null)) as (Partial<LlmProxyResponse> & { status?: string; message?: string }) | null;
       if (!res.ok || !body || body.status === 'error') {

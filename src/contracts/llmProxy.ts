@@ -113,6 +113,14 @@ export interface LlmProxyRequest {
   tools?: LlmProxyToolDefinition[];
   /** Additive, ADR-028 §3: `'none'` keeps the tools declared but forbids calling one — used for the final, written-answer round. Default `'auto'`. */
   toolChoice?: 'auto' | 'none';
+  /**
+   * Additive, D2: ask the proxy for a cheaper server-chosen model
+   * (`'light'`, e.g. Haiku-class) for checklist-like work. The caller still
+   * never names a model. Honoured only together with `useOrgKey`, so a tier
+   * can never choose a model on the platform key; any other value is refused.
+   * Absent means the standard model.
+   */
+  modelTier?: 'light';
 }
 
 export interface LlmProxyResponse {
@@ -207,6 +215,8 @@ export interface BuildLlmProxyRequestInput {
   streamToClient?: boolean;
   tools?: readonly LooseTool[];
   toolChoice?: 'auto' | 'none';
+  /** D2: `'light'` asks the proxy for a cheaper server-chosen model; only honoured with `useOrgKey`. */
+  modelTier?: 'light';
 }
 
 type LooseTool = LlmProxyToolDefinition;
@@ -228,6 +238,7 @@ export function buildLlmProxyRequest(input: BuildLlmProxyRequestInput): LlmProxy
     ...(input.streamToClient ? { streamToClient: true } : {}),
     ...(tools ? { tools } : {}),
     ...(tools && input.toolChoice === 'none' ? { toolChoice: 'none' as const } : {}),
+    ...(input.modelTier === 'light' ? { modelTier: 'light' as const } : {}),
   };
 }
 
@@ -270,6 +281,7 @@ export function isValidLlmProxyRequest(value: unknown): value is LlmProxyRequest
   if (v.tools !== undefined && (!Array.isArray(v.tools) || v.tools.length === 0 || normalizeTools(v.tools)?.length !== v.tools.length)) return false;
   if (v.toolChoice !== undefined && v.toolChoice !== 'auto' && v.toolChoice !== 'none') return false;
   if (v.toolChoice !== undefined && v.tools === undefined) return false;
+  if (v.modelTier !== undefined && v.modelTier !== 'light') return false;
   if (v.tools !== undefined && v.outputConfig !== undefined) return false;
   // A passthrough stream cannot hand tool calls back, so it may only carry tools with calling switched off.
   if (v.streamToClient === true && v.tools !== undefined && v.toolChoice !== 'none') return false;
