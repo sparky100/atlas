@@ -55,7 +55,7 @@ export function OptionSources({ sources }: { sources: readonly OptionSource[] })
                         </a>
                         <Text as="span" size="xs" tone="muted">
                           {' '}
-                          — source dated {claim.sourceDate}; reviewed by {claim.reviewedBy} on {claim.reviewedAt}
+                          — source dated {claim.sourceDate}
                         </Text>
                       </li>
                     ))}

@@ -30,7 +30,7 @@ function Entry({ entry }: { entry: CatalogueEntry }) {
             <li key={`${claim.sourceUrl}-${String(i)}`}>
               <Text as="p" size="sm">{claim.statement}</Text>
               <Text as="p" size="xs" tone="muted">
-                {sourceDomain(claim.sourceUrl)} · read {formatDate(claim.sourceDate)} · checked by {claim.reviewedBy} on {formatDate(claim.reviewedAt)}
+                {sourceDomain(claim.sourceUrl)} · read {formatDate(claim.sourceDate)}
               </Text>
             </li>
           ))}

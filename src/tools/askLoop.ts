@@ -163,6 +163,8 @@ export interface RunAskInput {
   onEvent?: ((event: AskEvent) => void) | undefined;
   /** D4: total provider-side web searches this run may use. Omitted means none. */
   webSearch?: { maxUses: number } | undefined;
+  /** The per-round output budget. Defaults to `ASK_MAX_TOKENS_PER_ROUND`; the Designer's long structured answer needs more. */
+  maxTokensPerRound?: number | undefined;
 }
 
 export async function runAsk(input: RunAskInput): Promise<AskResult> {
@@ -211,7 +213,7 @@ export async function runAsk(input: RunAskInput): Promise<AskResult> {
     const closing = limit !== undefined;
     const searchRemaining = (input.webSearch?.maxUses ?? 0) - webSearchUsed;
     const response = await client.complete({
-      system, messages, tools, toolChoice: closing ? 'none' : 'auto', maxTokens: ASK_MAX_TOKENS_PER_ROUND,
+      system, messages, tools, toolChoice: closing ? 'none' : 'auto', maxTokens: input.maxTokensPerRound ?? ASK_MAX_TOKENS_PER_ROUND,
       ...(!closing && searchRemaining > 0 ? { webSearch: { maxUses: searchRemaining } } : {}),
     });
     rounds += 1;

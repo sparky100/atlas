@@ -18,7 +18,7 @@ export const DESIGNER_CATALOGUE_REFS_MAX = 2;
 export const DESIGNER_WEB_REFS_MAX = 2;
 export const DESIGNER_TITLE_MAX = 120;
 export const DESIGNER_SUMMARY_MAX = 600;
-export const DESIGNER_WEIGH_MAX = 400;
+export const DESIGNER_WEIGH_MAX = 800;
 export const DESIGNER_GAPS_MAX = 8;
 export const DESIGNER_GAP_MAX = 240;
 
@@ -56,7 +56,14 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 }
 
 function text(value: unknown, max: number): string {
-  return typeof value === 'string' ? value.trim().slice(0, max) : '';
+  if (typeof value !== 'string') return '';
+  const trimmed = value.trim();
+  if (trimmed.length <= max) return trimmed;
+  // Cut at the last sentence or word boundary rather than mid-word; the
+  // ellipsis tells a reader the model's answer was longer than the card allows.
+  const cut = trimmed.slice(0, max);
+  const boundary = Math.max(cut.lastIndexOf('. '), cut.lastIndexOf('? '), cut.lastIndexOf('! '), cut.lastIndexOf('; '), cut.lastIndexOf(', '), cut.lastIndexOf(' '));
+  return `${(boundary > 0 ? cut.slice(0, boundary) : cut).trimEnd()}…`;
 }
 
 /** Finds the one JSON object in the model's answer, allowing for a code fence or a line of preamble. */

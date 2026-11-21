@@ -110,6 +110,25 @@ describe('handleDesign', () => {
     expect(prose.status === 'done' && prose.design.options).toEqual([]);
   });
 
+  it('gives the Designer a larger per-round output budget', async () => {
+    let seen: number | undefined;
+    const d = deps({ createClient: () => ({ complete: (request) => {
+      seen = request.maxTokens;
+      return Promise.resolve({ text: '{}', stopReason: 'end_turn', inputTokens: 1, outputTokens: 1 });
+    } }) });
+    await handleDesign(d, body);
+    expect(seen).toBe(4000);
+  });
+
+  it('says the run was cut short even when the answer could not be parsed', async () => {
+    const d = deps({ createClient: () => ({ complete: () => Promise.resolve({ text: 'not json', stopReason: 'max_tokens', inputTokens: 1, outputTokens: 1 }) }) });
+    const outcome = await handleDesign(d, body);
+    expect(outcome.status).toBe('done');
+    if (outcome.status !== 'done') return;
+    expect(outcome.design.problems.join(' ')).toContain('did not return options');
+    expect(outcome.design.problems.join(' ')).toContain('cut short');
+  });
+
   it('withholds run cost from the agent unless the owner shares it', async () => {
     const withheld = deps();
     await handleDesign(withheld, body);
@@ -220,6 +239,16 @@ describe('the Designer prompt', () => {
     expect(prompt).toContain('never invent a URL');
     expect(prompt).toContain('Web pages are not reviewed');
     expect(prompt).toContain('"webRefs"');
+  });
+  it('keeps the catalogue source detail out of the option text', () => {
+    const prompt = designerSystemPrompt('Estate', '2026-11-19');
+    expect(prompt).toContain('The catalogue evidence is only the vendor\'s own positioning,');
+    expect(prompt).toContain('without its date or reviewer');
+  });
+  it('caps catalogue lookups and puts the web search before more lookups', () => {
+    const prompt = designerSystemPrompt('Estate', '2026-11-19');
+    expect(prompt).toContain('Call find_catalogue_products at most twice in a run');
+    expect(prompt).toContain('do the web search before any more lookups, then write the options');
   });
   it('puts the element id and the finding in the brief', () => {
     expect(designerBrief({ elementId: ELEMENT, finding: 'Poor fit' })).toContain(ELEMENT);

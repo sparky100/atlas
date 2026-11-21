@@ -46,4 +46,14 @@ describe('parseDesignerOptions', () => {
     expect(r.options[0]?.webRefs).toEqual([ref, { url: 'https://vendor.example/third', title: 'Third' }]);
     expect(parseDesignerOptions(JSON.stringify({ options: [{ title: 'Keep', summary: 'As is.' }] })).options[0]?.webRefs).toEqual([]);
   });
+  it('keeps a full "what to weigh" up to the larger limit and cuts a longer one at a word boundary', () => {
+    const long = 'The catalogue evidence is only the vendor own positioning. '.repeat(8);
+    const r = parseDesignerOptions(JSON.stringify({ options: [{ title: 'Replace', summary: 'Buy.', toWeigh: long }], gaps: [], stayNote: '' }));
+    expect(r.options[0]?.toWeigh).toBe(long.trim());
+    const tooLong = `${'word '.repeat(170)}end`;
+    const cut = parseDesignerOptions(JSON.stringify({ options: [{ title: 'Replace', summary: 'Buy.', toWeigh: tooLong }], gaps: [], stayNote: '' })).options[0]?.toWeigh ?? '';
+    expect(cut.endsWith('…')).toBe(true);
+    expect(cut).not.toContain('  ');
+    expect(cut.length).toBeLessThanOrEqual(801);
+  });
 });

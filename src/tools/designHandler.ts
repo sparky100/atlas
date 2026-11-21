@@ -53,6 +53,9 @@ export type DesignOutcome =
 
 const UUID_SHAPE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
+/** A structured answer with 3-5 options, sources and reasoning needs more room than a short Ask Atlas reply. */
+const DESIGNER_MAX_TOKENS_PER_ROUND = 4000;
+
 export interface ParsedDesign {
   modelId: UUID;
   elementId: UUID;
@@ -120,6 +123,7 @@ export async function handleDesign(deps: DesignHandlerDeps, body: unknown): Prom
     // D4: only the organisation's own key may pay for web search; the
     // platform trial never does, and the proxy refuses it as well.
     ...(settings.keySet ? { webSearch: { maxUses: DESIGNER_MAX_WEB_SEARCHES } } : {}),
+    maxTokensPerRound: DESIGNER_MAX_TOKENS_PER_ROUND,
   });
   const design = parseDesignerOptions(result.answer);
   const returnedWebUrls = new Set([...(result.webSearch.results), ...(result.webSearch.citations)].map((source) => source.url));
@@ -147,6 +151,14 @@ export async function handleDesign(deps: DesignHandlerDeps, body: unknown): Prom
       : `${String(droppedCatalogueRefs)} catalogue products were left out because the Designer did not read them. Add one by hand only if you have checked it yourself.`);
   }
   // A run cut off by a limit is never complete, whatever the part that arrived looks like.
-  if (result.status !== 'answered' && design.problems.length === 0) design.problems.push('The Designer was cut short, so this answer may be incomplete.');
+  // Say why even when parsing already failed, so "did not return options" is not the only clue.
+  if (result.status !== 'answered') {
+    const reason = result.limit === 'rounds'
+      ? 'The Designer used all its lookup rounds before it finished.'
+      : result.limit === 'budget'
+        ? 'The Designer used its lookup budget before it finished.'
+        : 'The Designer was cut short, so this answer may be incomplete.';
+    if (!design.problems.includes(reason)) design.problems.push(reason);
+  }
   return { status: 'done', result, stamp: ctx.stamp, design };
 }

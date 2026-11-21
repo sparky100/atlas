@@ -260,7 +260,7 @@ describe('exportDecisionAsAdrMarkdown', () => {
     });
     expect(markdown).toContain('  - Sources:');
     expect(markdown).toContain('    - CRM X - Vendor Ltd (saved from catalogue v1, since replaced)');
-    expect(markdown).toContain('      - Records complaints. - https://vendor.example/crm (source dated 2026-01-01; reviewed by Simon Parkinson on 2026-01-02)');
+    expect(markdown).toContain('      - Records complaints. - https://vendor.example/crm (source dated 2026-01-01)');
     expect(exportDecisionAsAdrMarkdown({ decision: makeDecision(), ownerName: 'Alice', concerns: [], options: [{ branch, isChosen: false, ratings: [] }], whatChangesRows: [], reasons: null })).not.toContain('  - Sources:');
   });
   it('lists a saved web page as unreviewed evidence under its option', () => {

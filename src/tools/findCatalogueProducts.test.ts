@@ -27,7 +27,7 @@ describe('find_catalogue_products', () => {
     expect(result.data).toMatchObject({
       capability: { id: uid(70), name: 'Complaints', code: '5.4' },
       catalogue: { sector: 'electricity_network', version: 2 },
-      products: [{ entryCode: 'crm-x', product: 'CRM X', vendor: 'Vendor Ltd', claims: [{ statement: 'Records complaints.', reviewedBy: 'Simon Parkinson' }] }],
+      products: [{ entryCode: 'crm-x', product: 'CRM X', vendor: 'Vendor Ltd', claims: [{ statement: 'Records complaints.' }] }],
     });
     expect(result.total).toBe(1);
   });
