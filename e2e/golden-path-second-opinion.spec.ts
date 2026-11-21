@@ -25,11 +25,11 @@ async function createDecisionWithOption(page: Page) {
   return panel;
 }
 
-async function enableReviewers(page: Page) {
+async function enableReviewers(page: Page, keySet = true) {
   await page.route('**/rest/v1/organisations*', async (route) => {
     const response = await route.fetch();
     const body = (await response.json()) as unknown;
-    const patch = (row: Record<string, unknown>) => ({ ...row, ai_assistant_enabled: true, ai_agents_enabled: true, ai_agent_key_set: true });
+    const patch = (row: Record<string, unknown>) => ({ ...row, ai_assistant_enabled: true, ai_agents_enabled: true, ai_agent_key_set: keySet });
     await route.fulfill({ response, json: Array.isArray(body) ? body.map((row) => patch(row as Record<string, unknown>)) : patch(body as Record<string, unknown>) });
   });
   await page.reload();
@@ -83,6 +83,7 @@ test('failed and stopped runs keep no partial questions and do not create a clea
   });
   await panel.getByRole('button', { name: 'Ask the Steward: data' }).click();
   await expect(panel.getByRole('alert')).toContainText('Nothing was kept');
+  await test.info().attach('second-opinion-failed', { body: await panel.screenshot(), contentType: 'image/png' });
   await page.unroute('**/functions/v1/review-agent');
   await page.route('**/functions/v1/review-agent', async (route) => {
     await new Promise<void>((resolve) => { setTimeout(resolve, 3000); });
@@ -93,5 +94,33 @@ test('failed and stopped runs keep no partial questions and do not create a clea
   await panel.getByRole('button', { name: 'Stop waiting' }).click();
   await expect(panel.getByText('The request may already be with the AI provider')).toBeVisible();
   await expect(panel.getByTestId('review-cyber')).toHaveCount(0);
+  await test.info().attach('second-opinion-stopped', { body: await panel.screenshot(), contentType: 'image/png' });
   expect(await page.evaluate(() => document.documentElement.scrollWidth > document.documentElement.clientWidth + 1)).toBe(false);
+});
+
+test('no organisation key, interrupted run and empty answer are explained without inventing approval', async ({ page }) => {
+  test.slow();
+  await createDecisionWithOption(page);
+  await enableReviewers(page, false);
+  const panel = page.getByTestId('second-opinion');
+  await expect(panel.getByText("Add your organisation's AI key")).toBeVisible();
+  await expect(panel.getByRole('button', { name: 'Ask the Challenger' })).toHaveCount(0);
+  await page.unroute('**/rest/v1/organisations*');
+  await enableReviewers(page);
+
+  await page.route('**/functions/v1/review-agent', async (route) => {
+    await new Promise<void>((resolve) => { setTimeout(resolve, 3000); });
+    try { await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ status: 'done', inputHash: 'hash', runId: 'late', inputTokens: 1, outputTokens: 1, notes: [] }) }); } catch { /* The page was left. */ }
+  });
+  await panel.getByRole('button', { name: 'Ask the Challenger' }).click();
+  await expect(panel.getByRole('status')).toContainText('reading the saved decision');
+  await page.reload();
+  await expect(panel.getByText('That run did not finish on this page')).toBeVisible();
+  await page.unroute('**/functions/v1/review-agent');
+  await page.route('**/functions/v1/review-agent', async (route) => {
+    await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ status: 'done', inputHash: 'hash', runId: 'empty', inputTokens: 9, outputTokens: 2, notes: [] }) });
+  });
+  await panel.getByRole('button', { name: 'Ask the Steward: data' }).click();
+  await expect(panel.getByText('Nothing to add. That does not mean it is cleared.')).toBeVisible();
+  await test.info().attach('second-opinion-empty', { body: await panel.screenshot(), contentType: 'image/png' });
 });
