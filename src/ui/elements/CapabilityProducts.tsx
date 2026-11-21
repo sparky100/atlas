@@ -6,6 +6,7 @@
  */
 import { useQuery } from '@tanstack/react-query';
 import { capabilityMapMatch, listCurrentCatalogueEntriesForCapability, type CatalogueEntry } from '../../db/productCatalogue';
+import { CollapsibleSection } from '../components/CollapsibleSection/CollapsibleSection';
 import { Panel } from '../components/Panel/Panel';
 import { Text } from '../components/Text/Text';
 import { supabase } from '../supabaseClient';
@@ -62,13 +63,14 @@ export function CapabilityProducts({ templateRef, title = 'Products that can sup
   if (entries.data === undefined || entries.data.length === 0) return null;
   return (
     <Panel data-testid="capability-products">
-      <Text as="h2" size="lg">{title}</Text>
-      <Text as="p" size="sm" tone="muted">
-        Reviewed products from the published catalogue, for a replacement or build option. They are candidates, not a procurement decision.
-      </Text>
-      <ul className={styles.list}>
-        {entries.data.map((entry) => <Entry key={entry.id} entry={entry} />)}
-      </ul>
+      <CollapsibleSection title={title} defaultOpen>
+        <Text as="p" size="sm" tone="muted">
+          Reviewed products from the published catalogue, for a replacement or build option. They are candidates, not a procurement decision.
+        </Text>
+        <ul className={styles.list}>
+          {entries.data.map((entry) => <Entry key={entry.id} entry={entry} />)}
+        </ul>
+      </CollapsibleSection>
     </Panel>
   );
 }

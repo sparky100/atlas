@@ -6,6 +6,7 @@ import { keepDecisionAgentNote } from '../../db/decisionAgentNotes';
 import { runReviewer } from '../../db/reviewAgent';
 import type { ReviewLens } from '../../tools/reviewPrompt';
 import { Button } from '../components/Button/Button';
+import { CollapsibleSection } from '../components/CollapsibleSection/CollapsibleSection';
 import { Panel } from '../components/Panel/Panel';
 import { Text } from '../components/Text/Text';
 import { supabase } from '../supabaseClient';
@@ -32,8 +33,6 @@ export function SecondOpinion({ orgId, userId, decisionId, orgSlug, shareCost, a
   const [completed, setCompleted] = useState(false);
   const [message, setMessage] = useState<{ kind: 'failed' | 'stopped'; text: string } | null>(null);
   const [copied, setCopied] = useState<string | null>(null);
-  // Collapsible, but open by default: the section is long and pushes the evidence down.
-  const [open, setOpen] = useState(true);
   // Note ids (runId:index) already kept on this page, so the button reads "Kept".
   const [kept, setKept] = useState<ReadonlySet<string>>(new Set());
   const [keeping, setKeeping] = useState<string | null>(null);
@@ -131,21 +130,13 @@ export function SecondOpinion({ orgId, userId, decisionId, orgSlug, shareCost, a
 
   return (
     <Panel data-testid="second-opinion">
-      <section id="second-opinion" aria-labelledby="second-opinion-title">
-        <div className={styles.head}>
-          <Text as="h2" size="lg" id="second-opinion-title">Second opinion</Text>
-          <Button variant="ghost" aria-expanded={open} onClick={() => { setOpen((v) => !v); }}>
-            {open ? 'Hide' : 'Show'}
-          </Button>
-        </div>
+      <section id="second-opinion">
+        <CollapsibleSection
+          title="Second opinion"
+          meta={reviews.length > 0 ? `${String(reviews.reduce((n, r) => n + r.notes.length, 0))} question(s) held` : undefined}
+          defaultOpen
+        >
         <Text as="p">Ask what might be missing before a person chooses. These are AI questions for you to weigh, not a review, clearance or sign-off.</Text>
-        {!open && (
-          <Text as="p" size="sm" tone="muted">
-            {reviews.reduce((n, r) => n + r.notes.length, 0)} question(s) held for this visit.
-          </Text>
-        )}
-        {open && (
-          <>
         <Text as="p" size="sm" tone="muted">The decision as it stands now (context, options, ratings, principles and visible changes) goes to your organisation's AI provider when you ask. Nothing you are still typing is sent.</Text>
         <details className={styles.details}>
           <summary>What is sent to the AI?</summary>
@@ -189,8 +180,7 @@ export function SecondOpinion({ orgId, userId, decisionId, orgSlug, shareCost, a
             <Text as="p" size="sm" tone="muted">These questions reflect the decision as it stood when you asked. Ask again after changing it. This run used about {(review.inputTokens + review.outputTokens).toLocaleString('en-GB')} tokens. Held on this device only, not for the team; expires after 24 hours. A question you keep is saved to the decision.</Text>
           </div>;
         })}
-          </>
-        )}
+        </CollapsibleSection>
       </section>
     </Panel>
   );
