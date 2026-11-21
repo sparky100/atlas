@@ -235,4 +235,14 @@ describe('exportDecisionAsAdrMarkdown', () => {
     expect(exportDecisionAsAdrMarkdown({ ...base, goalsServed: [] })).not.toContain('## Goals served');
     expect(exportDecisionAsAdrMarkdown(base)).not.toContain('## Goals served');
   });
+  it('lists kept AI questions with their lens, date and original wording, and prints nothing when none are kept', () => {
+    const base = { decision: makeDecision(), ownerName: 'Alice', concerns: [], options: [], whatChangesRows: [], reasons: null };
+    const note = { id: 'n1', decisionId: 'dec-1', branchId: null, lens: 'challenge' as const, agent: 'challenger' as const, suggestedQuestion: 'What would make us reconsider?', question: 'Who will test the two-day quote?', basedOn: 'none' as const, basedOnLabel: null, inputHash: 'a'.repeat(64), runId: 'run-1', keptBy: 'user-1', keptAt: '2026-11-21T09:00:00Z' };
+    const markdown = exportDecisionAsAdrMarkdown({ ...base, keptQuestions: [note] });
+    expect(markdown).toContain('## Questions raised by an AI reviewer');
+    expect(markdown).toContain('- **Challenger**, kept 2026-11-21: Who will test the two-day quote?');
+    expect(markdown).toContain('  - Original AI wording: What would make us reconsider?');
+    expect(markdown).toContain('These are questions a person kept, not a review, clearance or sign-off.');
+    expect(exportDecisionAsAdrMarkdown(base)).not.toContain('## Questions raised by an AI reviewer');
+  });
 });

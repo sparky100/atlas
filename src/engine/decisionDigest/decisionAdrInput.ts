@@ -1,3 +1,4 @@
+import type { DecisionAgentNote } from '../../contracts/decisionAgentNote';
 import { DECISION_CRITERIA, decisionCriterionLevelLabel } from '../../contracts/decisionCriteria';
 import type { UUID } from '../../contracts/delta';
 import type { ElementsHeadRow } from '../../contracts/rows';
@@ -55,10 +56,12 @@ export interface DecisionAdrSource {
   /** Only the What-changes rows the table shows (`groupWhatChangesRows(...).visible`). */
   whatChangesRows: readonly WhatChangesRow[];
   ownerName: string;
+  /** D2 PR 4: questions an AI reviewer drafted that a person kept. Optional/empty prints no section. */
+  keptQuestions?: readonly DecisionAgentNote[];
 }
 
 export function buildDecisionAdrExportInput(source: DecisionAdrSource): DecisionAdrExportInput {
-  const { decision, links, linkedElementsById, linkedBranchesById, args, ratings, whatChangesRows, ownerName, principles, goalsServed } = source;
+  const { decision, links, linkedElementsById, linkedBranchesById, args, ratings, whatChangesRows, ownerName, principles, goalsServed, keptQuestions } = source;
   const { capabilityIds, otherElementIds } = decisionConcernIds(links, linkedElementsById);
   return {
     decision,
@@ -71,6 +74,7 @@ export function buildDecisionAdrExportInput(source: DecisionAdrSource): Decision
     whatChangesRows,
     ...(principles !== undefined ? { principles } : {}),
     ...(goalsServed !== undefined ? { goalsServed } : {}),
+    ...(keptQuestions !== undefined ? { keptQuestions } : {}),
     // The one `stance: 'for'` row `atlas.choose_decision_option` writes — null until decided.
     reasons: args.find((a) => a.stance === 'for')?.body ?? null,
   };

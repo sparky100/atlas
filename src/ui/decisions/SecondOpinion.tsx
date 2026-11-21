@@ -1,6 +1,8 @@
+import { useQueryClient } from '@tanstack/react-query';
 import { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router';
 import type { UUID } from '../../contracts/delta';
+import { keepDecisionAgentNote } from '../../db/decisionAgentNotes';
 import { runReviewer } from '../../db/reviewAgent';
 import type { ReviewLens } from '../../tools/reviewPrompt';
 import { Button } from '../components/Button/Button';
@@ -8,7 +10,7 @@ import { Panel } from '../components/Panel/Panel';
 import { Text } from '../components/Text/Text';
 import { supabase } from '../supabaseClient';
 import type { ReviewerAvailability } from './reviewerAvailability';
-import { interruptedReview, loadHeldReviews, reviewStorageKey, saveHeldReviews, type HeldReview } from './reviewerNotesStorage';
+import { interruptedReview, loadHeldReviews, reviewStorageKey, saveHeldReviews, type HeldQuestion, type HeldReview } from './reviewerNotesStorage';
 import styles from './SecondOpinion.module.css';
 
 const LENSES: readonly { lens: ReviewLens; button: string; name: string }[] = [
@@ -30,6 +32,10 @@ export function SecondOpinion({ orgId, userId, decisionId, orgSlug, shareCost, a
   const [completed, setCompleted] = useState(false);
   const [message, setMessage] = useState<{ kind: 'failed' | 'stopped'; text: string } | null>(null);
   const [copied, setCopied] = useState<string | null>(null);
+  // Note ids (runId:index) already kept on this page, so the button reads "Kept".
+  const [kept, setKept] = useState<ReadonlySet<string>>(new Set());
+  const [keeping, setKeeping] = useState<string | null>(null);
+  const queryClient = useQueryClient();
   const abort = useRef<AbortController | null>(null);
   const runNo = useRef(0);
 
@@ -94,6 +100,33 @@ export function SecondOpinion({ orgId, userId, decisionId, orgSlug, shareCost, a
     } catch { setMessage({ kind: 'failed', text: 'Could not copy the question. You can select its text and copy it.' }); }
   }
 
+  async function keep(review: HeldReview, note: HeldQuestion, index: number) {
+    if (userId === null || keeping !== null) return;
+    const id = `${review.runId}:${String(index)}`;
+    setKeeping(id);
+    setMessage(null);
+    try {
+      await keepDecisionAgentNote(supabase, {
+        decisionId,
+        branchId: note.basedOn.kind === 'option' && note.basedOn.branchId !== undefined ? note.basedOn.branchId : null,
+        lens: review.lens,
+        suggestedQuestion: note.suggestedQuestion,
+        question: note.question.trim(),
+        basedOn: note.basedOn.kind,
+        basedOnLabel: note.basedOn.kind === 'none' ? null : note.basedOn.label,
+        inputHash: review.inputHash,
+        runId: review.runId,
+        keptBy: userId,
+      });
+      setKept((old) => new Set(old).add(id));
+      await queryClient.invalidateQueries({ queryKey: ['decisionAgentNotes', decisionId] });
+    } catch (e) {
+      setMessage({ kind: 'failed', text: e instanceof Error ? e.message : 'Could not keep this question. Try again.' });
+    } finally {
+      setKeeping(null);
+    }
+  }
+
   return (
     <Panel data-testid="second-opinion">
       <section id="second-opinion" aria-labelledby="second-opinion-title">
@@ -134,11 +167,12 @@ export function SecondOpinion({ orgId, userId, decisionId, orgSlug, shareCost, a
                 </label>
                 <div className={styles.noteActions}>
                   <Button disabled={note.question.trim() === ''} onClick={() => { void copy(note.question.trim(), id); }}>{copied === id ? 'Copied' : 'Copy question'}</Button>
+                  <Button disabled={note.question.trim() === '' || keeping === id} onClick={() => { void keep(review, note, index); }}>{kept.has(id) ? 'Kept' : keeping === id ? 'Keeping…' : 'Keep this question'}</Button>
                   <Button variant="ghost" onClick={() => { dismiss(review.lens, index); }}>Dismiss</Button>
                 </div>
               </li>;
             })}</ol>}
-            <Text as="p" size="sm" tone="muted">These questions reflect the saved decision at the time of this run. Ask again after changing it. This run used about {(review.inputTokens + review.outputTokens).toLocaleString('en-GB')} tokens. Saved on this device only, not for the team; expires after 24 hours.</Text>
+            <Text as="p" size="sm" tone="muted">These questions reflect the saved decision at the time of this run. Ask again after changing it. This run used about {(review.inputTokens + review.outputTokens).toLocaleString('en-GB')} tokens. Questions are held on this device only and expire after 24 hours; a question you keep is saved to the decision.</Text>
           </div>;
         })}
       </section>

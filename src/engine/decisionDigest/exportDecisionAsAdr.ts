@@ -1,3 +1,4 @@
+import type { DecisionAgentNote } from '../../contracts/decisionAgentNote';
 import type { UUID } from '../../contracts/delta';
 import { aiMarkLine } from './aiMarks';
 import type { BranchRow, DecisionRow } from '../../db/types';
@@ -65,6 +66,8 @@ export interface DecisionAdrExportInput {
   goalsServed?: readonly string[];
   /** The one `decision_arguments` row `atlas.choose_decision_option` writes (`stance: 'for'`) — `null` until the decision is `accepted`. */
   reasons: string | null;
+  /** D2 PR 4: questions an AI reviewer drafted that a person kept. Optional/empty prints no section. */
+  keptQuestions?: readonly DecisionAgentNote[];
 }
 
 function statusLine(decision: DecisionRow): string {
@@ -152,6 +155,21 @@ export function exportDecisionAsAdrMarkdown(input: DecisionAdrExportInput): stri
       lines.push(...optionAboutLines(option));
       lines.push(...optionRatingLines(option));
     }
+  }
+
+  const keptQuestions = input.keptQuestions ?? [];
+  if (keptQuestions.length > 0) {
+    lines.push('');
+    lines.push('## Questions raised by an AI reviewer');
+    lines.push('');
+    for (const note of keptQuestions) {
+      const lens = note.lens === 'challenge' ? 'Challenger' : note.lens === 'cyber' ? 'Steward: cyber' : 'Steward: data';
+      const based = note.basedOn !== 'none' && note.basedOnLabel !== null ? ` (based on ${note.basedOnLabel})` : '';
+      lines.push(`- **${lens}**, kept ${note.keptAt.slice(0, 10)}${based}: ${note.question}`);
+      if (note.suggestedQuestion !== note.question) lines.push(`  - Original AI wording: ${note.suggestedQuestion}`);
+    }
+    lines.push('');
+    lines.push('These are questions a person kept, not a review, clearance or sign-off.');
   }
 
   const stayRisk = decision.stay_risk.trim();
