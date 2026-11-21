@@ -7,6 +7,7 @@
  * change's target state, the evidence link.
  */
 import { readFile } from 'node:fs/promises';
+import { optionSurface, ratingControl } from './fixtures/decisionLayout';
 import { expect, test, type Page } from '@playwright/test';
 import { addCapability, addSystemFromHome, clickNavItem, goToModelHome, signUpCreateOrgAndModel } from './fixtures/goldenPath';
 
@@ -54,15 +55,12 @@ test('project pack: decide and design inside a project, attach evidence, downloa
     await page.getByRole('button', { name: 'Add option' }).click();
     await expect(page.getByText(title).first()).toBeVisible();
   }
-  const criteriaTable = page.getByTestId('decision-criteria-grid').locator('table');
-  const headers = await criteriaTable.locator('th').allTextContents();
-  const hubColumn = headers.findIndex((h) => h.includes('Build Repairs Hub'));
-  await criteriaTable.locator('tr', { hasText: 'Cost' }).locator('button').nth(hubColumn - 1).click();
+  await (await ratingControl(page, 'Build Repairs Hub', 'Cost')).click();
   const editor = page.getByTestId('decision-rating-editor');
   await editor.getByRole('button', { name: 'Low' }).click();
   await editor.getByRole('button', { name: 'Save rating' }).click();
   await expect(editor).toHaveCount(0);
-  const hubHeader = criteriaTable.locator('th').nth(hubColumn);
+  const hubHeader = optionSurface(page, 'Build Repairs Hub');
   await hubHeader.getByRole('button', { name: 'Choose' }).click();
   await page.getByPlaceholder('The reasons this option was chosen over the others').fill('A dedicated hub is cheaper to run.');
   await page.getByRole('button', { name: 'Confirm choice' }).click();

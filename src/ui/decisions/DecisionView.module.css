@@ -160,3 +160,51 @@
   border-radius: var(--radius-md);
   background: var(--color-surface-muted, transparent);
 }
+
+/* Keep the decision state and its next action close to the details. */
+.statusBar {
+  flex: 0 1 auto;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  gap: var(--space-2);
+}
+.nextStep {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+  margin: var(--space-3) 0;
+  padding: var(--space-2) var(--space-3);
+  border-left: 3px solid var(--border-strong);
+  background: var(--bg-subtle);
+}
+.nextStep p { margin: 0; }
+.mobileChangeCards { display: none; }
+.changeCard {
+  min-width: 0;
+  border: var(--border-width) solid var(--border);
+  border-radius: var(--radius-md);
+  padding: var(--space-3);
+  overflow-wrap: anywhere;
+}
+.changeCard h3, .changeCard h4, .changeCard p { margin: 0 0 var(--space-2); }
+.changeGroup { margin-top: var(--space-3); }
+.changeRow {
+  padding: var(--space-2) 0;
+  border-top: var(--border-width) solid var(--border);
+}
+.changeRow > div {
+  display: grid;
+  grid-template-columns: 6rem minmax(0, 1fr);
+  gap: var(--space-2);
+  align-items: start;
+}
+@media (max-width: 800px) {
+  .tableWrap { display: none; }
+  .mobileChangeCards { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 300px), 1fr)); gap: var(--space-3); }
+  .changeRow > div { grid-template-columns: 5rem minmax(0, 1fr); }
+}
+.context { margin: var(--space-3) 0; }
+.context h2 { margin: 0 0 var(--space-1); }
+.context p { margin: 0; }

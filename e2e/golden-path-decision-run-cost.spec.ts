@@ -9,6 +9,7 @@
  * the 390 run is this spec's own "phone width usable" check.
  */
 import { randomUUID } from 'node:crypto';
+import { compactDecision, changesSurface } from './fixtures/decisionLayout';
 import { expect, test, type Page } from '@playwright/test';
 import { addSystemFromHome, goToModelHome, retireElement, signUpCreateOrgAndModel, clickNavItem } from './fixtures/goldenPath';
 
@@ -69,12 +70,16 @@ test('replacing a costed system with a costed alternative on an option shows the
   await decisionRow.getByRole('link', { name: 'Open →' }).click();
   await expect(page.getByRole('heading', { name: decisionTitle })).toBeVisible();
 
-  const whatChangesTable = page.locator('table').filter({ has: page.locator('th', { hasText: 'Row' }) });
-  await expect(whatChangesTable).toBeVisible();
-  const runCostRow = whatChangesTable.locator('tr', { hasText: 'Run cost' });
-  await expect(runCostRow).toContainText('PM £250k–£1m → Hana equivalent £50k–£250k');
-  await expect(runCostRow).not.toContainText('saving');
-  await expect(runCostRow).not.toContainText('total');
+  const changes = changesSurface(page);
+  await expect(changes).toBeVisible();
+  if (compactDecision(page)) {
+    await expect(changes.getByRole('article', { name: /Replace PM with Hana/ })).toContainText('PM £250k–£1m → Hana equivalent £50k–£250k');
+  } else {
+    const runCostRow = changes.locator('tr', { hasText: 'Run cost' });
+    await expect(runCostRow).toContainText('PM £250k–£1m → Hana equivalent £50k–£250k');
+    await expect(runCostRow).not.toContainText('saving');
+    await expect(runCostRow).not.toContainText('total');
+  }
 
   // Phone width usable: the row's own text is still reachable and the
   // page itself never grows a horizontal scrollbar.

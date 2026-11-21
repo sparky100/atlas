@@ -18,6 +18,7 @@
  * own "Criticality"/"Hosting model" edits.
  */
 import { randomUUID } from 'node:crypto';
+import { changesSurface, optionSurface } from './fixtures/decisionLayout';
 import { expect, test } from '@playwright/test';
 import { addSystemFromHome, addUsesRelationship, goToModelHome, retireElement, signUpCreateOrgAndModel, clickNavItem } from './fixtures/goldenPath';
 
@@ -115,17 +116,12 @@ test('an option that removes an IT/OT boundary crossing shows only the scoped-cr
   await decisionRow.getByRole('link', { name: 'Open →' }).click();
   await expect(page.getByRole('heading', { name: decisionTitle })).toBeVisible();
 
-  const whatChangesTable = page.locator('table').filter({ has: page.locator('th', { hasText: 'Row' }) });
-  await expect(whatChangesTable).toBeVisible();
-  const crossingsRow = whatChangesTable.locator('tr', { hasText: 'Scoped crossings' });
-  await expect(crossingsRow).toContainText('crossing');
-  // Every visible row belongs to "Boundary crossings" — no Outcome/Trigger
-  // row for System A or System B is showing, since neither system's own
-  // lifecycle or existence changed, only the connection between them.
-  await expect(whatChangesTable.getByText('Outcome', { exact: true })).toHaveCount(0);
-
-  const criteriaGridTable = page.locator('table').first();
-  await expect(criteriaGridTable.locator('th', { hasText: optionTitle })).toContainText('re-points 1 connection');
+  const changes = changesSurface(page);
+  await expect(changes).toBeVisible();
+  await expect(changes).toContainText('Scoped crossings');
+  await expect(changes).toContainText('crossing');
+  await expect(changes.getByText('Outcome', { exact: true })).toHaveCount(0);
+  await expect(optionSurface(page, optionTitle)).toContainText('re-points 1 connection');
 
   await expect(page.getByRole('heading', { name: /Also affected/ })).toBeVisible();
   await expect(page.getByText('System C', { exact: true })).toBeVisible();

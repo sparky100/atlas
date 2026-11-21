@@ -134,7 +134,7 @@ export function SecondOpinion({ orgId, userId, decisionId, orgSlug, shareCost, a
         <CollapsibleSection
           title="Second opinion"
           meta={reviews.length > 0 ? `${String(reviews.reduce((n, r) => n + r.notes.length, 0))} question(s) held` : undefined}
-          defaultOpen
+          defaultOpen={availability.available || reviews.length > 0 || interrupted}
         >
         <Text as="p">Ask what might be missing before a person chooses. These are AI questions for you to weigh, not a review, clearance or sign-off.</Text>
         <Text as="p" size="sm" tone="muted">The decision as it stands now (context, options, ratings, principles and visible changes) goes to your organisation's AI provider when you ask. Nothing you are still typing is sent.</Text>
@@ -147,7 +147,6 @@ export function SecondOpinion({ orgId, userId, decisionId, orgSlug, shareCost, a
           </ul>
           <Text as="p" size="sm">People's names, comments, approvals and frozen packs are not sent. Pasted source lines in an option description are sent as part of that text.</Text>
         </details>
-        {!availability.available && <div data-testid="second-opinion-unavailable"><Text as="p" size="sm">{availability.reason} {availability.canFix && <Link to={`/o/${orgSlug}/settings`}>Open organisation settings</Link>}</Text></div>}
         {availability.available && (
           <>
             <div className={styles.actions}>
@@ -181,6 +180,7 @@ export function SecondOpinion({ orgId, userId, decisionId, orgSlug, shareCost, a
           </div>;
         })}
         </CollapsibleSection>
+        {!availability.available && <div data-testid="second-opinion-unavailable"><Text as="p" size="sm">{availability.reason} {availability.canFix && <Link to={`/o/${orgSlug}/settings`}>Open organisation settings</Link>}</Text></div>}
       </section>
     </Panel>
   );

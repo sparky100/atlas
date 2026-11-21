@@ -11,6 +11,7 @@
  */
 import { expect, test } from '@playwright/test';
 import { signUpCreateOrgAndModel, clickNavItem } from './fixtures/goldenPath';
+import { optionSurface, ratingControl } from './fixtures/decisionLayout';
 
 test('rate decision options on judgement criteria, leave some unrated, choose one with a rationale; ratings stay recorded and read-only afterwards', async ({ page }) => {
   await signUpCreateOrgAndModel(page, 'ratings');
@@ -41,16 +42,13 @@ test('rate decision options on judgement criteria, leave some unrated, choose on
   // guaranteed order) rather than assuming insertion order.
   const criteriaGrid = page.getByTestId('decision-criteria-grid');
   await expect(criteriaGrid).toBeVisible();
-  const criteriaTable = criteriaGrid.locator('table');
-  const headers = await criteriaTable.locator('th').allTextContents();
-  const optionAColumn = headers.findIndex((h) => h.includes('Option 1'));
-  const optionBColumn = headers.findIndex((h) => h.includes('Option 2'));
-  expect(optionAColumn).toBeGreaterThan(0);
-  expect(optionBColumn).toBeGreaterThan(0);
+  const optionAHeader = optionSurface(page, 'Option 1');
+  const optionBHeader = optionSurface(page, 'Option 2');
+  await expect(optionAHeader).toBeVisible();
+  await expect(optionBHeader).toBeVisible();
 
-  async function rateCell(criterionLabel: string, optionColumn: number, levelLabel: string, note: string) {
-    const row = criteriaTable.locator('tr', { hasText: criterionLabel });
-    await row.locator('button').nth(optionColumn - 1).click();
+  async function rateCell(criterionLabel: string, title: string, levelLabel: string, note: string) {
+    await (await ratingControl(page, title, criterionLabel)).click();
     const editor = page.getByTestId('decision-rating-editor');
     await expect(editor).toBeVisible();
     await editor.getByRole('button', { name: levelLabel }).click();
@@ -59,28 +57,18 @@ test('rate decision options on judgement criteria, leave some unrated, choose on
     await expect(editor).toHaveCount(0);
   }
 
-  // Option 1: rate Cost and Delivery risk, leave Effort/Timing/Vendor and strategic fit unrated (2 of 5).
-  await rateCell('Cost', optionAColumn, 'Low', 'Cheaper than the incumbent.');
-  await rateCell('Delivery risk', optionAColumn, 'Medium', 'Some integration risk.');
+  await rateCell('Cost', 'Option 1', 'Low', 'Cheaper than the incumbent.');
+  await rateCell('Delivery risk', 'Option 1', 'Medium', 'Some integration risk.');
+  await rateCell('Timing', 'Option 2', 'After end date', 'Vendor cannot commit to a date.');
 
-  // Option 2: rate only Timing (1 of 5).
-  await rateCell('Timing', optionBColumn, 'After end date', 'Vendor cannot commit to a date.');
-
-  // F6.3's own compact "N/5" progress cue, in each option's own header cell.
-  const optionAHeader = criteriaTable.locator('th').nth(optionAColumn);
-  const optionBHeader = criteriaTable.locator('th').nth(optionBColumn);
   await expect(optionAHeader).toContainText('2/5');
   await expect(optionBHeader).toContainText('1/5');
-
-  // Unrated cells read "Not rated," visibly distinct from a rated one.
-  const effortRowForOptionA = criteriaTable.locator('tr', { hasText: 'Effort' });
-  await expect(effortRowForOptionA.locator('button').nth(optionAColumn - 1)).toContainText('Not rated');
-
-  // Recorded ratings show their own criterion label, not a raw level key.
-  const costRow = criteriaTable.locator('tr', { hasText: 'Cost' });
-  await expect(costRow.locator('button').nth(optionAColumn - 1)).toContainText('Low');
-  const timingRow = criteriaTable.locator('tr', { hasText: 'Timing' });
-  await expect(timingRow.locator('button').nth(optionBColumn - 1)).toContainText('After end date');
+  const effortControl = await ratingControl(page, 'Option 1', 'Effort');
+  const costControl = await ratingControl(page, 'Option 1', 'Cost');
+  const timingControl = await ratingControl(page, 'Option 2', 'Timing');
+  await expect(effortControl).toContainText('Not rated');
+  await expect(costControl).toContainText('Low');
+  await expect(timingControl).toContainText('After end date');
 
   // Choose/Add-option follow-up ("no full-page loading state after the
   // first load"): a hand-set attribute with no React counterpart, on a
@@ -114,17 +102,17 @@ test('rate decision options on judgement criteria, leave some unrated, choose on
   await expect(criteriaGrid).toHaveAttribute('data-e2e-marker', mountMarker);
 
   // The ratings recorded before choosing are still shown afterwards...
-  await expect(costRow.locator('button').nth(optionAColumn - 1)).toContainText('Low');
+  await expect(costControl).toContainText('Low');
   await expect(optionAHeader).toContainText('2/5');
 
   // ...and are now read-only: the cell is no longer a live tap target.
-  await expect(costRow.locator('button').nth(optionAColumn - 1)).toBeDisabled();
+  await expect(costControl).toBeDisabled();
 
   // The rejected option (Option 2) stays visible in the grid, not removed —
   // its own column, status chip, and previously-recorded rating remain.
   await expect(optionBHeader).toBeVisible();
   await expect(optionBHeader).toContainText('cancelled');
-  await expect(timingRow.locator('button').nth(optionBColumn - 1)).toContainText('After end date');
+  await expect(timingControl).toContainText('After end date');
 
   // A comment write doesn't blank the page either — same marker, still
   // there after posting, and the ratings/chosen state Choose just
@@ -135,7 +123,7 @@ test('rate decision options on judgement criteria, leave some unrated, choose on
   await expect(page.getByText('Noting this for the record.')).toBeVisible();
   await expect(criteriaGrid).toHaveAttribute('data-e2e-marker', mountMarker);
   await expect(optionAHeader).toContainText('chosen');
-  await expect(costRow.locator('button').nth(optionAColumn - 1)).toContainText('Low');
+  await expect(costControl).toContainText('Low');
 
   // Decision-side-completion item 5: "Work on this as a change" enters the
   // change workspace and selects the chosen option as the session's

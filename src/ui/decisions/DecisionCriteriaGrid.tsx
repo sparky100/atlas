@@ -13,6 +13,7 @@ import { OptionSources } from './OptionSources';
 import type { OptionSource } from '../../contracts/optionSource';
 import type { UseDecisionRatingsResult } from './useDecisionRatings';
 import styles from './DecisionCriteriaGrid.module.css';
+import { useCompactDecisionLayout } from './useCompactDecisionLayout';
 
 export interface DecisionCriteriaOption {
   branchId: UUID;
@@ -100,6 +101,7 @@ function stripExploringPrefix(label: string): string {
  */
 export function DecisionCriteriaGrid({ decisionId, options, canRate, userId, neededBy, orgSlug, modelSlug, commitId, onChoose, chooseNote, canWorkOnChange, onWorkOnThisChange, ratingsState }: DecisionCriteriaGridProps) {
   const ratings = ratingsState.ratings;
+  const compact = useCompactDecisionLayout();
   const [editing, setEditing] = useState<EditingCell | null>(null);
   const [levelDraft, setLevelDraft] = useState<DecisionRatingLevel | null>(null);
   const [noteDraft, setNoteDraft] = useState('');
@@ -133,6 +135,62 @@ export function DecisionCriteriaGrid({ decisionId, options, canRate, userId, nee
     if (saved) setEditing(null);
   }
 
+  function renderRatingEditor() {
+    if (!editing) return null;
+    return (
+        <div className={styles.editor} data-testid="decision-rating-editor">
+          <Text as="h3" size="sm">
+            {editing.criterionLabel} — {editing.branchLabel}
+          </Text>
+          <div className={styles.levelPicker}>
+            {DECISION_RATING_LEVELS.map((level) => {
+              const label = DECISION_CRITERIA.find((c) => c.key === editing.criterion)?.levelLabels[level] ?? level;
+              const selected = levelDraft === level;
+              return (
+                <button
+                  key={level}
+                  type="button"
+                  className={[styles.levelOption, selected ? styles.levelOptionSelected : ''].filter(Boolean).join(' ')}
+                  aria-pressed={selected}
+                  onClick={() => {
+                    setLevelDraft(level);
+                  }}
+                >
+                  <Chip tone={decisionRatingLevelTone(level)}>{label}</Chip>
+                </button>
+              );
+            })}
+          </div>
+          <Text as="label" size="sm" tone="muted">
+            Note (optional)
+          </Text>
+          <textarea
+            className={styles.noteInput}
+            maxLength={200}
+            placeholder="A short reason for this rating"
+            value={noteDraft}
+            onChange={(e) => {
+              setNoteDraft(e.target.value);
+            }}
+          />
+          <div className={styles.editorActions}>
+            <Button variant="primary" disabled={!levelDraft || ratingsState.status === 'saving'} onClick={() => void saveRating()}>
+              {ratingsState.status === 'saving' ? 'Saving…' : 'Save rating'}
+            </Button>
+            <Button
+              variant="ghost"
+              onClick={() => {
+                setEditing(null);
+              }}
+            >
+              Cancel
+            </Button>
+          </div>
+          {ratingsState.error !== null && <Text as="p">{ratingsState.error}</Text>}
+        </div>
+    );
+  }
+
   return (
     <div className={styles.wrap} data-testid="decision-criteria-grid">
       {chooseNote !== undefined && chooseNote !== null && (
@@ -140,7 +198,7 @@ export function DecisionCriteriaGrid({ decisionId, options, canRate, userId, nee
           {chooseNote}
         </Text>
       )}
-      <div className={styles.tableWrap}>
+      {!compact && <div className={styles.tableWrap}>
         <table className={styles.grid}>
           <thead>
             <tr>
@@ -264,60 +322,53 @@ export function DecisionCriteriaGrid({ decisionId, options, canRate, userId, nee
             ))}
           </tbody>
         </table>
-      </div>
+      </div>}
 
-      {editing && (
-        <div className={styles.editor} data-testid="decision-rating-editor">
-          <Text as="h3" size="sm">
-            {editing.criterionLabel} — {editing.branchLabel}
-          </Text>
-          <div className={styles.levelPicker}>
-            {DECISION_RATING_LEVELS.map((level) => {
-              const label = DECISION_CRITERIA.find((c) => c.key === editing.criterion)?.levelLabels[level] ?? level;
-              const selected = levelDraft === level;
-              return (
-                <button
-                  key={level}
-                  type="button"
-                  className={[styles.levelOption, selected ? styles.levelOptionSelected : ''].filter(Boolean).join(' ')}
-                  aria-pressed={selected}
-                  onClick={() => {
-                    setLevelDraft(level);
-                  }}
-                >
-                  <Chip tone={decisionRatingLevelTone(level)}>{label}</Chip>
-                </button>
-              );
-            })}
-          </div>
-          <Text as="label" size="sm" tone="muted">
-            Note (optional)
-          </Text>
-          <textarea
-            className={styles.noteInput}
-            maxLength={200}
-            placeholder="A short reason for this rating"
-            value={noteDraft}
-            onChange={(e) => {
-              setNoteDraft(e.target.value);
-            }}
-          />
-          <div className={styles.editorActions}>
-            <Button variant="primary" disabled={!levelDraft || ratingsState.status === 'saving'} onClick={() => void saveRating()}>
-              {ratingsState.status === 'saving' ? 'Saving…' : 'Save rating'}
-            </Button>
-            <Button
-              variant="ghost"
-              onClick={() => {
-                setEditing(null);
-              }}
-            >
-              Cancel
-            </Button>
-          </div>
-          {ratingsState.error !== null && <Text as="p">{ratingsState.error}</Text>}
-        </div>
-      )}
+      {compact && <div className={styles.mobileCards} data-testid="decision-option-cards">
+        {options.map((o) => (
+          <article key={o.branchId} className={styles.optionCard} data-testid="decision-option-card" aria-label={stripExploringPrefix(o.label)}>
+            <div className={styles.optionHeaderTop}>
+              {o.isChosen && <Chip tone="ok">chosen</Chip>}
+              <Chip tone={branchStatusTone(o.status)}>{o.status}</Chip>
+              <Text as="span" size="sm" tone="muted">{ratedCount(o.branchId)}/{DECISION_CRITERIA.length} rated</Text>
+            </div>
+            <Link to={`/o/${orgSlug}/m/${modelSlug}/changes/${o.branchId}`}>
+              <Text as="span" size="md" className={styles.optionTitle}>{stripExploringPrefix(o.label)}</Text>
+            </Link>
+            {o.provenance != null && <Text as="p" size="sm" tone="muted">{o.provenance}</Text>}
+            <Text as="p" size="sm" tone={o.summary === null ? 'muted' : 'default'}>{o.summary ?? 'No changes recorded yet'}</Text>
+            {((o.description?.trim() ?? '') !== '' || (o.sources?.length ?? 0) > 0) && (
+              <details className={styles.optionDetails}>
+                <summary>Details and evidence</summary>
+                {o.description?.trim() && <Text as="div" size="sm"><ClampedText text={o.description}><ElementNamedText text={o.description} commitId={commitId ?? null} /></ClampedText></Text>}
+                <OptionSources sources={o.sources ?? []} />
+              </details>
+            )}
+            <div className={styles.ratingList}>
+              {DECISION_CRITERIA.map((criterion) => {
+                const rating = ratingFor(o.branchId, criterion.key);
+                return (
+                  <div key={criterion.key} className={styles.ratingRow} data-testid={`decision-rating-${criterion.key}`}>
+                    <Text as="span" size="sm">{criterion.label}{criterion.key === 'timing' && neededBy !== null ? ` (needed by ${neededBy})` : ''}</Text>
+                    <button type="button" className={styles.cell} disabled={!canRate} onClick={() => { openEditor(o.branchId, stripExploringPrefix(o.label), criterion.key, criterion.label); }}>
+                      {rating ? <Chip tone={decisionRatingLevelTone(rating.level)}>{criterion.levelLabels[rating.level]}</Chip> : <span className={styles.notRated}>Not rated</span>}
+                      {rating?.note && <span className={styles.noteDot} aria-label="Has a note" title={rating.note}>•</span>}
+                    </button>
+                    {editing?.branchId === o.branchId && editing.criterion === criterion.key && renderRatingEditor()}
+                  </div>
+                );
+              })}
+            </div>
+            <div className={styles.optionHeaderActions}>
+              <Link to={`/o/${orgSlug}/m/${modelSlug}/decisions/${decisionId}/options/${o.branchId}/landscape`}>View diagram →</Link>
+              {canEditOption(o) && <Button variant="secondary" onClick={() => { onWorkOnThisChange(o.branchId); }}>Edit this change</Button>}
+              {o.canChoose && <Button variant="secondary" onClick={() => { onChoose(o.branchId); }}>Choose</Button>}
+              {o.isChosen && canWorkOnChange && o.status === 'draft' && <Button variant="primary" onClick={() => { onWorkOnThisChange(o.branchId); }}>Work on this as a change</Button>}
+            </div>
+          </article>
+        ))}
+      </div>}
+      {!compact && editing && <div className={styles.desktopEditor}>{renderRatingEditor()}</div>}
     </div>
   );
 }

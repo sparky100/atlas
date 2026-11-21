@@ -7,6 +7,7 @@
  * own branch. The Outcome row must read "replaced by <name>".
  */
 import { randomUUID } from 'node:crypto';
+import { compactDecision, changesSurface, optionSurface } from './fixtures/decisionLayout';
 import { expect, test } from '@playwright/test';
 import { addSystemFromHome, goToModelHome, retireElement, signUpCreateOrgAndModel, clickNavItem } from './fixtures/goldenPath';
 
@@ -66,24 +67,23 @@ test('retiring PM on an option, with a real replacement picked, shows the Outcom
   await decisionRow.getByRole('link', { name: 'Open →' }).click();
   await expect(page.getByRole('heading', { name: decisionTitle })).toBeVisible();
 
-  const whatChangesTable = page.locator('table').filter({ has: page.locator('th', { hasText: 'Row' }) });
-  await expect(whatChangesTable).toBeVisible();
-  const outcomeRow = whatChangesTable.locator('tr', { hasText: 'Outcome' });
-  await expect(outcomeRow).toContainText('unchanged');
-  await expect(outcomeRow).toContainText('replaced by Hana equivalent');
-
-  // The PM group-header row spans the whole table without adding phantom
-  // columns: each real header column keeps a readable width and none
-  // overlaps its neighbour (the 390px overlap bug, where `colSpan={99}`
-  // shrank every real column to ~3px).
-  const headerBoxes = await whatChangesTable.locator('thead th').evaluateAll((ths) => ths.map((th) => th.getBoundingClientRect()).map((r) => ({ left: r.left, right: r.right, width: r.width })));
-  expect(headerBoxes).toHaveLength(3);
-  for (const [i, box] of headerBoxes.entries()) {
-    expect(box.width).toBeGreaterThanOrEqual(80);
-    const next = headerBoxes[i + 1];
-    if (next) expect(box.right).toBeLessThanOrEqual(next.left + 1);
+  const changes = changesSurface(page);
+  await expect(changes).toBeVisible();
+  await expect(changes).toContainText('Outcome');
+  await expect(changes).toContainText('unchanged');
+  await expect(changes).toContainText('replaced by Hana equivalent');
+  if (!compactDecision(page)) {
+    // Wide comparison keeps separate, non-overlapping columns.
+    const headerBoxes = await changes.locator('thead th').evaluateAll((ths) => ths.map((th) => th.getBoundingClientRect()).map((r) => ({ left: r.left, right: r.right, width: r.width })));
+    expect(headerBoxes).toHaveLength(3);
+    for (const [i, box] of headerBoxes.entries()) {
+      expect(box.width).toBeGreaterThanOrEqual(80);
+      const next = headerBoxes[i + 1];
+      if (next) expect(box.right).toBeLessThanOrEqual(next.left + 1);
+    }
+  } else {
+    await expect(changes).toContainText('Today');
+    await expect(changes).toContainText('With this option');
   }
-
-  const criteriaGridTable = page.locator('table').first();
-  await expect(criteriaGridTable.locator('th', { hasText: optionTitle })).toContainText('Retires PM, adds Hana equivalent');
+  await expect(optionSurface(page, optionTitle)).toContainText('Retires PM, adds Hana equivalent');
 });

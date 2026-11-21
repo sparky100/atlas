@@ -1,15 +1,11 @@
 import { useEffect } from 'react';
 import { Loading } from '../components/Loading/Loading';
-import { Link, useParams } from 'react-router';
-import { useQuery } from '@tanstack/react-query';
-import { getProject } from '../../db/projects';
-import { supabase } from '../supabaseClient';
+import { useParams } from 'react-router';
 import { AppHeader } from '../components/AppHeader/AppHeader';
 import { Breadcrumb } from '../components/Breadcrumb/Breadcrumb';
 import { ModelNav } from '../components/ModelNav/ModelNav';
 import navStyles from '../components/ModelNav/ModelNav.module.css';
 import { PageIdentity } from '../components/PageIdentity/PageIdentity';
-import { Text } from '../components/Text/Text';
 import { DecisionView } from '../decisions/DecisionView';
 import { useDecision } from '../decisions/useDecision';
 import { useAuth } from '../auth/useAuth';
@@ -43,8 +39,6 @@ export function DecisionPage() {
   // `DecisionView.tsx`'s own doc comment on why that duplication was
   // worth removing, not just wasteful).
   const { state, applyNewOption, applyNewConcern, applyDecisionUpdate, refreshOptionsAndArguments } = useDecision(model?.id ?? '', decisionId ?? '');
-  const projectId = state.status === 'ready' ? state.decision.project_id : null;
-  const project = useQuery({ queryKey: ['decisionPageProject', projectId], enabled: projectId !== null, queryFn: () => (projectId === null ? Promise.resolve(null) : getProject(supabase, projectId)) });
   const title = state.status === 'ready' ? state.decision.title : 'Decision';
 
   // The decision page is main-context by design ("decisions are model-wide,
@@ -88,12 +82,6 @@ export function DecisionPage() {
         <main className={styles.main}>
           <EditingBranchBanner activeRef={ref} modelId={model.id} orgSlug={orgSlug ?? ''} modelSlug={model.slug} showModeShortcuts={false} currentDecisionId={decisionId} />
           <Breadcrumb org={{ label: organisation?.name ?? '', href: `/o/${orgSlug ?? ''}` }} model={{ label: model.name, href: `/o/${orgSlug ?? ''}/m/${model.slug}` }} refLabel={refLabelOf(ref, branchLabel)} />
-          {project.data && (
-            <Text as="p" size="md" data-testid="decision-parent-project">
-              Part of project:{' '}
-              <Link to={`/o/${orgSlug ?? ''}/m/${model.slug}/projects/${project.data.id}`}>{project.data.title}</Link> ({project.data.status})
-            </Text>
-          )}
           <div className={styles.headerRow}>
             <PageIdentity kind="Decision" name={title} />
           </div>

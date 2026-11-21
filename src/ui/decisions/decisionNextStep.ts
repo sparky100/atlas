@@ -32,7 +32,7 @@ export function decisionNextStep(i: DecisionNextStepInput): DecisionNextStep | n
   }
   const rated = `${String(i.ratedOptionCount)} of ${String(i.optionCount)} options rated.`;
   if (i.canChoose) {
-    return { title: 'Choose an option', body: `${rated} Compare what each changes, then choose and give your reasons. Rating first is optional but makes the choice easier to explain.`, action: 'choose', actionLabel: 'Go to the comparison' };
+    return { title: 'Choose an option', body: `${rated} Compare what each changes, then choose and give your reasons. Rating first is optional but makes the choice easier to explain.`, action: 'choose', actionLabel: 'Review what changes' };
   }
   if (i.ratedOptionCount === 0) {
     return { title: 'Compare the options', body: 'Rate each option for cost, effort, delivery risk, timing and vendor fit. It is optional, but it makes the choice easier to explain. An owner or architect makes the choice.', action: 'compare', actionLabel: 'Go to the comparison' };
