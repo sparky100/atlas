@@ -211,6 +211,12 @@ export function ArchitectHome({ data, modelId, mainCommitIdHint, insights, role,
   // Three sections, in this order, nothing listed twice (Simon, 2026-11-19): projects (with their decisions and changes inside), decisions outside a project, changes outside both.
   const ownedDecisionsOutside = data.myOwnedWork.decisions.filter(({ projectTitle }) => projectTitle === null);
   const standaloneChangeRows = myWorkRows.filter((row) => row.kind === 'change');
+  // Keep the home page a summary: a handful of project cards, then a link to
+  // the full Projects list. The card grid keeps several visible at once.
+  const PROJECT_CARD_LIMIT = 4;
+  const shownProjects = data.myOwnedWork.projects.slice(0, PROJECT_CARD_LIMIT);
+  const DECISION_CARD_LIMIT = 4;
+  const shownOwnedDecisions = ownedDecisionsOutside.slice(0, DECISION_CARD_LIMIT);
   const modelHref = `/o/${orgSlug}/m/${modelSlug}`;
   const elementHref = (elementId: string) => `/o/${orgSlug}/m/${modelSlug}/e/${elementId}`;
   // A commit's diff against its own parent (Sprint U4-1 B2) — main's genesis
@@ -756,9 +762,9 @@ export function ArchitectHome({ data, modelId, mainCommitIdHint, insights, role,
             {data.myOwnedWork.projects.length === 0 ? (
               <EmptyState>No projects of yours in hand.</EmptyState>
             ) : (
-              <ul className={styles.branchList} aria-label="My projects">
-                {data.myOwnedWork.projects.map(({ project, progress, overdueDecisions }) => (
-                  <li key={project.id} className={styles.ownedRow}>
+              <ul className={styles.workCardGrid} aria-label="My projects">
+                {shownProjects.map(({ project, progress, overdueDecisions }) => (
+                  <li key={project.id} className={styles.workCard}>
                     <div className={styles.branchRow}>
                       <Link to={`${modelHref}/projects/${project.id}`}>
                         <Text as="span" size="sm">
@@ -781,6 +787,11 @@ export function ArchitectHome({ data, modelId, mainCommitIdHint, insights, role,
                 ))}
               </ul>
             )}
+            {data.myOwnedWork.projects.length > shownProjects.length && (
+              <Text as="p" size="sm" className={styles.seeAll}>
+                <Link to={`${modelHref}/projects`}>See all {String(data.myOwnedWork.projects.length)} projects →</Link>
+              </Text>
+            )}
           </Panel>
 
           <Panel>
@@ -790,9 +801,9 @@ export function ArchitectHome({ data, modelId, mainCommitIdHint, insights, role,
             {ownedDecisionsOutside.length === 0 ? (
               <EmptyState>No open decisions of yours.</EmptyState>
             ) : (
-              <ul className={styles.branchList} aria-label="My decisions">
-                {ownedDecisionsOutside.map(({ decision, overdue, projectTitle }) => (
-                  <li key={decision.id} className={styles.ownedRow}>
+              <ul className={styles.workCardGrid} aria-label="My decisions">
+                {shownOwnedDecisions.map(({ decision, overdue, projectTitle }) => (
+                  <li key={decision.id} className={styles.workCard}>
                     <div className={styles.branchRow}>
                       <Link to={`${modelHref}/decisions/${decision.id}`}>
                         <Text as="span" size="sm">
@@ -810,6 +821,11 @@ export function ArchitectHome({ data, modelId, mainCommitIdHint, insights, role,
                   </li>
                 ))}
               </ul>
+            )}
+            {ownedDecisionsOutside.length > shownOwnedDecisions.length && (
+              <Text as="p" size="sm" className={styles.seeAll}>
+                <Link to={`${modelHref}/decisions`}>See all {String(ownedDecisionsOutside.length)} decisions →</Link>
+              </Text>
             )}
           </Panel>
 

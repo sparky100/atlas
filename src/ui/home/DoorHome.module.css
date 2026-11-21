@@ -110,6 +110,33 @@
   margin: var(--space-1) 0 0;
 }
 
+/* My projects / My decisions as compact cards: several visible at once on a
+   wide main column, one per row on a phone. Each card is self-contained; the
+   list is capped and ends with a "See all" link. */
+.workCardGrid {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: var(--space-3);
+}
+
+.workCard {
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md, 8px);
+  padding: var(--space-3);
+  min-width: 0;
+}
+
+.workCard p {
+  margin: var(--space-1) 0 0;
+}
+
+.seeAll {
+  margin: var(--space-2) 0 0;
+}
+
 .commitRow,
 .branchRow {
   display: flex;
