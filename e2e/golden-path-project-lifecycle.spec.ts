@@ -4,6 +4,7 @@
  * it → two options → rate → choose → the chosen change is in the project
  * → design it, submit, approve, merge → close the project.
  */
+import { compactDecision, optionSurface, ratingControl } from './fixtures/decisionLayout';
 import { expect, test, type Page } from '@playwright/test';
 import { addCapability, addSystemFromHome, clickNavItem, expectNavCurrent, goToModelHome, signUpCreateOrgAndModel } from './fixtures/goldenPath';
 
@@ -49,6 +50,7 @@ test('project lifecycle: start from a finding, decide inside it, deliver the cho
   await page.getByRole('button', { name: 'Start decision' }).click();
   await expect(page.getByRole('heading', { name: 'Which system supports repairs?' })).toBeVisible();
   await expect(page.getByRole('link', { name: PROJECT_TITLE }).first()).toBeVisible();
+  await expect(page.getByRole('link', { name: PROJECT_TITLE, exact: true })).toHaveCount(1);
   await expect(page.getByTestId('decision-source-finding')).toContainText('Started from a health finding: a capability nothing supports.');
   // It starts from where the person came from: the project's purpose is the context, the project's capability is what it concerns, and the edit form is already open.
   await expect(page.getByPlaceholder('What needs deciding, and why now')).not.toHaveValue('');
@@ -71,17 +73,16 @@ test('project lifecycle: start from a finding, decide inside it, deliver the cho
     await page.getByRole('button', { name: 'Add option' }).click();
     await expect(page.getByText(title).first()).toBeVisible();
   }
-  const criteriaTable = page.getByTestId('decision-criteria-grid').locator('table');
-  const headers = await criteriaTable.locator('th').allTextContents();
-  const hubColumn = headers.findIndex((h) => h.includes('Build Repairs Hub'));
-  expect(hubColumn).toBeGreaterThan(0);
-  await criteriaTable.locator('tr', { hasText: 'Cost' }).locator('button').nth(hubColumn - 1).click();
+  if (compactDecision(page)) {
+    await expect(page.getByTestId('decision-option-card')).toHaveCount(2);
+    expect(await page.evaluate(() => document.documentElement.scrollWidth > document.documentElement.clientWidth + 1)).toBe(false);
+  }
+  await (await ratingControl(page, 'Build Repairs Hub', 'Cost')).click();
   const editor = page.getByTestId('decision-rating-editor');
   await editor.getByRole('button', { name: 'Low' }).click();
   await editor.getByRole('button', { name: 'Save rating' }).click();
   await expect(editor).toHaveCount(0);
-
-  const hubHeader = criteriaTable.locator('th').nth(hubColumn);
+  const hubHeader = optionSurface(page, 'Build Repairs Hub');
   await hubHeader.getByRole('button', { name: 'Choose' }).click();
   await page.getByPlaceholder('The reasons this option was chosen over the others').fill('A dedicated hub is cheaper to run.');
   await page.getByRole('button', { name: 'Confirm choice' }).click();

@@ -67,6 +67,7 @@ import { useOptionSources } from './useOptionSources';
 import type { OptionSource } from '../../contracts/optionSource';
 import { groupWhatChangesRows, type WhatChangesRow } from './whatChangesRows';
 import styles from './DecisionView.module.css';
+import { useCompactDecisionLayout } from './useCompactDecisionLayout';
 
 export interface DecisionViewProps {
   modelId: UUID;
@@ -105,6 +106,7 @@ export interface DecisionViewProps {
  */
 export function DecisionView({ modelId, decisionId, orgId, orgSlug, modelSlug, role, assistantEnabled, agentsEnabled, keySet, shareCost, state, applyNewOption, applyNewConcern, applyDecisionUpdate, refreshOptionsAndArguments }: DecisionViewProps) {
   const { userId } = useAuth();
+  const compact = useCompactDecisionLayout();
   const { branch: main } = useMainBranch(modelId);
   const { members } = useMembers(orgId);
   const optionsState = useDecisionOptions(applyNewOption, applyDecisionUpdate, refreshOptionsAndArguments);
@@ -147,6 +149,9 @@ export function DecisionView({ modelId, decisionId, orgId, orgSlug, modelSlug, r
   const [askBusy, setAskBusy] = useState(false);
   const [askError, setAskError] = useState<string | null>(null);
   const [commentsKey, setCommentsKey] = useState(0);
+  useEffect(() => {
+    if (choosingBranchId !== null) requestAnimationFrame(() => document.getElementById('decision-confirm-choice')?.scrollIntoView({ behavior: 'smooth', block: 'start' }));
+  }, [choosingBranchId]);
 
   // Every hook above must run unconditionally (rules of hooks) — the
   // comparison hook too, even before `state` has resolved to `ready`;
@@ -217,7 +222,7 @@ export function DecisionView({ modelId, decisionId, orgId, orgSlug, modelSlug, r
   function onNextStepAction() {
     if (!nextStep) return;
     if (nextStep.action === 'compare' || nextStep.action === 'choose') {
-      document.getElementById('decision-compare')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      document.getElementById(nextStep.action === 'choose' && comparisonOptions.length > 0 ? 'decision-effects' : 'decision-compare')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
       return;
     }
     if (nextStep.action === 'ask-to-choose' && userId !== null) {
@@ -309,7 +314,20 @@ export function DecisionView({ modelId, decisionId, orgId, orgSlug, modelSlug, r
           {adrCopied ? 'Copied' : 'Copy as ADR markdown'}
         </Button>
       </div>
-      {nextStep !== null && <DecisionNextStepCard step={nextStep} onAction={onNextStepAction} busy={askBusy} askedNames={askedNames} error={askError} showSecondOpinion={secondOpinion.available} />}
+      {/* F10 step 4 (ADR-024 P1): moving a proposed decision moves its draft options with it. */}
+      <ProjectAssignment
+        modelId={modelId}
+        orgSlug={orgSlug}
+        modelSlug={modelSlug}
+        currentProjectId={decision.project_id}
+        canMove={decision.status === 'proposed' && (decision.created_by === userId || role === 'owner' || role === 'architect')}
+        onMove={async (projectId) => {
+          const updated = await setDecisionProject(supabase, decision.id, projectId);
+          applyDecisionUpdate(updated);
+          await refreshOptionsAndArguments();
+        }}
+      />
+
       {canEditDecision(role, decision, userId) && (
         <DecisionEdit
           decision={decision}
@@ -328,22 +346,8 @@ export function DecisionView({ modelId, decisionId, orgId, orgSlug, modelSlug, r
           await refreshOptionsAndArguments();
         }}
       />
-      {/* F10 step 4 (ADR-024 P1): moving a proposed decision moves its draft options with it. */}
-      <ProjectAssignment
-        modelId={modelId}
-        orgSlug={orgSlug}
-        modelSlug={modelSlug}
-        currentProjectId={decision.project_id}
-        canMove={decision.status === 'proposed' && (decision.created_by === userId || role === 'owner' || role === 'architect')}
-        onMove={async (projectId) => {
-          const updated = await setDecisionProject(supabase, decision.id, projectId);
-          applyDecisionUpdate(updated);
-          await refreshOptionsAndArguments();
-        }}
-      />
-
-      <Panel>
-        <CollapsibleSection title="Context">
+      <section className={styles.context} aria-label="Decision details">
+        <Text as="h2" size="lg">Decision details</Text>
         <div className={styles.field}>
           <Text as="p" tone={decision.statement ? 'default' : 'muted'}>
             {decision.statement || 'No context recorded.'}
@@ -363,8 +367,7 @@ export function DecisionView({ modelId, decisionId, orgId, orgSlug, modelSlug, r
 </div>
           )}
         </div>
-        </CollapsibleSection>
-      </Panel>
+      </section>
 
       {decision.status === 'accepted' && (
         <Panel>
@@ -407,7 +410,7 @@ export function DecisionView({ modelId, decisionId, orgId, orgSlug, modelSlug, r
       )}
 
       <Panel>
-        <CollapsibleSection title="Concerns" meta={`(${String(elementLinks.length)})`}>
+        <CollapsibleSection title="Concerns" meta={`(${String(elementLinks.length)})`} defaultOpen={elementLinks.length > 0}>
         {elementLinks.length === 0 ? null : (
           <ul className={styles.linkList}>
             {elementLinks.map((link) => {
@@ -463,6 +466,7 @@ export function DecisionView({ modelId, decisionId, orgId, orgSlug, modelSlug, r
         </Text>
       )}
 
+      {nextStep !== null && decision.status === 'proposed' && <DecisionNextStepCard step={nextStep} onAction={onNextStepAction} busy={askBusy} askedNames={askedNames} error={askError} showSecondOpinion={secondOpinion.available} />}
       {(branchLinks.length > 0 || canAddOption) && (
         <Panel>
           <CollapsibleSection title="Options" meta={`(${String(branchLinks.length)})`}>
@@ -570,70 +574,6 @@ export function DecisionView({ modelId, decisionId, orgId, orgSlug, modelSlug, r
             </Text>
           )}
 
-          {choosingBranchId !== null && (
-            <div className={styles.field}>
-              <Text as="label" size="sm" tone="muted">
-                Why this option
-              </Text>
-              <textarea
-                className={styles.textarea}
-                placeholder="The reasons this option was chosen over the others"
-                value={reasons}
-                onChange={(e) => {
-                  setReasons(e.target.value);
-                }}
-              />
-              <Text as="label" size="sm" tone="muted">
-                What would make us reconsider (optional)
-              </Text>
-              <textarea
-                className={styles.textarea}
-                placeholder="For example: the vendor price rises, support is extended, or the migration slips past March"
-                value={reconsiderIf}
-                onChange={(e) => {
-                  setReconsiderIf(e.target.value);
-                }}
-              />
-              <label>
-                <Text as="span" size="sm" tone="muted">
-                  Look at this decision again by (optional)
-                </Text>
-                <input
-                  type="date"
-                  value={reviewBy}
-                  onChange={(e) => {
-                    setReviewBy(e.target.value);
-                  }}
-                />
-              </label>
-              <div className={styles.addOptionForm}>
-                <Button
-                  variant="primary"
-                  disabled={optionsState.status === 'choosing' || reasons.trim().length === 0}
-                  onClick={() => {
-                    void optionsState.chooseOption(decisionId, choosingBranchId, reasons, { reconsiderIf, reviewBy }).then((chosen) => {
-                      if (chosen) {
-                        setChoosingBranchId(null);
-                        setReconsiderIf('');
-                        setReviewBy('');
-                      }
-                    });
-                  }}
-                >
-                  {optionsState.status === 'choosing' ? 'Choosing…' : 'Confirm choice'}
-                </Button>
-                <Button
-                  variant="ghost"
-                  onClick={() => {
-                    setChoosingBranchId(null);
-                  }}
-                >
-                  Cancel
-                </Button>
-              </div>
-            </div>
-          )}
-
           {/* Starting points are for beginning a list of options. Once there are options (the Designer's, or ones added by hand) they are already in the list, so they are not shown again (Simon, 2026-11-20). */}
           {canAddOption && scoredLinks.length === 0 && estateSupporters !== null && concernedCapabilityIds.length > 0 && (
             <div data-testid="option-suggestions">
@@ -719,29 +659,8 @@ export function DecisionView({ modelId, decisionId, orgId, orgSlug, modelSlug, r
         return <CapabilityProducts key={capability.element_id} templateRef={templateRef} title={`Products that can support ${capability.name}`} />;
       })}
 
-      <SecondOpinion key={`${decisionId}:${userId ?? ''}`} orgId={orgId} userId={userId} decisionId={decisionId} orgSlug={orgSlug} shareCost={shareCost} availability={secondOpinion} />
-
-      <KeptQuestions
-        decisionId={decisionId}
-        nameOfUser={(id) => {
-          const member = members.find((m) => m.member.user_id === id);
-          return member ? profileLabel(member.profile) : 'a former member';
-        }}
-      />
-
-      {decision.status === 'accepted' && chosenBranch !== undefined && (
-        <DecisionGoLive
-          branch={chosenBranch}
-          canEdit={canCreateChangeBranch(role)}
-          onSaved={refreshOptionsAndArguments}
-          onWorkOnChange={(branchId) => {
-            setRef({ kind: 'branch', branchId });
-            void navigate(`/o/${orgSlug}/m/${modelSlug}/changes/${branchId}`);
-          }}
-        />
-      )}
-
       {comparisonOptions.length > 0 && (
+        <div id="decision-effects">
         <Panel>
           <CollapsibleSection title="What changes" meta="per option">
 
@@ -763,7 +682,7 @@ export function DecisionView({ modelId, decisionId, orgId, orgSlug, modelSlug, r
                   {visible.length === 0 ? (
                     <Text as="p">These options don't change the structure of anything in scope.</Text>
                   ) : (
-                    <div className={styles.tableWrap}>
+                    !compact && <div className={styles.tableWrap}>
                       <table className={styles.comparisonTable}>
                         <thead>
                           <tr>
@@ -795,6 +714,31 @@ export function DecisionView({ modelId, decisionId, orgId, orgSlug, modelSlug, r
                     </div>
                   )}
 
+                  {compact && (visible.length > 0 || whatChangesExpanded) && (
+                    <div className={styles.mobileChangeCards} data-testid="what-changes-cards">
+                      {comparison.options.map((option) => option.branchId !== null && (
+                        <article key={option.branchId} className={styles.changeCard} aria-label={`What changes — ${option.label}`}>
+                          <Text as="h3" size="md">{option.label}</Text>
+                          {comparison.mainDriftedByBranchId.has(option.branchId) && (
+                            <Text as="p" size="sm" tone="muted">The live model has moved since this option was started.</Text>
+                          )}
+                          {groupConsecutiveByLabel(whatChangesExpanded ? [...visible, ...collapsed] : visible).map((group) => (
+                            <div key={group.groupLabel} className={styles.changeGroup}>
+                              <Text as="h4" size="sm">{group.groupLabel}</Text>
+                              {group.rows.map((row) => (
+                                <div key={row.id} className={styles.changeRow}>
+                                  {row.rowLabel !== group.groupLabel && <Text as="span" size="sm">{row.rowLabel}</Text>}
+                                  <div><Text as="span" size="xs" tone="muted">Today</Text><Text as="span" size="sm">{row.main.display}</Text></div>
+                                  <div><Text as="span" size="xs" tone="muted">With this option</Text><Text as="span" size="sm">{row.options.get(option.branchId ?? '')?.display ?? '—'}</Text></div>
+                                </div>
+                              ))}
+                            </div>
+                          ))}
+                        </article>
+                      ))}
+                    </div>
+                  )}
+
                   {collapsed.length > 0 && (
                     <div className={styles.field}>
                       <button
@@ -806,7 +750,7 @@ export function DecisionView({ modelId, decisionId, orgId, orgSlug, modelSlug, r
                       >
                         {collapsed.length} row{collapsed.length === 1 ? '' : 's'} unchanged in all options {whatChangesExpanded ? '▲' : '▼'}
                       </button>
-                      {whatChangesExpanded && visible.length === 0 && (
+                      {!compact && whatChangesExpanded && visible.length === 0 && (
                         <div className={styles.tableWrap}>
                           <table className={styles.comparisonTable}>
                             <tbody>
@@ -855,6 +799,96 @@ export function DecisionView({ modelId, decisionId, orgId, orgSlug, modelSlug, r
             })()}
           </CollapsibleSection>
         </Panel>
+        </div>
+      )}
+
+      {decision.status === 'proposed' && <SecondOpinion key={`${decisionId}:${userId ?? ''}`} orgId={orgId} userId={userId} decisionId={decisionId} orgSlug={orgSlug} shareCost={shareCost} availability={secondOpinion} />}
+
+      <KeptQuestions
+        decisionId={decisionId}
+        nameOfUser={(id) => {
+          const member = members.find((m) => m.member.user_id === id);
+          return member ? profileLabel(member.profile) : 'a former member';
+        }}
+      />
+
+      {decision.status === 'accepted' && chosenBranch !== undefined && (
+        <DecisionGoLive
+          branch={chosenBranch}
+          canEdit={canCreateChangeBranch(role)}
+          onSaved={refreshOptionsAndArguments}
+          onWorkOnChange={(branchId) => {
+            setRef({ kind: 'branch', branchId });
+            void navigate(`/o/${orgSlug}/m/${modelSlug}/changes/${branchId}`);
+          }}
+        />
+      )}
+
+      {choosingBranchId !== null && (
+        <div id="decision-confirm-choice"><Panel>
+          <Text as="h2" size="lg">Confirm the choice</Text>
+            <div className={styles.field}>
+              <Text as="label" size="sm" tone="muted">
+                Why this option
+              </Text>
+              <textarea
+                className={styles.textarea}
+                placeholder="The reasons this option was chosen over the others"
+                value={reasons}
+                onChange={(e) => {
+                  setReasons(e.target.value);
+                }}
+              />
+              <Text as="label" size="sm" tone="muted">
+                What would make us reconsider (optional)
+              </Text>
+              <textarea
+                className={styles.textarea}
+                placeholder="For example: the vendor price rises, support is extended, or the migration slips past March"
+                value={reconsiderIf}
+                onChange={(e) => {
+                  setReconsiderIf(e.target.value);
+                }}
+              />
+              <label>
+                <Text as="span" size="sm" tone="muted">
+                  Look at this decision again by (optional)
+                </Text>
+                <input
+                  type="date"
+                  value={reviewBy}
+                  onChange={(e) => {
+                    setReviewBy(e.target.value);
+                  }}
+                />
+              </label>
+              <div className={styles.addOptionForm}>
+                <Button
+                  variant="primary"
+                  disabled={optionsState.status === 'choosing' || reasons.trim().length === 0}
+                  onClick={() => {
+                    void optionsState.chooseOption(decisionId, choosingBranchId, reasons, { reconsiderIf, reviewBy }).then((chosen) => {
+                      if (chosen) {
+                        setChoosingBranchId(null);
+                        setReconsiderIf('');
+                        setReviewBy('');
+                      }
+                    });
+                  }}
+                >
+                  {optionsState.status === 'choosing' ? 'Choosing…' : 'Confirm choice'}
+                </Button>
+                <Button
+                  variant="ghost"
+                  onClick={() => {
+                    setChoosingBranchId(null);
+                  }}
+                >
+                  Cancel
+                </Button>
+              </div>
+            </div>
+        </Panel></div>
       )}
 
       <div id="decision-principles">

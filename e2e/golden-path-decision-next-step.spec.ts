@@ -31,7 +31,17 @@ test('a decision tells the owner what to do next, and Home says it is open', asy
   }
   await expect(card).toContainText('Choose an option');
   await expect(card).toContainText('0 of 2 options rated');
-  await expect(card.getByRole('button', { name: 'Go to the comparison' })).toBeVisible();
+  await expect(card.getByRole('button', { name: 'Review what changes' })).toBeVisible();
+  // Read the option, then its effect, then the optional AI questions.
+  const inReadingOrder = await page.evaluate(() => {
+    const option = document.getElementById('decision-compare');
+    const changes = document.getElementById('decision-effects');
+    const review = document.getElementById('second-opinion');
+    return option !== null && changes !== null && review !== null &&
+      Boolean(option.compareDocumentPosition(changes) & Node.DOCUMENT_POSITION_FOLLOWING) &&
+      Boolean(changes.compareDocumentPosition(review) & Node.DOCUMENT_POSITION_FOLLOWING);
+  });
+  expect(inReadingOrder).toBe(true);
 
   await goToModelHome(page);
   await expect(page.getByTestId('decisions-waiting-for-you')).toContainText('1 decision is open and needs a choice');
