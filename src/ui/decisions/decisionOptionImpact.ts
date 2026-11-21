@@ -25,6 +25,7 @@
 import type { UUID } from '../../contracts/delta';
 import type { ElementsHeadRow, RelationshipsHeadRow } from '../../contracts/rows';
 import type { VersionDiff } from '../../engine/versionDiff';
+import { forLandscapeDisplay } from '../../engine/versionDiff';
 import { laneKeysBySystemId } from '../landscape/landscapeFilter';
 import { groupSystemsByLane } from '../landscape/layout';
 
@@ -42,6 +43,16 @@ function changedSystemIds(diff: VersionDiff, systemIds: ReadonlySet<UUID>): Set<
     }
   }
   return changed;
+}
+
+/**
+ * The systems a diff diagram may honestly call touched. Changed system
+ * records and both system ends of a changed connection are included; a
+ * neighbouring system is context only when the connection itself changed.
+ * A whole capability lane is never a substitute for this set.
+ */
+export function optionImpactSystemIds(diff: VersionDiff, systemIds: ReadonlySet<UUID>): Set<UUID> {
+  return changedSystemIds(forLandscapeDisplay(diff), systemIds);
 }
 
 /**

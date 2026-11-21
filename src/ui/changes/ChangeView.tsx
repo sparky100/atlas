@@ -26,6 +26,7 @@ import { ElementNamedText } from './ElementNamedText';
 import { OptionAiMark } from './OptionAiMark';
 import { optionKindOf } from './optionDraftActions';
 import { OptionDraftCard } from './OptionDraftCard';
+import { ChangeImpactPreview } from './ChangeImpactPreview';
 import { dateFieldLabelForIntent, intentReviewWeight, isDateRequiredForIntent } from './branchIntent';
 import { branchStatusTone } from './branchStatus';
 import { deriveChangeStep } from './changeStepper';
@@ -412,6 +413,10 @@ export function ChangeView({ orgId, modelId, branchId, orgSlug, modelSlug, role,
 
       {/* Only appears when the model has moved on (or an edit needs a decision). */}
       {branch.status === 'draft' && openRequest === null && <BranchRebasePanel modelId={modelId} branch={branch} userId={userId} canEdit={canEdit} onRebased={reload} />}
+
+      {summaryState.status === 'ready' && hasEdits && !['merged', 'cancelled', 'rejected', 'archived'].includes(branch.status) && (
+        <ChangeImpactPreview modelId={modelId} branch={branch} affectedCapabilities={summaryState.summary.affectedCapabilities} base={`/o/${orgSlug}/m/${modelSlug}`} />
+      )}
 
       <div className={impactHasContent ? styles.layout : styles.layoutSingle}>
         {/* Change information */}

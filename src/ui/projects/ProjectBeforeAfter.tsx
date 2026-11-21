@@ -18,7 +18,8 @@ const OPEN_STATUSES = new Set(['draft', 'proposed', 'in_review', 'approved']);
 
 export interface ProjectBeforeAfterProps {
   modelId: UUID;
-  projectId: UUID;
+  /** Stable identity for the comparison cache: project id on a project, branch id on a change. */
+  comparisonId: UUID;
   /** The live model's head commit; nothing to compare without it. */
   mainHeadCommitId: UUID | null;
   /** The project's changes, any stage; only the open ones with their own commits are compared. */
@@ -32,6 +33,10 @@ export interface ProjectBeforeAfterProps {
   base: string;
   /** Within an accepted decision, without another project-level panel or accordion. */
   embedded?: boolean;
+  /** The project recap and a draft's preview explain different stages. */
+  intro?: string;
+  /** The thing whose affected systems are foregrounded. */
+  scopeLabel?: 'project' | 'draft';
 }
 
 function markLabel(mark: BeforeAfterMark): string | null {
@@ -75,7 +80,7 @@ function SystemList({ systems, base }: { systems: readonly BeforeAfterSystem[]; 
   );
 }
 
-function Column({ column, base, scopeSystemIds }: { column: BeforeAfterColumn; base: string; scopeSystemIds: ReadonlySet<UUID> }) {
+function Column({ column, base, scopeSystemIds, scopeLabel }: { column: BeforeAfterColumn; base: string; scopeSystemIds: ReadonlySet<UUID>; scopeLabel: 'project' | 'draft' }) {
   const { inProject, alsoSupports } = splitBySystemScope(column.systems, scopeSystemIds);
   return (
     <div className={styles.column}>
@@ -89,7 +94,7 @@ function Column({ column, base, scopeSystemIds }: { column: BeforeAfterColumn; b
       )}
       {column.systems.length > 0 && inProject.length === 0 && (
         <Text as="p" size="sm" tone="muted">
-          No system is named in this project yet.
+          No system affected by this {scopeLabel} is shown here.
         </Text>
       )}
       {inProject.length > 0 && <SystemList systems={inProject} base={base} />}
@@ -97,7 +102,7 @@ function Column({ column, base, scopeSystemIds }: { column: BeforeAfterColumn; b
         <details className={styles.also} data-testid="also-supports">
           <summary>
             <Text as="span" size="sm" tone="muted">
-              Also supports this capability, not in this project ({alsoSupports.length})
+              Also supports this capability, outside this {scopeLabel} ({alsoSupports.length})
             </Text>
           </summary>
           <SystemList systems={alsoSupports} base={base} />
@@ -113,12 +118,12 @@ function Column({ column, base, scopeSystemIds }: { column: BeforeAfterColumn; b
  * after each drafted change, with each system's connected apps and
  * integrations. Derived from the commit history on load, nothing stored.
  */
-export function ProjectBeforeAfter({ modelId, projectId, mainHeadCommitId, changes, capabilities, scopeSystemIds, decisions, base, embedded = false }: ProjectBeforeAfterProps) {
+export function ProjectBeforeAfter({ modelId, comparisonId, mainHeadCommitId, changes, capabilities, scopeSystemIds, decisions, base, embedded = false, intro = 'This compares the live model with this chosen option only. It does not combine separate decisions.', scopeLabel = 'project' }: ProjectBeforeAfterProps) {
   const [view, setView] = useState<'list' | 'diagram'>('list');
   const openChanges = changes.filter((c) => OPEN_STATUSES.has(c.status));
   const changeKey = openChanges.map((c) => `${c.id}:${c.head_commit_id}`).join(',');
   const { data, isPending, isError } = useQuery({
-    queryKey: ['projects', 'beforeAfter', projectId, mainHeadCommitId, changeKey],
+    queryKey: ['beforeAfter', modelId, comparisonId, mainHeadCommitId, changeKey, capabilities.map((c) => c.id).join(',')],
     enabled: mainHeadCommitId !== null && capabilities.length > 0,
     queryFn: async () => {
       if (mainHeadCommitId === null) return null;
@@ -129,14 +134,14 @@ export function ProjectBeforeAfter({ modelId, projectId, mainHeadCommitId, chang
 
   if (capabilities.length === 0) return null;
   if (isError) return <Text as="p" size="sm">Could not load this comparison. Open the change to inspect it.</Text>;
-  if (isPending || !data) return <Text as="p" size="sm" tone="muted">Loading the chosen option…</Text>;
+  if (isPending || !data) return <Text as="p" size="sm" tone="muted">Loading comparison…</Text>;
   const shownChangeIds = new Set(data.flatMap((c) => c.after.map((col) => col.changeId)));
   const omitted = openChanges.filter((c) => !shownChangeIds.has(c.id));
 
   const content = (
     <>
       <Text as="p" size="sm" tone="muted">
-        This compares the live model with this chosen option only. It does not combine separate decisions.
+        {intro}
       </Text>
       {!embedded && decisions.length > 0 && (
         <Text as="p" size="sm" tone="muted">
@@ -170,9 +175,9 @@ export function ProjectBeforeAfter({ modelId, projectId, mainHeadCommitId, chang
           </Text>
           {view === 'list' ? (
             <div className={styles.columns}>
-              <Column column={capability.today} base={base} scopeSystemIds={scopeSystemIds} />
+              <Column column={capability.today} base={base} scopeSystemIds={scopeSystemIds} scopeLabel={scopeLabel} />
               {capability.after.map((column) => (
-                <Column key={column.changeId} column={column} base={base} scopeSystemIds={scopeSystemIds} />
+                <Column key={column.changeId} column={column} base={base} scopeSystemIds={scopeSystemIds} scopeLabel={scopeLabel} />
               ))}
             </div>
           ) : (
@@ -193,5 +198,5 @@ export function ProjectBeforeAfter({ modelId, projectId, mainHeadCommitId, chang
     </>
   );
   if (embedded) return <div data-testid="project-before-after">{content}</div>;
-  return <Panel data-testid="project-before-after"><ProjectStep stepKey="before-after" projectId={projectId} title="What this changes, capability by capability" summary={`${String(data.length)} ${data.length === 1 ? 'capability' : 'capabilities'}`} defaultOpen>{content}</ProjectStep></Panel>;
+  return <Panel data-testid="project-before-after"><ProjectStep stepKey="before-after" projectId={comparisonId} title="What this changes, capability by capability" summary={`${String(data.length)} ${data.length === 1 ? 'capability' : 'capabilities'}`} defaultOpen>{content}</ProjectStep></Panel>;
 }

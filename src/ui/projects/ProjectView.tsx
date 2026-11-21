@@ -460,7 +460,7 @@ function ProjectDecision({ decision, options, modelId, projectId, mainHeadCommit
             <Text as="p" size="sm"><strong>Chosen:</strong> {chosen ? <Link to={`${base}/changes/${chosen.id}`}>{chosen.title ?? chosen.name}</Link> : decision.branch_id ? <Link to={`${base}/changes/${decision.branch_id}`}>Open chosen option</Link> : 'Option not recorded'} {chosen && <Chip tone={branchStatusTone(chosen.status)}>{chosen.status === 'merged' ? 'Merged into live model' : `Model change: ${chosen.status.replace('_', ' ')}`}</Chip>}</Text>
             {chosen && mainHeadCommitId !== null && chosen.status !== 'merged' && chosen.status !== 'cancelled' && chosen.status !== 'rejected' && chosen.status !== 'archived' && capabilities.length > 0 && (
               <details className={styles.disclosure} onToggle={(event) => { setCompareOpen(event.currentTarget.open); }}><summary>Compare live model with chosen option</summary>
-                {compareOpen && <ProjectBeforeAfter embedded modelId={modelId} projectId={projectId} mainHeadCommitId={mainHeadCommitId} changes={[chosen]} capabilities={capabilities} scopeSystemIds={scopeSystemIds} decisions={[decision]} base={base} />}
+                {compareOpen && <ProjectBeforeAfter embedded modelId={modelId} comparisonId={projectId} mainHeadCommitId={mainHeadCommitId} changes={[chosen]} capabilities={capabilities} scopeSystemIds={scopeSystemIds} decisions={[decision]} base={base} />}
               </details>
             )}
           </>

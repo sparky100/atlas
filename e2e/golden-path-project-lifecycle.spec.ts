@@ -95,6 +95,18 @@ test('project lifecycle: start from a finding, decide inside it, deliver the cho
   await goToModelHome(page);
   await addSystemFromHome(page, { name: 'Repairs Hub', description: 'Schedules and tracks housing repairs.', capabilityName: 'Housing Repairs' });
 
+  // See the draft's impact before it is delivered, using the same
+  // capability comparison the project will show after choosing.
+  await openProject(page);
+  await page.getByRole('link', { name: 'Build Repairs Hub' }).first().click();
+  const preview = page.getByTestId('change-impact-preview');
+  await expect(preview).toBeVisible();
+  await preview.locator('summary').click();
+  await expect(preview.getByTestId('project-before-after')).toContainText('Housing Repairs');
+  await preview.getByRole('button', { name: 'Diagram' }).click();
+  await expect(preview.getByTestId('project-diagram')).toHaveCount(2);
+  expect(await page.evaluate(() => document.documentElement.scrollWidth > document.documentElement.clientWidth + 1)).toBe(false);
+
   // 5. The project shows the decision accepted, the chosen design open,
   // the other option closed, and what the design touches beyond scope.
   await openProject(page);
