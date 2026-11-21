@@ -536,6 +536,23 @@ export interface DecisionOptionMarkRow {
   created_at: string;
 }
 
+/** D2 PR 4: a question an AI reviewer drafted that a person kept on a decision (`20261121120000_decision_agent_notes.sql`). Insert-only. */
+export interface DecisionAgentNoteRow {
+  id: UUID;
+  decision_id: UUID;
+  branch_id: UUID | null;
+  lens: 'challenge' | 'cyber' | 'data';
+  agent: 'challenger' | 'steward';
+  suggested_question: string;
+  question: string;
+  based_on: 'option' | 'element' | 'none';
+  based_on_label: string | null;
+  input_hash: string;
+  run_id: UUID | null;
+  kept_by: UUID;
+  kept_at: string;
+}
+
 export interface DecisionLinkRow {
   decision_id: UUID;
   linked_type: DecisionLinkedType;

@@ -1,5 +1,5 @@
 import { Loading } from '../components/Loading/Loading';
-import { useQueryClient } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useEffect, useState } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router';
 import { suggestOptions } from './optionSuggestions';
@@ -28,6 +28,7 @@ import { useMembers } from '../orgs/useMembers';
 import { ownerNames } from '../orgs/ownerNames';
 import { reviewerAvailability } from './reviewerAvailability';
 import { SecondOpinion } from './SecondOpinion';
+import { KeptQuestions } from './KeptQuestions';
 import type { AlsoAffectedElement } from './alsoAffected';
 import { DecisionBaselineCard } from './DecisionBaselineCard';
 import { CollapsibleSection } from '../components/CollapsibleSection/CollapsibleSection';
@@ -50,6 +51,7 @@ import { reportError } from '../errors/errorBannerStore';
 import { queryKeys } from '../query/keys';
 import { ProjectAssignment } from '../projects/ProjectAssignment';
 import { supabase } from '../supabaseClient';
+import { listDecisionAgentNotes } from '../../db/decisionAgentNotes';
 import { buildDecisionAdrExportInput, decisionConcernIds } from './decisionAdrInput';
 import { exportDecisionAsAdrMarkdown } from './exportDecisionAsAdr';
 import type { DecisionPageState } from './useDecision';
@@ -114,6 +116,7 @@ export function DecisionView({ modelId, decisionId, orgId, orgSlug, modelSlug, r
   // mean two separate fetches/polling loops for the same table.
   const ratingsState = useDecisionRatings(modelId, decisionId);
   const principlesState = useDecisionPrinciples(modelId, decisionId, userId);
+  const { data: keptNotes } = useQuery({ queryKey: ['decisionAgentNotes', decisionId], queryFn: () => listDecisionAgentNotes(supabase, decisionId) });
   const modelGoals = useModelGoals(modelId);
 
   const [addingOption, setAddingOption] = useState(false);
@@ -231,6 +234,7 @@ export function DecisionView({ modelId, decisionId, orgId, orgSlug, modelSlug, r
         principles: adrPrincipleItems(principlesState.principles, principlesState.links),
         goalsServed: modelGoals ? goalTitlesServedBy(decisionConcernIds(links, linkedElementsById).capabilityIds, modelGoals.goals.filter((g) => g.status === 'active'), modelGoals.links) : [],
         whatChangesRows: comparison.status === 'ready' ? groupWhatChangesRows(comparison.whatChangesRows).visible : [],
+        keptQuestions: keptNotes ?? [],
         ownerName,
       }),
     );
@@ -673,6 +677,14 @@ export function DecisionView({ modelId, decisionId, orgId, orgSlug, modelSlug, r
       )}
 
       <SecondOpinion key={`${decisionId}:${userId ?? ''}`} orgId={orgId} userId={userId} decisionId={decisionId} orgSlug={orgSlug} shareCost={shareCost} availability={secondOpinion} />
+
+      <KeptQuestions
+        decisionId={decisionId}
+        nameOfUser={(id) => {
+          const member = members.find((m) => m.member.user_id === id);
+          return member ? profileLabel(member.profile) : 'a former member';
+        }}
+      />
 
       {decision.status === 'accepted' && chosenBranch !== undefined && (
         <DecisionGoLive

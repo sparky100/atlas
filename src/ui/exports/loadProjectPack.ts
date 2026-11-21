@@ -11,6 +11,7 @@
 import type { UUID } from '../../contracts/delta';
 import { getMainBranch } from '../../db/branches';
 import { loadChangeSummariesForModel } from '../../db/changeSummary';
+import { listDecisionAgentNotes } from '../../db/decisionAgentNotes';
 import { listDecisionRatingsForDecision } from '../../db/decisionRatings';
 import type { DecisionRow } from '../../db/types';
 import { compareDecisionOptions } from '../decisions/compareOptions';
@@ -30,7 +31,7 @@ import { supabase } from '../supabaseClient';
 import type { ProjectPackDecision, ProjectPackInput } from './projectPack';
 
 async function decisionAdr(modelId: UUID, mainHeadCommitId: UUID | null, decision: DecisionRow, nameOfUser: (id: UUID) => string): Promise<ProjectPackDecision> {
-  const [page, ratings, principles, principleLinks] = await Promise.all([loadDecisionPageData(modelId, decision.id), listDecisionRatingsForDecision(supabase, decision.id), listPrinciplesForModel(supabase, modelId), listPrinciplesForDecision(supabase, decision.id)]);
+  const [page, ratings, principles, principleLinks, keptQuestions] = await Promise.all([loadDecisionPageData(modelId, decision.id), listDecisionRatingsForDecision(supabase, decision.id), listPrinciplesForModel(supabase, modelId), listPrinciplesForDecision(supabase, decision.id), listDecisionAgentNotes(supabase, decision.id)]);
   const goals = (await listGoalsForModel(supabase, modelId)).filter((g) => g.status === 'active');
   const goalLinks = await listGoalLinksForGoals(supabase, goals.map((g) => g.id));
   if (page.status !== 'ready') throw new Error(`Couldn't load the decision "${decision.title}".`);
@@ -48,6 +49,7 @@ async function decisionAdr(modelId: UUID, mainHeadCommitId: UUID | null, decisio
       principles: adrPrincipleItems(principles, principleLinks),
       goalsServed: goalTitlesServedBy(capabilityIds, goals, goalLinks),
       whatChangesRows: comparison ? groupWhatChangesRows(comparison.whatChangesRows).visible : [],
+      keptQuestions,
       ownerName: nameOfUser(page.decision.owner_id),
     }),
   );
