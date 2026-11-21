@@ -78,11 +78,8 @@ test('cancel a decision: it stays in the log as cancelled with its reason, its d
   // Cancelled: no longer counted. The project now lists nothing open and can close; its option is closed without merging.
   await expectProposedDecisions(page, 0);
   await openProject(page);
-  // Nothing is open any more, so the Changes step starts collapsed; open it to see the cancelled change.
-  const changesToggle = page.getByRole('button', { name: /^Changes/ });
-  await expect(changesToggle).toHaveAttribute('aria-expanded', 'false');
-  await changesToggle.click();
-  await expect(page.getByRole('region', { name: 'Closed without merging' }).getByRole('link', { name: 'Move to Datasphere' })).toBeVisible();
+  await expect(page.getByText('Cancelled', { exact: true }).first()).toBeVisible();
+  await expect(page.getByRole('link', { name: 'Move to Datasphere' })).toHaveCount(0);
   await page.getByRole('button', { name: 'Close project' }).click();
   await expect(page.getByText('Closed', { exact: true }).first()).toBeVisible();
 

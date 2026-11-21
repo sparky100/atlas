@@ -30,6 +30,8 @@ export interface ProjectBeforeAfterProps {
   /** The project's decisions, so the option columns can name where they come from. */
   decisions: readonly DecisionRow[];
   base: string;
+  /** Within an accepted decision, without another project-level panel or accordion. */
+  embedded?: boolean;
 }
 
 function markLabel(mark: BeforeAfterMark): string | null {
@@ -111,11 +113,11 @@ function Column({ column, base, scopeSystemIds }: { column: BeforeAfterColumn; b
  * after each drafted change, with each system's connected apps and
  * integrations. Derived from the commit history on load, nothing stored.
  */
-export function ProjectBeforeAfter({ modelId, projectId, mainHeadCommitId, changes, capabilities, scopeSystemIds, decisions, base }: ProjectBeforeAfterProps) {
+export function ProjectBeforeAfter({ modelId, projectId, mainHeadCommitId, changes, capabilities, scopeSystemIds, decisions, base, embedded = false }: ProjectBeforeAfterProps) {
   const [view, setView] = useState<'list' | 'diagram'>('list');
   const openChanges = changes.filter((c) => OPEN_STATUSES.has(c.status));
   const changeKey = openChanges.map((c) => `${c.id}:${c.head_commit_id}`).join(',');
-  const { data } = useQuery({
+  const { data, isPending, isError } = useQuery({
     queryKey: ['projects', 'beforeAfter', projectId, mainHeadCommitId, changeKey],
     enabled: mainHeadCommitId !== null && capabilities.length > 0,
     queryFn: async () => {
@@ -125,17 +127,18 @@ export function ProjectBeforeAfter({ modelId, projectId, mainHeadCommitId, chang
     },
   });
 
-  if (capabilities.length === 0 || !data) return null;
+  if (capabilities.length === 0) return null;
+  if (isError) return <Text as="p" size="sm">Could not load this comparison. Open the change to inspect it.</Text>;
+  if (isPending || !data) return <Text as="p" size="sm" tone="muted">Loading the chosen option…</Text>;
   const shownChangeIds = new Set(data.flatMap((c) => c.after.map((col) => col.changeId)));
   const omitted = openChanges.filter((c) => !shownChangeIds.has(c.id));
 
-  return (
-    <Panel data-testid="project-before-after">
-      <ProjectStep stepKey="before-after" projectId={projectId} title="What this changes, capability by capability" summary={`${String(data.length)} ${data.length === 1 ? 'capability' : 'capabilities'}`} defaultOpen>
+  const content = (
+    <>
       <Text as="p" size="sm" tone="muted">
-        For each capability this project serves: what supports it today, and what would support it after each drafted change, with the apps and integrations each system connects to. Read from the model, not stored.
+        This compares the live model with this chosen option only. It does not combine separate decisions.
       </Text>
-      {decisions.length > 0 && (
+      {!embedded && decisions.length > 0 && (
         <Text as="p" size="sm" tone="muted">
           The options come from {decisions.length === 1 ? 'the decision' : 'the decisions'}{' '}
           {decisions.map((d, i) => (
@@ -187,7 +190,8 @@ export function ProjectBeforeAfter({ modelId, projectId, mainHeadCommitId, chang
           )}
         </section>
       ))}
-      </ProjectStep>
-    </Panel>
+    </>
   );
+  if (embedded) return <div data-testid="project-before-after">{content}</div>;
+  return <Panel data-testid="project-before-after"><ProjectStep stepKey="before-after" projectId={projectId} title="What this changes, capability by capability" summary={`${String(data.length)} ${data.length === 1 ? 'capability' : 'capabilities'}`} defaultOpen>{content}</ProjectStep></Panel>;
 }

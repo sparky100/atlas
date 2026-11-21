@@ -40,13 +40,16 @@ test('roadmap grouped by project: the project\'s change lands under the project,
   await page.getByRole('button', { name: 'Start project' }).click();
   await expect(page.getByRole('heading', { name: 'CRM replacement', level: 1 })).toBeVisible();
 
-  await page.getByLabel("What's this change?").fill('sunset-legacy-crm');
-  await page.getByLabel('New change intent').selectOption('record');
-  await page.getByLabel('Delivered date').fill(isoDateDaysFromNow(120));
-  await page.getByRole('button', { name: 'Start change' }).click();
-  // The change page names its project twice (above the title and in the project row), so look at the one above the title.
+  await clickNavItem(page, 'Changes');
+  const newChange = page.locator('form').filter({ has: page.getByLabel("What's this change?") });
+  await newChange.getByLabel("What's this change?").fill('sunset-legacy-crm');
+  await newChange.locator('select').selectOption('record');
+  await newChange.locator('input[type="date"]').fill(isoDateDaysFromNow(120));
+  await newChange.getByRole('button', { name: 'Create change' }).click();
+  await page.getByRole('button', { name: 'Add to project…' }).click();
+  await page.getByRole('combobox', { name: 'Project' }).selectOption({ label: 'CRM replacement' });
+  await page.getByRole('button', { name: 'Save', exact: true }).click();
   await expect(page.getByTestId('change-parents').getByRole('link', { name: 'CRM replacement' })).toBeVisible();
-  // "Start change" opens the new change already selected as the editing ref.
   await expect(page.getByRole('button', { name: 'Editing in this change' })).toBeVisible();
 
   // Inside the change: retire Legacy CRM, replaced by New CRM Platform.
@@ -63,7 +66,7 @@ test('roadmap grouped by project: the project\'s change lands under the project,
   // Submit and merge (record: one approver, from the change's own request page).
   await clickNavItem(page, 'Projects');
   await page.getByRole('link', { name: 'Open CRM replacement' }).click();
-  await page.getByRole('region', { name: 'Chosen design' }).getByRole('link', { name: 'sunset-legacy-crm' }).click();
+  await page.getByRole('region', { name: 'Other project changes' }).getByRole('link', { name: 'sunset-legacy-crm' }).click();
   await page.getByRole('button', { name: 'Submit for review' }).click();
   // The change and its review request each carry a "proposed" chip once submitted.
   await expect(page.getByText('proposed', { exact: true }).first()).toBeVisible({ timeout: 20_000 });

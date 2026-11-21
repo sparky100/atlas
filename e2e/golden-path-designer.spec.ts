@@ -143,7 +143,7 @@ test('from a project: the brief is visible and editable, a failed run keeps it, 
   await page.getByRole('link', { name: 'Start a project →' }).click();
   await page.getByLabel('Architect').selectOption({ index: 1 });
   await page.getByRole('button', { name: 'Start project' }).click();
-  const nextStep = page.getByTestId('project-next-step');
+  const nextStep = page.getByTestId('start-project-decision');
   await expect(nextStep.getByLabel('New decision title')).toBeVisible();
 
   // Agents are off: the form says why instead of going quiet, and the brief box is still there.
@@ -181,13 +181,13 @@ test('from a project: the brief is visible and editable, a failed run keeps it, 
 
   // Interrupted: a refresh does not lose the unsaved suggestions.
   await page.reload();
-  const restore = page.getByTestId('project-next-step').getByTestId('designer-restore');
+  const restore = page.getByTestId('start-project-decision').getByTestId('designer-restore');
   await expect(restore).toContainText('unsaved suggestions from earlier');
   await restore.getByRole('button', { name: 'Restore them' }).click();
-  await expect(page.getByTestId('project-next-step').getByTestId('suggestion-card')).toHaveCount(4);
+  await expect(page.getByTestId('start-project-decision').getByTestId('suggestion-card')).toHaveCount(4);
 
   // Start the decision with what is kept: it opens already holding the options.
-  await page.getByTestId('project-next-step').getByRole('button', { name: /^Start decision with \d+ suggested options?$/ }).click();
+  await page.getByTestId('start-project-decision').getByRole('button', { name: /^Start decision with \d+ suggested options?$/ }).click();
   await expect(page.getByTestId('decision-ai-mark')).toContainText('AI helped with this: Drafted by the Designer on');
   await expect(page.getByRole('link', { name: 'Replace with a repairs product' }).first()).toBeVisible();
   await expect(page.getByTestId('pending-options')).toHaveCount(0);

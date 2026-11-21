@@ -17,7 +17,7 @@ test('My work lists the project, not the decision options inside it', async ({ p
   await page.getByRole('link', { name: 'Start a project →' }).click();
   await page.getByLabel('Architect').selectOption({ index: 1 });
   await page.getByRole('button', { name: 'Start project' }).click();
-  await expect(page.getByTestId('project-next-step')).toBeVisible();
+  await expect(page.getByTestId('start-project-decision')).toBeVisible();
   await page.getByRole('button', { name: 'Start decision' }).click();
   await page.getByRole('button', { name: 'Cancel', exact: true }).click();
   await page.getByRole('button', { name: '+ Add an option' }).click();

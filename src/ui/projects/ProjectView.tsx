@@ -2,15 +2,13 @@ import { addBaseline } from '../decisions/addBaseline';
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router';
 import type { UUID } from '../../contracts/delta';
-import { createChangeBranch } from '../../db/branches';
-import { createDecision, createDecisionLink, listDecisionOptionLinksForModel } from '../../db/decisions';
-import { useQuery } from '@tanstack/react-query';
+import { createDecision, createDecisionLink } from '../../db/decisions';
 import { orderOpenWork } from './openWorkOrder';
 import { createEvidence } from '../../db/evidence';
 import { addProjectLink, removeProjectLink, setProjectStatus, updateProject } from '../../db/projects';
-import type { BranchIntent, BranchRow, DecisionRow, MemberRole, ProjectRow } from '../../db/types';
+import type { BranchRow, DecisionRow, MemberRole, ProjectRow } from '../../db/types';
 import { useMainBranch } from '../branches/useMainBranch';
-import { dateFieldLabelForIntent, INTENT_LABEL, isDateRequiredForIntent, NEW_CHANGE_INTENT_OPTIONS } from '../changes/branchIntent';
+import { INTENT_LABEL } from '../changes/branchIntent';
 import { branchStatusTone } from '../changes/branchStatus';
 import { profileLabel } from '../comments/profileLabel';
 import { Button } from '../components/Button/Button';
@@ -23,17 +21,12 @@ import { projectManagerFromRow, projectManagerToInput, type ProjectManagerValue 
 import { DecisionLinkPicker } from '../decisions/DecisionLinkPicker';
 import { decisionStatusLabel, decisionStatusTone } from '../decisions/decisionStatus';
 import { reportError } from '../errors/errorBannerStore';
-import { canAcceptProject, canCreateChangeBranch, canEditProject, canStartDecision } from '../orgs/roleGates';
+import { canAcceptProject, canEditProject, canStartDecision } from '../orgs/roleGates';
 import { useMembers } from '../orgs/useMembers';
 import { supabase } from '../supabaseClient';
 import {
-  formatProjectProgress,
-  groupChangesByStage,
   isDecisionOverdue,
   openItemsBlockingClose,
-  originatingDecision,
-  projectChangeStageLabel,
-  projectProgress,
   projectStatusLabel,
   projectStatusTone,
   scopeDifference,
@@ -47,7 +40,6 @@ import { loadProjectPack } from '../exports/loadProjectPack';
 import { markdownToPdfBytes } from '../exports/markdownPdf';
 import { buildProjectPackMarkdown, projectPackFilename } from '../exports/projectPack';
 import { downloadBlob, exportDate } from '../exports/viewExport';
-import { projectNextStep } from './projectNextStep';
 import { findingLabel } from '../decisions/findingLabels';
 import { suggestDecisionTitle } from '../decisions/optionSuggestions';
 import { ProjectBeforeAfter } from './ProjectBeforeAfter';
@@ -56,7 +48,7 @@ import { DecisionDraftBanner } from '../decisions/DecisionDraftBanner';
 import { useDecisionFormDraft } from '../decisions/useDecisionFormDraft';
 import { clockNow, pendingKey, savePending } from '../decisions/pendingOptions';
 import { ProjectStep } from './ProjectStep';
-import { changesSummary, decisionsSummary, evidenceSummary, scopeSummary } from './projectStepSummary';
+import { evidenceSummary } from './projectStepSummary';
 import type { ProjectData } from './useProject';
 import { moduleDisplayNameFromMap } from '../elements/moduleDisplayName';
 import styles from './ProjectView.module.css';
@@ -89,7 +81,8 @@ export interface ProjectViewProps {
  * person can do and explains refusals in plain words.
  */
 export function ProjectView({ data, modelName, orgId, modelId, orgSlug, modelSlug, userId, role, today, reload, designerAvailable = false, designerUnavailable = null }: ProjectViewProps) {
-  const { project, decisions, constrainingDecisions, changes, links, evidence, touched, elementsById } = data;
+  const [editingProject, setEditingProject] = useState(false);
+  const { project, decisions, constrainingDecisions, changes, optionLinks, links, evidence, touched, elementsById } = data;
   const { members } = useMembers(orgId);
   const { branch: main } = useMainBranch(modelId);
   const canEdit = canEditProject(role, project, userId);
@@ -112,71 +105,29 @@ export function ProjectView({ data, modelName, orgId, modelId, orgSlug, modelSlu
     return type === 'system' || type === 'container';
   }));
   const difference = scopeDifference(scopeIds, touchedIds, data.reachedIds);
-  const progress = projectProgress(changes, decisions);
-  const firstDecision = originatingDecision(decisions);
   const scopeNamesOfType = (types: readonly string[]) => scopeIds.filter((id) => types.includes(elementsById.get(id)?.element_type ?? '')).map((id) => elementName(id));
   const suggestedTitle = suggestDecisionTitle(scopeNamesOfType(['system', 'container']), scopeNamesOfType(['capability']));
-  const canDecide = canStartDecision(role) && userId !== null;
-  const canDraft = canCreateChangeBranch(role) && userId !== null && Boolean(main?.head_commit_id);
-  const nextStep = projectNextStep({
-    isOpen,
-    purpose: project.purpose,
-    hasCapability: data.scopeHasCapability,
-    decisions,
-    changes,
-    canStartDecision: canDecide,
-    canChoose: role === 'owner' || role === 'architect',
-    canCreateChange: canCreateChangeBranch(role) && userId !== null,
-    canDraftChange: Boolean(main?.head_commit_id),
-  });
-  // The card hosts the form for its step, so the same form is not drawn twice further down.
-  const cardHostsDecisionForm = nextStep?.action.kind === 'start-decision';
-  const cardHostsChangeForm = nextStep?.action.kind === 'start-change';
+  const canDecide = canStartDecision(role);
+  const optionIds = new Set(optionLinks.map((link) => link.branchId));
+  const standaloneChanges = changes.filter((change) => !optionIds.has(change.id));
+  const acceptance = proposalAcceptance({ isApprover: canAcceptProject(role), userId, proposedBy: project.created_by, approvers: members.filter((m) => m.member.role === 'owner' || m.member.role === 'architect').map((m) => ({ userId: m.member.user_id, name: profileLabel(m.profile) })) });
 
   return (
     <div className={styles.page}>
-      <ProjectHeader project={project} ownerName={nameOfUser(project.owner_id)} managerName={project.project_manager_id ? nameOfUser(project.project_manager_id) : project.project_manager_name} progress={progress} proposalHistory={proposalHistoryLines(project, nameOfUser)} />
-
-      <ProjectPackActions data={data} modelId={modelId} modelName={modelName} nameOfUser={nameOfUser} />
-
-      {canEdit && <ProjectEditPanel project={project} members={members.map((m) => ({ id: m.member.user_id, label: profileLabel(m.profile) }))} onSaved={reload} />}
-
-      {canEdit && <ProjectStatusPanel project={project} changes={changes} decisions={decisions} base={base} isProposer={userId !== null && userId === project.created_by} acceptance={proposalAcceptance({ isApprover: canAcceptProject(role), userId, proposedBy: project.created_by, approvers: members.filter((m) => m.member.role === 'owner' || m.member.role === 'architect').map((m) => ({ userId: m.member.user_id, name: profileLabel(m.profile) })) })} onChanged={reload} />}
-
-      {!isOpen && (
-        <Panel>
+      <Panel>
+        <div className={styles.sectionHeading}><Text as="h2" size="lg">Project details</Text>{canEdit && <ProjectEditPanel project={project} members={members.map((m) => ({ id: m.member.user_id, label: profileLabel(m.profile) }))} onSaved={reload} onEditingChange={setEditingProject} />}</div>
+        {!editingProject && <ProjectHeader project={project} ownerName={nameOfUser(project.owner_id)} managerName={project.project_manager_id ? nameOfUser(project.project_manager_id) : project.project_manager_name} proposalHistory={proposalHistoryLines(project, nameOfUser)} />}
+        {!editingProject && canEdit && <ProjectStatusPanel project={project} changes={changes} decisions={decisions} optionLinks={optionLinks} base={base} isProposer={userId !== null && userId === project.created_by} acceptance={acceptance} onChanged={reload} />}
+        {!isOpen && (
           <Text as="p">
             {project.status === 'closed' ? 'Closed' : 'Cancelled'} by {nameOfUser(project.closed_by)} on {project.closed_at?.slice(0, 10) ?? ''}
             {project.close_reason !== null ? ` — ${project.close_reason}` : ''}.
           </Text>
-        </Panel>
-      )}
+        )}
+      </Panel>
 
-      {nextStep !== null && (
-        <Panel data-testid="project-next-step">
-          <Text as="h2" size="lg">
-            What to do next
-          </Text>
-          <Text as="p" size="md">
-            {nextStep.title}
-          </Text>
-          <Text as="p" size="sm" tone="muted">
-            {nextStep.body}
-          </Text>
-          {nextStep.action.kind === 'start-decision' && userId !== null && <NewDecisionForm project={project} userId={userId} scopeIds={scopeIds} suggestedTitle={suggestedTitle} base={base} designerAvailable={designerAvailable} designerUnavailable={designerUnavailable} orgSlug={orgSlug} />}
-          {nextStep.action.kind === 'start-change' && userId !== null && main?.head_commit_id && <NewChangeForm project={project} userId={userId} mainHeadCommitId={main.head_commit_id} base={base} />}
-          {nextStep.action.kind === 'open-decision' && (
-            <Link to={`${base}/decisions/${nextStep.action.id}`}>{nextStep.action.label}</Link>
-          )}
-          {nextStep.action.kind === 'open-change' && <Link to={`${base}/changes/${nextStep.action.id}`}>{nextStep.action.label}</Link>}
-        </Panel>
-      )}
-
-      <ProjectBeforeAfter modelId={modelId} projectId={project.id} mainHeadCommitId={main?.head_commit_id ?? null} changes={changes} capabilities={data.journeyCapabilities.map((c) => ({ id: c.id, name: c.name }))} scopeSystemIds={scopeSystemIds} decisions={decisions} base={base} />
-
-      {(scopeIds.length > 0 || canEdit) && (
-        <Panel>
-          <ProjectStep stepKey="scope" projectId={project.id} title="Declared scope" summary={scopeSummary(scopeIds.length)} defaultOpen>
+      <Panel>
+          <Text as="h2" size="lg">Scope</Text>
           <Text as="p" tone="muted" size="sm">
             The capabilities and systems this project is about.
           </Text>
@@ -213,9 +164,18 @@ export function ProjectView({ data, modelName, orgId, modelId, orgSlug, modelSlu
           )}
           {scopeIds.length > 0 && (
             <ul className={styles.list}>
-              {scopeIds.map((id) => (
+              {scopeIds.map((id) => {
+                const capability = data.journeyCapabilities.find((cap) => cap.id === id);
+                return (
                 <li key={id} className={styles.row}>
-                  <Link to={`${base}/e/${id}`}>{elementName(id)}</Link>
+                  <div>
+                    <Link to={`${base}/e/${id}`}>{elementName(id)}</Link>
+                    {capability && (
+                      <Text as="p" size="sm" tone="muted" className={styles.scopeSupporters}>
+                        {capability.supporters.length ? `Systems recorded today: ${capability.supporters.join(', ')}` : 'No supporting system recorded; investigate what meets this need.'}
+                      </Text>
+                    )}
+                  </div>
                   {canEdit && (
                     <Button
                       variant="ghost"
@@ -230,7 +190,8 @@ export function ProjectView({ data, modelName, orgId, modelId, orgSlug, modelSlu
                     </Button>
                   )}
                 </li>
-              ))}
+                );
+              })}
             </ul>
           )}
           {canEdit && main?.head_commit_id && (
@@ -248,8 +209,11 @@ export function ProjectView({ data, modelName, orgId, modelId, orgSlug, modelSlu
               onRemove={() => undefined}
             />
           )}
-          {(difference.touchedNotDeclared.length > 0 || difference.declaredNotTouched.length > 0) && (
-            <div className={styles.scopeDiff}>
+          {changes.length > 0 && (difference.touchedNotDeclared.length > 0 || difference.declaredNotTouched.length > 0) && (
+            <details className={styles.disclosure}>
+              <summary>Review scope against draft changes</summary>
+              <Text as="p" size="sm" tone="muted">Includes draft options under consideration; these are not approved changes.</Text>
+              <div className={styles.scopeDiff}>
               {difference.touchedNotDeclared.length > 0 && (
                 <div>
                   <Text as="h3" size="md">
@@ -278,23 +242,23 @@ export function ProjectView({ data, modelName, orgId, modelId, orgSlug, modelSlu
                   </ul>
                 </div>
               )}
+              </div>
+            </details>
+          )}
+      </Panel>
+
+      <Panel>
+          <Text as="h2" size="lg">Decisions</Text>
+          <Text as="p" tone="muted" size="sm">Explore options and choose on each decision. A draft is not a chosen design.</Text>
+          {decisions.length > 0 && (
+            <div className={styles.decisionList}>
+              {decisions.map((d) => (
+                <ProjectDecision key={d.id} decision={d} options={changes.filter((c) => optionLinks.some((link) => link.decisionId === d.id && link.branchId === c.id))} modelId={modelId} projectId={project.id} mainHeadCommitId={main?.head_commit_id ?? null} capabilities={data.journeyCapabilities.map((c) => ({ id: c.id, name: c.name }))} scopeSystemIds={scopeSystemIds} base={base} overdue={isDecisionOverdue(d, today)} />
+              ))}
             </div>
           )}
-          </ProjectStep>
-        </Panel>
-      )}
-
-      {(decisions.length > 0 || constrainingDecisions.length > 0 || (isOpen && canStartDecision(role) && userId !== null)) && (
-        <Panel>
-          <ProjectStep stepKey="decisions" projectId={project.id} title="Decision log" summary={decisionsSummary(decisions.map((d) => d.status))} defaultOpen={decisions.length === 0 || decisions.some((d) => d.status === 'proposed')}>
-          {decisions.length > 0 && (
-            <ul className={styles.list}>
-              {decisions.map((d) => (
-                <DecisionLine key={d.id} decision={d} href={`${base}/decisions/${d.id}`} overdue={isDecisionOverdue(d, today)} first={firstDecision?.id === d.id && decisions.length > 1} />
-              ))}
-            </ul>
-          )}
-          {isOpen && canDecide && !cardHostsDecisionForm && <NewDecisionForm project={project} userId={userId} scopeIds={scopeIds} suggestedTitle={suggestedTitle} base={base} designerAvailable={designerAvailable} designerUnavailable={designerUnavailable} orgSlug={orgSlug} />}
+          {decisions.length === 0 && <Text as="p" size="sm">No decisions yet. Start one to explore the options for this project.</Text>}
+          {isOpen && canDecide && userId !== null && <details className={styles.disclosure} open={decisions.length === 0} data-testid="start-project-decision"><summary>Start a decision</summary><NewDecisionForm project={project} userId={userId} scopeIds={scopeIds} suggestedTitle={suggestedTitle} base={base} designerAvailable={designerAvailable} designerUnavailable={designerUnavailable} orgSlug={orgSlug} /></details>}
           {constrainingDecisions.length > 0 && (
             <>
               <Text as="h3" size="md">
@@ -305,34 +269,17 @@ export function ProjectView({ data, modelName, orgId, modelId, orgSlug, modelSlu
               </Text>
               <ul className={styles.list}>
                 {constrainingDecisions.map((d) => (
-                  <DecisionLine key={d.id} decision={d} href={`${base}/decisions/${d.id}`} overdue={false} first={false} />
+                  <li key={d.id} className={styles.row}><Link to={`${base}/decisions/${d.id}`}>{d.title}</Link><Chip tone={decisionStatusTone(d.status)}>{decisionStatusLabel(d.status)}</Chip></li>
                 ))}
               </ul>
             </>
           )}
-          </ProjectStep>
-        </Panel>
-      )}
-
-      {(changes.length > 0 || (isOpen && canCreateChangeBranch(role) && userId !== null && Boolean(main?.head_commit_id))) && (
-        <Panel>
-          <ProjectStep stepKey="changes" projectId={project.id} title="Changes" summary={changesSummary(changes.length)} defaultOpen={changes.length === 0 || changes.some((c) => c.status !== 'merged' && c.status !== 'cancelled')}>
-          {groupChangesByStage(changes).map((group) => (
-            <section key={group.stage} aria-label={projectChangeStageLabel(group.stage)}>
-              <Text as="h3" size="md">
-                {projectChangeStageLabel(group.stage)} ({group.changes.length})
-              </Text>
-              <ul className={styles.list}>
-                {group.changes.map((c) => (
-                  <ChangeLine key={c.id} change={c} href={`${base}/changes/${c.id}`} />
-                ))}
-              </ul>
-            </section>
-          ))}
-          {isOpen && canDraft && main?.head_commit_id && !cardHostsChangeForm && <NewChangeForm project={project} userId={userId} mainHeadCommitId={main.head_commit_id} base={base} />}
-          </ProjectStep>
-        </Panel>
-      )}
+          {standaloneChanges.length > 0 && <section className={styles.standalone} aria-label="Other project changes">
+            <Text as="h3" size="md">Other project changes</Text>
+            <Text as="p" size="sm" tone="muted">Changes recorded directly against this project, outside its decisions.</Text>
+            <ul className={styles.list}>{standaloneChanges.map((c) => <ChangeLine key={c.id} change={c} href={`${base}/changes/${c.id}`} />)}</ul>
+          </section>}
+      </Panel>
 
       {(evidence.length > 0 || (canEdit && userId !== null)) && (
         <Panel>
@@ -370,6 +317,7 @@ export function ProjectView({ data, modelName, orgId, modelId, orgSlug, modelSlu
         <CommentsSection orgId={orgId} modelId={modelId} userId={userId} role={role} anchorType="project" anchorId={project.id} branchId={null} />
         </ProjectStep>
       </Panel>
+      <div className={styles.secondaryActions}><ProjectPackActions data={data} modelId={modelId} modelName={modelName} nameOfUser={nameOfUser} /></div>
     </div>
   );
 }
@@ -413,7 +361,7 @@ function ProjectPackActions({ data, modelId, modelName, nameOfUser }: { data: Pr
   );
 }
 
-function ProjectHeader({ project, ownerName, managerName, progress, proposalHistory }: { project: ProjectRow; ownerName: string; managerName: string | null; progress: ReturnType<typeof projectProgress>; proposalHistory: readonly string[] }) {
+function ProjectHeader({ project, ownerName, managerName, proposalHistory }: { project: ProjectRow; ownerName: string; managerName: string | null; proposalHistory: readonly string[] }) {
   return (
     <div className={styles.header}>
       <div className={styles.meta}>
@@ -435,6 +383,7 @@ function ProjectHeader({ project, ownerName, managerName, progress, proposalHist
           </Text>
         )}
       </div>
+      {project.purpose !== '' && <Text as="p">{project.purpose}</Text>}
       {project.status === 'proposed' && (
         <Text as="p" size="sm">
           This is a proposal. {PROPOSED_PROJECT_EXPLAINER}
@@ -449,7 +398,6 @@ function ProjectHeader({ project, ownerName, managerName, progress, proposalHist
           ))}
         </div>
       )}
-      {project.purpose !== '' && <Text as="p">{project.purpose}</Text>}
       {findingLabel(project.source_finding_key) !== null && (
         <div data-testid="project-source-finding">
 <Text as="p" tone="muted" size="sm">
@@ -457,29 +405,7 @@ function ProjectHeader({ project, ownerName, managerName, progress, proposalHist
         </Text>
 </div>
       )}
-      <Text as="p" tone="muted" size="sm">
-        {formatProjectProgress(progress)}
-      </Text>
     </div>
-  );
-}
-
-function DecisionLine({ decision, href, overdue, first }: { decision: DecisionRow; href: string; overdue: boolean; first: boolean }) {
-  return (
-    <li className={styles.row}>
-      <div>
-        <Link to={href}>{decision.title}</Link>
-        <div className={styles.meta}>
-          <Chip tone={decisionStatusTone(decision.status)}>{decisionStatusLabel(decision.status)}</Chip>
-          {overdue && <Chip tone="warn">Overdue — needed by {decision.needed_by}</Chip>}
-          {first && (
-            <Text as="span" size="xs" tone="faint">
-              First decision
-            </Text>
-          )}
-        </div>
-      </div>
-    </li>
   );
 }
 
@@ -504,6 +430,45 @@ function ChangeLine({ change, href }: { change: BranchRow; href: string }) {
       </div>
     </li>
   );
+}
+
+function ProjectDecision({ decision, options, modelId, projectId, mainHeadCommitId, capabilities, scopeSystemIds, base, overdue }: {
+  decision: DecisionRow; options: BranchRow[]; modelId: UUID; projectId: UUID; mainHeadCommitId: UUID | null;
+  capabilities: { id: UUID; name: string }[]; scopeSystemIds: ReadonlySet<UUID>; base: string; overdue: boolean;
+}) {
+  const [compareOpen, setCompareOpen] = useState(false);
+  const chosen = options.find((option) => option.id === decision.branch_id);
+  const isBaseline = decision.branch_id !== null && decision.branch_id === decision.baseline_branch_id;
+  const alternatives = options.filter((option) => option.id !== decision.baseline_branch_id);
+  const decisionHref = `${base}/decisions/${decision.id}`;
+  return <article className={styles.decisionCard}>
+    <div className={styles.decisionTop}>
+      <div>
+        <Text as="h3" size="md"><Link to={decisionHref}>{decision.title}</Link></Text>
+        <div className={styles.meta}>
+          <Chip tone={decisionStatusTone(decision.status)}>{decision.status === 'proposed' ? 'Exploring options' : decision.status === 'accepted' ? 'Option chosen' : decisionStatusLabel(decision.status)}</Chip>
+          {overdue && <Chip tone="warn">Overdue — needed by {decision.needed_by}</Chip>}
+        </div>
+      </div>
+      <Link to={decisionHref}>{decision.status === 'proposed' ? 'Explore and choose options →' : 'Open decision →'}</Link>
+    </div>
+    {decision.status === 'proposed' && <Text as="p" size="sm" tone="muted">{alternatives.length} {alternatives.length === 1 ? 'draft option' : 'draft options'} to consider. None is chosen yet.</Text>}
+    {decision.status === 'accepted' && (
+      <div className={styles.chosen}>
+        {isBaseline ? <Text as="p" size="sm"><strong>Chosen:</strong> Stay as we are. No model change is planned for this decision.</Text> : (
+          <>
+            <Text as="p" size="sm"><strong>Chosen:</strong> {chosen ? <Link to={`${base}/changes/${chosen.id}`}>{chosen.title ?? chosen.name}</Link> : decision.branch_id ? <Link to={`${base}/changes/${decision.branch_id}`}>Open chosen option</Link> : 'Option not recorded'} {chosen && <Chip tone={branchStatusTone(chosen.status)}>{chosen.status === 'merged' ? 'Merged into live model' : `Model change: ${chosen.status.replace('_', ' ')}`}</Chip>}</Text>
+            {chosen && mainHeadCommitId !== null && chosen.status !== 'merged' && chosen.status !== 'cancelled' && chosen.status !== 'rejected' && chosen.status !== 'archived' && capabilities.length > 0 && (
+              <details className={styles.disclosure} onToggle={(event) => { setCompareOpen(event.currentTarget.open); }}><summary>Compare live model with chosen option</summary>
+                {compareOpen && <ProjectBeforeAfter embedded modelId={modelId} projectId={projectId} mainHeadCommitId={mainHeadCommitId} changes={[chosen]} capabilities={capabilities} scopeSystemIds={scopeSystemIds} decisions={[decision]} base={base} />}
+              </details>
+            )}
+          </>
+        )}
+        {alternatives.length > (isBaseline ? 0 : 1) && <Text as="p" size="xs" tone="muted">Other options remain on the decision page; they are not the chosen design.</Text>}
+      </div>
+    )}
+  </article>;
 }
 
 /**
@@ -631,88 +596,6 @@ function NewDecisionForm({
   );
 }
 
-/** Step 4: "New change" from the project page — created inside the project (`branches.project_id`). */
-function NewChangeForm({ project, userId, mainHeadCommitId, base }: { project: ProjectRow; userId: UUID; mainHeadCommitId: UUID; base: string }) {
-  const navigate = useNavigate();
-  const [title, setTitle] = useState('');
-  const [intent, setIntent] = useState<BranchIntent>('propose');
-  const [targetDate, setTargetDate] = useState('');
-  const dateLabel = dateFieldLabelForIntent(intent);
-  const dateMissing = isDateRequiredForIntent(intent) && targetDate === '';
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  return (
-    <form
-      className={styles.inlineForm}
-      onSubmit={(e) => {
-        e.preventDefault();
-        if (title.trim().length === 0 || dateMissing) return;
-        setBusy(true);
-        setError(null);
-        void createChangeBranch(supabase, {
-          id: crypto.randomUUID(),
-          orgId: project.org_id,
-          modelId: project.model_id,
-          title: title.trim(),
-          createdBy: userId,
-          mainHeadCommitId,
-          intent,
-          ...(dateLabel !== null && targetDate !== '' ? { targetDate } : {}),
-          projectId: project.id,
-        })
-          .then((b) => navigate(`${base}/changes/${b.id}?ref=branch:${b.id}`))
-          .catch((err: unknown) => {
-            setError('Could not start this change.');
-            reportError('Could not start this change.', err);
-          })
-          .finally(() => {
-            setBusy(false);
-          });
-      }}
-    >
-      <input
-        className={styles.input}
-        type="text"
-        aria-label="What's this change?"
-        placeholder="What's this change? (e.g. CRM cutover)"
-        value={title}
-        onChange={(e) => {
-          setTitle(e.target.value);
-        }}
-      />
-      <select
-        className={styles.input}
-        aria-label="New change intent"
-        value={intent}
-        onChange={(e) => {
-          setIntent(e.target.value as BranchIntent);
-        }}
-      >
-        {NEW_CHANGE_INTENT_OPTIONS.map((o) => (
-          <option key={o.value} value={o.value}>
-            {o.label}
-          </option>
-        ))}
-      </select>
-      {dateLabel !== null && (
-        <input
-          className={styles.input}
-          type="date"
-          aria-label={dateLabel}
-          value={targetDate}
-          onChange={(e) => {
-            setTargetDate(e.target.value);
-          }}
-        />
-      )}
-      <Button type="submit" disabled={busy || title.trim().length === 0 || dateMissing}>
-        {busy ? 'Starting…' : 'Start change'}
-      </Button>
-      {error !== null && <Text as="p">{error}</Text>}
-    </form>
-  );
-}
-
 /** Step 5: the first authoring path for `evidence` — a link or document reference, attached to the project. */
 function EvidenceForm({ project, userId, onAdded }: { project: ProjectRow; userId: UUID; onAdded: () => void }) {
   const [kind, setKind] = useState<'link' | 'document'>('link');
@@ -789,7 +672,7 @@ function EvidenceForm({ project, userId, onAdded }: { project: ProjectRow; userI
 }
 
 /** §4: edit the project's own fields — its creator or owner, or an org owner/architect, while open. */
-function ProjectEditPanel({ project, members, onSaved }: { project: ProjectRow; members: { id: UUID; label: string }[]; onSaved: () => void }) {
+function ProjectEditPanel({ project, members, onSaved, onEditingChange }: { project: ProjectRow; members: { id: UUID; label: string }[]; onSaved: () => void; onEditingChange: (editing: boolean) => void }) {
   const [editing, setEditing] = useState(false);
   const [title, setTitle] = useState(project.title);
   const [purpose, setPurpose] = useState(project.purpose);
@@ -804,6 +687,7 @@ function ProjectEditPanel({ project, members, onSaved }: { project: ProjectRow; 
         <Button
           onClick={() => {
             setEditing(true);
+            onEditingChange(true);
           }}
         >
           ✎ Edit project
@@ -812,7 +696,7 @@ function ProjectEditPanel({ project, members, onSaved }: { project: ProjectRow; 
     );
   }
   return (
-    <Panel>
+    <div className={styles.editPanel}>
       <form
         className={styles.inlineForm}
         onSubmit={(e) => {
@@ -828,6 +712,7 @@ function ProjectEditPanel({ project, members, onSaved }: { project: ProjectRow; 
           void updateProject(supabase, project.id, { title: title.trim(), purpose: purpose.trim(), ownerId, ...projectManagerToInput(manager), startDate: startDate === '' ? null : startDate, targetDate: targetDate === '' ? null : targetDate }).then(
             () => {
               setEditing(false);
+              onEditingChange(false);
               onSaved();
             },
             (err: unknown) => {
@@ -856,6 +741,7 @@ function ProjectEditPanel({ project, members, onSaved }: { project: ProjectRow; 
           <Button
             onClick={() => {
               setEditing(false);
+              onEditingChange(false);
             }}
           >
             Cancel
@@ -863,7 +749,7 @@ function ProjectEditPanel({ project, members, onSaved }: { project: ProjectRow; 
         </div>
         {error !== null && <Text as="p">{error}</Text>}
       </form>
-    </Panel>
+    </div>
   );
 }
 
@@ -873,14 +759,13 @@ function ProjectEditPanel({ project, members, onSaved }: { project: ProjectRow; 
  * each linking to its own page where its own existing action ends it — the
  * project never cancels anything itself.
  */
-function ProjectStatusPanel({ project, changes, decisions, base, acceptance, isProposer, onChanged }: { project: ProjectRow; changes: BranchRow[]; decisions: DecisionRow[]; base: string; isProposer: boolean; acceptance: ProposalAcceptance; onChanged: () => void }) {
+function ProjectStatusPanel({ project, changes, decisions, optionLinks, base, acceptance, isProposer, onChanged }: { project: ProjectRow; changes: BranchRow[]; decisions: DecisionRow[]; optionLinks: ProjectData['optionLinks']; base: string; isProposer: boolean; acceptance: ProposalAcceptance; onChanged: () => void }) {
   const [reason, setReason] = useState('');
   const [mode, setMode] = useState<'idle' | 'cancelling'>('idle');
   const [error, setError] = useState<string | null>(null);
   const open = openItemsBlockingClose(changes, decisions);
   const blocked = open.changes.length > 0 || open.decisions.length > 0;
-  const links = useQuery({ queryKey: ['projectOptionLinks', project.model_id], enabled: blocked, queryFn: () => listDecisionOptionLinksForModel(supabase, project.model_id) });
-  const ordered = orderOpenWork(open.decisions, open.changes, links.data ?? []);
+  const ordered = orderOpenWork(open.decisions, open.changes, optionLinks);
   // Whoever drafted a proposal withdraws it (cancel); someone else turning it down declines it. Both record the same status and reason.
   const withdrawing = project.status === 'proposed' && isProposer;
   const proposalVerb = withdrawing ? 'Cancel' : 'Decline';
@@ -905,10 +790,7 @@ function ProjectStatusPanel({ project, changes, decisions, base, acceptance, isP
   };
 
   return (
-    <Panel>
-      <Text as="h2" size="lg">
-        Status
-      </Text>
+    <div className={styles.projectActions}>
       <div className={styles.meta}>
         {project.status === 'proposed' && acceptance.canAccept && (
           <Button
@@ -991,7 +873,8 @@ function ProjectStatusPanel({ project, changes, decisions, base, acceptance, isP
         </form>
       )}
       {blocked && (
-        <div>
+        <details className={styles.disclosure}>
+          <summary>Why can’t this project close?</summary>
           <Text as="p" size="sm">
             To close or cancel this project, first finish or cancel what is still open in it:
           </Text>
@@ -1016,9 +899,9 @@ function ProjectStatusPanel({ project, changes, decisions, base, acceptance, isP
               </li>
             ))}
           </ul>
-        </div>
+        </details>
       )}
       {error !== null && <Text as="p">{error}</Text>}
-    </Panel>
+    </div>
   );
 }
