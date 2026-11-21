@@ -28,4 +28,13 @@ describe('parseDesignerOptions', () => {
     expect(parseDesignerOptions(JSON.stringify({ options: many })).options).toHaveLength(6);
     expect(parseDesignerOptions(JSON.stringify({ options: [many[0]] })).problems.length).toBeGreaterThan(0);
   });
+  it('keeps well-formed catalogue refs, drops malformed ones, dedupes and caps at two', () => {
+    const ref = { sector: 'electricity_network', version: 2, entryCode: 'crm-x' };
+    const r = parseDesignerOptions(JSON.stringify({
+      options: [{ title: 'Replace', summary: 'Buy one.', catalogueRefs: [ref, ref, { sector: 'electricity_network', version: 2, entryCode: 'other' }, { sector: '', version: 0, entryCode: 'x' }, { sector: 'electricity_network', version: 2, entryCode: 'third' }] }],
+      gaps: [], stayNote: '',
+    }));
+    expect(r.options[0]?.catalogueRefs).toEqual([ref, { sector: 'electricity_network', version: 2, entryCode: 'other' }]);
+    expect(parseDesignerOptions(JSON.stringify({ options: [{ title: 'Keep', summary: 'As is.' }] })).options[0]?.catalogueRefs).toEqual([]);
+  });
 });

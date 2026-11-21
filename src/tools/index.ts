@@ -4,6 +4,7 @@
  * comes back as an error result the assistant can read, never as a throw.
  */
 import { findElements } from './findElements';
+import { findCatalogueProducts } from './findCatalogueProducts';
 import { getElement } from './getElement';
 import { listHealthFindings } from './healthFindings';
 import { listRelationships } from './listRelationships';
@@ -13,7 +14,7 @@ import { searchElements } from './searchElements';
 import { changeImpact, listChanges, listDecisions, listGoals, listPrinciples, listProjects } from './workRecords';
 import type { ModelTool, ToolContext, ToolResult } from './types';
 
-export const MODEL_TOOLS: readonly ModelTool[] = [searchElements, getElement, listRelationships, findElements, listSavedReports, runSavedReport, listHealthFindings, portfolioSignals, listChanges, changeImpact, listDecisions, listProjects, listGoals, listPrinciples];
+export const MODEL_TOOLS: readonly ModelTool[] = [searchElements, getElement, listRelationships, findElements, findCatalogueProducts, listSavedReports, runSavedReport, listHealthFindings, portfolioSignals, listChanges, changeImpact, listDecisions, listProjects, listGoals, listPrinciples];
 
 export function callTool(ctx: ToolContext, name: string, input: unknown): Promise<ToolResult> {
   const tool = MODEL_TOOLS.find((t) => t.name === name);

@@ -3,8 +3,8 @@ import type { AskModelClient, AskModelRequest } from './askLoop';
 import { handleDesign, parseDesignBody } from './designHandler';
 import type { DesignHandlerDeps } from './designHandler';
 import { designerBrief, designerSystemPrompt } from './designPrompt';
-import { estateContext, uid } from './fixtures/estateSnapshot';
-import type { RunCostSharing } from './types';
+import { estateContext, estateSnapshot, element, uid } from './fixtures/estateSnapshot';
+import type { RunCostSharing, ToolContext } from './types';
 
 const MODEL = { id: uid(5000), orgId: uid(6000), name: 'Estate' };
 const ELEMENT = uid(70);
@@ -128,6 +128,33 @@ describe('handleDesign', () => {
 
   it('says so when the model has no committed content yet', async () => {
     expect((await handleDesign(deps({ mainCommit: () => Promise.resolve(null) }), body)).status).toBe('empty_model');
+  });
+
+  it('keeps a catalogue reference only when the Designer actually read that product, and says when one was left out', async () => {
+    const ctx: ToolContext = {
+      ...estateContext({ snapshot: estateSnapshot({ elements: [element(70, 'capability', 'Complaints', { templateRef: uid(700) })] }) }),
+      catalogueForCapability: () => Promise.resolve({
+        sector: 'electricity_network', capabilityCode: '5.4', capabilityName: 'Complaints', catalogueVersion: 2,
+        entries: [{ id: 'e1', code: 'crm-x', product: 'CRM X', vendor: 'Vendor Ltd', summary: 'A CRM.', howItSupports: 'Records complaints.', claims: [] }],
+      }),
+    };
+    const answer = JSON.stringify({ options: [{ title: 'Replace', summary: 'Buy a CRM.', catalogueRefs: [{ sector: 'electricity_network', version: 2, entryCode: 'crm-x' }] }, { title: 'Build', summary: 'Build it.', catalogueRefs: [{ sector: 'electricity_network', version: 2, entryCode: 'not-returned' }] }], gaps: [], stayNote: '' });
+    let round = 0;
+    const d = deps({
+      createContext: () => ctx,
+      createClient: () => ({ complete: () => {
+        round += 1;
+        return Promise.resolve(round === 1
+          ? { text: '', stopReason: 'tool_use', toolCalls: [{ id: 't1', name: 'find_catalogue_products', input: { capability_element_id: uid(70) } }], inputTokens: 1, outputTokens: 1 }
+          : { text: answer, stopReason: 'end_turn', inputTokens: 1, outputTokens: 1 });
+      } }),
+    });
+    const outcome = await handleDesign(d, body);
+    expect(outcome.status).toBe('done');
+    if (outcome.status !== 'done') return;
+    expect(outcome.design.options[0]?.catalogueRefs).toEqual([{ sector: 'electricity_network', version: 2, entryCode: 'crm-x' }]);
+    expect(outcome.design.options[1]?.catalogueRefs).toEqual([]);
+    expect(outcome.design.problems.join(' ')).toContain('did not read');
   });
 });
 

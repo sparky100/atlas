@@ -11,6 +11,16 @@ import type { OpenDecisionElementLink } from '../db/decisions';
 import type { GoalCapabilityRow, GoalRow } from '../contracts/goals';
 import type { DecisionPrincipleRow, PrincipleRow } from '../contracts/principles';
 import type { BranchRow, DecisionRow, ProjectRow, SavedReportRow } from '../db/types';
+import type { CatalogueEntry } from '../db/productCatalogue';
+
+/** Current published catalogue products for one capability, with the catalogue version they came from. */
+export interface CapabilityCatalogue {
+  sector: string;
+  capabilityCode: string;
+  capabilityName: string;
+  catalogueVersion: number;
+  entries: readonly CatalogueEntry[];
+}
 
 /** Everything the tools need from the model, read once per question. Plain arrays, so a test can build one by hand. */
 export interface ModelSnapshot {
@@ -60,6 +70,8 @@ export interface ToolContext {
   principleLinks: () => Promise<readonly DecisionPrincipleRow[]>;
   /** What one change touches and who it affects, read from its own work against main; `null` when it has made no work yet or does not exist. */
   changeImpact: (change: BranchRow) => Promise<ChangeSummary | null>;
+  /** Current published catalogue products for a capability's starter-map item. Absent where the catalogue is not available to this caller. */
+  catalogueForCapability?: (templateRef: string) => Promise<CapabilityCatalogue | null>;
   /** The clock, passed in so findings that depend on today's date are testable (rule 6). */
   now: () => Date;
 }
