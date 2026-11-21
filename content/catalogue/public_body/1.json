@@ -1,0 +1,165 @@
+{
+  "sector": "public_body",
+  "version": 1,
+  "capabilityMapVersion": 2,
+  "status": "draft",
+  "title": "Public Body (Generic) product catalogue, version 1",
+  "sourceDescription": "Selected product evidence from current vendor pages, checked on 21 November 2026. Claims state what the vendor describes, not proven suitability for an organisation. Editorial review is pending. Coverage spans the sector’s main capability areas but is not exhaustive; a missing product is not evidence that no product exists.",
+  "licence": "CC-BY-4.0",
+  "entries": [
+    {
+      "code": "granicus-engagementhq",
+      "product": "Granicus EngagementHQ",
+      "vendor": "Granicus",
+      "summary": "A digital consultation and community engagement platform.",
+      "capabilities": [
+        {
+          "code": "10.4",
+          "name": "Public Consultation",
+          "howItSupports": "Collects and organises responses to public consultations"
+        }
+      ],
+      "claims": [
+        {
+          "position": 1,
+          "kind": "functional",
+          "statement": "The vendor describes Granicus EngagementHQ as a digital consultation and community engagement platform.",
+          "sourceUrl": "https://granicus.com/uk/product/engagementhq/",
+          "sourceDate": "2026-11-21",
+          "reviewedBy": "Pending review",
+          "reviewedAt": "2026-11-21"
+        }
+      ]
+    },
+    {
+      "code": "delib-citizen-space",
+      "product": "Delib Citizen Space",
+      "vendor": "Delib",
+      "summary": "A public consultation and engagement platform for government.",
+      "capabilities": [
+        {
+          "code": "10.4",
+          "name": "Public Consultation",
+          "howItSupports": "Runs public consultations and gathers stakeholder responses"
+        },
+        {
+          "code": "9.1",
+          "name": "Evidence & Research",
+          "howItSupports": "Collects consultation evidence to inform policy work"
+        }
+      ],
+      "claims": [
+        {
+          "position": 1,
+          "kind": "functional",
+          "statement": "The vendor describes Delib Citizen Space as a public consultation and engagement platform for government.",
+          "sourceUrl": "https://www.delib.net/citizen-space",
+          "sourceDate": "2026-11-21",
+          "reviewedBy": "Pending review",
+          "reviewedAt": "2026-11-21"
+        }
+      ]
+    },
+    {
+      "code": "granicus-govdelivery",
+      "product": "Granicus govDelivery",
+      "vendor": "Granicus",
+      "summary": "A government communications platform for email, SMS and campaigns.",
+      "capabilities": [
+        {
+          "code": "10.1",
+          "name": "Media & Public Affairs",
+          "howItSupports": "Sends public communications through managed channels"
+        }
+      ],
+      "claims": [
+        {
+          "position": 1,
+          "kind": "functional",
+          "statement": "The vendor describes Granicus govDelivery as a government communications platform for email, SMS and campaigns.",
+          "sourceUrl": "https://granicus.com/uk/product/govdelivery/",
+          "sourceDate": "2026-11-21",
+          "reviewedBy": "Pending review",
+          "reviewedAt": "2026-11-21"
+        }
+      ]
+    },
+    {
+      "code": "granicus-govservice",
+      "product": "Granicus govService",
+      "vendor": "Granicus",
+      "summary": "Online forms, workflows and case management for government service requests.",
+      "capabilities": [
+        {
+          "code": "5",
+          "name": "Customer Contact",
+          "howItSupports": "Receives and routes requests from members of the public"
+        }
+      ],
+      "claims": [
+        {
+          "position": 1,
+          "kind": "functional",
+          "statement": "The vendor describes Granicus govService as online forms, workflows and case management for government service requests.",
+          "sourceUrl": "https://granicus.com/uk/product/govservice/",
+          "sourceDate": "2026-11-21",
+          "reviewedBy": "Pending review",
+          "reviewedAt": "2026-11-21"
+        }
+      ]
+    },
+    {
+      "code": "flexigrant",
+      "product": "Flexigrant",
+      "vendor": "Fluent Technology",
+      "summary": "A grant management platform for applications, assessment, awards and monitoring.",
+      "capabilities": [
+        {
+          "code": "11.2",
+          "name": "Application Assessment & Award",
+          "howItSupports": "Runs application assessment and award workflows"
+        },
+        {
+          "code": "11.3",
+          "name": "Grant Monitoring & Assurance",
+          "howItSupports": "Tracks awarded grants and monitoring information"
+        }
+      ],
+      "claims": [
+        {
+          "position": 1,
+          "kind": "functional",
+          "statement": "The vendor describes Flexigrant as a grant management platform for applications, assessment, awards and monitoring.",
+          "sourceUrl": "https://flexigrant.com/",
+          "sourceDate": "2026-11-21",
+          "reviewedBy": "Pending review",
+          "reviewedAt": "2026-11-21"
+        }
+      ]
+    },
+    {
+      "code": "smartsimple-cloud",
+      "product": "SmartSimple Cloud",
+      "vendor": "SmartSimple Software",
+      "summary": "A grant management platform for funders.",
+      "capabilities": [
+        {
+          "code": "11.2",
+          "name": "Application Assessment & Award",
+          "howItSupports": "Supports grant application and decision workflows"
+        }
+      ],
+      "claims": [
+        {
+          "position": 1,
+          "kind": "functional",
+          "statement": "The vendor describes SmartSimple Cloud as a grant management platform for funders.",
+          "sourceUrl": "https://www.smartsimple.com/",
+          "sourceDate": "2026-11-21",
+          "reviewedBy": "Pending review",
+          "reviewedAt": "2026-11-21"
+        }
+      ]
+    }
+  ]
+}

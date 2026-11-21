@@ -1,0 +1,194 @@
+{
+  "sector": "water_wastewater",
+  "version": 1,
+  "capabilityMapVersion": 1,
+  "status": "draft",
+  "title": "Water & Wastewater Company product catalogue, version 1",
+  "sourceDescription": "Selected product evidence from current vendor pages, checked on 21 November 2026. Claims state what the vendor describes, not proven suitability for an organisation. Editorial review is pending. Coverage spans the sector’s main capability areas but is not exhaustive; a missing product is not evidence that no product exists.",
+  "licence": "CC-BY-4.0",
+  "entries": [
+    {
+      "code": "xylem-vue",
+      "product": "Xylem Vue",
+      "vendor": "Xylem",
+      "summary": "A digital water platform for operational analysis.",
+      "capabilities": [
+        {
+          "code": "10.2",
+          "name": "Leakage Detection & Control",
+          "howItSupports": "Uses network information to identify potential leakage"
+        },
+        {
+          "code": "9.4",
+          "name": "Water Quality Monitoring & Compliance",
+          "howItSupports": "Provides water quality information for operations"
+        }
+      ],
+      "claims": [
+        {
+          "position": 1,
+          "kind": "functional",
+          "statement": "The vendor describes Xylem Vue as a digital water platform for operational analysis.",
+          "sourceUrl": "https://www.xylem.com/en-uk/catalog/products--services/digital-water/xylem-vue/",
+          "sourceDate": "2026-11-21",
+          "reviewedBy": "Pending review",
+          "reviewedAt": "2026-11-21"
+        }
+      ]
+    },
+    {
+      "code": "openflows-water",
+      "product": "OpenFlows Water",
+      "vendor": "Bentley Systems",
+      "summary": "Hydraulic modelling software for water distribution systems.",
+      "capabilities": [
+        {
+          "code": "10.1",
+          "name": "Network Modelling & Hydraulics",
+          "howItSupports": "Models and analyses water distribution hydraulics"
+        }
+      ],
+      "claims": [
+        {
+          "position": 1,
+          "kind": "functional",
+          "statement": "The vendor describes OpenFlows Water as hydraulic modelling software for water distribution systems.",
+          "sourceUrl": "https://www.bentley.com/products/openflows-water",
+          "sourceDate": "2026-11-21",
+          "reviewedBy": "Pending review",
+          "reviewedAt": "2026-11-21"
+        }
+      ]
+    },
+    {
+      "code": "infoworks-icm",
+      "product": "InfoWorks ICM",
+      "vendor": "Autodesk",
+      "summary": "Integrated catchment modelling software for drainage networks.",
+      "capabilities": [
+        {
+          "code": "11.1",
+          "name": "Sewer Network Operations",
+          "howItSupports": "Models sewer and drainage network behaviour"
+        },
+        {
+          "code": "11.3",
+          "name": "Storm Overflow & Pollution Management",
+          "howItSupports": "Models overflow and flooding scenarios"
+        }
+      ],
+      "claims": [
+        {
+          "position": 1,
+          "kind": "functional",
+          "statement": "The vendor describes InfoWorks ICM as integrated catchment modelling software for drainage networks.",
+          "sourceUrl": "https://www.autodesk.com/products/infoworks-icm/overview",
+          "sourceDate": "2026-11-21",
+          "reviewedBy": "Pending review",
+          "reviewedAt": "2026-11-21"
+        }
+      ]
+    },
+    {
+      "code": "simatic-pcs-neo",
+      "product": "SIMATIC PCS neo",
+      "vendor": "Siemens",
+      "summary": "Process control software used in water operations.",
+      "capabilities": [
+        {
+          "code": "9.3",
+          "name": "Water Treatment Operations",
+          "howItSupports": "Monitors and controls water treatment processes"
+        }
+      ],
+      "claims": [
+        {
+          "position": 1,
+          "kind": "functional",
+          "statement": "The vendor describes SIMATIC PCS neo as process control software used in water operations.",
+          "sourceUrl": "https://www.siemens.com/en-gb/industries/water/simatic-pcs-neo-water/",
+          "sourceDate": "2026-11-21",
+          "reviewedBy": "Pending review",
+          "reviewedAt": "2026-11-21"
+        }
+      ]
+    },
+    {
+      "code": "arcgis-utility-network",
+      "product": "ArcGIS Utility Network",
+      "vendor": "Esri",
+      "summary": "Network information management and analysis software for utilities.",
+      "capabilities": [
+        {
+          "code": "10.1",
+          "name": "Network Modelling & Hydraulics",
+          "howItSupports": "Models clean water network assets and connectivity"
+        }
+      ],
+      "claims": [
+        {
+          "position": 1,
+          "kind": "functional",
+          "statement": "The vendor describes ArcGIS Utility Network as network information management and analysis software for utilities.",
+          "sourceUrl": "https://www.esri.com/en-us/arcgis/products/arcgis-utility-network/overview",
+          "sourceDate": "2026-11-21",
+          "reviewedBy": "Pending review",
+          "reviewedAt": "2026-11-21"
+        }
+      ]
+    },
+    {
+      "code": "oracle-utilities-customer-cloud-service",
+      "product": "Oracle Utilities Customer Cloud Service",
+      "vendor": "Oracle",
+      "summary": "Customer information and service software for utilities.",
+      "capabilities": [
+        {
+          "code": "12.1",
+          "name": "Customer Contact & Self-Service",
+          "howItSupports": "Supports customer contact and service workflows"
+        },
+        {
+          "code": "12.3",
+          "name": "Billing & Collections",
+          "howItSupports": "Supports water customer billing"
+        }
+      ],
+      "claims": [
+        {
+          "position": 1,
+          "kind": "functional",
+          "statement": "The vendor describes Oracle Utilities Customer Cloud Service as customer information and service software for utilities.",
+          "sourceUrl": "https://docs.oracle.com/en/industries/utilities/customer-cloud-service/index.html",
+          "sourceDate": "2026-11-21",
+          "reviewedBy": "Pending review",
+          "reviewedAt": "2026-11-21"
+        }
+      ]
+    },
+    {
+      "code": "ifs-copperleaf",
+      "product": "IFS Copperleaf",
+      "vendor": "IFS",
+      "summary": "Asset investment planning software for utilities.",
+      "capabilities": [
+        {
+          "code": "13.4",
+          "name": "Asset Management Plan & Investment",
+          "howItSupports": "Supports asset investment planning and prioritisation"
+        }
+      ],
+      "claims": [
+        {
+          "position": 1,
+          "kind": "functional",
+          "statement": "The vendor describes IFS Copperleaf as asset investment planning software for utilities.",
+          "sourceUrl": "https://www.copperleaf.com/industries-we-serve/water-and-wastewater-utilities/",
+          "sourceDate": "2026-11-21",
+          "reviewedBy": "Pending review",
+          "reviewedAt": "2026-11-21"
+        }
+      ]
+    }
+  ]
+}

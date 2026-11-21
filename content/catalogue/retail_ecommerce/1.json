@@ -1,0 +1,194 @@
+{
+  "sector": "retail_ecommerce",
+  "version": 1,
+  "capabilityMapVersion": 1,
+  "status": "draft",
+  "title": "Retail & E-commerce product catalogue, version 1",
+  "sourceDescription": "Selected product evidence from current vendor pages, checked on 21 November 2026. Claims state what the vendor describes, not proven suitability for an organisation. Editorial review is pending. Coverage spans the sector’s main capability areas but is not exhaustive; a missing product is not evidence that no product exists.",
+  "licence": "CC-BY-4.0",
+  "entries": [
+    {
+      "code": "shopify-plus",
+      "product": "Shopify Plus",
+      "vendor": "Shopify",
+      "summary": "An enterprise commerce platform for online selling.",
+      "capabilities": [
+        {
+          "code": "12.1",
+          "name": "Website & App Experience",
+          "howItSupports": "Runs online storefront experiences"
+        },
+        {
+          "code": "12.2",
+          "name": "Online Basket & Checkout",
+          "howItSupports": "Supports basket and checkout workflows"
+        }
+      ],
+      "claims": [
+        {
+          "position": 1,
+          "kind": "functional",
+          "statement": "The vendor describes Shopify Plus as an enterprise commerce platform for online selling.",
+          "sourceUrl": "https://www.shopify.com/uk/plus",
+          "sourceDate": "2026-11-21",
+          "reviewedBy": "Pending review",
+          "reviewedAt": "2026-11-21"
+        }
+      ]
+    },
+    {
+      "code": "adobe-commerce",
+      "product": "Adobe Commerce",
+      "vendor": "Adobe",
+      "summary": "A commerce platform for online storefronts and orders.",
+      "capabilities": [
+        {
+          "code": "12.1",
+          "name": "Website & App Experience",
+          "howItSupports": "Builds online shopping experiences"
+        },
+        {
+          "code": "12.5",
+          "name": "Order Management",
+          "howItSupports": "Handles online order workflows"
+        }
+      ],
+      "claims": [
+        {
+          "position": 1,
+          "kind": "functional",
+          "statement": "The vendor describes Adobe Commerce as a commerce platform for online storefronts and orders.",
+          "sourceUrl": "https://business.adobe.com/uk/products/magento/magento-commerce.html",
+          "sourceDate": "2026-11-21",
+          "reviewedBy": "Pending review",
+          "reviewedAt": "2026-11-21"
+        }
+      ]
+    },
+    {
+      "code": "akeneo-pim",
+      "product": "Akeneo PIM",
+      "vendor": "Akeneo",
+      "summary": "Software for managing product information across selling channels.",
+      "capabilities": [
+        {
+          "code": "9.5",
+          "name": "Product Information Management",
+          "howItSupports": "Maintains and distributes product information"
+        }
+      ],
+      "claims": [
+        {
+          "position": 1,
+          "kind": "functional",
+          "statement": "The vendor describes Akeneo PIM as software for managing product information across selling channels.",
+          "sourceUrl": "https://www.akeneo.com/",
+          "sourceDate": "2026-11-21",
+          "reviewedBy": "Pending review",
+          "reviewedAt": "2026-11-21"
+        }
+      ]
+    },
+    {
+      "code": "blue-yonder-warehouse-management",
+      "product": "Blue Yonder Warehouse Management",
+      "vendor": "Blue Yonder",
+      "summary": "Software for warehouse operations and inventory execution.",
+      "capabilities": [
+        {
+          "code": "10.2",
+          "name": "Warehouse Operations",
+          "howItSupports": "Coordinates warehouse tasks and stock movements"
+        }
+      ],
+      "claims": [
+        {
+          "position": 1,
+          "kind": "functional",
+          "statement": "The vendor describes Blue Yonder Warehouse Management as software for warehouse operations and inventory execution.",
+          "sourceUrl": "https://blueyonder.com/solutions/warehouse-management",
+          "sourceDate": "2026-11-21",
+          "reviewedBy": "Pending review",
+          "reviewedAt": "2026-11-21"
+        }
+      ]
+    },
+    {
+      "code": "manhattan-active-order-management",
+      "product": "Manhattan Active Order Management",
+      "vendor": "Manhattan Associates",
+      "summary": "Order management software for omnichannel fulfilment.",
+      "capabilities": [
+        {
+          "code": "12.5",
+          "name": "Order Management",
+          "howItSupports": "Orchestrates orders across fulfilment channels"
+        },
+        {
+          "code": "10.4",
+          "name": "Click & Collect and Returns",
+          "howItSupports": "Supports fulfilment choices including collection and returns"
+        }
+      ],
+      "claims": [
+        {
+          "position": 1,
+          "kind": "functional",
+          "statement": "The vendor describes Manhattan Active Order Management as order management software for omnichannel fulfilment.",
+          "sourceUrl": "https://www.manh.com/en-gb/our-solutions/omnichannel-software-solutions/activeorder",
+          "sourceDate": "2026-11-21",
+          "reviewedBy": "Pending review",
+          "reviewedAt": "2026-11-21"
+        }
+      ]
+    },
+    {
+      "code": "oracle-retail-xstore",
+      "product": "Oracle Retail Xstore",
+      "vendor": "Oracle",
+      "summary": "Point of sale software for retail stores.",
+      "capabilities": [
+        {
+          "code": "11.2",
+          "name": "Point of Sale",
+          "howItSupports": "Handles in-store selling and service transactions"
+        }
+      ],
+      "claims": [
+        {
+          "position": 1,
+          "kind": "functional",
+          "statement": "The vendor describes Oracle Retail Xstore as point of sale software for retail stores.",
+          "sourceUrl": "https://docs.oracle.com/en/industries/retail/retail-xstore-point-of-service/26.0/rxprq/c_feature_summary.htm",
+          "sourceDate": "2026-11-21",
+          "reviewedBy": "Pending review",
+          "reviewedAt": "2026-11-21"
+        }
+      ]
+    },
+    {
+      "code": "loyaltylion",
+      "product": "LoyaltyLion",
+      "vendor": "LoyaltyLion",
+      "summary": "Customer loyalty software for online retailers.",
+      "capabilities": [
+        {
+          "code": "13.2",
+          "name": "Loyalty & Offers",
+          "howItSupports": "Manages loyalty programmes and customer rewards"
+        }
+      ],
+      "claims": [
+        {
+          "position": 1,
+          "kind": "functional",
+          "statement": "The vendor describes LoyaltyLion as customer loyalty software for online retailers.",
+          "sourceUrl": "https://loyaltylion.com/lp/customer-loyalty-software",
+          "sourceDate": "2026-11-21",
+          "reviewedBy": "Pending review",
+          "reviewedAt": "2026-11-21"
+        }
+      ]
+    }
+  ]
+}

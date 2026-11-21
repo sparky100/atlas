@@ -1,0 +1,213 @@
+{
+  "sector": "police",
+  "version": 1,
+  "capabilityMapVersion": 1,
+  "status": "draft",
+  "title": "Police Force product catalogue, version 1",
+  "sourceDescription": "Selected product evidence from current vendor pages, checked on 21 November 2026. Claims state what the vendor describes, not proven suitability for an organisation. Editorial review is pending. Coverage spans the sector’s main capability areas but is not exhaustive; a missing product is not evidence that no product exists.",
+  "licence": "CC-BY-4.0",
+  "entries": [
+    {
+      "code": "nec-connect-police-records-management",
+      "product": "NEC Connect Police Records Management",
+      "vendor": "NEC Software Solutions",
+      "summary": "Police records management software.",
+      "capabilities": [
+        {
+          "code": "11.1",
+          "name": "Crime Recording & Investigation",
+          "howItSupports": "Records crime and investigation information"
+        },
+        {
+          "code": "12.1",
+          "name": "Custody Management",
+          "howItSupports": "Supports custody records and workflows"
+        }
+      ],
+      "claims": [
+        {
+          "position": 1,
+          "kind": "functional",
+          "statement": "The vendor describes NEC Connect Police Records Management as police records management software.",
+          "sourceUrl": "https://www.necsws.com/sectors/public-safety/police-records-management-system/",
+          "sourceDate": "2026-11-21",
+          "reviewedBy": "Pending review",
+          "reviewedAt": "2026-11-21"
+        }
+      ]
+    },
+    {
+      "code": "motorola-solutions-computer-aided-dispatch",
+      "product": "Motorola Solutions Computer Aided Dispatch",
+      "vendor": "Motorola Solutions",
+      "summary": "Computer aided dispatch software for emergency control rooms.",
+      "capabilities": [
+        {
+          "code": "10.1",
+          "name": "Call Handling & Triage",
+          "howItSupports": "Supports emergency call handling and incident triage"
+        },
+        {
+          "code": "10.2",
+          "name": "Incident Command & Dispatch",
+          "howItSupports": "Dispatches police response to incidents"
+        }
+      ],
+      "claims": [
+        {
+          "position": 1,
+          "kind": "functional",
+          "statement": "The vendor describes Motorola Solutions Computer Aided Dispatch as computer aided dispatch software for emergency control rooms.",
+          "sourceUrl": "https://www.motorolasolutions.com/en_us/products/command-center-software/public-safety-software/voice-and-computer-aided-dispatch.html",
+          "sourceDate": "2026-11-21",
+          "reviewedBy": "Pending review",
+          "reviewedAt": "2026-11-21"
+        }
+      ]
+    },
+    {
+      "code": "axon-evidence",
+      "product": "Axon Evidence",
+      "vendor": "Axon",
+      "summary": "Digital evidence management software.",
+      "capabilities": [
+        {
+          "code": "11.3",
+          "name": "Forensic & Digital Evidence",
+          "howItSupports": "Stores and manages digital evidence for investigations"
+        }
+      ],
+      "claims": [
+        {
+          "position": 1,
+          "kind": "functional",
+          "statement": "The vendor describes Axon Evidence as digital evidence management software.",
+          "sourceUrl": "https://www.axon.com/uk/products/axon-evidence",
+          "sourceDate": "2026-11-21",
+          "reviewedBy": "Pending review",
+          "reviewedAt": "2026-11-21"
+        }
+      ]
+    },
+    {
+      "code": "axon-records",
+      "product": "Axon Records",
+      "vendor": "Axon",
+      "summary": "Records and report management software for police agencies.",
+      "capabilities": [
+        {
+          "code": "11.1",
+          "name": "Crime Recording & Investigation",
+          "howItSupports": "Supports police reports and investigation records"
+        }
+      ],
+      "claims": [
+        {
+          "position": 1,
+          "kind": "functional",
+          "statement": "The vendor describes Axon Records as records and report management software for police agencies.",
+          "sourceUrl": "https://www.axon.com/uk/products/axon-records",
+          "sourceDate": "2026-11-21",
+          "reviewedBy": "Pending review",
+          "reviewedAt": "2026-11-21"
+        }
+      ]
+    },
+    {
+      "code": "centurion-professional-standards",
+      "product": "Centurion Professional Standards",
+      "vendor": "Force Information Systems",
+      "summary": "Professional standards case management software for police.",
+      "capabilities": [
+        {
+          "code": "14.2",
+          "name": "Complaints & Conduct Handling",
+          "howItSupports": "Records and manages complaints and conduct cases"
+        }
+      ],
+      "claims": [
+        {
+          "position": 1,
+          "kind": "functional",
+          "statement": "The vendor describes Centurion Professional Standards as professional standards case management software for police.",
+          "sourceUrl": "https://www.force-uk.com/solutions/centurion-professional-standards-software/",
+          "sourceDate": "2026-11-21",
+          "reviewedBy": "Pending review",
+          "reviewedAt": "2026-11-21"
+        }
+      ]
+    },
+    {
+      "code": "gatekeeper-vetting",
+      "product": "Gatekeeper Vetting",
+      "vendor": "Force Information Systems",
+      "summary": "Police vetting software.",
+      "capabilities": [
+        {
+          "code": "14.1",
+          "name": "Vetting & Clearance",
+          "howItSupports": "Manages vetting applications and clearance work"
+        }
+      ],
+      "claims": [
+        {
+          "position": 1,
+          "kind": "functional",
+          "statement": "The vendor describes Gatekeeper Vetting as police vetting software.",
+          "sourceUrl": "https://www.force-uk.com/solutions/gatekeeper/",
+          "sourceDate": "2026-11-21",
+          "reviewedBy": "Pending review",
+          "reviewedAt": "2026-11-21"
+        }
+      ]
+    },
+    {
+      "code": "arcgis-law-enforcement",
+      "product": "ArcGIS Law Enforcement",
+      "vendor": "Esri",
+      "summary": "Mapping and location analysis tools for police.",
+      "capabilities": [
+        {
+          "code": "9.4",
+          "name": "Visibility & Patrol Planning",
+          "howItSupports": "Maps patrol demand and spatial patterns"
+        }
+      ],
+      "claims": [
+        {
+          "position": 1,
+          "kind": "functional",
+          "statement": "The vendor describes ArcGIS Law Enforcement as mapping and location analysis tools for police.",
+          "sourceUrl": "https://www.esri.com/en-us/industries/law-enforcement/overview",
+          "sourceDate": "2026-11-21",
+          "reviewedBy": "Pending review",
+          "reviewedAt": "2026-11-21"
+        }
+      ]
+    },
+    {
+      "code": "tecsafe",
+      "product": "TecSAFE",
+      "vendor": "Police Digital Service",
+      "summary": "Technical safeguarding application for vulnerable victims.",
+      "capabilities": [
+        {
+          "code": "13.1",
+          "name": "Safeguarding Vulnerable People",
+          "howItSupports": "Supports safeguarding response to threats against vulnerable victims"
+        }
+      ],
+      "claims": [
+        {
+          "position": 1,
+          "kind": "functional",
+          "statement": "The vendor describes TecSAFE as technical safeguarding application for vulnerable victims.",
+          "sourceUrl": "https://pds.police.uk/welcome/pds-service-catalogue/frontline-digital-applications/tecsafe/",
+          "sourceDate": "2026-11-21",
+          "reviewedBy": "Pending review",
+          "reviewedAt": "2026-11-21"
+        }
+      ]
+    }
+  ]
+}

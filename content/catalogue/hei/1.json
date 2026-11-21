@@ -1,0 +1,189 @@
+{
+  "sector": "hei",
+  "version": 1,
+  "capabilityMapVersion": 2,
+  "status": "draft",
+  "title": "University or College product catalogue, version 1",
+  "sourceDescription": "Selected product evidence from current vendor pages, checked on 21 November 2026. Claims state what the vendor describes, not proven suitability for an organisation. Editorial review is pending. Coverage spans the sector’s main capability areas but is not exhaustive; a missing product is not evidence that no product exists.",
+  "licence": "CC-BY-4.0",
+  "entries": [
+    {
+      "code": "sits-vision",
+      "product": "SITS Vision",
+      "vendor": "Tribal Group",
+      "summary": "A student information system for higher education.",
+      "capabilities": [
+        {
+          "code": "11.5",
+          "name": "Student Records & Progression",
+          "howItSupports": "Maintains student records and progression information"
+        },
+        {
+          "code": "12.2",
+          "name": "Applications & Offers",
+          "howItSupports": "Supports admissions and offers administration"
+        }
+      ],
+      "claims": [
+        {
+          "position": 1,
+          "kind": "functional",
+          "statement": "The vendor describes SITS Vision as a student information system for higher education.",
+          "sourceUrl": "https://www.tribalgroup.com/solutions/student-information-systems/sits-vision",
+          "sourceDate": "2026-11-21",
+          "reviewedBy": "Pending review",
+          "reviewedAt": "2026-11-21"
+        }
+      ]
+    },
+    {
+      "code": "ellucian-student",
+      "product": "Ellucian Student",
+      "vendor": "Ellucian",
+      "summary": "A student information system for higher education.",
+      "capabilities": [
+        {
+          "code": "11.5",
+          "name": "Student Records & Progression",
+          "howItSupports": "Supports student records and progression"
+        }
+      ],
+      "claims": [
+        {
+          "position": 1,
+          "kind": "functional",
+          "statement": "The vendor describes Ellucian Student as a student information system for higher education.",
+          "sourceUrl": "https://www.ellucian.com/en-gb/products/student/student-information-systems",
+          "sourceDate": "2026-11-21",
+          "reviewedBy": "Pending review",
+          "reviewedAt": "2026-11-21"
+        }
+      ]
+    },
+    {
+      "code": "canvas-lms",
+      "product": "Canvas LMS",
+      "vendor": "Instructure",
+      "summary": "A learning management system for teaching and assessment.",
+      "capabilities": [
+        {
+          "code": "9.6",
+          "name": "Digital & Distance Learning",
+          "howItSupports": "Delivers online learning content and activities"
+        },
+        {
+          "code": "9.3",
+          "name": "Assessment & Award",
+          "howItSupports": "Supports online assessments and feedback"
+        }
+      ],
+      "claims": [
+        {
+          "position": 1,
+          "kind": "functional",
+          "statement": "The vendor describes Canvas LMS as a learning management system for teaching and assessment.",
+          "sourceUrl": "https://www.instructure.com/en-gb/canvas-lms-learning-management-system",
+          "sourceDate": "2026-11-21",
+          "reviewedBy": "Pending review",
+          "reviewedAt": "2026-11-21"
+        }
+      ]
+    },
+    {
+      "code": "worktribe-research-management",
+      "product": "Worktribe Research Management",
+      "vendor": "Worktribe",
+      "summary": "Research management software for the funding lifecycle.",
+      "capabilities": [
+        {
+          "code": "10.1",
+          "name": "Research Funding & Grants",
+          "howItSupports": "Supports research funding applications and awards"
+        }
+      ],
+      "claims": [
+        {
+          "position": 1,
+          "kind": "functional",
+          "statement": "The vendor describes Worktribe Research Management as research management software for the funding lifecycle.",
+          "sourceUrl": "https://www.worktribe.com/what-we-do/research-management/",
+          "sourceDate": "2026-11-21",
+          "reviewedBy": "Pending review",
+          "reviewedAt": "2026-11-21"
+        }
+      ]
+    },
+    {
+      "code": "worktribe-curriculum-management",
+      "product": "Worktribe Curriculum Management",
+      "vendor": "Worktribe",
+      "summary": "Software for programme and curriculum design.",
+      "capabilities": [
+        {
+          "code": "9.1",
+          "name": "Curriculum & Programme Design",
+          "howItSupports": "Supports programme and module development workflows"
+        }
+      ],
+      "claims": [
+        {
+          "position": 1,
+          "kind": "functional",
+          "statement": "The vendor describes Worktribe Curriculum Management as software for programme and curriculum design.",
+          "sourceUrl": "https://www.worktribe.com/what-we-do/curriculum-management/",
+          "sourceDate": "2026-11-21",
+          "reviewedBy": "Pending review",
+          "reviewedAt": "2026-11-21"
+        }
+      ]
+    },
+    {
+      "code": "symplectic-elements",
+      "product": "Symplectic Elements",
+      "vendor": "Symplectic",
+      "summary": "A research information management platform.",
+      "capabilities": [
+        {
+          "code": "10.2",
+          "name": "Research Governance & Integrity",
+          "howItSupports": "Keeps research outputs and related governance information"
+        }
+      ],
+      "claims": [
+        {
+          "position": 1,
+          "kind": "functional",
+          "statement": "The vendor describes Symplectic Elements as a research information management platform.",
+          "sourceUrl": "https://www.symplectic.co.uk/research-management-using-the-elements-platform/",
+          "sourceDate": "2026-11-21",
+          "reviewedBy": "Pending review",
+          "reviewedAt": "2026-11-21"
+        }
+      ]
+    },
+    {
+      "code": "alma",
+      "product": "Alma",
+      "vendor": "Ex Libris",
+      "summary": "A library services platform for academic collections.",
+      "capabilities": [
+        {
+          "code": "5",
+          "name": "Customer Contact",
+          "howItSupports": "Manages library resources that support students and researchers"
+        }
+      ],
+      "claims": [
+        {
+          "position": 1,
+          "kind": "functional",
+          "statement": "The vendor describes Alma as a library services platform for academic collections.",
+          "sourceUrl": "https://exlibrisgroup.com/products/alma-library-services-platform/",
+          "sourceDate": "2026-11-21",
+          "reviewedBy": "Pending review",
+          "reviewedAt": "2026-11-21"
+        }
+      ]
+    }
+  ]
+}

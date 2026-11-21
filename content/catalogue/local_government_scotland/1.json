@@ -1,0 +1,170 @@
+{
+  "sector": "local_government_scotland",
+  "version": 1,
+  "capabilityMapVersion": 2,
+  "status": "draft",
+  "title": "Scottish Local Authority product catalogue, version 1",
+  "sourceDescription": "Selected product evidence from current vendor pages, checked on 21 November 2026. Claims state what the vendor describes, not proven suitability for an organisation. Editorial review is pending. Coverage spans the sector’s main capability areas but is not exhaustive; a missing product is not evidence that no product exists.",
+  "licence": "CC-BY-4.0",
+  "entries": [
+    {
+      "code": "liquidlogic-adults-case-management",
+      "product": "Liquidlogic Adults Case Management",
+      "vendor": "System C",
+      "summary": "A case management system for adult social care assessments and care planning.",
+      "capabilities": [
+        {
+          "code": "10.1",
+          "name": "Adult Social Care & Support",
+          "howItSupports": "Records assessments and plans for adult care and support"
+        }
+      ],
+      "claims": [
+        {
+          "position": 1,
+          "kind": "functional",
+          "statement": "The vendor describes Liquidlogic Adults Case Management as a case management system for adult social care assessments and care planning.",
+          "sourceUrl": "https://www.systemc.com/local-government/liquidlogic-adults-case-management/",
+          "sourceDate": "2026-11-21",
+          "reviewedBy": "Pending review",
+          "reviewedAt": "2026-11-21"
+        }
+      ]
+    },
+    {
+      "code": "liquidlogic-children-s-case-management",
+      "product": "Liquidlogic Children’s Case Management",
+      "vendor": "System C",
+      "summary": "A case management system for children’s social care work.",
+      "capabilities": [
+        {
+          "code": "10.2",
+          "name": "Children & Families Social Work",
+          "howItSupports": "Holds children and families social work cases and practitioner records"
+        }
+      ],
+      "claims": [
+        {
+          "position": 1,
+          "kind": "functional",
+          "statement": "The vendor describes Liquidlogic Children’s Case Management as a case management system for children’s social care work.",
+          "sourceUrl": "https://www.systemc.com/local-government/liquidlogic-childrens-case-management/",
+          "sourceDate": "2026-11-21",
+          "reviewedBy": "Pending review",
+          "reviewedAt": "2026-11-21"
+        }
+      ]
+    },
+    {
+      "code": "idox-uniform",
+      "product": "Idox Uniform",
+      "vendor": "Idox",
+      "summary": "Local authority regulatory case management for planning, building control and licensing.",
+      "capabilities": [
+        {
+          "code": "11.3",
+          "name": "Planning & Building Standards",
+          "howItSupports": "Handles planning and building standards case work"
+        },
+        {
+          "code": "11.6",
+          "name": "Licensing",
+          "howItSupports": "Handles licensing case work"
+        }
+      ],
+      "claims": [
+        {
+          "position": 1,
+          "kind": "functional",
+          "statement": "The vendor describes Idox Uniform as local authority regulatory case management for planning, building control and licensing.",
+          "sourceUrl": "https://www.idoxgroup.com/solutions/regulatory-services/uniform/",
+          "sourceDate": "2026-11-21",
+          "reviewedBy": "Pending review",
+          "reviewedAt": "2026-11-21"
+        }
+      ]
+    },
+    {
+      "code": "civica-revenues-benefits",
+      "product": "Civica Revenues & Benefits",
+      "vendor": "Civica",
+      "summary": "Software for local authority revenues and benefits administration.",
+      "capabilities": [
+        {
+          "code": "12.1",
+          "name": "Council Tax & Non-Domestic Rates",
+          "howItSupports": "Administers local taxation and non-domestic rates"
+        },
+        {
+          "code": "12.3",
+          "name": "Housing Benefit",
+          "howItSupports": "Processes housing benefit cases"
+        }
+      ],
+      "claims": [
+        {
+          "position": 1,
+          "kind": "functional",
+          "statement": "The vendor describes Civica Revenues & Benefits as software for local authority revenues and benefits administration.",
+          "sourceUrl": "https://www.civica.com/en-gb/product-pages/revenues-and-benefits-software/",
+          "sourceDate": "2026-11-21",
+          "reviewedBy": "Pending review",
+          "reviewedAt": "2026-11-21"
+        }
+      ]
+    },
+    {
+      "code": "nec-revenues-benefits",
+      "product": "NEC Revenues & Benefits",
+      "vendor": "NEC Software Solutions",
+      "summary": "Software for council tax, business rates and housing benefit administration.",
+      "capabilities": [
+        {
+          "code": "12.1",
+          "name": "Council Tax & Non-Domestic Rates",
+          "howItSupports": "Processes council tax and non-domestic rates"
+        },
+        {
+          "code": "12.3",
+          "name": "Housing Benefit",
+          "howItSupports": "Processes housing benefit cases"
+        }
+      ],
+      "claims": [
+        {
+          "position": 1,
+          "kind": "functional",
+          "statement": "The vendor describes NEC Revenues & Benefits as software for council tax, business rates and housing benefit administration.",
+          "sourceUrl": "https://www.necsws.com/sectors/local-government/revenues-and-benefits-software/",
+          "sourceDate": "2026-11-21",
+          "reviewedBy": "Pending review",
+          "reviewedAt": "2026-11-21"
+        }
+      ]
+    },
+    {
+      "code": "granicus-govservice",
+      "product": "Granicus govService",
+      "vendor": "Granicus",
+      "summary": "Online forms, workflows and case management for government service requests.",
+      "capabilities": [
+        {
+          "code": "5",
+          "name": "Customer Contact",
+          "howItSupports": "Accepts and routes resident service requests online"
+        }
+      ],
+      "claims": [
+        {
+          "position": 1,
+          "kind": "functional",
+          "statement": "The vendor describes Granicus govService as online forms, workflows and case management for government service requests.",
+          "sourceUrl": "https://granicus.com/uk/product/govservice/",
+          "sourceDate": "2026-11-21",
+          "reviewedBy": "Pending review",
+          "reviewedAt": "2026-11-21"
+        }
+      ]
+    }
+  ]
+}

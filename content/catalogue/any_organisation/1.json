@@ -1,0 +1,165 @@
+{
+  "sector": "any_organisation",
+  "version": 1,
+  "capabilityMapVersion": 2,
+  "status": "draft",
+  "title": "Any Organisation (Generic) product catalogue, version 1",
+  "sourceDescription": "Selected product evidence from current vendor pages, checked on 21 November 2026. Claims state what the vendor describes, not proven suitability for an organisation. Editorial review is pending. Coverage spans the sector’s main capability areas but is not exhaustive; a missing product is not evidence that no product exists.",
+  "licence": "CC-BY-4.0",
+  "entries": [
+    {
+      "code": "servicenow-customer-service-management",
+      "product": "ServiceNow Customer Service Management",
+      "vendor": "ServiceNow",
+      "summary": "Customer service case management and self-service software.",
+      "capabilities": [
+        {
+          "code": "9.3",
+          "name": "Relationship Management",
+          "howItSupports": "Maintains customer cases and relationships"
+        },
+        {
+          "code": "9.4",
+          "name": "Feedback & Insight",
+          "howItSupports": "Captures service interactions and feedback"
+        }
+      ],
+      "claims": [
+        {
+          "position": 1,
+          "kind": "functional",
+          "statement": "The vendor describes ServiceNow Customer Service Management as customer service case management and self-service software.",
+          "sourceUrl": "https://www.servicenow.com/uk/products/customer-service-management.html",
+          "sourceDate": "2026-11-21",
+          "reviewedBy": "Pending review",
+          "reviewedAt": "2026-11-21"
+        }
+      ]
+    },
+    {
+      "code": "microsoft-dynamics-365-customer-service",
+      "product": "Microsoft Dynamics 365 Customer Service",
+      "vendor": "Microsoft",
+      "summary": "Customer service and case management software.",
+      "capabilities": [
+        {
+          "code": "9.3",
+          "name": "Relationship Management",
+          "howItSupports": "Supports ongoing customer relationships and cases"
+        }
+      ],
+      "claims": [
+        {
+          "position": 1,
+          "kind": "functional",
+          "statement": "The vendor describes Microsoft Dynamics 365 Customer Service as customer service and case management software.",
+          "sourceUrl": "https://www.microsoft.com/en-gb/dynamics-365/products/customer-service",
+          "sourceDate": "2026-11-21",
+          "reviewedBy": "Pending review",
+          "reviewedAt": "2026-11-21"
+        }
+      ]
+    },
+    {
+      "code": "microsoft-dynamics-365-field-service",
+      "product": "Microsoft Dynamics 365 Field Service",
+      "vendor": "Microsoft",
+      "summary": "Field work scheduling and service management software.",
+      "capabilities": [
+        {
+          "code": "11.1",
+          "name": "Work Planning & Scheduling",
+          "howItSupports": "Schedules work and assigns it to field teams"
+        },
+        {
+          "code": "11.2",
+          "name": "Service Delivery",
+          "howItSupports": "Supports field delivery and completion records"
+        }
+      ],
+      "claims": [
+        {
+          "position": 1,
+          "kind": "functional",
+          "statement": "The vendor describes Microsoft Dynamics 365 Field Service as field work scheduling and service management software.",
+          "sourceUrl": "https://www.microsoft.com/en-us/dynamics-365/products/field-service",
+          "sourceDate": "2026-11-21",
+          "reviewedBy": "Pending review",
+          "reviewedAt": "2026-11-21"
+        }
+      ]
+    },
+    {
+      "code": "planview-adaptivework",
+      "product": "Planview AdaptiveWork",
+      "vendor": "Planview",
+      "summary": "Portfolio and work management software.",
+      "capabilities": [
+        {
+          "code": "12.1",
+          "name": "Portfolio & Programme Management",
+          "howItSupports": "Plans projects and tracks portfolio delivery"
+        }
+      ],
+      "claims": [
+        {
+          "position": 1,
+          "kind": "functional",
+          "statement": "The vendor describes Planview AdaptiveWork as portfolio and work management software.",
+          "sourceUrl": "https://www.planview.com/products-solutions/products/adaptivework/",
+          "sourceDate": "2026-11-21",
+          "reviewedBy": "Pending review",
+          "reviewedAt": "2026-11-21"
+        }
+      ]
+    },
+    {
+      "code": "workday-human-capital-management",
+      "product": "Workday Human Capital Management",
+      "vendor": "Workday",
+      "summary": "Human resources management software.",
+      "capabilities": [
+        {
+          "code": "7",
+          "name": "Digital & Technology",
+          "howItSupports": "Maintains workforce information and employment processes"
+        }
+      ],
+      "claims": [
+        {
+          "position": 1,
+          "kind": "functional",
+          "statement": "The vendor describes Workday Human Capital Management as human resources management software.",
+          "sourceUrl": "https://www.workday.com/en-gb/products/human-capital-management/overview.html",
+          "sourceDate": "2026-11-21",
+          "reviewedBy": "Pending review",
+          "reviewedAt": "2026-11-21"
+        }
+      ]
+    },
+    {
+      "code": "miro",
+      "product": "Miro",
+      "vendor": "Miro",
+      "summary": "A collaborative workspace for mapping services and processes.",
+      "capabilities": [
+        {
+          "code": "10.1",
+          "name": "Service Design",
+          "howItSupports": "Supports collaborative service design workshops"
+        }
+      ],
+      "claims": [
+        {
+          "position": 1,
+          "kind": "functional",
+          "statement": "The vendor describes Miro as a collaborative workspace for mapping services and processes.",
+          "sourceUrl": "https://miro.com/",
+          "sourceDate": "2026-11-21",
+          "reviewedBy": "Pending review",
+          "reviewedAt": "2026-11-21"
+        }
+      ]
+    }
+  ]
+}

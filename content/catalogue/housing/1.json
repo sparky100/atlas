@@ -1,0 +1,232 @@
+{
+  "sector": "housing",
+  "version": 1,
+  "capabilityMapVersion": 2,
+  "status": "draft",
+  "title": "Housing Association product catalogue, version 1",
+  "sourceDescription": "Selected product evidence from current vendor pages, checked on 21 November 2026. Claims state what the vendor describes, not proven suitability for an organisation. Editorial review is pending. Coverage spans the sector’s main capability areas but is not exhaustive; a missing product is not evidence that no product exists.",
+  "licence": "CC-BY-4.0",
+  "entries": [
+    {
+      "code": "nec-housing",
+      "product": "NEC Housing",
+      "vendor": "NEC Software Solutions",
+      "summary": "A housing management platform spanning resident, property and repairs work.",
+      "capabilities": [
+        {
+          "code": "9.2",
+          "name": "Tenancy Management",
+          "howItSupports": "Holds tenancy records and processes"
+        },
+        {
+          "code": "10.1",
+          "name": "Responsive Repairs",
+          "howItSupports": "Manages responsive repairs work"
+        }
+      ],
+      "claims": [
+        {
+          "position": 1,
+          "kind": "functional",
+          "statement": "The vendor describes NEC Housing as a housing management platform spanning resident, property and repairs work.",
+          "sourceUrl": "https://www.necsws.com/sectors/housing/housing-management-software/",
+          "sourceDate": "2026-11-21",
+          "reviewedBy": "Pending review",
+          "reviewedAt": "2026-11-21"
+        }
+      ]
+    },
+    {
+      "code": "aareon-ql",
+      "product": "Aareon QL",
+      "vendor": "Aareon",
+      "summary": "A housing management system for social landlords.",
+      "capabilities": [
+        {
+          "code": "9.2",
+          "name": "Tenancy Management",
+          "howItSupports": "Holds core tenancy management information"
+        }
+      ],
+      "claims": [
+        {
+          "position": 1,
+          "kind": "functional",
+          "statement": "The vendor describes Aareon QL as a housing management system for social landlords.",
+          "sourceUrl": "https://www.aareon.co.uk/products/ql-hms",
+          "sourceDate": "2026-11-21",
+          "reviewedBy": "Pending review",
+          "reviewedAt": "2026-11-21"
+        }
+      ]
+    },
+    {
+      "code": "aareon-homemaster",
+      "product": "Aareon HomeMaster",
+      "vendor": "Aareon",
+      "summary": "A housing management system for social housing providers.",
+      "capabilities": [
+        {
+          "code": "9.1",
+          "name": "Allocations & Lettings",
+          "howItSupports": "Supports housing and tenancy administration"
+        }
+      ],
+      "claims": [
+        {
+          "position": 1,
+          "kind": "functional",
+          "statement": "The vendor describes Aareon HomeMaster as a housing management system for social housing providers.",
+          "sourceUrl": "https://www.aareon.co.uk/products/homemaster",
+          "sourceDate": "2026-11-21",
+          "reviewedBy": "Pending review",
+          "reviewedAt": "2026-11-21"
+        }
+      ]
+    },
+    {
+      "code": "civica-cx-housing",
+      "product": "Civica Cx Housing",
+      "vendor": "Civica",
+      "summary": "A housing management platform for social landlords.",
+      "capabilities": [
+        {
+          "code": "9.2",
+          "name": "Tenancy Management",
+          "howItSupports": "Connects tenancy and resident service processes"
+        }
+      ],
+      "claims": [
+        {
+          "position": 1,
+          "kind": "functional",
+          "statement": "The vendor describes Civica Cx Housing as a housing management platform for social landlords.",
+          "sourceUrl": "https://www.civica.com/en-gb/product-pages/social-housing-software/",
+          "sourceDate": "2026-11-21",
+          "reviewedBy": "Pending review",
+          "reviewedAt": "2026-11-21"
+        }
+      ]
+    },
+    {
+      "code": "civica-cx-asset-management",
+      "product": "Civica Cx Asset Management",
+      "vendor": "Civica",
+      "summary": "Property asset management and building safety software for social housing.",
+      "capabilities": [
+        {
+          "code": "10.3",
+          "name": "Building Safety & Compliance",
+          "howItSupports": "Records building safety and property risk information"
+        }
+      ],
+      "claims": [
+        {
+          "position": 1,
+          "kind": "functional",
+          "statement": "The vendor describes Civica Cx Asset Management as property asset management and building safety software for social housing.",
+          "sourceUrl": "https://www.civica.com/en-gb/product-pages/cx-asset-management/",
+          "sourceDate": "2026-11-21",
+          "reviewedBy": "Pending review",
+          "reviewedAt": "2026-11-21"
+        }
+      ]
+    },
+    {
+      "code": "mobysoft-rentsense",
+      "product": "Mobysoft RentSense",
+      "vendor": "Mobysoft",
+      "summary": "Rent arrears and income collection software for social landlords.",
+      "capabilities": [
+        {
+          "code": "9.3",
+          "name": "Rent & Service Charge Collection",
+          "howItSupports": "Prioritises rent accounts for income collection work"
+        }
+      ],
+      "claims": [
+        {
+          "position": 1,
+          "kind": "functional",
+          "statement": "The vendor describes Mobysoft RentSense as rent arrears and income collection software for social landlords.",
+          "sourceUrl": "https://www.mobysoft.com/propertysense/rentsense/",
+          "sourceDate": "2026-11-21",
+          "reviewedBy": "Pending review",
+          "reviewedAt": "2026-11-21"
+        }
+      ]
+    },
+    {
+      "code": "plentific-resident-experience",
+      "product": "Plentific Resident Experience",
+      "vendor": "Plentific",
+      "summary": "A resident portal for maintenance requests and repair progress.",
+      "capabilities": [
+        {
+          "code": "10.1",
+          "name": "Responsive Repairs",
+          "howItSupports": "Gives residents a channel to raise and track repair requests"
+        }
+      ],
+      "claims": [
+        {
+          "position": 1,
+          "kind": "functional",
+          "statement": "The vendor describes Plentific Resident Experience as a resident portal for maintenance requests and repair progress.",
+          "sourceUrl": "https://www.plentific.com/resident-engagement/",
+          "sourceDate": "2026-11-21",
+          "reviewedBy": "Pending review",
+          "reviewedAt": "2026-11-21"
+        }
+      ]
+    },
+    {
+      "code": "voicescape-tenant-feedback",
+      "product": "Voicescape Tenant Feedback",
+      "vendor": "Voicescape",
+      "summary": "Software for collecting tenant feedback and engagement.",
+      "capabilities": [
+        {
+          "code": "12.3",
+          "name": "Tenant Engagement & Scrutiny",
+          "howItSupports": "Collects resident feedback for tenant engagement work"
+        }
+      ],
+      "claims": [
+        {
+          "position": 1,
+          "kind": "functional",
+          "statement": "The vendor describes Voicescape Tenant Feedback as software for collecting tenant feedback and engagement.",
+          "sourceUrl": "https://www.voicescape.com/services/tenant-feedback-software",
+          "sourceDate": "2026-11-21",
+          "reviewedBy": "Pending review",
+          "reviewedAt": "2026-11-21"
+        }
+      ]
+    },
+    {
+      "code": "sds-proval-vantage",
+      "product": "SDS Proval Vantage",
+      "vendor": "SDS",
+      "summary": "Development appraisal software for social housing schemes.",
+      "capabilities": [
+        {
+          "code": "11.2",
+          "name": "New Homes Development",
+          "howItSupports": "Appraises proposed new homes schemes before delivery decisions"
+        }
+      ],
+      "claims": [
+        {
+          "position": 1,
+          "kind": "functional",
+          "statement": "The vendor describes SDS Proval Vantage as development appraisal software for social housing schemes.",
+          "sourceUrl": "https://s-d-s.co.uk/products/proval",
+          "sourceDate": "2026-11-21",
+          "reviewedBy": "Pending review",
+          "reviewedAt": "2026-11-21"
+        }
+      ]
+    }
+  ]
+}
