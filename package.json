@@ -49,6 +49,8 @@
     "functions:bundle:org-ai-key": "tsx scripts/bundleOrgAiKeyFunction.ts",
     "functions:deploy:org-ai-key": "pnpm functions:bundle:org-ai-key && supabase functions deploy org-ai-key",
     "functions:bundle:design-agent": "tsx scripts/bundleDesignAgentFunction.ts",
+    "functions:bundle:review-agent": "tsx scripts/bundleReviewAgentFunction.ts",
+    "functions:deploy:review-agent": "pnpm functions:bundle:review-agent && supabase functions deploy review-agent --use-api",
     "functions:deploy:design-agent": "pnpm functions:bundle:design-agent && supabase functions deploy design-agent",
     "functions:deploy:ask-model": "pnpm functions:bundle:ask-model && supabase functions deploy ask-model",
     "functions:bundle:api": "tsx scripts/bundleApiFunction.ts",

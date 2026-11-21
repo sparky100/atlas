@@ -146,6 +146,8 @@ export interface BranchRow {
   /** Set only on a branch created by partial acceptance in the review queue (ADR-006 amendment, SPEC §1 S-22) — the branch it was split out of. */
   split_from: UUID | null;
   created_by: UUID;
+  /** Creation timestamp used by the editing banner; older test fixtures may omit it. */
+  created_at?: string;
   updated_at: string;
   /** S1 item 4, set together by `atlas.cancel_change`: the proposer or owner/architect's own stated reason, `null` unless `status === 'cancelled'`. */
   cancel_reason: string | null;
