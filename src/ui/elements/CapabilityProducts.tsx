@@ -40,7 +40,7 @@ function Entry({ entry }: { entry: CatalogueEntry }) {
   );
 }
 
-export function CapabilityProducts({ templateRef }: { templateRef: string | null }) {
+export function CapabilityProducts({ templateRef, title = 'Products that can support this' }: { templateRef: string | null; title?: string }) {
   const match = useQuery({
     queryKey: ['capabilityCatalogueMatch', templateRef],
     enabled: templateRef !== null,
@@ -62,9 +62,9 @@ export function CapabilityProducts({ templateRef }: { templateRef: string | null
   if (entries.data === undefined || entries.data.length === 0) return null;
   return (
     <Panel data-testid="capability-products">
-      <Text as="h2" size="lg">Products that can support this</Text>
+      <Text as="h2" size="lg">{title}</Text>
       <Text as="p" size="sm" tone="muted">
-        Reviewed products from the published catalogue. They are candidates, not a procurement decision.
+        Reviewed products from the published catalogue, for a replacement or build option. They are candidates, not a procurement decision.
       </Text>
       <ul className={styles.list}>
         {entries.data.map((entry) => <Entry key={entry.id} entry={entry} />)}

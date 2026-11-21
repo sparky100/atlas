@@ -29,6 +29,9 @@ import { ownerNames } from '../orgs/ownerNames';
 import { reviewerAvailability } from './reviewerAvailability';
 import { SecondOpinion } from './SecondOpinion';
 import { KeptQuestions } from './KeptQuestions';
+import { CapabilityProducts } from '../elements/CapabilityProducts';
+import { optionKindOf } from '../changes/optionDraftActions';
+import { attributesRecord } from '../elements/attributesRecord';
 import type { AlsoAffectedElement } from './alsoAffected';
 import { DecisionBaselineCard } from './DecisionBaselineCard';
 import { CollapsibleSection } from '../components/CollapsibleSection/CollapsibleSection';
@@ -140,6 +143,18 @@ export function DecisionView({ modelId, decisionId, orgId, orgSlug, modelSlug, r
   const readyState = state.status === 'ready' ? state : null;
   const elementLinks = readyState ? readyState.links.filter((l) => l.linked_type === 'element' || l.linked_type === 'relationship') : [];
   const branchLinks = readyState ? readyState.links.filter((l) => l.linked_type === 'branch') : [];
+  // Products belong beside a replacement decision, not on the capability page:
+  // only when an option is a replace/build one, and only for the capabilities
+  // this decision concerns.
+  const capabilityConcerns = elementLinks.flatMap((link) => {
+    const element = readyState?.linkedElementsById.get(link.linked_id);
+    return element?.element_type === 'capability' ? [element] : [];
+  });
+  const hasReplaceOrBuildOption = branchLinks.some((link) => {
+    const branch = readyState?.linkedBranchesById.get(link.linked_id);
+    const kind = branch ? optionKindOf(branch.title ?? branch.name) : null;
+    return kind === 'replace' || kind === 'build';
+  });
   const concernedCapabilityIds = readyState ? elementLinks.map((l) => l.linked_id).filter((id) => readyState.linkedElementsById.get(id)?.element_type === 'capability') : [];
   // F6.3 (Part B) rule 5: a system/container concern gets its own outcome
   // row (unchanged/retired/replaced by X) alongside a capability concern's
@@ -684,6 +699,12 @@ export function DecisionView({ modelId, decisionId, orgId, orgSlug, modelSlug, r
           </CollapsibleSection>
         </Panel>
       )}
+
+      {hasReplaceOrBuildOption && capabilityConcerns.map((capability) => {
+        const templateRef = attributesRecord(capability.attributes).templateRef;
+        if (typeof templateRef !== 'string') return null;
+        return <CapabilityProducts key={capability.element_id} templateRef={templateRef} title={`Products that can support ${capability.name}`} />;
+      })}
 
       <SecondOpinion key={`${decisionId}:${userId ?? ''}`} orgId={orgId} userId={userId} decisionId={decisionId} orgSlug={orgSlug} shareCost={shareCost} availability={secondOpinion} />
 

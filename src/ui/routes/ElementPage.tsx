@@ -74,7 +74,6 @@ import { useValueStreamImpact } from '../valueStreams/useValueStreamImpact';
 import { CompletenessChip } from '../gaps/CompletenessChip';
 import { bandAction, capabilityProblems, purposeFromProblems } from '../elements/capabilityProblems';
 import { CapabilityProblemsBand } from '../elements/CapabilityProblemsBand';
-import { CapabilityProducts } from '../elements/CapabilityProducts';
 import { completenessOf, firstWalkableKind, missingFactsText, sumCompleteness } from '../gaps/gaps';
 import { usePortfolio } from '../portfolio/usePortfolio';
 import styles from './ElementPage.module.css';
@@ -109,12 +108,6 @@ import styles from './ElementPage.module.css';
 /** What a lower-right section shows while its data is still loading, or if loading it failed — never the empty value. */
 function SecondaryPlaceholder({ status }: { status: 'loading' | 'error' }) {
   return status === 'error' ? <Text tone="muted">Couldn't load this section. Reload the page to try again.</Text> : <Loading />;
-}
-
-/** A seeded capability's starter-map item id, or `null` for one created by hand. */
-function templateRefOf(attributes: Parameters<typeof attributesRecord>[0]): string | null {
-  const value = attributesRecord(attributes).templateRef;
-  return typeof value === 'string' ? value : null;
 }
 
 export function ElementPage() {
@@ -485,9 +478,6 @@ export function ElementPage() {
               startProjectLabel={canStartProjectActive(role) ? undefined : 'Propose a project…'}
             />
             {problemsNode}
-            {state.data.element.element_type === 'capability' && (
-              <CapabilityProducts templateRef={templateRefOf(state.data.element.attributes)} />
-            )}
             {attestation.error !== null && (
               <div role="alert">
                 <Text as="p" size="sm">
