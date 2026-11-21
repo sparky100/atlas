@@ -23,6 +23,11 @@ export function SecondOpinion({ orgId, userId, decisionId, orgSlug, shareCost, a
   const [reviews, setReviews] = useState<HeldReview[]>(() => loadHeldReviews(localStorage, key, Date.now()));
   const [interrupted, setInterrupted] = useState(() => interruptedReview(sessionStorage, key, Date.now()));
   const [running, setRunning] = useState<ReviewLens | null>(null);
+  // Set only when a run completes in this mount. The marker is cleared in a
+  // committed effect, never in `finally`: a reload aborts the request, and
+  // clearing there would erase the very marker the next page needs to say the
+  // run did not finish.
+  const [completed, setCompleted] = useState(false);
   const [message, setMessage] = useState<{ kind: 'failed' | 'stopped'; text: string } | null>(null);
   const [copied, setCopied] = useState<string | null>(null);
   const abort = useRef<AbortController | null>(null);
@@ -30,9 +35,9 @@ export function SecondOpinion({ orgId, userId, decisionId, orgSlug, shareCost, a
 
   useEffect(() => { saveHeldReviews(localStorage, key, reviews); }, [key, reviews]);
   useEffect(() => {
-    if (!interrupted) return;
+    if (!completed) return;
     try { sessionStorage.removeItem(`${key}:running`); } catch { /* Storage may be unavailable. */ }
-  }, [key, interrupted]);
+  }, [key, completed]);
   useEffect(() => () => { runNo.current += 1; abort.current?.abort(); }, []);
 
   async function ask(lens: ReviewLens) {
@@ -43,18 +48,22 @@ export function SecondOpinion({ orgId, userId, decisionId, orgSlug, shareCost, a
     setRunning(lens);
     setMessage(null);
     setInterrupted(false);
+    setCompleted(false);
     try { sessionStorage.setItem(`${key}:running`, String(now())); } catch { /* The page still works without the return marker. */ }
     try {
       const result = await runReviewer(supabase, decisionId, lens, controller.signal);
       if (mine !== runNo.current) return;
       const review: HeldReview = { lens, notes: result.notes.map((n) => ({ ...n, suggestedQuestion: n.question })), inputHash: result.inputHash, runId: result.runId, inputTokens: result.inputTokens, outputTokens: result.outputTokens, savedAt: now() };
       setReviews((old) => [...old.filter((r) => r.lens !== lens), review]);
+      setCompleted(true);
     } catch (e) {
       if (mine !== runNo.current) return;
+      // A failed or aborted run keeps the marker: the page may be reloading,
+      // and the next page must be able to say the run did not finish. A new
+      // ask overwrites it; a successful run clears it (the effect above).
       setMessage({ kind: 'failed', text: e instanceof Error ? e.message : 'The second opinion could not be completed. Try again.' });
     } finally {
       if (mine === runNo.current) {
-        try { sessionStorage.removeItem(`${key}:running`); } catch { /* Storage may be unavailable. */ }
         setRunning(null);
         abort.current = null;
       }
