@@ -8,6 +8,7 @@ import type { ModelSnapshot, ToolContext } from './types';
 
 const UUID_SHAPE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const UNSAFE_VERDICT = /\b(?:pass|fail|compliant|approved|recommend(?:ed|ation)?|score)\b|\b\d+\s*\/\s*\d+\b/i;
+const MAX_REVIEW_DIGEST_CHARS = 40_000;
 
 export interface SavedReview {
   decision: DecisionRow;
@@ -33,7 +34,7 @@ export interface ReviewDeps {
 }
 
 export type ReviewOutcome =
-  | { status: 'invalid' | 'forbidden' | 'not_enabled' | 'cost_blocked'; message: string }
+  | { status: 'invalid' | 'forbidden' | 'not_enabled' | 'cost_blocked' | 'too_large'; message: string }
   | { status: 'not_found' | 'empty_model' }
   | { status: 'incomplete'; message: string; inputTokens: number; outputTokens: number }
   | { status: 'done'; notes: ReviewNote[]; inputHash: string; runId: string; inputTokens: number; outputTokens: number; dropped: number };
@@ -71,6 +72,7 @@ export async function handleReview(deps: ReviewDeps, body: unknown): Promise<Rev
   const snapshot = await ctx.snapshot();
   const saved = await deps.loadSavedReview(decision, snapshot);
   const digest = buildReviewerDigest({ ...saved, snapshot, shareCost: settings.shareCost });
+  if (digest.text.length > MAX_REVIEW_DIGEST_CHARS) return { status: 'too_large', message: 'This decision contains too much saved material for one second opinion. Narrow its options or linked concerns, then try again.' };
   // A warning with a generic "send anyway" would let a contributor override an owner-only choice.
   if (digest.containsMoneyText) return { status: 'cost_blocked', message: 'Saved text contains an amount of money. Remove it before requesting a second opinion, or ask an owner to allow cost sharing.' };
   const inputHash = await deps.hash(digest.text);

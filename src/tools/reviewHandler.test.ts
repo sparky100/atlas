@@ -95,6 +95,12 @@ describe('review-agent boundary', () => {
     const d = deps({ createClient: () => ({ complete: () => Promise.resolve({ text: answer, stopReason: 'max_tokens', inputTokens: 1, outputTokens: 2 }) }) });
     expect(await handleReview(d.deps, body)).toMatchObject({ status: 'incomplete', inputTokens: 1, outputTokens: 2 });
   });
+
+  it('refuses an unbounded saved decision before it can spend tokens', async () => {
+    const d = deps({ loadDecision: () => Promise.resolve({ ...decision, statement: 'A'.repeat(40_001) }) });
+    expect((await handleReview(d.deps, body)).status).toBe('too_large');
+    expect(d.requests).toHaveLength(0);
+  });
 });
 
 it('the digest is an explicit allowlist: a new attribute does not reach the provider', () => {

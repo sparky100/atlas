@@ -4,13 +4,12 @@ import { corsHeaders } from '../../_shared/cors.ts';
 import { handleReview } from '../../../../src/tools/reviewHandler.ts';
 import { createToolContext } from '../../../../src/tools/loadContext.ts';
 import { createProxyAskClient, AskProviderError } from '../../../../src/tools/proxyClient.ts';
-import { listDecisionLinksForDecision } from '../../../../src/db/decisions.ts';
-import { listDecisionRatingsForDecision } from '../../../../src/db/decisionRatings.ts';
-import { listPrinciplesForDecision, listPrinciplesForModel } from '../../../../src/db/principles.ts';
-import { listGoalsForModel, listGoalLinksForGoals } from '../../../../src/db/goals.ts';
+import { listGoalLinksForGoals } from '../../../../src/db/goals.ts';
+import type { GoalRow } from '../../../../src/contracts/goals.ts';
 import { adrPrincipleItems, goalTitlesServedBy } from '../../../../src/engine/decisionDigest/relatedContext.ts';
 import { selectAll } from '../../../../src/db/selectAll.ts';
-import type { BranchRow, DecisionRow } from '../../../../src/db/types.ts';
+import type { BranchRow, DecisionLinkRow, DecisionOptionRatingRow, DecisionRow } from '../../../../src/db/types.ts';
+import type { DecisionPrincipleRow, PrincipleRow } from '../../../../src/contracts/principles.ts';
 
 function jsonResponse(body: unknown, status: number): Response {
   return new Response(JSON.stringify(body), { status, headers: { ...corsHeaders, 'Content-Type': 'application/json', 'Cache-Control': 'no-store' } });
@@ -61,11 +60,11 @@ Deno.serve(async (req: Request) => {
       },
       loadSavedReview: async (decision, snapshot) => {
         const [links, ratings, principleLinks, principles, goals] = await Promise.all([
-          listDecisionLinksForDecision(supabase, decision.id),
-          listDecisionRatingsForDecision(supabase, decision.id),
-          listPrinciplesForDecision(supabase, decision.id),
-          listPrinciplesForModel(supabase, decision.model_id),
-          listGoalsForModel(supabase, decision.model_id),
+          selectAll<DecisionLinkRow>(supabase.from('decision_links').select('*', { count: 'exact' }).eq('decision_id', decision.id).order('linked_type').order('linked_id')),
+          selectAll<DecisionOptionRatingRow>(supabase.from('decision_option_ratings').select('*', { count: 'exact' }).eq('decision_id', decision.id).order('branch_id').order('criterion')),
+          selectAll<DecisionPrincipleRow>(supabase.from('decision_principles').select('*', { count: 'exact' }).eq('decision_id', decision.id).order('principle_id')),
+          selectAll<PrincipleRow>(supabase.from('principles').select('*', { count: 'exact' }).eq('model_id', decision.model_id).order('id')),
+          selectAll<GoalRow>(supabase.from('goals').select('*', { count: 'exact' }).eq('model_id', decision.model_id).order('id')),
         ]);
         const branchIds = new Set(links.filter((l) => l.linked_type === 'branch').map((l) => l.linked_id));
         // Query by model, not an unbounded caller-derived .in() URL.
@@ -88,7 +87,7 @@ Deno.serve(async (req: Request) => {
       createClient: (orgId, runId, lens) => createProxyAskClient({ proxyUrl: `${supabaseUrl}/functions/v1/llm-proxy`, authorization: authHeader, anonKey: supabaseAnonKey, orgId, useOrgKey: true, requireOrgKey: true, ...(lens !== 'challenge' ? { modelTier: 'light' as const } : {}), runId }),
       hash: async (text) => [...new Uint8Array(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(text)))].map((n) => n.toString(16).padStart(2, '0')).join(''),
     }, body);
-    if (outcome.status === 'invalid') return jsonResponse(outcome, 400);
+    if (outcome.status === 'invalid' || outcome.status === 'too_large') return jsonResponse(outcome, 400);
     if (outcome.status === 'forbidden' || outcome.status === 'not_enabled' || outcome.status === 'cost_blocked') return jsonResponse(outcome, 403);
     if (outcome.status === 'not_found') return jsonResponse(outcome, 404);
     return jsonResponse(outcome, 200);
