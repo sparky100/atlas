@@ -189,6 +189,53 @@ export async function capabilityMapMatch(client: Client, templateRef: string): P
   return { sector: mapRow.sector, capabilityMapVersion: mapRow.version, capabilityCode: row.code, capabilityName: row.name };
 }
 
+/** The sectors of the starter maps this model was seeded from. A draft map can be reloaded and its item ids replaced, so the sector is also the durable part of the link. */
+export async function templateSectorsForModel(client: Client, modelId: string): Promise<string[]> {
+  const sources = await client.from('sources').select('capability_map_id').eq('model_id', modelId).eq('kind', 'template').not('capability_map_id', 'is', null);
+  if (sources.error) throw new Error(`templateSectorsForModel: ${sources.error.message}`);
+  const ids = [...new Set(((sources.data as { capability_map_id: string | null }[] | null) ?? []).flatMap((s) => (s.capability_map_id === null ? [] : [s.capability_map_id])))];
+  if (ids.length === 0) return [];
+  const maps = await client.from('capability_maps').select('sector').in('id', ids);
+  if (maps.error) throw new Error(`templateSectorsForModel: ${maps.error.message}`);
+  return [...new Set(((maps.data as { sector: string }[] | null) ?? []).map((m) => m.sector))];
+}
+
+/** A capability code's item in the current published map for one sector. Codes are stable across map versions; item ids are not. */
+export async function publishedMapItemForCapability(client: Client, sector: string, code: string): Promise<CapabilityCatalogueMatch | null> {
+  const map = await client
+    .from('capability_maps')
+    .select('id, sector, version')
+    .eq('sector', sector)
+    .eq('status', 'published')
+    .order('version', { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  if (map.error) throw new Error(`publishedMapItemForCapability: ${map.error.message}`);
+  const mapRow = map.data;
+  if (!mapRow) return null;
+  const item = await client.from('capability_map_items').select('code, name').eq('map_id', mapRow.id).eq('code', code).maybeSingle();
+  if (item.error) throw new Error(`publishedMapItemForCapability: ${item.error.message}`);
+  const row = item.data;
+  if (!row) return null;
+  return { sector: mapRow.sector, capabilityMapVersion: mapRow.version, capabilityCode: row.code, capabilityName: row.name };
+}
+
+/**
+ * The fallback for a capability whose stored `templateRef` no longer resolves:
+ * the capability's code in the current published map for the sector the model
+ * was seeded from. When the model has been seeded from more than one sector,
+ * only a single unambiguous match is accepted.
+ */
+export async function publishedCapabilityMatchForModel(client: Client, modelId: string, code: string): Promise<CapabilityCatalogueMatch | null> {
+  const sectors = await templateSectorsForModel(client, modelId);
+  const matches: CapabilityCatalogueMatch[] = [];
+  for (const sector of sectors) {
+    const match = await publishedMapItemForCapability(client, sector, code);
+    if (match) matches.push(match);
+  }
+  return matches.length === 1 ? matches[0] ?? null : null;
+}
+
 export async function currentCatalogue(client: Client, sector: string): Promise<{ id: string; version: number; title: string; published_at: string | null } | null> {
   const { data, error } = await client
     .from('product_catalogues')

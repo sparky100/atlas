@@ -14,7 +14,7 @@ import { parseDesignerOptions, type DesignerOptionsResult } from '../contracts/d
 import { runAsk } from './askLoop';
 import type { AskModelClient, AskResult } from './askLoop';
 import { designerBrief, designerSystemPrompt, DESIGNER_MAX_FINDING_CHARS, DESIGNER_MAX_WEB_SEARCHES } from './designPrompt';
-import { catalogueRefKey, capabilityTemplateRef } from './findCatalogueProducts';
+import { catalogueRefKey, capabilityCode, capabilityTemplateRef } from './findCatalogueProducts';
 import { indexSnapshot } from './toolKit';
 import type { RunCostSharing, ToolContext, ToolStamp } from './types';
 
@@ -79,7 +79,7 @@ async function returnedCatalogueKeys(ctx: ToolContext, toolUses: readonly { name
     const element = index.byId.get(id);
     const templateRef = capabilityTemplateRef(element?.attributes);
     if (templateRef === null) continue;
-    const catalogue = await ctx.catalogueForCapability(templateRef);
+    const catalogue = await ctx.catalogueForCapability({ templateRef, code: capabilityCode(element?.attributes) });
     if (catalogue === null) continue;
     for (const entry of catalogue.entries) allowed.add(catalogueRefKey({ sector: catalogue.sector, version: catalogue.catalogueVersion, entryCode: entry.code }));
   }
