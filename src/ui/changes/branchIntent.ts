@@ -6,7 +6,7 @@
  * `src/db/types.ts`'s `BranchIntent` doc comment for why this stays a
  * workflow/UI concept, not an engine one.
  */
-import type { BranchIntent, BranchRow } from '../../db/types';
+import type { BranchIntent } from '../../db/types';
 
 /** The entry points that create a change, each with a real default — every branch-creation call site names which one it is. (F0's "director door → propose" and "'what happened' → record" left with Overview's change buttons on 2026-10-04 — UI-principles §3; a record is started from the Changes page's own form.) */
 export type IntentEntryPoint = 'elementPage' | 'changesList' | 'homeSearch';
@@ -70,21 +70,7 @@ export const INTENT_LABEL: Readonly<Record<BranchIntent, string>> = {
  * migration) falls back to the plain title/name this page always showed
  * before F0 existed.
  */
-export function intentHeaderLine(branch: Pick<BranchRow, 'intent' | 'title' | 'name'>): string {
-  const title = branch.title ?? branch.name;
-  switch (branch.intent) {
-    case 'record':
-      return `Recording: ${title}`;
-    case 'propose':
-      return `Proposing: ${title}`;
-    case 'correct':
-      return 'Correction';
-    case 'explore':
-      return `Exploring: ${title}`;
-    case null:
-      return title;
-  }
-}
+export { intentHeaderLine } from '../../engine/decisionDigest/intentHeaderLine';
 
 /** F0: "review weight per intent (correct and record: single approver, no split; propose and explore: full queue)" — resolved with the human as "reuse the existing single-approver `merge_requests` mechanism for every intent; record/correct just never render the multi-step review queue UI" (no new privilege model, see the plan's own Decision 1). `'single'` means the change page's own one-click "Approve & merge" action (PR3); `'queue'` means the existing `ReviewQueuePage` flow, unchanged. */
 export type IntentReviewWeight = 'single' | 'queue';

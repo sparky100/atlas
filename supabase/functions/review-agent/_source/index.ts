@@ -7,6 +7,9 @@ import { createProxyAskClient, AskProviderError } from '../../../../src/tools/pr
 import { listGoalLinksForGoals } from '../../../../src/db/goals.ts';
 import type { GoalRow } from '../../../../src/contracts/goals.ts';
 import { adrPrincipleItems, goalTitlesServedBy } from '../../../../src/engine/decisionDigest/relatedContext.ts';
+import { compareDecisionOptions } from '../../../../src/engine/decisionDigest/compareOptions.ts';
+import { groupWhatChangesRows } from '../../../../src/engine/decisionDigest/whatChangesRows.ts';
+import { intentHeaderLine } from '../../../../src/engine/decisionDigest/intentHeaderLine.ts';
 import { selectAll } from '../../../../src/db/selectAll.ts';
 import type { BranchRow, DecisionLinkRow, DecisionOptionRatingRow, DecisionRow } from '../../../../src/db/types.ts';
 import type { DecisionPrincipleRow, PrincipleRow } from '../../../../src/contracts/principles.ts';
@@ -58,7 +61,7 @@ Deno.serve(async (req: Request) => {
         if (error) throw new Error('Could not read the model head.');
         return (data as { head_commit_id?: string | null } | null)?.head_commit_id ?? null;
       },
-      loadSavedReview: async (decision, snapshot) => {
+      loadSavedReview: async (decision, snapshot, mainCommitId) => {
         const [links, ratings, principleLinks, principles, goals] = await Promise.all([
           selectAll<DecisionLinkRow>(supabase.from('decision_links').select('*', { count: 'exact' }).eq('decision_id', decision.id).order('linked_type').order('linked_id')),
           selectAll<DecisionOptionRatingRow>(supabase.from('decision_option_ratings').select('*', { count: 'exact' }).eq('decision_id', decision.id).order('branch_id').order('criterion')),
@@ -68,18 +71,27 @@ Deno.serve(async (req: Request) => {
         ]);
         const branchIds = new Set(links.filter((l) => l.linked_type === 'branch').map((l) => l.linked_id));
         // Query by model, not an unbounded caller-derived .in() URL.
-        const branches = await selectAll<BranchRow>(supabase.from('branches').select('id, title, name, description, model_id, org_id', { count: 'exact' }).eq('model_id', decision.model_id).eq('kind', 'change').order('id'));
-        const options = branches.filter((b) => branchIds.has(b.id) && b.org_id === decision.org_id);
+        const branches = await selectAll<BranchRow>(supabase.from('branches').select('*', { count: 'exact' }).eq('model_id', decision.model_id).eq('kind', 'change').order('id'));
+        const options = links.filter((l) => l.linked_type === 'branch').map((l) => branches.find((b) => b.id === l.linked_id && b.org_id === decision.org_id)).filter((b): b is BranchRow => b !== undefined);
         if (options.length !== branchIds.size) throw new Error('Some saved options could not be read.');
         const concernIds = new Set(links.filter((l) => l.linked_type === 'element').map((l) => l.linked_id));
         const relationshipIds = new Set(links.filter((l) => l.linked_type === 'relationship').map((l) => l.linked_id));
         const concerns = snapshot.elements.filter((e) => concernIds.has(e.element_id));
         const concernRelationships = snapshot.relationships.filter((r) => relationshipIds.has(r.relationship_id));
         const goalLinks = await listGoalLinksForGoals(supabase, goals.map((g) => g.id));
+        const capabilityIds = concerns.filter((e) => e.element_type === 'capability').map((e) => e.element_id);
+        const otherConcernElementIds = concerns.filter((e) => e.element_type === 'system' || e.element_type === 'container').map((e) => e.element_id);
+        const comparison = await compareDecisionOptions(supabase, {
+          modelId: decision.model_id, mainHeadCommitId: mainCommitId, capabilityIds, otherConcernElementIds,
+          options: options.filter((b) => b.id !== decision.baseline_branch_id).map((b) => ({
+            branchId: b.id, baseCommitId: b.base_commit_id, headCommitId: b.head_commit_id, label: intentHeaderLine(b),
+          })),
+        });
         return {
-          decision, options, ratings, concerns, concernRelationships,
+          decision, links, options, ratings, concerns, concernRelationships,
           principles: adrPrincipleItems(principles, principleLinks),
-          goals: goalTitlesServedBy(concerns.filter((e) => e.element_type === 'capability').map((e) => e.element_id), goals.filter((g) => g.status === 'active'), goalLinks),
+          goals: goalTitlesServedBy(capabilityIds, goals.filter((g) => g.status === 'active'), goalLinks),
+          whatChangesRows: groupWhatChangesRows(comparison.whatChangesRows).visible,
         };
       },
       createContext: (model, commitId, shareCost) => createToolContext(supabase, model, commitId, { runCost: shareCost ? 'share' : 'exclude' }),

@@ -1,6 +1,7 @@
 import type { UUID } from '../contracts/delta';
 import type { ElementsHeadRow, RelationshipsHeadRow } from '../contracts/rows';
-import type { BranchRow, DecisionOptionRatingRow, DecisionRow } from '../db/types';
+import type { BranchRow, DecisionLinkRow, DecisionOptionRatingRow, DecisionRow } from '../db/types';
+import type { WhatChangesRow } from '../engine/decisionDigest/whatChangesType';
 import type { AskModelClient } from './askLoop';
 import { buildReviewerDigest } from './reviewDigest';
 import { reviewerPrompt, type ReviewLens } from './reviewPrompt';
@@ -12,12 +13,14 @@ const MAX_REVIEW_DIGEST_CHARS = 40_000;
 
 export interface SavedReview {
   decision: DecisionRow;
-  options: Pick<BranchRow, 'id' | 'title' | 'name' | 'description'>[];
+  links: DecisionLinkRow[];
+  options: BranchRow[];
   ratings: Pick<DecisionOptionRatingRow, 'branch_id' | 'criterion' | 'level' | 'note'>[];
   concerns: ElementsHeadRow[];
   concernRelationships: RelationshipsHeadRow[];
   principles: { title: string; stance: 'follows' | 'departs'; reason: string }[];
   goals: string[];
+  whatChangesRows: WhatChangesRow[];
 }
 
 export interface ReviewDeps {
@@ -26,7 +29,7 @@ export interface ReviewDeps {
   callerRole: (orgId: UUID) => Promise<string | null>;
   settings: (orgId: UUID) => Promise<{ assistantEnabled: boolean; agentsEnabled: boolean; keySet: boolean; shareCost: boolean }>;
   mainCommit: (modelId: UUID) => Promise<UUID | null>;
-  loadSavedReview: (decision: DecisionRow, snapshot: ModelSnapshot) => Promise<SavedReview>;
+  loadSavedReview: (decision: DecisionRow, snapshot: ModelSnapshot, mainCommitId: UUID) => Promise<SavedReview>;
   createContext: (model: { id: UUID; name: string }, commitId: UUID, shareCost: boolean) => ToolContext;
   newRunId: () => string;
   createClient: (orgId: UUID, runId: string, lens: ReviewLens) => AskModelClient;
@@ -70,7 +73,7 @@ export async function handleReview(deps: ReviewDeps, body: unknown): Promise<Rev
   if (!commitId) return { status: 'empty_model' };
   const ctx = deps.createContext(model, commitId, settings.shareCost);
   const snapshot = await ctx.snapshot();
-  const saved = await deps.loadSavedReview(decision, snapshot);
+  const saved = await deps.loadSavedReview(decision, snapshot, commitId);
   const digest = buildReviewerDigest({ ...saved, snapshot, shareCost: settings.shareCost });
   if (digest.text.length > MAX_REVIEW_DIGEST_CHARS) return { status: 'too_large', message: 'This decision contains too much saved material for one second opinion. Narrow its options or linked concerns, then try again.' };
   // A warning with a generic "send anyway" would let a contributor override an owner-only choice.

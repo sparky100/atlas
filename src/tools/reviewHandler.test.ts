@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { ElementsHeadRow } from '../contracts/rows';
-import type { BranchRow, DecisionRow } from '../db/types';
+import type { BranchRow, DecisionLinkRow, DecisionRow } from '../db/types';
 import type { AskModelRequest } from './askLoop';
 import { handleReview, type ReviewDeps } from './reviewHandler';
 import { buildReviewerDigest } from './reviewDigest';
@@ -8,8 +8,12 @@ import type { ModelSnapshot, ToolContext } from './types';
 
 const id = (n: number) => `00000000-0000-4000-8000-${String(n).padStart(12, '0')}`;
 const decision = { id: id(1), org_id: id(2), model_id: id(3), status: 'proposed', title: 'How do we quote new connections?', statement: 'Quotes should take two days.', needed_by: '2027-01-01', branch_id: null, reconsider_if: null, review_by: null } as DecisionRow;
-const option = { id: id(4), title: 'Replace', name: 'Replace', description: 'Move quotes to a hosted product.' } as BranchRow;
+const option = { id: id(4), title: 'Replace', name: 'Replace', description: 'Move quotes to a hosted product.', status: 'draft', intent: 'explore', base_commit_id: id(7), head_commit_id: id(9) } as BranchRow;
 const concern = { element_id: id(5), element_type: 'system', name: 'Quote Tool', parent_id: null, attributes: { criticality: 'high', annualRunCost: 'over_5m' }, exists_delta_id: id(6) } as ElementsHeadRow;
+const links = [{ linked_type: 'branch', linked_id: option.id }, { linked_type: 'element', linked_id: concern.element_id }] as DecisionLinkRow[];
+const visibleRow = { id: 'element:quote:outcome', groupLabel: 'Quote Tool', rowLabel: 'Outcome', main: { display: 'unchanged', changed: false }, options: new Map([[option.id, { display: 'replaced by hosted quote service', changed: true }]]), anyChanged: true };
+const whatChangesRows = [visibleRow];
+const runCostRow = { ...visibleRow, id: 'run-cost', groupLabel: 'Run cost', rowLabel: 'Run cost', options: new Map([[option.id, { display: '£250k–£1m', changed: true }]]) };
 const snapshot: ModelSnapshot = { elements: [concern], relationships: [], aliases: new Map() };
 const body = { decisionId: decision.id, lens: 'challenge' };
 const answer = JSON.stringify({ notes: [{ note: 'The hosted option needs an interface.', basedOn: 'Option 1: Replace', question: 'Who has checked its fit with billing?' }] });
@@ -23,7 +27,7 @@ function deps(overrides: Partial<ReviewDeps> = {}) {
     callerRole: () => Promise.resolve('contributor'),
     settings: () => Promise.resolve({ assistantEnabled: true, agentsEnabled: true, keySet: true, shareCost: false }),
     mainCommit: () => Promise.resolve(id(7)),
-    loadSavedReview: (row) => Promise.resolve({ decision: row, options: [option], ratings: [{ branch_id: option.id, criterion: 'cost', level: 'unfavourable', note: 'Cost secret' }, { branch_id: option.id, criterion: 'effort', level: 'acceptable', note: 'Configuration needed' }], concerns: [concern], concernRelationships: [], principles: [{ title: 'Reuse', stance: 'follows', reason: 'Already in the estate' }], goals: ['Quicker quotes'] }),
+    loadSavedReview: (row) => Promise.resolve({ decision: row, links, options: [option], ratings: [{ branch_id: option.id, criterion: 'cost', level: 'unfavourable', note: 'Cost secret' }, { branch_id: option.id, criterion: 'effort', level: 'acceptable', note: 'Configuration needed' }], concerns: [concern], concernRelationships: [], principles: [{ title: 'Reuse', stance: 'follows', reason: 'Already in the estate' }], goals: ['Quicker quotes'], whatChangesRows: [...whatChangesRows, runCostRow] }),
     createContext: (_model, _commit, shareCost) => {
       choices.push({ lens: '', runId: '', shareCost });
       return { snapshot: () => Promise.resolve(snapshot) } as ToolContext;
@@ -48,8 +52,11 @@ describe('review-agent boundary', () => {
     expect(actual).toContain('Quote Tool');
     expect(actual).toContain('Configuration needed');
     expect(actual).toContain('Quicker quotes');
+    expect(actual).toContain('replaced by hosted quote service');
+    expect(actual).toContain('# ADR: How do we quote new connections?');
     expect(actual).not.toContain('Cost secret');
     expect(actual).not.toContain('annualRunCost');
+    expect(actual).not.toContain('£250k');
     expect(actual).not.toContain(decision.org_id);
     expect(actual).not.toContain(decision.model_id);
     expect(actual).not.toContain(option.id);
@@ -107,8 +114,18 @@ describe('review-agent boundary', () => {
 
 it('the digest is an explicit allowlist: a new attribute does not reach the provider', () => {
   const secret = { ...concern, attributes: { annualRunCost: 'over_5m', annualBudget: '£1m', criticality: 'high' } };
-  const d = buildReviewerDigest({ decision, options: [option], ratings: [], concerns: [secret], snapshot: { ...snapshot, elements: [secret] }, principles: [], goals: [], shareCost: false });
+  const d = buildReviewerDigest({ decision, links, options: [option], ratings: [], concerns: [secret], snapshot: { ...snapshot, elements: [secret] }, principles: [], goals: [], whatChangesRows: [], shareCost: false });
   expect(d.text).toContain('criticality: high');
   expect(d.text).not.toContain('annualBudget');
   expect(d.text).not.toContain('annualRunCost');
+});
+
+it('uses the same visible What-changes wording as the pack, withholding its run-cost row until sharing is enabled', () => {
+  const base = { decision, links, options: [option], ratings: [], concerns: [concern], snapshot, principles: [], goals: [], whatChangesRows: [...whatChangesRows, runCostRow] };
+  const withheld = buildReviewerDigest({ ...base, shareCost: false }).text;
+  expect(withheld).toContain('## What changes (evidence)');
+  expect(withheld).toContain('**Quote Tool — Outcome** — Current (main): unchanged; Exploring: Replace: replaced by hosted quote service');
+  expect(withheld).not.toContain('Run cost');
+  expect(withheld).not.toContain('£250k');
+  expect(buildReviewerDigest({ ...base, shareCost: true }).text).toContain('£250k–£1m');
 });
