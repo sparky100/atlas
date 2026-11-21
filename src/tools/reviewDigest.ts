@@ -1,18 +1,24 @@
 /** The reviewer's explicit data boundary. Only these saved fields leave Atlas. */
-import { decisionCriterionLevelLabel, DECISION_CRITERIA } from '../contracts/decisionCriteria';
 import type { ElementsHeadRow, RelationshipsHeadRow } from '../contracts/rows';
 import type { BranchRow, DecisionOptionRatingRow, DecisionRow } from '../db/types';
+import type { WhatChangesRow } from '../engine/decisionDigest/whatChangesType';
+import { buildDecisionAdrExportInput } from '../engine/decisionDigest/decisionAdrInput';
+import { exportDecisionAsAdrMarkdown } from '../engine/decisionDigest/exportDecisionAsAdr';
+import { intentHeaderLine } from '../engine/decisionDigest/intentHeaderLine';
+import type { DecisionLinkRow } from '../db/types';
 import type { ModelSnapshot } from './types';
 
 export interface ReviewDigestInput {
-  decision: Pick<DecisionRow, 'title' | 'statement' | 'status' | 'needed_by' | 'branch_id' | 'reconsider_if' | 'review_by'>;
-  options: readonly Pick<BranchRow, 'id' | 'title' | 'name' | 'description'>[];
+  decision: DecisionRow;
+  links: readonly DecisionLinkRow[];
+  options: readonly BranchRow[];
   ratings: readonly Pick<DecisionOptionRatingRow, 'branch_id' | 'criterion' | 'level' | 'note'>[];
   concerns: readonly ElementsHeadRow[];
   concernRelationships?: readonly RelationshipsHeadRow[];
   snapshot: ModelSnapshot;
   principles: readonly { title: string; stance: 'follows' | 'departs'; reason: string }[];
   goals: readonly string[];
+  whatChangesRows: readonly WhatChangesRow[];
   shareCost: boolean;
 }
 
@@ -45,10 +51,31 @@ function relationLine(edge: RelationshipsHeadRow, names: ReadonlyMap<string, str
 
 export function buildReviewerDigest(input: ReviewDigestInput): ReviewDigest {
   const { decision, options, concerns, ratings, snapshot, shareCost } = input;
-  const lines = [`# Decision: ${decision.title}`, `Status: ${decision.status}`, `Context: ${decision.statement}`];
-  if (decision.needed_by) lines.push(`Needed by: ${decision.needed_by}`);
-  if (decision.reconsider_if) lines.push(`Reconsider if: ${decision.reconsider_if}`);
-  if (decision.review_by) lines.push(`Review by: ${decision.review_by}`);
+  // Build an explicit copy: a future field on DecisionRow/BranchRow does not
+  // leave Atlas simply because the human pack starts rendering it.
+  const safeDecision = {
+    title: decision.title, statement: decision.statement, status: decision.status,
+    needed_by: decision.needed_by, branch_id: decision.branch_id,
+    reconsider_if: decision.reconsider_if, review_by: decision.review_by,
+    stay_risk: '', stay_reason: '', lens_map_url: null,
+    ai_draft_agent: null, ai_drafted_at: null, ai_draft_edited: false,
+    decided_at: null, cancel_reason: null,
+  } as DecisionRow;
+  const safeOptions = options.map((option) => ({
+    id: option.id, name: option.name, title: option.title,
+    description: option.description, status: option.status, intent: option.intent,
+  } as BranchRow));
+  const visibleRows = input.whatChangesRows.filter((r) => r.anyChanged && (shareCost || r.id !== 'run-cost'));
+  const adrInput = buildDecisionAdrExportInput({
+    decision: safeDecision,
+    links: input.links,
+    linkedElementsById: new Map(concerns.map((e) => [e.element_id, e])),
+    linkedBranchesById: new Map(safeOptions.map((b) => [b.id, b])),
+    args: [], ratings: ratings.filter((r) => shareCost || r.criterion !== 'cost'),
+    principles: input.principles, goalsServed: input.goals,
+    whatChangesRows: visibleRows, ownerName: '',
+  });
+  const lines = [exportDecisionAsAdrMarkdown({ ...adrInput, omitOwner: true }).trimEnd()];
   const optionIdsByLabel = new Map<string, string>();
   const elementIdsByLabel = new Map<string, string>();
   const allNames = new Map(snapshot.elements.map((e) => [e.element_id, e.name]));
@@ -57,13 +84,7 @@ export function buildReviewerDigest(input: ReviewDigestInput): ReviewDigest {
     // Index makes the reference unambiguous even when two options share a title; ids stay server-side.
     const label = `Option ${String(index + 1)}: ${option.title ?? option.name}`;
     optionIdsByLabel.set(label, option.id);
-    lines.push(`${label}${option.id === decision.branch_id ? ' (chosen)' : ''}`);
-    if (option.description) lines.push(`About: ${option.description}`);
-    for (const criterion of DECISION_CRITERIA) {
-      if (!shareCost && criterion.key === 'cost') continue;
-      const rating = ratings.find((r) => r.branch_id === option.id && r.criterion === criterion.key);
-      if (rating) lines.push(`${criterion.label}: ${decisionCriterionLevelLabel(criterion.key, rating.level) ?? rating.level}${rating.note ? ` — ${rating.note}` : ''}`);
-    }
+    lines.push(`${label} means ${intentHeaderLine(option)}`);
   }
   const relevantIds = new Set(concerns.map((e) => e.element_id));
   for (const edge of input.concernRelationships ?? []) {

@@ -57,6 +57,17 @@ function makeBranch(overrides: Partial<BranchRow> = {}): BranchRow {
 }
 
 describe('exportDecisionAsAdrMarkdown', () => {
+  it('keeps the pack text byte-for-byte stable after sharing its formatter with reviewers', () => {
+    const branch = makeBranch({ description: 'A replacement.' });
+    const markdown = exportDecisionAsAdrMarkdown({
+      decision: makeDecision(), ownerName: 'Alice',
+      concerns: [{ name: 'Ledger', typeLabel: 'system' }],
+      options: [{ branch, isChosen: false, ratings: [{ criterionLabel: 'Effort', levelLabel: 'Acceptable', note: null }] }],
+      whatChangesRows: [{ id: 'ledger:outcome', groupLabel: 'Ledger', rowLabel: 'Outcome', main: { display: 'unchanged', changed: false }, options: new Map([[branch.id, { display: 'retired', changed: true }]]), anyChanged: true }],
+      reasons: null,
+    });
+    expect(markdown).toBe('# ADR: Replace Ledger Service?\n\n**Status:** Proposed\n**Outcome:** Not yet decided\n**Owner:** Alice\n\n## Context\n\nLedger Service needs a real replacement plan.\n\n## Concerns\n\n- Ledger (system)\n\n## Options considered\n\n- Exploring: Option A — draft\n  - About: A replacement.\n  - Effort: Acceptable\n\n## What changes (evidence)\n\n- **Ledger — Outcome** — Current (main): unchanged; Exploring: Option A: retired\n\n## Decision\n\nNot yet decided.\n');
+  });
   it('records the stay-as-we-are baseline only when something was written', () => {
     const base = { ownerName: 'Alice', concerns: [], options: [], whatChangesRows: [], reasons: null };
     expect(exportDecisionAsAdrMarkdown({ ...base, decision: makeDecision() })).not.toContain('## Staying as we are');

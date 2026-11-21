@@ -25,9 +25,7 @@ export function decisionStatusTone(status: DecisionStatus): ChipTone {
  * as "cancelled" (ADR-022 amendment, 2026-10-03) — the word people use for
  * a decision that was dropped rather than decided. The others show as stored.
  */
-export function decisionStatusLabel(status: DecisionStatus): string {
-  return status === 'rejected' ? 'cancelled' : status;
-}
+export { decisionStatusLabel } from '../../engine/decisionDigest/decisionStatusLabel';
 
 /** One plain sentence on what the status means, shown beside it so the state is never just a small grey word. */
 export function decisionStatusMeaning(status: DecisionStatus): string {
