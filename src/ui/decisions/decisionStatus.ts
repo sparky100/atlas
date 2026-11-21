@@ -1,6 +1,13 @@
 import type { DecisionStatus } from '../../db/types';
 import type { ChipTone } from '../components/Chip/Chip';
 
+/**
+ * Moved to `src/engine/decisionDigest/decisionStatusLabel.ts` so the ADR
+ * formatter (and reviewer digest) can use it without importing UI code.
+ * Re-exported here so every existing UI import is unchanged.
+ */
+export { decisionStatusLabel } from '../../engine/decisionDigest/decisionStatusLabel';
+
 /** Status → chip tone, the decisions list/page's own equivalent of `branchStatus.ts`'s `branchStatusTone` — never colour-only (§6.3/§8.4/§8.7: `Chip` always pairs tone with the status label itself). */
 export function decisionStatusTone(status: DecisionStatus): ChipTone {
   switch (status) {
@@ -18,15 +25,6 @@ export function decisionStatusTone(status: DecisionStatus): ChipTone {
     case 'superseded':
       return 'neutral';
   }
-}
-
-/**
- * Status as shown. `rejected` is stored by `atlas.cancel_decision` and reads
- * as "cancelled" (ADR-022 amendment, 2026-10-03) — the word people use for
- * a decision that was dropped rather than decided. The others show as stored.
- */
-export function decisionStatusLabel(status: DecisionStatus): string {
-  return status === 'rejected' ? 'cancelled' : status;
 }
 
 /** One plain sentence on what the status means, shown beside it so the state is never just a small grey word. */

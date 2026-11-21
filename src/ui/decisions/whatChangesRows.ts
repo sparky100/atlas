@@ -70,22 +70,14 @@ import type { ValueStreamTone } from '../valueStreams/valueStreamRollup';
 import type { CapabilityComparisonMetrics, OptionComparisonRow } from './compareOptions';
 import type { OptionTouch } from './optionTouch';
 
-export interface WhatChangesCell {
-  display: string;
-  changed: boolean;
-}
+/**
+ * The row shape lives in `src/engine/decisionDigest/whatChangesRow.ts` so the
+ * ADR formatter and reviewer digest can read it without importing UI code.
+ * Re-exported here so every existing UI import is unchanged.
+ */
+import type { WhatChangesCell, WhatChangesRow } from '../../engine/decisionDigest/whatChangesRow';
 
-export interface WhatChangesRow {
-  id: string;
-  /** The capability/system/container/stream name this row belongs under, or "Boundary crossings" — how the UI groups rows (decision 2: "group visible rows under the capability name"). */
-  groupLabel: string;
-  /** "Coverage" / "Lifecycle" / "Criticality" / "Fit" / "Outcome" / "Scoped crossings" / a value stream's own name. */
-  rowLabel: string;
-  main: WhatChangesCell;
-  options: ReadonlyMap<UUID, WhatChangesCell>;
-  /** `true` the moment any one option's value differs from main's — the collapse rule (rule 2) operates on exactly this flag. */
-  anyChanged: boolean;
-}
+export type { WhatChangesCell, WhatChangesRow } from '../../engine/decisionDigest/whatChangesRow';
 
 function cell(display: string, changed: boolean): WhatChangesCell {
   return { display, changed };
