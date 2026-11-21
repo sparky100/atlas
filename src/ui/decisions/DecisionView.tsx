@@ -25,6 +25,9 @@ import { DecisionNextStepCard } from './DecisionNextStepCard';
 import { createComment } from '../../db/comments';
 import { canAddDecisionConcern, canCancelDecision, canChooseDecisionOption, canCreateChangeBranch, canEditDecision, canRateDecisionOption } from '../orgs/useMembership';
 import { useMembers } from '../orgs/useMembers';
+import { ownerNames } from '../orgs/ownerNames';
+import { reviewerAvailability } from './reviewerAvailability';
+import { SecondOpinion } from './SecondOpinion';
 import type { AlsoAffectedElement } from './alsoAffected';
 import { DecisionBaselineCard } from './DecisionBaselineCard';
 import { CollapsibleSection } from '../components/CollapsibleSection/CollapsibleSection';
@@ -65,6 +68,10 @@ export interface DecisionViewProps {
   orgSlug: string;
   modelSlug: string;
   role: MemberRole | null;
+  assistantEnabled: boolean;
+  agentsEnabled: boolean;
+  keySet: boolean;
+  shareCost: boolean;
   /** Lifted from `DecisionPage.tsx`'s own `useDecision` call, not fetched again here — the two used to each run their own independent copy of the same fetch (one for this view, one `DecisionPage.tsx` only ever read `.title` from), so a transient failure of either one alone could post the "Couldn't load this decision" banner even while the other succeeded and rendered full content underneath it (found in a walkthrough, issue-reported). One fetch, shared. */
   state: DecisionPageState;
   /** `useDecision.ts`'s own patches — see that file's doc comments. Passed straight through to `useDecisionOptions` so Add-an-option/Choose never trigger this page's own full `reload()`/loading flash any more. */
@@ -89,7 +96,7 @@ export interface DecisionViewProps {
  * this here" (an element's own linked decisions) are also PR6, but live on
  * `DecisionsView.tsx`/`ElementDecisionsSection.tsx` respectively, not here.
  */
-export function DecisionView({ modelId, decisionId, orgId, orgSlug, modelSlug, role, state, applyNewOption, applyNewConcern, applyDecisionUpdate, refreshOptionsAndArguments }: DecisionViewProps) {
+export function DecisionView({ modelId, decisionId, orgId, orgSlug, modelSlug, role, assistantEnabled, agentsEnabled, keySet, shareCost, state, applyNewOption, applyNewConcern, applyDecisionUpdate, refreshOptionsAndArguments }: DecisionViewProps) {
   const { userId } = useAuth();
   const { branch: main } = useMainBranch(modelId);
   const { members } = useMembers(orgId);
@@ -162,6 +169,7 @@ export function DecisionView({ modelId, decisionId, orgId, orgSlug, modelSlug, r
   const canRate = canRateDecisionOption(role, decision);
   const chosenBranch = decision.branch_id !== null ? linkedBranchesById.get(decision.branch_id) : undefined;
   const scoredLinks = branchLinks.filter((l) => l.linked_id !== decision.baseline_branch_id);
+  const secondOpinion = reviewerAvailability({ role, status: decision.status, optionCount: scoredLinks.length, assistantEnabled, agentsEnabled, keySet, ownerNames: ownerNames(members) });
   const canEditBaseline = canAddOption && canEditDecision(role, decision, userId);
   const baselineBranch = decision.baseline_branch_id !== null ? linkedBranchesById.get(decision.baseline_branch_id) : undefined;
   const approvers = members.filter((m) => m.member.role === 'owner' || m.member.role === 'architect');
@@ -268,7 +276,7 @@ export function DecisionView({ modelId, decisionId, orgId, orgSlug, modelSlug, r
           {adrCopied ? 'Copied' : 'Copy as ADR markdown'}
         </Button>
       </div>
-      {nextStep !== null && <DecisionNextStepCard step={nextStep} onAction={onNextStepAction} busy={askBusy} askedNames={askedNames} error={askError} />}
+      {nextStep !== null && <DecisionNextStepCard step={nextStep} onAction={onNextStepAction} busy={askBusy} askedNames={askedNames} error={askError} showSecondOpinion={secondOpinion.available} />}
       {canEditDecision(role, decision, userId) && (
         <DecisionEdit
           decision={decision}
@@ -663,6 +671,8 @@ export function DecisionView({ modelId, decisionId, orgId, orgSlug, modelSlug, r
           </CollapsibleSection>
         </Panel>
       )}
+
+      <SecondOpinion orgId={orgId} userId={userId} decisionId={decisionId} orgSlug={orgSlug} shareCost={shareCost} availability={secondOpinion} />
 
       {decision.status === 'accepted' && chosenBranch !== undefined && (
         <DecisionGoLive
