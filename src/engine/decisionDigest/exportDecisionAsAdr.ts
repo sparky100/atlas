@@ -115,6 +115,11 @@ function optionSourceLines(option: DecisionAdrExportOption): string[] {
   if (sources.length === 0) return [];
   const lines = ['  - Sources:'];
   for (const source of sources) {
+    if (source.kind === 'web') {
+      lines.push(`    - ${source.title} - ${source.url} (${source.publisher ?? 'web page'}; retrieved ${source.retrievedAt.slice(0, 10)}; unreviewed)`);
+      if (source.excerpt !== null) lines.push(`      - ${source.excerpt}`);
+      continue;
+    }
     const standing = source.standing === 'current'
       ? `current in catalogue v${String(source.version)}`
       : source.standing === 'replaced'

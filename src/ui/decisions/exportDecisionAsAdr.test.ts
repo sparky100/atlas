@@ -263,4 +263,19 @@ describe('exportDecisionAsAdrMarkdown', () => {
     expect(markdown).toContain('      - Records complaints. - https://vendor.example/crm (source dated 2026-01-01; reviewed by Simon Parkinson on 2026-01-02)');
     expect(exportDecisionAsAdrMarkdown({ decision: makeDecision(), ownerName: 'Alice', concerns: [], options: [{ branch, isChosen: false, ratings: [] }], whatChangesRows: [], reasons: null })).not.toContain('  - Sources:');
   });
+  it('lists a saved web page as unreviewed evidence under its option', () => {
+    const branch = makeBranch();
+    const source: OptionSource = {
+      kind: 'web', id: 'branch-1\u0000https://example.com/evidence', branchId: branch.id,
+      url: 'https://example.com/evidence', title: 'Product evidence', publisher: 'Example', excerpt: 'The page says it records complaints.',
+      retrievedAt: '2026-11-21T10:00:00Z', citedBy: 'user-1', citedAt: '2026-11-21T10:05:00Z',
+    };
+    const markdown = exportDecisionAsAdrMarkdown({
+      decision: makeDecision(), ownerName: 'Alice', concerns: [], whatChangesRows: [], reasons: null,
+      options: [{ branch, isChosen: false, ratings: [], sources: [source] }],
+    });
+    expect(markdown).toContain('  - Sources:');
+    expect(markdown).toContain('    - Product evidence - https://example.com/evidence (Example; retrieved 2026-11-21; unreviewed)');
+    expect(markdown).toContain('      - The page says it records complaints.');
+  });
 });
