@@ -176,6 +176,21 @@ export async function listDecisionOptionLinksForModel(supabase: Client, modelId:
   return rows.map((r) => ({ decisionId: r.decision_id, branchId: r.linked_id }));
 }
 
+/** Option branches belonging to decisions in this project, including closed decisions. */
+export async function listDecisionOptionLinksForProject(supabase: Client, projectId: UUID): Promise<DecisionOptionLink[]> {
+  assertRealId('listDecisionOptionLinksForProject', 'project_id', projectId);
+  const rows = await selectAll<{ decision_id: UUID; linked_id: UUID }>(
+    supabase
+      .from('decision_links')
+      .select('decision_id, linked_id, decisions!inner(id, project_id)', { count: 'exact' })
+      .eq('linked_type', 'branch')
+      .eq('decisions.project_id', projectId)
+      .order('decision_id')
+      .order('linked_id'),
+  );
+  return rows.map((r) => ({ decisionId: r.decision_id, branchId: r.linked_id }));
+}
+
 /**
  * F3 PR6's "why is this here": every decision that names one of the given
  * elements as something it concerns (`linked_type='element'`). `elementIds`

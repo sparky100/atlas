@@ -35,16 +35,15 @@ test('project lifecycle: start from a finding, decide inside it, deliver the cho
   await page.getByRole('button', { name: 'Start project' }).click();
   await expect(page.getByRole('heading', { name: PROJECT_TITLE, level: 1 })).toBeVisible();
   await expectNavCurrent(page, 'Projects');
-  const scopePanel = page.locator('section, div').filter({ has: page.getByRole('heading', { name: 'Declared scope' }) }).last();
-  await expect(scopePanel.getByRole('link', { name: 'Housing Repairs' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Scope', exact: true })).toBeVisible();
+  await expect(page.getByRole('link', { name: 'Housing Repairs' }).first()).toBeVisible();
 
   // The project remembers which finding it started from, and says so.
   await expect(page.getByTestId('project-source-finding')).toContainText('Started from a health finding: a capability nothing supports.');
 
   // 2. The page says what to do next, and the decision form is right there in that card.
-  const nextStep = page.getByTestId('project-next-step');
-  await expect(nextStep.getByRole('heading', { name: 'What to do next' })).toBeVisible();
-  await expect(nextStep.getByText('Work out the options')).toBeVisible();
+  const nextStep = page.getByTestId('start-project-decision');
+  await expect(page.getByRole('heading', { name: 'Decisions', exact: true })).toBeVisible();
   await expect(nextStep.getByLabel('New decision title')).toHaveValue('How should we meet Housing Repairs?');
   await nextStep.getByLabel('New decision title').fill('Which system supports repairs?');
   await page.getByRole('button', { name: 'Start decision' }).click();
@@ -98,19 +97,23 @@ test('project lifecycle: start from a finding, decide inside it, deliver the cho
   // 5. The project shows the decision accepted, the chosen design open,
   // the other option closed, and what the design touches beyond scope.
   await openProject(page);
-  await expect(page.getByRole('region', { name: 'Chosen design' }).getByRole('link', { name: 'Build Repairs Hub' })).toBeVisible();
-  await expect(page.getByRole('region', { name: 'Closed without merging' }).getByRole('link', { name: 'Extend the CRM' })).toBeVisible();
+  await expect(page.getByText('Option chosen', { exact: true })).toBeVisible();
+  await expect(page.getByRole('link', { name: 'Build Repairs Hub' }).first()).toBeVisible();
+  await expect(page.getByText('Other options remain on the decision page; they are not the chosen design.')).toBeVisible();
+  await page.locator('summary', { hasText: 'Review scope against draft changes' }).click();
   await expect(page.getByText('Touched by this project\'s changes, not in scope')).toBeVisible();
-  // The system now also appears in the before/after panel, so match the first link on the page.
-  await expect(page.getByRole('link', { name: 'Repairs Hub', exact: true }).first()).toBeVisible();
-  // The card follows the work: the choice is made and the design is open, so the next step is review.
-  await expect(page.getByTestId('project-next-step').getByText('Take the change through review')).toBeVisible();
+  await page.locator('summary', { hasText: 'Compare live model with chosen option' }).click();
+  await page.getByTestId('project-before-after').getByTestId('also-supports').first().locator('summary').click();
+  await expect(page.getByTestId('project-before-after').getByRole('link', { name: 'Repairs Hub', exact: true }).first()).toBeVisible();
+  await page.getByTestId('project-before-after').getByRole('button', { name: 'Diagram' }).click();
+  await expect(page.getByTestId('project-before-after').getByTestId('project-diagram').first()).toBeVisible();
   // Closing is refused while the design is open — and the page says what's open.
   await expect(page.getByRole('button', { name: 'Close project' })).toHaveCount(0);
+  await page.locator('summary', { hasText: 'Why can’t this project close?' }).click();
   await expect(page.getByText('To close or cancel this project, first finish or cancel what is still open in it:')).toBeVisible();
 
   // 6. Submit, approve and merge the design (the owner is the required reviewer).
-  await page.getByRole('region', { name: 'Chosen design' }).getByRole('link', { name: 'Build Repairs Hub' }).click();
+  await page.getByRole('link', { name: 'Build Repairs Hub' }).first().click();
   await page.getByRole('button', { name: 'Submit for review' }).click();
   await expect(page.getByRole('button', { name: 'Submit for review' })).toHaveCount(2);
   const unchecked = page.getByRole('checkbox', { checked: false });
@@ -126,17 +129,12 @@ test('project lifecycle: start from a finding, decide inside it, deliver the cho
   // 7. Nothing is open any more: close the project.
   await goToModelHome(page);
   await openProject(page);
-  // Nothing is open, so the Changes step starts collapsed; open it to see the merged change.
-  const changesToggle = page.getByRole('button', { name: /^Changes/ });
-  await expect(changesToggle).toHaveAttribute('aria-expanded', 'false');
-  await changesToggle.click();
-  await expect(page.getByRole('region', { name: 'Merged' }).getByRole('link', { name: 'Build Repairs Hub' })).toBeVisible();
-  await expect(page.getByTestId('project-next-step').getByText('Check the result, then close the project', { exact: true })).toBeVisible();
+  await expect(page.getByText('Merged into live model')).toBeVisible();
+  await expect(page.getByRole('link', { name: 'Build Repairs Hub' }).first()).toBeVisible();
   await page.getByRole('button', { name: 'Close project' }).click();
   await expect(page.getByText('Closed', { exact: true }).first()).toBeVisible();
   await expect(page.getByRole('button', { name: '✎ Edit project' })).toHaveCount(0);
-  // A closed project has no next step.
-  await expect(page.getByTestId('project-next-step')).toHaveCount(0);
+  await expect(page.getByRole('heading', { name: 'Project details' })).toBeVisible();
 
   // No horizontal overflow on the project page (meaningful at 390).
   const overflow = await page.evaluate(() => document.documentElement.scrollWidth > document.documentElement.clientWidth + 1);
