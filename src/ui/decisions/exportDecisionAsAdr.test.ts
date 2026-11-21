@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { BranchRow, DecisionRow } from '../../db/types';
+import type { OptionSource } from '../../contracts/optionSource';
 import { exportDecisionAsAdrMarkdown } from './exportDecisionAsAdr';
 
 function makeDecision(overrides: Partial<DecisionRow> = {}): DecisionRow {
@@ -244,5 +245,22 @@ describe('exportDecisionAsAdrMarkdown', () => {
     expect(markdown).toContain('  - Original AI wording: What would make us reconsider?');
     expect(markdown).toContain('These are questions a person kept, not a review, clearance or sign-off.');
     expect(exportDecisionAsAdrMarkdown(base)).not.toContain('## Questions raised by an AI reviewer');
+  });
+  it('lists saved catalogue evidence under its option, with the claim, source and reviewer, and keeps standing live', () => {
+    const branch = makeBranch();
+    const source: OptionSource = {
+      kind: 'catalogue', id: 'branch-1:sector:1:crm-x', branchId: branch.id, sector: 'electricity_network', version: 1,
+      entryCode: 'crm-x', product: 'CRM X', vendor: 'Vendor Ltd', summary: 'A CRM.', licence: 'CC-BY-4.0',
+      standing: 'replaced', citedBy: 'user-1', citedAt: '2026-11-21T09:00:00Z',
+      claims: [{ position: 1, kind: 'functional', statement: 'Records complaints.', sourceUrl: 'https://vendor.example/crm', sourceDate: '2026-01-01', reviewedBy: 'Simon Parkinson', reviewedAt: '2026-01-02' }],
+    };
+    const markdown = exportDecisionAsAdrMarkdown({
+      decision: makeDecision(), ownerName: 'Alice', concerns: [], whatChangesRows: [], reasons: null,
+      options: [{ branch, isChosen: false, ratings: [], sources: [source] }],
+    });
+    expect(markdown).toContain('  - Sources:');
+    expect(markdown).toContain('    - CRM X - Vendor Ltd (saved from catalogue v1, since replaced)');
+    expect(markdown).toContain('      - Records complaints. - https://vendor.example/crm (source dated 2026-01-01; reviewed by Simon Parkinson on 2026-01-02)');
+    expect(exportDecisionAsAdrMarkdown({ decision: makeDecision(), ownerName: 'Alice', concerns: [], options: [{ branch, isChosen: false, ratings: [] }], whatChangesRows: [], reasons: null })).not.toContain('  - Sources:');
   });
 });

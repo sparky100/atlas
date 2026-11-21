@@ -7,6 +7,8 @@ export const CATALOGUE_NO_PRICE_PATTERN = "[£$€]|(^|[^a-z0-9_])(gbp|usd|eur|a
 export const CATALOGUE_SOURCE_URL_PATTERN = "^https://[^/@:\\s?#]+(/[^\\s]*)?$";
 export const CATALOGUE_CLAIM_KINDS = ['functional', 'deployment', 'licensing_model', 'support_end', 'integration'] as const;
 export const CATALOGUE_SNAPSHOT_MAX_BYTES = 8000;
+/** What a saved citation is, relative to the catalogue as it stands now. */
+export type CatalogueStanding = 'current' | 'replaced' | 'withdrawn';
 const price = new RegExp(CATALOGUE_NO_PRICE_PATTERN, 'i');
 const url = new RegExp(CATALOGUE_SOURCE_URL_PATTERN);
 export const containsCataloguePrice = (value: string): boolean => price.test(value);
