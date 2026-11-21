@@ -14,7 +14,7 @@ import { createModel } from './models';
 import { createDecision, createDecisionLink } from './decisions';
 import { createChangeBranch, getMainBranch } from './branches';
 import { markOptionEdited } from './decisionOptionMarks';
-import { addOptionWithCatalogueSources, catalogueToRows, catalogueSnapshotFromRows, listCatalogueSources } from './productCatalogue';
+import { addOptionWithCatalogueSources, catalogueToRows, catalogueSnapshotFromRows, listCatalogueSources, listOptionSources } from './productCatalogue';
 
 function at<T>(items: readonly T[], index = 0): T {
   const value = items[index];
@@ -218,6 +218,9 @@ describe('product catalogue and option evidence, real database', () => {
     const expected = catalogueSnapshotFromRows({ ...s.rows, catalogue: { ...s.rows.catalogue, sector: 'electricity_network' } }, s.entryId);
     expect(sources[0]?.snapshot).toEqual({ ...expected, sector: s.citation.sector });
     expect(sources[0]?.cited_by).toBe(contributor.id);
+    const mapped = await listOptionSources(viewer.client, m.decisionId);
+    expect(mapped[0]).toMatchObject({ kind: 'catalogue', branchId: m.branchId, product: 'Quotation Tool', standing: 'current' });
+    expect(mapped[0]?.claims).toHaveLength(1);
     await markOptionEdited(owner.client, { decisionId: m.decisionId, branchId: m.branchId, editedBy: owner.id, editedAt: '2026-11-20T10:02:00Z' });
     await addOptionWithCatalogueSources(contributor.client, m, [s.citation]);
     expect(await listCatalogueSources(viewer.client, m.decisionId)).toHaveLength(1);

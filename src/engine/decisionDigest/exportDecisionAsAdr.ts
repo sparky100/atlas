@@ -1,4 +1,5 @@
 import type { DecisionAgentNote } from '../../contracts/decisionAgentNote';
+import type { OptionSource } from '../../contracts/optionSource';
 import type { UUID } from '../../contracts/delta';
 import { aiMarkLine } from './aiMarks';
 import type { BranchRow, DecisionRow } from '../../db/types';
@@ -48,6 +49,8 @@ export interface DecisionAdrExportOption {
   isChosen: boolean;
   /** This option's own recorded ratings, already resolved to the criterion's/level's own display label (`decisionCriterionLevelLabel`) and in `DECISION_CRITERIA`'s own presentation order — the same labels and order the criteria grid itself shows, never a raw criterion/level key. Empty when nothing on this option has been rated yet. */
   ratings: readonly DecisionAdrExportOptionRating[];
+  /** Catalogue or web evidence saved with this option. Optional/empty prints no Sources block, so an older pack reads as it did. */
+  sources?: readonly OptionSource[];
 }
 
 export interface DecisionAdrExportInput {
@@ -106,6 +109,25 @@ function optionRatingLines(option: DecisionAdrExportOption): string[] {
   return option.ratings.map((r) => `  - ${r.criterionLabel}: ${r.levelLabel}${r.note && r.note.trim().length > 0 ? ` — ${r.note}` : ''}`);
 }
 
+/** Saved evidence, under the option it belongs to. The product and the claim are both printed: a reader should not have to open a URL to know what was claimed. */
+function optionSourceLines(option: DecisionAdrExportOption): string[] {
+  const sources = option.sources ?? [];
+  if (sources.length === 0) return [];
+  const lines = ['  - Sources:'];
+  for (const source of sources) {
+    const standing = source.standing === 'current'
+      ? `current in catalogue v${String(source.version)}`
+      : source.standing === 'replaced'
+        ? `saved from catalogue v${String(source.version)}, since replaced`
+        : `saved from catalogue v${String(source.version)}, now withdrawn`;
+    lines.push(`    - ${source.product} - ${source.vendor} (${standing})`);
+    for (const claim of source.claims) {
+      lines.push(`      - ${claim.statement} - ${claim.sourceUrl} (source dated ${claim.sourceDate}; reviewed by ${claim.reviewedBy} on ${claim.reviewedAt})`);
+    }
+  }
+  return lines;
+}
+
 function whatChangesRowLine(row: WhatChangesRow, optionLabelsByBranchId: ReadonlyMap<UUID, string>): string {
   const optionParts = [...row.options.entries()].map(([branchId, cell]) => `${optionLabelsByBranchId.get(branchId) ?? branchId}: ${cell.display}`);
   return `- **${row.groupLabel} — ${row.rowLabel}** — ${[`Current (main): ${row.main.display}`, ...optionParts].join('; ')}`;
@@ -154,6 +176,7 @@ export function exportDecisionAsAdrMarkdown(input: DecisionAdrExportInput): stri
       lines.push(optionLine(option));
       lines.push(...optionAboutLines(option));
       lines.push(...optionRatingLines(option));
+      lines.push(...optionSourceLines(option));
     }
   }
 

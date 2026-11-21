@@ -1,7 +1,10 @@
 import type { DecisionOptionMark } from '../contracts/decisionOptionMark';
-import type { CatalogueCitation, CatalogueSnapshot, ProductCatalogueContent, ProductCatalogueRow, CatalogueEntryRow, CatalogueCapabilityRow, CatalogueClaimRow, OptionCatalogueSourceRow } from '../contracts/productCatalogue';
+import type { CatalogueCitation, CatalogueSnapshot, ProductCatalogueContent, ProductCatalogueRow, CatalogueEntryRow, CatalogueCapabilityRow, CatalogueClaimRow, OptionCatalogueSourceRow, CatalogueStanding } from '../contracts/productCatalogue';
+import type { OptionSource } from '../contracts/optionSource';
 import { productCatalogueContentSchema } from '../contracts/productCatalogue';
 import type { Client } from './client';
+
+export type { CatalogueStanding };
 
 export interface CatalogueRows {
   catalogue: ProductCatalogueRow;
@@ -106,8 +109,6 @@ export interface CatalogueEntry {
   claims: CatalogueClaim[];
 }
 
-export type CatalogueStanding = 'current' | 'replaced' | 'withdrawn';
-
 export interface CitedCatalogueEntry extends CatalogueEntry {
   sector: string;
   version: number;
@@ -117,6 +118,61 @@ export interface CitedCatalogueEntry extends CatalogueEntry {
   standing: CatalogueStanding;
   withdrawnReason: string | null;
   newerVersion: number | null;
+}
+
+/** The live standing of every cited catalogue, so saved citations can be marked without one query per source. */
+export async function catalogueStandingByCitation(client: Client, citations: readonly { sector: string; version: number }[]): Promise<Map<string, CatalogueStanding>> {
+  const sectors = [...new Set(citations.map((c) => c.sector))];
+  if (sectors.length === 0) return new Map();
+  const { data, error } = await client
+    .from('product_catalogues')
+    .select('sector, version, status, withdrawn_at')
+    .in('sector', sectors);
+  if (error) throw new Error(`catalogueStandingByCitation: ${error.message}`);
+  const rows = (data as { sector: string; version: number; status: 'draft' | 'published'; withdrawn_at: string | null }[] | null) ?? [];
+  const currentVersion = new Map<string, number>();
+  for (const row of rows) {
+    if (row.status !== 'published' || row.withdrawn_at !== null) continue;
+    if ((currentVersion.get(row.sector) ?? 0) < row.version) currentVersion.set(row.sector, row.version);
+  }
+  const standing = new Map<string, CatalogueStanding>();
+  for (const citation of citations) {
+    const row = rows.find((r) => r.sector === citation.sector && r.version === citation.version);
+    // A published catalogue cannot be deleted. If it cannot be read at all, treat the saved citation as no longer current rather than presenting it as current.
+    const value: CatalogueStanding = row?.withdrawn_at !== null
+      ? 'withdrawn'
+      : (currentVersion.get(citation.sector) ?? 0) > citation.version ? 'replaced' : 'current';
+    standing.set(`${citation.sector}\u0000${String(citation.version)}`, value);
+  }
+  return standing;
+}
+
+/** Pure mapping from saved rows plus live standing; no fetch, so it is unit-testable. */
+export function optionSourcesFromRows(rows: readonly OptionCatalogueSourceRow[], standingByCitation: ReadonlyMap<string, CatalogueStanding>): OptionSource[] {
+  return rows.map((row) => ({
+    kind: 'catalogue' as const,
+    id: `${row.branch_id}\u0000${row.catalogue_sector}\u0000${String(row.catalogue_version)}\u0000${row.entry_code}`,
+    branchId: row.branch_id,
+    sector: row.catalogue_sector,
+    version: row.catalogue_version,
+    entryCode: row.entry_code,
+    product: row.snapshot.product,
+    vendor: row.snapshot.vendor,
+    summary: row.snapshot.summary,
+    licence: row.snapshot.licence,
+    standing: standingByCitation.get(`${row.catalogue_sector}\u0000${String(row.catalogue_version)}`) ?? 'withdrawn',
+    citedBy: row.cited_by,
+    citedAt: row.cited_at,
+    claims: row.snapshot.claims,
+  }));
+}
+
+/** Every saved catalogue citation on a decision, ready for the option blocks and the pack. */
+export async function listOptionSources(client: Client, decisionId: string): Promise<OptionSource[]> {
+  const rows = await listCatalogueSources(client, decisionId);
+  if (rows.length === 0) return [];
+  const standing = await catalogueStandingByCitation(client, rows.map((r) => ({ sector: r.catalogue_sector, version: r.catalogue_version })));
+  return optionSourcesFromRows(rows, standing);
 }
 
 /** The map item a seeded capability came from, via `attributes.templateRef`. */

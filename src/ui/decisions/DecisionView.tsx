@@ -63,6 +63,8 @@ import { useDecisionOptions } from './useDecisionOptions';
 import { usePendingOptions } from './usePendingOptions';
 import { optionProvenance } from './optionProvenance';
 import { useDecisionRatings } from './useDecisionRatings';
+import { useOptionSources } from './useOptionSources';
+import type { OptionSource } from '../../contracts/optionSource';
 import { groupWhatChangesRows, type WhatChangesRow } from './whatChangesRows';
 import styles from './DecisionView.module.css';
 
@@ -123,6 +125,15 @@ export function DecisionView({ modelId, decisionId, orgId, orgSlug, modelSlug, r
   const principlesDeparted = principlesState.links.filter((l) => l.stance === 'departs').length;
   const { data: keptNotes } = useQuery({ queryKey: ['decisionAgentNotes', decisionId], queryFn: () => listDecisionAgentNotes(supabase, decisionId) });
   const modelGoals = useModelGoals(modelId);
+  // Catalogue citations saved with each option, in the saved snapshot. The
+  // pack, the grid and (later) the option page all read this same shape.
+  const optionSources = useOptionSources(decisionId);
+  const sourcesByBranch = new Map<string, OptionSource[]>();
+  for (const source of optionSources.data ?? []) {
+    const list = sourcesByBranch.get(source.branchId) ?? [];
+    list.push(source);
+    sourcesByBranch.set(source.branchId, list);
+  }
 
   const [addingOption, setAddingOption] = useState(false);
   const [optionTitle, setOptionTitle] = useState('');
@@ -252,6 +263,7 @@ export function DecisionView({ modelId, decisionId, orgId, orgSlug, modelSlug, r
         goalsServed: modelGoals ? goalTitlesServedBy(decisionConcernIds(links, linkedElementsById).capabilityIds, modelGoals.goals.filter((g) => g.status === 'active'), modelGoals.links) : [],
         whatChangesRows: comparison.status === 'ready' ? groupWhatChangesRows(comparison.whatChangesRows).visible : [],
         keptQuestions: keptNotes ?? [],
+        sourcesByBranch,
         ownerName,
       }),
     );
@@ -523,6 +535,7 @@ export function DecisionView({ modelId, decisionId, orgId, orgSlug, modelSlug, r
                   canChoose: canChoose && b.status === 'draft',
                   description: b.description,
                   provenance: optionProvenance(pendingOptions.marks.get(b.id), (id) => profileLabel(members.find((m) => m.member.user_id === id)?.profile)),
+                  sources: sourcesByBranch.get(b.id) ?? [],
                 }));
               return (
                 <div id="decision-compare">

@@ -25,7 +25,10 @@ test('a decision follows a principle, then departs from it with a reason; read-o
   await page.getByRole('button', { name: 'Start decision' }).click();
   await expect(page.getByRole('heading', { name: 'What replaces the old CRM' })).toBeVisible();
 
-  await expect(page.getByRole('button', { name: /^Principles/ })).toBeVisible();
+  const principles = page.getByRole('button', { name: /^Principles/ });
+  await expect(principles).toBeVisible();
+  // The section collapses when no principle has a stance yet; open it before reading the list.
+  if ((await principles.getAttribute('aria-expanded')) === 'false') await principles.click();
   await expect(page.getByRole('heading', { name: 'Reuse before buying' })).toBeVisible();
 
   // click(), not check(): the radio is controlled and only reflects the stance once it has been saved and reloaded, so check()'s immediate state assertion would fail; the toBeChecked() below retries until the save lands.

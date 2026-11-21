@@ -1,4 +1,5 @@
 import type { DecisionAgentNote } from '../../contracts/decisionAgentNote';
+import type { OptionSource } from '../../contracts/optionSource';
 import { DECISION_CRITERIA, decisionCriterionLevelLabel } from '../../contracts/decisionCriteria';
 import type { UUID } from '../../contracts/delta';
 import type { ElementsHeadRow } from '../../contracts/rows';
@@ -58,10 +59,12 @@ export interface DecisionAdrSource {
   ownerName: string;
   /** D2 PR 4: questions an AI reviewer drafted that a person kept. Optional/empty prints no section. */
   keptQuestions?: readonly DecisionAgentNote[];
+  /** Catalogue citations saved with each option, by branch. Optional/empty prints no Sources block. */
+  sourcesByBranch?: ReadonlyMap<UUID, readonly OptionSource[]>;
 }
 
 export function buildDecisionAdrExportInput(source: DecisionAdrSource): DecisionAdrExportInput {
-  const { decision, links, linkedElementsById, linkedBranchesById, args, ratings, whatChangesRows, ownerName, principles, goalsServed, keptQuestions } = source;
+  const { decision, links, linkedElementsById, linkedBranchesById, args, ratings, whatChangesRows, ownerName, principles, goalsServed, keptQuestions, sourcesByBranch } = source;
   const { capabilityIds, otherElementIds } = decisionConcernIds(links, linkedElementsById);
   return {
     decision,
@@ -70,7 +73,10 @@ export function buildDecisionAdrExportInput(source: DecisionAdrSource): Decision
       .map((id) => linkedElementsById.get(id))
       .filter((e): e is ElementsHeadRow => e !== undefined)
       .map((e) => ({ name: e.name, typeLabel: e.element_type })),
-    options: decisionOptionBranches(links, linkedBranchesById).map((b) => ({ branch: b, isChosen: b.id === decision.branch_id, ratings: optionRatingsFor(ratings, b.id) })),
+    options: decisionOptionBranches(links, linkedBranchesById).map((b) => {
+      const sources = sourcesByBranch?.get(b.id) ?? [];
+      return { branch: b, isChosen: b.id === decision.branch_id, ratings: optionRatingsFor(ratings, b.id), ...(sources.length > 0 ? { sources } : {}) };
+    }),
     whatChangesRows,
     ...(principles !== undefined ? { principles } : {}),
     ...(goalsServed !== undefined ? { goalsServed } : {}),

@@ -9,6 +9,8 @@ import { Button } from '../components/Button/Button';
 import { Chip } from '../components/Chip/Chip';
 import { ClampedText } from '../components/ClampedText/ClampedText';
 import { Text } from '../components/Text/Text';
+import { OptionSources } from './OptionSources';
+import type { OptionSource } from '../../contracts/optionSource';
 import type { UseDecisionRatingsResult } from './useDecisionRatings';
 import styles from './DecisionCriteriaGrid.module.css';
 
@@ -23,6 +25,8 @@ export interface DecisionCriteriaOption {
   canChoose: boolean;
   /** The option's own plain description (what the person or the Designer wrote about it), shown under its name. */
   description?: string | null;
+  /** Catalogue citations saved when this option was added. Absent or empty prints no sources block. */
+  sources?: readonly OptionSource[];
   /** Where the option came from when an agent suggested it, e.g. "Suggested by the Designer, edited by Priya". `null` for an option someone added by hand. */
   provenance?: string | null;
 }
@@ -171,6 +175,7 @@ export function DecisionCriteriaGrid({ decisionId, options, canRate, userId, nee
                     <Text as="p" size="sm" tone={o.summary === null ? 'muted' : 'default'}>
                       {o.summary ?? 'No changes recorded yet'}
                     </Text>
+                    <OptionSources sources={o.sources ?? []} />
                     {o.summary === null && canEditOption(o) && (
                       <Text as="p" size="sm" tone="muted">
                         Use Edit this change to draft it.
