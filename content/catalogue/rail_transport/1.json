@@ -1,0 +1,218 @@
+{
+  "sector": "rail_transport",
+  "version": 1,
+  "capabilityMapVersion": 1,
+  "status": "draft",
+  "title": "Rail & Transport Operator product catalogue, version 1",
+  "sourceDescription": "Selected product evidence from current vendor pages, checked on 21 November 2026. Claims state what the vendor describes, not proven suitability for an organisation. Editorial review is pending. Coverage spans the sector’s main capability areas but is not exhaustive; a missing product is not evidence that no product exists.",
+  "licence": "CC-BY-4.0",
+  "entries": [
+    {
+      "code": "tracsis-attune",
+      "product": "Tracsis ATTUne",
+      "vendor": "Tracsis",
+      "summary": "Rail timetable planning software.",
+      "capabilities": [
+        {
+          "code": "9.1",
+          "name": "Timetable Planning",
+          "howItSupports": "Creates and analyses rail timetables"
+        }
+      ],
+      "claims": [
+        {
+          "position": 1,
+          "kind": "functional",
+          "statement": "The vendor describes Tracsis ATTUne as rail timetable planning software.",
+          "sourceUrl": "https://tracsis.com/products/operations/attune-tracs-trent",
+          "sourceDate": "2026-11-21",
+          "reviewedBy": "Pending review",
+          "reviewedAt": "2026-11-21"
+        }
+      ]
+    },
+    {
+      "code": "tracsis-tracs",
+      "product": "Tracsis TRACS",
+      "vendor": "Tracsis",
+      "summary": "Rail rolling stock and crew planning software.",
+      "capabilities": [
+        {
+          "code": "9.3",
+          "name": "Rolling Stock Diagramming",
+          "howItSupports": "Builds rolling stock diagrams"
+        },
+        {
+          "code": "9.4",
+          "name": "Crew Rostering",
+          "howItSupports": "Plans crew deployment"
+        }
+      ],
+      "claims": [
+        {
+          "position": 1,
+          "kind": "functional",
+          "statement": "The vendor describes Tracsis TRACS as rail rolling stock and crew planning software.",
+          "sourceUrl": "https://tracsis.com/products/operations/attune-tracs-trent",
+          "sourceDate": "2026-11-21",
+          "reviewedBy": "Pending review",
+          "reviewedAt": "2026-11-21"
+        }
+      ]
+    },
+    {
+      "code": "tracsis-railhub",
+      "product": "Tracsis RailHub",
+      "vendor": "Tracsis",
+      "summary": "Rail safety and worksite management software.",
+      "capabilities": [
+        {
+          "code": "13.1",
+          "name": "Safety Management System",
+          "howItSupports": "Controls rail safety worksite processes"
+        }
+      ],
+      "claims": [
+        {
+          "position": 1,
+          "kind": "functional",
+          "statement": "The vendor describes Tracsis RailHub as rail safety and worksite management software.",
+          "sourceUrl": "https://tracsis.com/products/safety/railhub",
+          "sourceDate": "2026-11-21",
+          "reviewedBy": "Pending review",
+          "reviewedAt": "2026-11-21"
+        }
+      ]
+    },
+    {
+      "code": "tracsis-on-day-operations",
+      "product": "Tracsis On-Day Operations",
+      "vendor": "Tracsis",
+      "summary": "Real time rail service operations and disruption software.",
+      "capabilities": [
+        {
+          "code": "10.1",
+          "name": "Real-Time Service Control",
+          "howItSupports": "Supports on-day control of train services"
+        },
+        {
+          "code": "10.2",
+          "name": "Disruption & Contingency Management",
+          "howItSupports": "Coordinates responses to service disruption"
+        }
+      ],
+      "claims": [
+        {
+          "position": 1,
+          "kind": "functional",
+          "statement": "The vendor describes Tracsis On-Day Operations as real time rail service operations and disruption software.",
+          "sourceUrl": "https://tracsis.com/solutions/operations/on-day-operations",
+          "sourceDate": "2026-11-21",
+          "reviewedBy": "Pending review",
+          "reviewedAt": "2026-11-21"
+        }
+      ]
+    },
+    {
+      "code": "siemens-railigent-x",
+      "product": "Siemens Railigent X",
+      "vendor": "Siemens Mobility",
+      "summary": "Digital services for rail fleet monitoring and maintenance.",
+      "capabilities": [
+        {
+          "code": "11.2",
+          "name": "Condition Monitoring & Diagnostics",
+          "howItSupports": "Analyses vehicle condition and operational data"
+        }
+      ],
+      "claims": [
+        {
+          "position": 1,
+          "kind": "functional",
+          "statement": "The vendor describes Siemens Railigent X as digital services for rail fleet monitoring and maintenance.",
+          "sourceUrl": "https://www.mobility.siemens.com/global/en/portfolio/digital-solutions-software/digital-services/railigent-x.html",
+          "sourceDate": "2026-11-21",
+          "reviewedBy": "Pending review",
+          "reviewedAt": "2026-11-21"
+        }
+      ]
+    },
+    {
+      "code": "alstom-healthhub",
+      "product": "Alstom HealthHub",
+      "vendor": "Alstom",
+      "summary": "Asset monitoring and maintenance analytics for rail fleets.",
+      "capabilities": [
+        {
+          "code": "11.2",
+          "name": "Condition Monitoring & Diagnostics",
+          "howItSupports": "Uses fleet condition data for maintenance decisions"
+        }
+      ],
+      "claims": [
+        {
+          "position": 1,
+          "kind": "functional",
+          "statement": "The vendor describes Alstom HealthHub as asset monitoring and maintenance analytics for rail fleets.",
+          "sourceUrl": "https://www.alstom.com/solutions/services/digital-railway-solutions-unlock-higher-asset-availability-reliability-and-performance",
+          "sourceDate": "2026-11-21",
+          "reviewedBy": "Pending review",
+          "reviewedAt": "2026-11-21"
+        }
+      ]
+    },
+    {
+      "code": "hafas",
+      "product": "HAFAS",
+      "vendor": "Hacon",
+      "summary": "Passenger journey planning and information software.",
+      "capabilities": [
+        {
+          "code": "12.2",
+          "name": "Journey Planning & Passenger Information",
+          "howItSupports": "Provides journey planning and passenger travel information"
+        }
+      ],
+      "claims": [
+        {
+          "position": 1,
+          "kind": "functional",
+          "statement": "The vendor describes HAFAS as passenger journey planning and information software.",
+          "sourceUrl": "https://www.hacon.de/en/portfolio/information-ticketing",
+          "sourceDate": "2026-11-21",
+          "reviewedBy": "Pending review",
+          "reviewedAt": "2026-11-21"
+        }
+      ]
+    },
+    {
+      "code": "masabi-justride",
+      "product": "Masabi Justride",
+      "vendor": "Masabi",
+      "summary": "Mobile ticketing and account-based fare collection software.",
+      "capabilities": [
+        {
+          "code": "12.1",
+          "name": "Fares & Ticketing",
+          "howItSupports": "Sells and validates rail tickets"
+        },
+        {
+          "code": "12.3",
+          "name": "Retail Channels & Smart Ticketing",
+          "howItSupports": "Supports digital ticketing channels"
+        }
+      ],
+      "claims": [
+        {
+          "position": 1,
+          "kind": "functional",
+          "statement": "The vendor describes Masabi Justride as mobile ticketing and account-based fare collection software.",
+          "sourceUrl": "https://www.masabi.com/rail-ticketing-system/",
+          "sourceDate": "2026-11-21",
+          "reviewedBy": "Pending review",
+          "reviewedAt": "2026-11-21"
+        }
+      ]
+    }
+  ]
+}

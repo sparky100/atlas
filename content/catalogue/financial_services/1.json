@@ -1,0 +1,184 @@
+{
+  "sector": "financial_services",
+  "version": 1,
+  "capabilityMapVersion": 1,
+  "status": "draft",
+  "title": "Financial Services (Retail Bank or Insurer) product catalogue, version 1",
+  "sourceDescription": "Selected product evidence from current vendor pages, checked on 21 November 2026. Claims state what the vendor describes, not proven suitability for an organisation. Editorial review is pending. Coverage spans the sector’s main capability areas but is not exhaustive; a missing product is not evidence that no product exists.",
+  "licence": "CC-BY-4.0",
+  "entries": [
+    {
+      "code": "temenos-core-banking",
+      "product": "Temenos Core Banking",
+      "vendor": "Temenos",
+      "summary": "A core banking platform for product configuration and account processing.",
+      "capabilities": [
+        {
+          "code": "10.1",
+          "name": "Product Design & Management",
+          "howItSupports": "Configures banking products for launch and change"
+        },
+        {
+          "code": "11.3",
+          "name": "Account & Ledger Management",
+          "howItSupports": "Maintains customer accounts and ledgers"
+        }
+      ],
+      "claims": [
+        {
+          "position": 1,
+          "kind": "functional",
+          "statement": "The vendor describes Temenos Core Banking as a core banking platform for product configuration and account processing.",
+          "sourceUrl": "https://www.temenos.com/products/core-banking/core-banking-knowledge-hub/",
+          "sourceDate": "2026-11-21",
+          "reviewedBy": "Pending review",
+          "reviewedAt": "2026-11-21"
+        }
+      ]
+    },
+    {
+      "code": "finastra-payments-hub",
+      "product": "Finastra Payments Hub",
+      "vendor": "Finastra",
+      "summary": "Software for orchestrating payment processing.",
+      "capabilities": [
+        {
+          "code": "11.1",
+          "name": "Payments Processing",
+          "howItSupports": "Routes and processes payments"
+        }
+      ],
+      "claims": [
+        {
+          "position": 1,
+          "kind": "functional",
+          "statement": "The vendor describes Finastra Payments Hub as software for orchestrating payment processing.",
+          "sourceUrl": "https://www.finastra.com/payments/payments-hubs",
+          "sourceDate": "2026-11-21",
+          "reviewedBy": "Pending review",
+          "reviewedAt": "2026-11-21"
+        }
+      ]
+    },
+    {
+      "code": "guidewire-policycenter",
+      "product": "Guidewire PolicyCenter",
+      "vendor": "Guidewire",
+      "summary": "Core policy administration software for insurers.",
+      "capabilities": [
+        {
+          "code": "9.3",
+          "name": "Account & Policy Opening",
+          "howItSupports": "Administers opening and servicing insurance policies"
+        }
+      ],
+      "claims": [
+        {
+          "position": 1,
+          "kind": "functional",
+          "statement": "The vendor describes Guidewire PolicyCenter as core policy administration software for insurers.",
+          "sourceUrl": "https://www.guidewire.com/products/core-products",
+          "sourceDate": "2026-11-21",
+          "reviewedBy": "Pending review",
+          "reviewedAt": "2026-11-21"
+        }
+      ]
+    },
+    {
+      "code": "guidewire-claimcenter",
+      "product": "Guidewire ClaimCenter",
+      "vendor": "Guidewire",
+      "summary": "Claims management software for insurers.",
+      "capabilities": [
+        {
+          "code": "12.2",
+          "name": "Claims Intake & Assessment",
+          "howItSupports": "Supports claims intake, assessment and handling"
+        }
+      ],
+      "claims": [
+        {
+          "position": 1,
+          "kind": "functional",
+          "statement": "The vendor describes Guidewire ClaimCenter as claims management software for insurers.",
+          "sourceUrl": "https://www.guidewire.com/products/core-products/insurancesuite/claimcenter-claims-management-software",
+          "sourceDate": "2026-11-21",
+          "reviewedBy": "Pending review",
+          "reviewedAt": "2026-11-21"
+        }
+      ]
+    },
+    {
+      "code": "entrust-identity-verification",
+      "product": "Entrust Identity Verification",
+      "vendor": "Entrust",
+      "summary": "Digital identity verification software.",
+      "capabilities": [
+        {
+          "code": "9.2",
+          "name": "Know Your Customer & Identity Checks",
+          "howItSupports": "Checks customer identity during onboarding"
+        }
+      ],
+      "claims": [
+        {
+          "position": 1,
+          "kind": "functional",
+          "statement": "The vendor describes Entrust Identity Verification as digital identity verification software.",
+          "sourceUrl": "https://www.entrust.com/products/identity-verification",
+          "sourceDate": "2026-11-21",
+          "reviewedBy": "Pending review",
+          "reviewedAt": "2026-11-21"
+        }
+      ]
+    },
+    {
+      "code": "feedzai-transaction-fraud",
+      "product": "Feedzai Transaction Fraud",
+      "vendor": "Feedzai",
+      "summary": "Software for detecting fraud in financial transactions.",
+      "capabilities": [
+        {
+          "code": "13.2",
+          "name": "Fraud Detection & Prevention",
+          "howItSupports": "Detects and investigates potentially fraudulent transactions"
+        }
+      ],
+      "claims": [
+        {
+          "position": 1,
+          "kind": "functional",
+          "statement": "The vendor describes Feedzai Transaction Fraud as software for detecting fraud in financial transactions.",
+          "sourceUrl": "https://www.feedzai.com/solutions/transaction-fraud/",
+          "sourceDate": "2026-11-21",
+          "reviewedBy": "Pending review",
+          "reviewedAt": "2026-11-21"
+        }
+      ]
+    },
+    {
+      "code": "feedzai-anti-money-laundering",
+      "product": "Feedzai Anti Money Laundering",
+      "vendor": "Feedzai",
+      "summary": "Software for monitoring and investigating financial crime.",
+      "capabilities": [
+        {
+          "code": "13.1",
+          "name": "Anti-Money Laundering & Sanctions",
+          "howItSupports": "Monitors transactions for anti-money-laundering investigations"
+        }
+      ],
+      "claims": [
+        {
+          "position": 1,
+          "kind": "functional",
+          "statement": "The vendor describes Feedzai Anti Money Laundering as software for monitoring and investigating financial crime.",
+          "sourceUrl": "https://www.feedzai.com/anti-money-laundering/",
+          "sourceDate": "2026-11-21",
+          "reviewedBy": "Pending review",
+          "reviewedAt": "2026-11-21"
+        }
+      ]
+    }
+  ]
+}

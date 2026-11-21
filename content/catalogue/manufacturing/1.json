@@ -1,0 +1,204 @@
+{
+  "sector": "manufacturing",
+  "version": 1,
+  "capabilityMapVersion": 1,
+  "status": "draft",
+  "title": "Manufacturing product catalogue, version 1",
+  "sourceDescription": "Selected product evidence from current vendor pages, checked on 21 November 2026. Claims state what the vendor describes, not proven suitability for an organisation. Editorial review is pending. Coverage spans the sector’s main capability areas but is not exhaustive; a missing product is not evidence that no product exists.",
+  "licence": "CC-BY-4.0",
+  "entries": [
+    {
+      "code": "ptc-windchill",
+      "product": "PTC Windchill",
+      "vendor": "PTC",
+      "summary": "Product lifecycle management software.",
+      "capabilities": [
+        {
+          "code": "9.1",
+          "name": "Product Lifecycle Management",
+          "howItSupports": "Manages product and engineering information"
+        },
+        {
+          "code": "9.2",
+          "name": "Engineering Change Management",
+          "howItSupports": "Controls engineering changes"
+        }
+      ],
+      "claims": [
+        {
+          "position": 1,
+          "kind": "functional",
+          "statement": "The vendor describes PTC Windchill as product lifecycle management software.",
+          "sourceUrl": "https://www.ptc.com/en/products/windchill",
+          "sourceDate": "2026-11-21",
+          "reviewedBy": "Pending review",
+          "reviewedAt": "2026-11-21"
+        }
+      ]
+    },
+    {
+      "code": "siemens-opcenter-execution",
+      "product": "Siemens Opcenter Execution",
+      "vendor": "Siemens",
+      "summary": "Manufacturing execution software for production operations.",
+      "capabilities": [
+        {
+          "code": "10.3",
+          "name": "Shop Floor Execution",
+          "howItSupports": "Tracks and coordinates work on the shop floor"
+        },
+        {
+          "code": "10.4",
+          "name": "Traceability & Genealogy",
+          "howItSupports": "Records production genealogy"
+        }
+      ],
+      "claims": [
+        {
+          "position": 1,
+          "kind": "functional",
+          "statement": "The vendor describes Siemens Opcenter Execution as manufacturing execution software for production operations.",
+          "sourceUrl": "https://www.siemens.com/en-gb/products/opcenter/execution/",
+          "sourceDate": "2026-11-21",
+          "reviewedBy": "Pending review",
+          "reviewedAt": "2026-11-21"
+        }
+      ]
+    },
+    {
+      "code": "siemens-opcenter-x-quality",
+      "product": "Siemens Opcenter X Quality",
+      "vendor": "Siemens",
+      "summary": "Quality management software for manufacturing.",
+      "capabilities": [
+        {
+          "code": "11.1",
+          "name": "Quality Management",
+          "howItSupports": "Manages quality processes and records"
+        },
+        {
+          "code": "11.2",
+          "name": "Inspection & Non-Conformance",
+          "howItSupports": "Tracks inspection and non-conformance work"
+        }
+      ],
+      "claims": [
+        {
+          "position": 1,
+          "kind": "functional",
+          "statement": "The vendor describes Siemens Opcenter X Quality as quality management software for manufacturing.",
+          "sourceUrl": "https://www.siemens.com/en-gb/products/opcenter/quality-x-cloud-qms/",
+          "sourceDate": "2026-11-21",
+          "reviewedBy": "Pending review",
+          "reviewedAt": "2026-11-21"
+        }
+      ]
+    },
+    {
+      "code": "factorytalk-productioncentre",
+      "product": "FactoryTalk ProductionCentre",
+      "vendor": "Rockwell Automation",
+      "summary": "Manufacturing execution software for production management.",
+      "capabilities": [
+        {
+          "code": "10.3",
+          "name": "Shop Floor Execution",
+          "howItSupports": "Coordinates shop floor production execution"
+        }
+      ],
+      "claims": [
+        {
+          "position": 1,
+          "kind": "functional",
+          "statement": "The vendor describes FactoryTalk ProductionCentre as manufacturing execution software for production management.",
+          "sourceUrl": "https://www.rockwellautomation.com/en-gb/products/software/factorytalk/operationsuite/mes/productioncentre.html",
+          "sourceDate": "2026-11-21",
+          "reviewedBy": "Pending review",
+          "reviewedAt": "2026-11-21"
+        }
+      ]
+    },
+    {
+      "code": "ibm-maximo-application-suite",
+      "product": "IBM Maximo Application Suite",
+      "vendor": "IBM",
+      "summary": "Enterprise asset management and maintenance software.",
+      "capabilities": [
+        {
+          "code": "12.1",
+          "name": "Preventive & Predictive Maintenance",
+          "howItSupports": "Plans and records preventive maintenance"
+        },
+        {
+          "code": "12.3",
+          "name": "Equipment Performance Monitoring",
+          "howItSupports": "Tracks equipment performance"
+        }
+      ],
+      "claims": [
+        {
+          "position": 1,
+          "kind": "functional",
+          "statement": "The vendor describes IBM Maximo Application Suite as enterprise asset management and maintenance software.",
+          "sourceUrl": "https://www.ibm.com/products/maximo",
+          "sourceDate": "2026-11-21",
+          "reviewedBy": "Pending review",
+          "reviewedAt": "2026-11-21"
+        }
+      ]
+    },
+    {
+      "code": "blue-yonder-warehouse-management",
+      "product": "Blue Yonder Warehouse Management",
+      "vendor": "Blue Yonder",
+      "summary": "Software for warehouse operations and inventory execution.",
+      "capabilities": [
+        {
+          "code": "13.3",
+          "name": "Warehousing & Inventory",
+          "howItSupports": "Coordinates warehouse operations and inventory"
+        }
+      ],
+      "claims": [
+        {
+          "position": 1,
+          "kind": "functional",
+          "statement": "The vendor describes Blue Yonder Warehouse Management as software for warehouse operations and inventory execution.",
+          "sourceUrl": "https://blueyonder.com/solutions/warehouse-management",
+          "sourceDate": "2026-11-21",
+          "reviewedBy": "Pending review",
+          "reviewedAt": "2026-11-21"
+        }
+      ]
+    },
+    {
+      "code": "sap-s4hana-manufacturing-for-planning-and-scheduling",
+      "product": "SAP S4HANA Manufacturing for Planning and Scheduling",
+      "vendor": "SAP",
+      "summary": "Software for production planning and detailed scheduling.",
+      "capabilities": [
+        {
+          "code": "10.1",
+          "name": "Demand & Capacity Planning",
+          "howItSupports": "Supports production planning against demand and capacity"
+        },
+        {
+          "code": "10.2",
+          "name": "Production Scheduling",
+          "howItSupports": "Schedules production work and resources"
+        }
+      ],
+      "claims": [
+        {
+          "position": 1,
+          "kind": "functional",
+          "statement": "The vendor describes SAP S4HANA Manufacturing for Planning and Scheduling as software for production planning and detailed scheduling.",
+          "sourceUrl": "https://www.sap.com/uk/products/scm/manufacturing-for-planning-and-scheduling.html",
+          "sourceDate": "2026-11-21",
+          "reviewedBy": "Pending review",
+          "reviewedAt": "2026-11-21"
+        }
+      ]
+    }
+  ]
+}

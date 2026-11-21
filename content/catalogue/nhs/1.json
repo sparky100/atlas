@@ -1,0 +1,189 @@
+{
+  "sector": "nhs",
+  "version": 1,
+  "capabilityMapVersion": 2,
+  "status": "draft",
+  "title": "NHS Board or Trust product catalogue, version 1",
+  "sourceDescription": "Selected product evidence from current vendor pages, checked on 21 November 2026. Claims state what the vendor describes, not proven suitability for an organisation. Editorial review is pending. Coverage spans the sector’s main capability areas but is not exhaustive; a missing product is not evidence that no product exists.",
+  "licence": "CC-BY-4.0",
+  "entries": [
+    {
+      "code": "epic-ehr",
+      "product": "Epic EHR",
+      "vendor": "Epic",
+      "summary": "Electronic health record software spanning clinical and patient workflows.",
+      "capabilities": [
+        {
+          "code": "9.1",
+          "name": "Urgent & Emergency Care",
+          "howItSupports": "Records and coordinates emergency care workflows"
+        },
+        {
+          "code": "9.2",
+          "name": "Planned & Elective Care",
+          "howItSupports": "Supports planned care records and scheduling"
+        }
+      ],
+      "claims": [
+        {
+          "position": 1,
+          "kind": "functional",
+          "statement": "The vendor describes Epic EHR as electronic health record software spanning clinical and patient workflows.",
+          "sourceUrl": "https://www.epic.com/software/",
+          "sourceDate": "2026-11-21",
+          "reviewedBy": "Pending review",
+          "reviewedAt": "2026-11-21"
+        }
+      ]
+    },
+    {
+      "code": "careflow-epr",
+      "product": "CareFlow EPR",
+      "vendor": "System C",
+      "summary": "An electronic patient record for clinical and administrative care.",
+      "capabilities": [
+        {
+          "code": "9.1",
+          "name": "Urgent & Emergency Care",
+          "howItSupports": "Supports emergency care documentation and patient flow"
+        },
+        {
+          "code": "9.2",
+          "name": "Planned & Elective Care",
+          "howItSupports": "Supports planned care records and scheduling"
+        }
+      ],
+      "claims": [
+        {
+          "position": 1,
+          "kind": "functional",
+          "statement": "The vendor describes CareFlow EPR as an electronic patient record for clinical and administrative care.",
+          "sourceUrl": "https://www.systemc.com/healthcare/careflow-epr/",
+          "sourceDate": "2026-11-21",
+          "reviewedBy": "Pending review",
+          "reviewedAt": "2026-11-21"
+        }
+      ]
+    },
+    {
+      "code": "badgernet-maternity",
+      "product": "BadgerNet Maternity",
+      "vendor": "System C",
+      "summary": "A digital record for maternity care.",
+      "capabilities": [
+        {
+          "code": "9.3",
+          "name": "Maternity & Neonatal Care",
+          "howItSupports": "Records maternity care from booking through postnatal care"
+        }
+      ],
+      "claims": [
+        {
+          "position": 1,
+          "kind": "functional",
+          "statement": "The vendor describes BadgerNet Maternity as a digital record for maternity care.",
+          "sourceUrl": "https://www.systemc.com/healthcare/",
+          "sourceDate": "2026-11-21",
+          "reviewedBy": "Pending review",
+          "reviewedAt": "2026-11-21"
+        }
+      ]
+    },
+    {
+      "code": "sectra-enterprise-imaging",
+      "product": "Sectra Enterprise Imaging",
+      "vendor": "Sectra",
+      "summary": "An enterprise imaging platform for clinical image management.",
+      "capabilities": [
+        {
+          "code": "12.1",
+          "name": "Imaging",
+          "howItSupports": "Manages and presents diagnostic images for clinical use"
+        }
+      ],
+      "claims": [
+        {
+          "position": 1,
+          "kind": "functional",
+          "statement": "The vendor describes Sectra Enterprise Imaging as an enterprise imaging platform for clinical image management.",
+          "sourceUrl": "https://medical.sectra.com/solutionarea/enterprise-imaging-platform/",
+          "sourceDate": "2026-11-21",
+          "reviewedBy": "Pending review",
+          "reviewedAt": "2026-11-21"
+        }
+      ]
+    },
+    {
+      "code": "careflow-medicines-management",
+      "product": "CareFlow Medicines Management",
+      "vendor": "System C",
+      "summary": "Electronic prescribing and medicine administration software.",
+      "capabilities": [
+        {
+          "code": "12.3",
+          "name": "Pharmacy & Medicines Optimisation",
+          "howItSupports": "Supports prescribing, pharmacy and medicine administration workflows"
+        }
+      ],
+      "claims": [
+        {
+          "position": 1,
+          "kind": "functional",
+          "statement": "The vendor describes CareFlow Medicines Management as electronic prescribing and medicine administration software.",
+          "sourceUrl": "https://www.systemc.com/healthcare/careflow-medicines-management/",
+          "sourceDate": "2026-11-21",
+          "reviewedBy": "Pending review",
+          "reviewedAt": "2026-11-21"
+        }
+      ]
+    },
+    {
+      "code": "datixweb",
+      "product": "DatixWeb",
+      "vendor": "RLDatix",
+      "summary": "Software for reporting and reviewing patient safety incidents.",
+      "capabilities": [
+        {
+          "code": "10.1",
+          "name": "Incident Reporting & Learning",
+          "howItSupports": "Captures and manages incident reports for learning"
+        }
+      ],
+      "claims": [
+        {
+          "position": 1,
+          "kind": "functional",
+          "statement": "The vendor describes DatixWeb as software for reporting and reviewing patient safety incidents.",
+          "sourceUrl": "https://www.rldatix.com/en-uki/lfpse-hub/",
+          "sourceDate": "2026-11-21",
+          "reviewedBy": "Pending review",
+          "reviewedAt": "2026-11-21"
+        }
+      ]
+    },
+    {
+      "code": "graphnet-population-health",
+      "product": "Graphnet Population Health",
+      "vendor": "Graphnet",
+      "summary": "Population health analytics and care coordination tools.",
+      "capabilities": [
+        {
+          "code": "11.1",
+          "name": "Health Needs Assessment",
+          "howItSupports": "Uses linked care data for population health insight"
+        }
+      ],
+      "claims": [
+        {
+          "position": 1,
+          "kind": "functional",
+          "statement": "The vendor describes Graphnet Population Health as population health analytics and care coordination tools.",
+          "sourceUrl": "https://www.graphnethealth.com/solutions",
+          "sourceDate": "2026-11-21",
+          "reviewedBy": "Pending review",
+          "reviewedAt": "2026-11-21"
+        }
+      ]
+    }
+  ]
+}

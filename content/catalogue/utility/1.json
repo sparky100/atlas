@@ -1,0 +1,194 @@
+{
+  "sector": "utility",
+  "version": 1,
+  "capabilityMapVersion": 3,
+  "status": "draft",
+  "title": "Utility (Generic) product catalogue, version 1",
+  "sourceDescription": "Selected product evidence from current vendor pages, checked on 21 November 2026. Claims state what the vendor describes, not proven suitability for an organisation. Editorial review is pending. Coverage spans the sector’s main capability areas but is not exhaustive; a missing product is not evidence that no product exists.",
+  "licence": "CC-BY-4.0",
+  "entries": [
+    {
+      "code": "arcgis-utility-network",
+      "product": "ArcGIS Utility Network",
+      "vendor": "Esri",
+      "summary": "Network information management and analysis software for utilities.",
+      "capabilities": [
+        {
+          "code": "9.1",
+          "name": "Asset Register & Data",
+          "howItSupports": "Models network assets and their connectivity"
+        }
+      ],
+      "claims": [
+        {
+          "position": 1,
+          "kind": "functional",
+          "statement": "The vendor describes ArcGIS Utility Network as network information management and analysis software for utilities.",
+          "sourceUrl": "https://www.esri.com/en-us/arcgis/products/arcgis-utility-network/overview",
+          "sourceDate": "2026-11-21",
+          "reviewedBy": "Pending review",
+          "reviewedAt": "2026-11-21"
+        }
+      ]
+    },
+    {
+      "code": "ibm-maximo-application-suite",
+      "product": "IBM Maximo Application Suite",
+      "vendor": "IBM",
+      "summary": "Enterprise asset management and maintenance software.",
+      "capabilities": [
+        {
+          "code": "9.2",
+          "name": "Asset Health & Condition Assessment",
+          "howItSupports": "Records asset condition and maintenance information"
+        },
+        {
+          "code": "9.3",
+          "name": "Inspection & Maintenance",
+          "howItSupports": "Plans and records inspections and maintenance"
+        }
+      ],
+      "claims": [
+        {
+          "position": 1,
+          "kind": "functional",
+          "statement": "The vendor describes IBM Maximo Application Suite as enterprise asset management and maintenance software.",
+          "sourceUrl": "https://www.ibm.com/products/maximo",
+          "sourceDate": "2026-11-21",
+          "reviewedBy": "Pending review",
+          "reviewedAt": "2026-11-21"
+        }
+      ]
+    },
+    {
+      "code": "oracle-utilities-customer-cloud-service",
+      "product": "Oracle Utilities Customer Cloud Service",
+      "vendor": "Oracle",
+      "summary": "Customer information and service software for utilities.",
+      "capabilities": [
+        {
+          "code": "11.2",
+          "name": "Billing & Settlement",
+          "howItSupports": "Supports customer billing workflows"
+        }
+      ],
+      "claims": [
+        {
+          "position": 1,
+          "kind": "functional",
+          "statement": "The vendor describes Oracle Utilities Customer Cloud Service as customer information and service software for utilities.",
+          "sourceUrl": "https://docs.oracle.com/en/industries/utilities/customer-cloud-service/index.html",
+          "sourceDate": "2026-11-21",
+          "reviewedBy": "Pending review",
+          "reviewedAt": "2026-11-21"
+        }
+      ]
+    },
+    {
+      "code": "microsoft-dynamics-365-field-service",
+      "product": "Microsoft Dynamics 365 Field Service",
+      "vendor": "Microsoft",
+      "summary": "Field work scheduling and service management software.",
+      "capabilities": [
+        {
+          "code": "10.4",
+          "name": "Field Operations",
+          "howItSupports": "Schedules and records field service work"
+        },
+        {
+          "code": "13.3",
+          "name": "Field Workforce Scheduling & Dispatch",
+          "howItSupports": "Dispatches field work to crews"
+        }
+      ],
+      "claims": [
+        {
+          "position": 1,
+          "kind": "functional",
+          "statement": "The vendor describes Microsoft Dynamics 365 Field Service as field work scheduling and service management software.",
+          "sourceUrl": "https://www.microsoft.com/en-us/dynamics-365/products/field-service",
+          "sourceDate": "2026-11-21",
+          "reviewedBy": "Pending review",
+          "reviewedAt": "2026-11-21"
+        }
+      ]
+    },
+    {
+      "code": "oracle-primavera-unifier",
+      "product": "Oracle Primavera Unifier",
+      "vendor": "Oracle",
+      "summary": "Capital project and asset lifecycle management software.",
+      "capabilities": [
+        {
+          "code": "9.5",
+          "name": "Capital Projects",
+          "howItSupports": "Manages capital project records and controls"
+        },
+        {
+          "code": "13.1",
+          "name": "Capital Projects & Construction",
+          "howItSupports": "Supports construction project workflows"
+        }
+      ],
+      "claims": [
+        {
+          "position": 1,
+          "kind": "functional",
+          "statement": "The vendor describes Oracle Primavera Unifier as capital project and asset lifecycle management software.",
+          "sourceUrl": "https://www.oracle.com/uk/construction-engineering/primavera-unifier-project-controls-asset-management/",
+          "sourceDate": "2026-11-21",
+          "reviewedBy": "Pending review",
+          "reviewedAt": "2026-11-21"
+        }
+      ]
+    },
+    {
+      "code": "ifs-copperleaf",
+      "product": "IFS Copperleaf",
+      "vendor": "IFS",
+      "summary": "Asset investment planning software.",
+      "capabilities": [
+        {
+          "code": "9.4",
+          "name": "Investment Planning",
+          "howItSupports": "Supports prioritisation of asset investment plans"
+        }
+      ],
+      "claims": [
+        {
+          "position": 1,
+          "kind": "functional",
+          "statement": "The vendor describes IFS Copperleaf as asset investment planning software.",
+          "sourceUrl": "https://www.copperleaf.com/industries-we-serve/water-and-wastewater-utilities/",
+          "sourceDate": "2026-11-21",
+          "reviewedBy": "Pending review",
+          "reviewedAt": "2026-11-21"
+        }
+      ]
+    },
+    {
+      "code": "enablon",
+      "product": "Enablon",
+      "vendor": "Wolters Kluwer",
+      "summary": "Environment, health and safety management software.",
+      "capabilities": [
+        {
+          "code": "12.5",
+          "name": "Health, Safety & Environment",
+          "howItSupports": "Manages health and safety processes and records"
+        }
+      ],
+      "claims": [
+        {
+          "position": 1,
+          "kind": "functional",
+          "statement": "The vendor describes Enablon as environment, health and safety management software.",
+          "sourceUrl": "https://www.wolterskluwer.com/en/solutions/enablon",
+          "sourceDate": "2026-11-21",
+          "reviewedBy": "Pending review",
+          "reviewedAt": "2026-11-21"
+        }
+      ]
+    }
+  ]
+}
