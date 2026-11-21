@@ -1,8 +1,9 @@
 import type { UUID } from '../../contracts/delta';
-import { optionWasEdited } from '../../contracts/decisionOptionMark';
+import { optionWasEdited, type DecisionOptionMark } from '../../contracts/decisionOptionMark';
 import { createChangeBranch, getBranch, getMainBranch } from '../../db/branches';
 import { createDecisionLink, listDecisionLinksForDecision } from '../../db/decisions';
 import { insertOptionMark, listOptionMarksForDecision, markOptionEdited } from '../../db/decisionOptionMarks';
+import { addOptionWithCatalogueSources } from '../../db/productCatalogue';
 import type { BranchRow, DecisionLinkRow } from '../../db/types';
 import { supabase } from '../supabaseClient';
 import { optionDescription, type PendingOption } from './pendingOptions';
@@ -48,6 +49,22 @@ export async function addSuggestedOption(input: AddSuggestedOptionInput): Promis
     });
   }
   const links = await listDecisionLinksForDecision(supabase, input.decisionId);
+  // With reviewed catalogue products, the link, Designer mark, edit stamp and
+  // citations are saved in one database transaction. Without them, the
+  // existing three writes are unchanged.
+  const refs = option.catalogueRefs;
+  if (refs.length > 0) {
+    const edited = optionWasEdited({ suggestedTitle: option.suggestedTitle, suggestedSummary: option.suggestedSummary }, option.title, option.summary);
+    const mark: DecisionOptionMark = {
+      decisionId: input.decisionId, branchId: option.id, agent: 'designer', draftedAt: option.draftedAt, draftRunId: null,
+      suggestedTitle: option.suggestedTitle, suggestedSummary: option.suggestedSummary,
+      editedBy: edited ? input.userId : null, editedAt: edited ? new Date().toISOString() : null,
+    };
+    await addOptionWithCatalogueSources(supabase, mark, refs);
+    const saved = (await listDecisionLinksForDecision(supabase, input.decisionId)).find((l) => l.linked_type === 'branch' && l.linked_id === option.id);
+    if (!saved) throw new Error('The option was saved, but its link to the decision could not be read back.');
+    return { branch, link: saved };
+  }
   const link = links.find((l) => l.linked_type === 'branch' && l.linked_id === option.id) ?? (await createDecisionLink(supabase, { decisionId: input.decisionId, linkedType: 'branch', linkedId: option.id, createdBy: input.userId }));
   const marks = await listOptionMarksForDecision(supabase, input.decisionId);
   if (!marks.some((m) => m.branchId === option.id)) {

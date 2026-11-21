@@ -17,6 +17,7 @@ import { listGoalLinksForGoals, listGoalsForModel } from '../db/goals';
 import { getStaleAfterMonthsForModel } from '../db/organisations';
 import { listPrincipleLinksForPrinciples, listPrinciplesForModel } from '../db/principles';
 import { listProjectsForModel } from '../db/projects';
+import { capabilityMapMatch, currentCatalogue, listCurrentCatalogueEntriesForCapability } from '../db/productCatalogue';
 import { listSavedReports } from '../db/reports';
 import { selectAll } from '../db/selectAll';
 import { factsWithoutCost, snapshotWithoutCost } from './runCostExclusion';
@@ -80,6 +81,13 @@ export function createToolContext(supabase: Client, model: { id: UUID; name: str
     principles: () => (principles ??= listPrinciplesForModel(supabase, model.id)),
     principleLinks: async () => (principleLinks ??= listPrincipleLinksForPrinciples(supabase, (await (principles ??= listPrinciplesForModel(supabase, model.id))).map((p) => p.id))),
     changeImpact: (change) => loadChangeSummary(supabase, model.id, change),
+    catalogueForCapability: async (templateRef) => {
+      const match = await capabilityMapMatch(supabase, templateRef);
+      if (!match) return null;
+      const catalogue = await currentCatalogue(supabase, match.sector);
+      if (!catalogue) return null;
+      return { ...match, catalogueVersion: catalogue.version, entries: await listCurrentCatalogueEntriesForCapability(supabase, match) };
+    },
     now: () => new Date(),
   };
 }

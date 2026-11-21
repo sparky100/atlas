@@ -1,5 +1,6 @@
 import type { UUID } from '../contracts/delta';
-import type { DesignerOptionDraft } from '../contracts/designerOptions';
+import { DESIGNER_CATALOGUE_REFS_MAX, type DesignerOptionDraft } from '../contracts/designerOptions';
+import { catalogueCitationSchema, type CatalogueCitation } from '../contracts/productCatalogue';
 import type { Client } from './client';
 
 /**
@@ -61,9 +62,19 @@ export function interpretDesignerReply(body: unknown): DesignerDraft {
     const count = (n: unknown) => (typeof n === 'number' && Number.isFinite(n) && n >= 0 ? Math.round(n) : 0);
     const strings = (v: unknown) => (Array.isArray(v) ? v.filter((x): x is string => typeof x === 'string').map((x) => citationsToNames(x, names)) : []);
     const plain = (v: string) => citationsToNames(v, names);
+    const refs = (v: unknown): CatalogueCitation[] => {
+      if (!Array.isArray(v)) return [];
+      const out: CatalogueCitation[] = [];
+      for (const raw of v) {
+        const parsed = catalogueCitationSchema.safeParse(raw);
+        if (parsed.success) out.push(parsed.data);
+        if (out.length >= DESIGNER_CATALOGUE_REFS_MAX) break;
+      }
+      return out;
+    };
     const options = (Array.isArray(r.design.options) ? r.design.options : []).flatMap((o): DesignerOptionDraft[] => {
       const x = typeof o === 'object' && o !== null ? (o as Record<string, unknown>) : {};
-      return typeof x.title === 'string' && typeof x.summary === 'string' ? [{ title: plain(x.title), summary: plain(x.summary), toWeigh: typeof x.toWeigh === 'string' ? plain(x.toWeigh) : '' }] : [];
+      return typeof x.title === 'string' && typeof x.summary === 'string' ? [{ title: plain(x.title), summary: plain(x.summary), toWeigh: typeof x.toWeigh === 'string' ? plain(x.toWeigh) : '', catalogueRefs: refs(x.catalogueRefs) }] : [];
     });
     const problems = strings(r.design.problems);
     if (options.length === 0 && problems.length === 0) problems.push('The Designer gave no usable options.');

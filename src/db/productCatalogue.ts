@@ -188,7 +188,7 @@ export async function capabilityMapMatch(client: Client, templateRef: string): P
   return { sector: mapRow.sector, capabilityMapVersion: mapRow.version, capabilityCode: row.code, capabilityName: row.name };
 }
 
-async function currentCatalogue(client: Client, sector: string): Promise<{ id: string; version: number; title: string; published_at: string | null } | null> {
+export async function currentCatalogue(client: Client, sector: string): Promise<{ id: string; version: number; title: string; published_at: string | null } | null> {
   const { data, error } = await client
     .from('product_catalogues')
     .select('id, version, title, published_at')

@@ -14,6 +14,8 @@ import { parseDesignerOptions, type DesignerOptionsResult } from '../contracts/d
 import { runAsk } from './askLoop';
 import type { AskModelClient, AskResult } from './askLoop';
 import { designerBrief, designerSystemPrompt, DESIGNER_MAX_FINDING_CHARS } from './designPrompt';
+import { catalogueRefKey, capabilityTemplateRef } from './findCatalogueProducts';
+import { indexSnapshot } from './toolKit';
 import type { RunCostSharing, ToolContext, ToolStamp } from './types';
 
 export interface DesignModelInfo {
@@ -67,6 +69,23 @@ export function parseDesignBody(body: unknown): ParsedDesign | string {
   return { modelId: r.modelId, elementId: r.elementId, finding: r.finding.trim() };
 }
 
+/** Citation keys the run actually read from the catalogue. A cited product not in this set was never returned by a tool, so it is dropped. */
+async function returnedCatalogueKeys(ctx: ToolContext, toolUses: readonly { name: string; input: Record<string, unknown>; ok: boolean }[]): Promise<Set<string>> {
+  const ids = [...new Set(toolUses.filter((u) => u.name === 'find_catalogue_products' && u.ok).map((u) => u.input.capability_element_id).filter((v): v is string => typeof v === 'string'))];
+  const allowed = new Set<string>();
+  if (ids.length === 0 || ctx.catalogueForCapability === undefined) return allowed;
+  const index = indexSnapshot(await ctx.snapshot());
+  for (const id of ids) {
+    const element = index.byId.get(id);
+    const templateRef = capabilityTemplateRef(element?.attributes);
+    if (templateRef === null) continue;
+    const catalogue = await ctx.catalogueForCapability(templateRef);
+    if (catalogue === null) continue;
+    for (const entry of catalogue.entries) allowed.add(catalogueRefKey({ sector: catalogue.sector, version: catalogue.catalogueVersion, entryCode: entry.code }));
+  }
+  return allowed;
+}
+
 export async function handleDesign(deps: DesignHandlerDeps, body: unknown): Promise<DesignOutcome> {
   const parsed = parseDesignBody(body);
   if (typeof parsed === 'string') return { status: 'invalid', message: parsed };
@@ -100,6 +119,18 @@ export async function handleDesign(deps: DesignHandlerDeps, body: unknown): Prom
     system: designerSystemPrompt(ctx.stamp.modelName, ctx.now().toISOString().slice(0, 10), { runCost }),
   });
   const design = parseDesignerOptions(result.answer);
+  const allowedCatalogueRefs = await returnedCatalogueKeys(ctx, result.toolUses);
+  let droppedCatalogueRefs = 0;
+  for (const option of design.options) {
+    const kept = option.catalogueRefs.filter((ref) => allowedCatalogueRefs.has(catalogueRefKey(ref)));
+    droppedCatalogueRefs += option.catalogueRefs.length - kept.length;
+    option.catalogueRefs = kept;
+  }
+  if (droppedCatalogueRefs > 0) {
+    design.problems.push(droppedCatalogueRefs === 1
+      ? 'One catalogue product was left out because the Designer did not read it. Add it by hand only if you have checked it yourself.'
+      : `${String(droppedCatalogueRefs)} catalogue products were left out because the Designer did not read them. Add one by hand only if you have checked it yourself.`);
+  }
   // A run cut off by a limit is never complete, whatever the part that arrived looks like.
   if (result.status !== 'answered' && design.problems.length === 0) design.problems.push('The Designer was cut short, so this answer may be incomplete.');
   return { status: 'done', result, stamp: ctx.stamp, design };

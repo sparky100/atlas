@@ -5,7 +5,7 @@ function memory(): StorageLike & { data: Map<string, string> } {
   const data = new Map<string, string>();
   return { data, getItem: (k) => data.get(k) ?? null, setItem: (k, v) => void data.set(k, v), removeItem: (k) => void data.delete(k) };
 }
-const option = (id: string): PendingOption => ({ id, title: `Option ${id}`, summary: 's', toWeigh: '', suggestedTitle: `Option ${id}`, suggestedSummary: 's', draftedAt: '2026-11-19T10:00:00Z' });
+const option = (id: string): PendingOption => ({ id, title: `Option ${id}`, summary: 's', toWeigh: '', suggestedTitle: `Option ${id}`, suggestedSummary: 's', draftedAt: '2026-11-19T10:00:00Z', catalogueRefs: [] });
 const key = pendingKey('o', 'u', 'd');
 
 describe('pending options', () => {
@@ -34,5 +34,16 @@ describe('pending options', () => {
   it('writes the summary and what to weigh as the option description', () => {
     expect(optionDescription({ summary: ' Use it. ', toWeigh: '' })).toBe('Use it.');
     expect(optionDescription({ summary: 'Use it.', toWeigh: 'Fit' })).toBe('Use it.\n\nTo weigh: Fit');
+  });
+  it('loads a draft saved before catalogue refs existed as having none', () => {
+    const s = memory();
+    s.setItem(key, JSON.stringify({ savedAt: 1000, options: [{ id: 'a', title: 'Keep', summary: 's', toWeigh: '', suggestedTitle: 'Keep', suggestedSummary: 's', draftedAt: '2026-11-19T10:00:00Z' }] }));
+    expect(loadPending(s, key, 2000)[0]?.catalogueRefs).toEqual([]);
+  });
+  it('keeps only well-formed catalogue refs from storage', () => {
+    const s = memory();
+    const valid = { sector: 'electricity_network', version: 1, entryCode: 'crm-x' };
+    s.setItem(key, JSON.stringify({ savedAt: 1000, options: [{ ...option('a'), catalogueRefs: [valid, { sector: '', version: 0, entryCode: '' }] }] }));
+    expect(loadPending(s, key, 2000)[0]?.catalogueRefs).toEqual([valid]);
   });
 });

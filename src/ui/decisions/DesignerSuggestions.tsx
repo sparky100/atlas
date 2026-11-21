@@ -45,7 +45,7 @@ export interface DesignerSuggestionsProps {
 const isEdited = (c: PendingOption) => c.title.trim() !== c.suggestedTitle.trim() || c.summary.trim() !== c.suggestedSummary.trim();
 
 function newCards(draft: DesignerDraft, draftedAt: string): SuggestionCard[] {
-  return draft.options.map((o) => ({ id: crypto.randomUUID(), title: o.title, summary: o.summary, toWeigh: o.toWeigh, suggestedTitle: o.title, suggestedSummary: o.summary, draftedAt, included: true }));
+  return draft.options.map((o) => ({ id: crypto.randomUUID(), title: o.title, summary: o.summary, toWeigh: o.toWeigh, suggestedTitle: o.title, suggestedSummary: o.summary, draftedAt, catalogueRefs: o.catalogueRefs, included: true }));
 }
 
 /**
@@ -141,6 +141,9 @@ export function DesignerSuggestions({ orgId, userId, modelId, elementId, brief, 
       <li key={c.id} className={[styles.card, c.included ? undefined : styles.cardLeftOut].filter(Boolean).join(' ')} data-testid="suggestion-card">
         <div className={styles.cardHead}>
           <Chip tone="info">{edited ? 'Suggested by the Designer, edited by you' : 'Suggested by the Designer'}</Chip>
+          {c.catalogueRefs.length > 0 && (
+            <Chip tone="neutral">{c.catalogueRefs.length === 1 ? '1 reviewed product' : `${String(c.catalogueRefs.length)} reviewed products`}</Chip>
+          )}
           <label className={styles.include}>
             <input type="checkbox" checked={c.included} onChange={(e) => { update(c.id, { included: e.target.checked }); }} />
             <Text as="span" size="sm">{c.included ? 'Include' : 'Left out'}</Text>

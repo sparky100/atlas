@@ -1,4 +1,5 @@
 import type { UUID } from '../../contracts/delta';
+import { catalogueCitationSchema, type CatalogueCitation } from '../../contracts/productCatalogue';
 
 /**
  * Suggested options a person has chosen to carry into a decision, held until
@@ -21,6 +22,8 @@ export interface PendingOption {
   suggestedTitle: string;
   suggestedSummary: string;
   draftedAt: string;
+  /** Reviewed catalogue products the Designer read for this option. Saved as citations when the option is added. */
+  catalogueRefs: CatalogueCitation[];
 }
 
 export const PENDING_TTL_MS = 24 * 60 * 60 * 1000;
@@ -56,7 +59,16 @@ export function loadPending(storage: StorageLike, key: string, now: number): Pen
   try {
     const stored = JSON.parse(raw) as Partial<Stored>;
     if (typeof stored.savedAt !== 'number' || now - stored.savedAt > PENDING_TTL_MS || !Array.isArray(stored.options)) throw new Error('stale');
-    return stored.options.filter((o): o is PendingOption => typeof o.id === 'string' && typeof o.title === 'string' && o.title.trim() !== '');
+    return stored.options.flatMap((o): PendingOption[] => {
+      if (typeof o.id !== 'string' || typeof o.title !== 'string' || o.title.trim() === '') return [];
+      const refs = Array.isArray(o.catalogueRefs)
+        ? o.catalogueRefs.flatMap((v): CatalogueCitation[] => {
+            const parsed = catalogueCitationSchema.safeParse(v);
+            return parsed.success ? [parsed.data] : [];
+          })
+        : [];
+      return [{ ...o, catalogueRefs: refs }];
+    });
   } catch {
     storage.removeItem(key);
     return [];
