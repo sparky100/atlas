@@ -172,7 +172,7 @@ export function ProjectView({ data, modelName, orgId, modelId, orgSlug, modelSlu
         </Panel>
       )}
 
-      <ProjectBeforeAfter modelId={modelId} projectId={project.id} mainHeadCommitId={main?.head_commit_id ?? null} changes={changes} capabilities={data.journeyCapabilities.map((c) => ({ id: c.id, name: c.name }))} scopeSystemIds={scopeSystemIds} base={base} />
+      <ProjectBeforeAfter modelId={modelId} projectId={project.id} mainHeadCommitId={main?.head_commit_id ?? null} changes={changes} capabilities={data.journeyCapabilities.map((c) => ({ id: c.id, name: c.name }))} scopeSystemIds={scopeSystemIds} decisions={decisions} base={base} />
 
       {(scopeIds.length > 0 || canEdit) && (
         <Panel>

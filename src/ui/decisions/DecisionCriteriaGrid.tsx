@@ -7,6 +7,7 @@ import { branchStatusTone } from '../changes/branchStatus';
 import { ElementNamedText } from '../changes/ElementNamedText';
 import { Button } from '../components/Button/Button';
 import { Chip } from '../components/Chip/Chip';
+import { ClampedText } from '../components/ClampedText/ClampedText';
 import { Text } from '../components/Text/Text';
 import type { UseDecisionRatingsResult } from './useDecisionRatings';
 import styles from './DecisionCriteriaGrid.module.css';
@@ -161,8 +162,10 @@ export function DecisionCriteriaGrid({ decisionId, options, canRate, userId, nee
                     </Link>
                     {o.provenance != null && <Chip tone="info">{o.provenance}</Chip>}
                     {o.description != null && o.description.trim() !== '' && (
-                      <Text as="p" size="sm">
-                        <ElementNamedText text={o.description} commitId={commitId ?? null} />
+                      <Text as="div" size="sm">
+                        <ClampedText text={o.description}>
+                          <ElementNamedText text={o.description} commitId={commitId ?? null} />
+                        </ClampedText>
                       </Text>
                     )}
                     <Text as="p" size="sm" tone={o.summary === null ? 'muted' : 'default'}>

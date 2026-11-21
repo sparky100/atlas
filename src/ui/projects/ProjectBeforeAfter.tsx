@@ -3,7 +3,7 @@ import { useState } from 'react';
 import { Link } from 'react-router';
 import type { UUID } from '../../contracts/delta';
 import { loadProjectHeads } from '../../db/projectHeads';
-import type { BranchRow } from '../../db/types';
+import type { BranchRow, DecisionRow } from '../../db/types';
 import { Button } from '../components/Button/Button';
 import { Chip } from '../components/Chip/Chip';
 import { Panel } from '../components/Panel/Panel';
@@ -27,6 +27,8 @@ export interface ProjectBeforeAfterProps {
   capabilities: readonly { id: UUID; name: string }[];
   /** The systems the project's declared scope names. */
   scopeSystemIds: ReadonlySet<UUID>;
+  /** The project's decisions, so the option columns can name where they come from. */
+  decisions: readonly DecisionRow[];
   base: string;
 }
 
@@ -109,7 +111,7 @@ function Column({ column, base, scopeSystemIds }: { column: BeforeAfterColumn; b
  * after each drafted change, with each system's connected apps and
  * integrations. Derived from the commit history on load, nothing stored.
  */
-export function ProjectBeforeAfter({ modelId, projectId, mainHeadCommitId, changes, capabilities, scopeSystemIds, base }: ProjectBeforeAfterProps) {
+export function ProjectBeforeAfter({ modelId, projectId, mainHeadCommitId, changes, capabilities, scopeSystemIds, decisions, base }: ProjectBeforeAfterProps) {
   const [view, setView] = useState<'list' | 'diagram'>('list');
   const openChanges = changes.filter((c) => OPEN_STATUSES.has(c.status));
   const changeKey = openChanges.map((c) => `${c.id}:${c.head_commit_id}`).join(',');
@@ -124,6 +126,8 @@ export function ProjectBeforeAfter({ modelId, projectId, mainHeadCommitId, chang
   });
 
   if (capabilities.length === 0 || !data) return null;
+  const shownChangeIds = new Set(data.flatMap((c) => c.after.map((col) => col.changeId)));
+  const omitted = openChanges.filter((c) => !shownChangeIds.has(c.id));
 
   return (
     <Panel data-testid="project-before-after">
@@ -131,6 +135,23 @@ export function ProjectBeforeAfter({ modelId, projectId, mainHeadCommitId, chang
       <Text as="p" size="sm" tone="muted">
         For each capability this project serves: what supports it today, and what would support it after each drafted change, with the apps and integrations each system connects to. Read from the model, not stored.
       </Text>
+      {decisions.length > 0 && (
+        <Text as="p" size="sm" tone="muted">
+          The options come from {decisions.length === 1 ? 'the decision' : 'the decisions'}{' '}
+          {decisions.map((d, i) => (
+            <span key={d.id}>
+              {i > 0 ? ', ' : ''}
+              <Link to={`${base}/decisions/${d.id}`}>{d.title}</Link>
+            </span>
+          ))}
+          .
+        </Text>
+      )}
+      {omitted.length > 0 && (
+        <Text as="p" size="sm" tone="muted">
+          Not shown because {omitted.length === 1 ? 'it changes' : 'they change'} nothing structurally: {omitted.map((c) => c.title ?? c.name).join(', ')}.
+        </Text>
+      )}
       <div className={styles.toggle} role="group" aria-label="Show this as">
         <Button variant={view === 'list' ? 'primary' : 'secondary'} type="button" aria-pressed={view === 'list'} onClick={() => { setView('list'); }}>
           List

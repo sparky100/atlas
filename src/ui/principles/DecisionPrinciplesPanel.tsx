@@ -50,7 +50,7 @@ export function DecisionPrinciplesPanel({ principles, links, editable, savingIds
 
   return (
     <Panel>
-      <CollapsibleSection title="Principles" meta={`(${String(lines.filter((l) => l.stance !== null).length)} of ${String(lines.length)} with a stance)`}>
+      <CollapsibleSection title="Principles" meta={`(${String(lines.filter((l) => l.stance !== null).length)} of ${String(lines.length)} with a stance)`} defaultOpen={lines.some((l) => l.stance !== null)}>
       {lines.length === 0 ? (
         <Text as="p" tone="muted">
           This model has no principles yet. <Link to={principlesHref}>Add some on the Principles page.</Link>

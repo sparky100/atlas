@@ -57,9 +57,14 @@ export function DecisionOptionLandscapePage() {
   const [showAllLanes, setShowAllLanes] = useState(false);
   const { ref: canvasRef, width: canvasWidth } = useCanvasWidth();
 
-  const displayInput = state.status === 'ready' ? state.data : null;
+  // People and teams do not belong here: an option touches systems, not actors.
+  // Drop them from the layout input so neither the lanes nor the canvas show them.
+  const displayInput = useMemo(
+    () => (state.status === 'ready' ? { ...state.data, actorsById: new Map() } : null),
+    [state],
+  );
   const laneOptions = useMemo(
-    () => (displayInput ? listLandscapeLaneOptions([...displayInput.systemsById.values()], displayInput.supportsEdges, displayInput.l1AncestorByCapabilityId, [...displayInput.actorsById.values()]) : []),
+    () => (displayInput ? listLandscapeLaneOptions([...displayInput.systemsById.values()], displayInput.supportsEdges, displayInput.l1AncestorByCapabilityId, []) : []),
     [displayInput],
   );
   const touched = useMemo(
@@ -114,10 +119,10 @@ export function DecisionOptionLandscapePage() {
           <Breadcrumb
             org={{ label: organisation?.name ?? '', href: `/o/${orgSlug ?? ''}` }}
             model={{ label: model.name, href: `/o/${orgSlug ?? ''}/m/${model.slug}` }}
-            refLabel="diff"
+            refLabel="Proposed changes"
             segments={[
               { label: decisionTitle, href: `/o/${orgSlug ?? ''}/m/${model.slug}/decisions/${decisionId ?? ''}` },
-              { label: 'Option diagram', href: `/o/${orgSlug ?? ''}/m/${model.slug}/decisions/${decisionId ?? ''}/options/${branchId ?? ''}/landscape` },
+              { label: 'What this option touches', href: `/o/${orgSlug ?? ''}/m/${model.slug}/decisions/${decisionId ?? ''}/options/${branchId ?? ''}/landscape` },
             ]}
           />
           <div className={styles.header}>
@@ -148,13 +153,16 @@ export function DecisionOptionLandscapePage() {
           {state.status === 'loading' && <Loading />}
           {state.status === 'error' && <Text as="p">{state.message}</Text>}
           {state.status === 'refNotFound' && <Text as="p">This option no longer exists.</Text>}
-          {state.status === 'ready' && displayState.status === 'ready' && (
-            <div className={styles.canvasWrap}>
+          {state.status === 'ready' && displayState.status === 'ready' && displayInput !== null && (
+            <div
+              className={styles.canvasWrap}
+              style={{ height: `${String(Math.max(320, Math.min(displayState.display.layout.height + 96, 720)))}px` }}
+            >
               <LandscapeCanvas
                 layout={displayState.display.layout}
-                systemsById={state.data.systemsById}
-                actorsById={state.data.actorsById}
-                edges={state.data.edges}
+                systemsById={displayInput.systemsById}
+                actorsById={displayInput.actorsById}
+                edges={displayInput.edges}
                 diff={state.data.diff}
                 nodeHref={nodeHref}
                 actorHref={elementHref}
