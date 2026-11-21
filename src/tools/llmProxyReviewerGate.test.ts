@@ -122,10 +122,13 @@ describe('llm-proxy reviewer key and tier on the actual edge entrypoint', () => 
       const first = await call({ modelTier: 'light' });
       expect(first.status).toBe(200);
       expect(logs.at(-1)).toMatchObject({ key_source: 'org', run_id: runId, model: 'claude-haiku-5-5' });
+      const challenger = await call({});
+      expect(challenger.status).toBe(200);
+      expect(logs.at(-1)).toMatchObject({ key_source: 'org', run_id: runId, model: 'claude-sonnet-5-5' });
       ownKey = false;
       const second = await call({ modelTier: 'light' });
       expect(second.status).toBe(403);
-      expect(providerCalls).toBe(1);
+      expect(providerCalls).toBe(2);
       expect(trialReads).toBe(0);
     } finally {
       ownKey = true;

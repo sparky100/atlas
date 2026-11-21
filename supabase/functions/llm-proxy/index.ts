@@ -446,6 +446,7 @@ function callAnthropicStreamingPassthrough(request: ProxyRequestBody, apiKey: st
 
 interface LlmProxyConfig {
   model: string;
+  agentStandardModel: string;
   lightModel: string;
   apiKey: string;
   rateLimitPerHour: number;
@@ -484,10 +485,12 @@ const TRIAL_TOKENS = 300_000;
 const DEFAULT_TRIAL_DAILY_TOKENS = 2_000_000;
 const UUID_SHAPE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const DEFAULT_LIGHT_MODEL = 'claude-haiku-5-5';
+const DEFAULT_AGENT_STANDARD_MODEL = 'claude-sonnet-5-5';
 
 async function loadConfig(supabaseUrl: string, serviceRoleKey: string): Promise<LlmProxyConfig> {
   const envDefaults: LlmProxyConfig = {
     model: Deno.env.get('LLM_PROXY_MODEL') || DEFAULT_MODEL,
+    agentStandardModel: Deno.env.get('LLM_PROXY_AGENT_STANDARD_MODEL') || DEFAULT_AGENT_STANDARD_MODEL,
     lightModel: Deno.env.get('LLM_PROXY_LIGHT_MODEL') || DEFAULT_LIGHT_MODEL,
     apiKey: Deno.env.get('ANTHROPIC_API_KEY') || '',
     rateLimitPerHour: Number(Deno.env.get('LLM_PROXY_RATE_LIMIT_PER_HOUR')) || DEFAULT_RATE_LIMIT_PER_HOUR,
@@ -511,6 +514,7 @@ async function loadConfig(supabaseUrl: string, serviceRoleKey: string): Promise<
     const vaultKey = await loadVaultApiKey(supabaseUrl, serviceRoleKey);
     return {
       model: typeof cfg.model === 'string' && cfg.model !== '' ? cfg.model : envDefaults.model,
+      agentStandardModel: typeof cfg.agentStandardModel === 'string' && cfg.agentStandardModel !== '' ? cfg.agentStandardModel : envDefaults.agentStandardModel,
       lightModel: typeof cfg.lightModel === 'string' && cfg.lightModel !== '' ? cfg.lightModel : envDefaults.lightModel,
       apiKey: vaultKey !== '' ? vaultKey : typeof cfg.apiKey === 'string' && cfg.apiKey !== '' ? cfg.apiKey : envDefaults.apiKey,
       rateLimitPerHour: typeof cfg.rateLimitPerHour === 'number' && cfg.rateLimitPerHour > 0 ? cfg.rateLimitPerHour : envDefaults.rateLimitPerHour,
@@ -652,7 +656,7 @@ Deno.serve(async (req: Request) => {
 
     const keySource: 'app' | 'org' | 'trial' = orgApiKey !== null ? 'org' : trialRunId !== null ? 'trial' : 'app';
     const config = await loadConfig(supabaseUrl, serviceRoleKey);
-    const model = bodyRecord.modelTier === 'light' && orgApiKey !== null ? config.lightModel : config.model;
+    const model = bodyRecord.modelTier === 'light' && orgApiKey !== null ? config.lightModel : bodyRecord.requireOrgKey === true && orgApiKey !== null ? config.agentStandardModel : config.model;
     const { rateLimitPerHour } = config;
     const loggedRunId = orgApiKey !== null ? validatedRunId : trialRunId;
     const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000).toISOString();

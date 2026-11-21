@@ -40,7 +40,8 @@ function deps(overrides: Partial<ReviewDeps> = {}) {
 
 describe('review-agent boundary', () => {
   it('sends only saved, relevant facts; excludes cost and identity on the actual outgoing request', async () => {
-    const d = deps();
+    const privateDecision = { ...decision, owner_id: id(91), lens_map_url: 'https://internal.example/hidden', owner_email: 'owner@example.invalid', frozen_pack: 'PRIVATE PACK', approval_name: 'Board Chair', comment: 'PRIVATE COMMENT' };
+    const d = deps({ loadDecision: () => Promise.resolve(privateDecision) });
     const result = await handleReview(d.deps, body);
     expect(result).toMatchObject({ status: 'done', inputTokens: 14, outputTokens: 21, notes: [{ basedOn: { kind: 'option', branchId: option.id } }] });
     const actual = JSON.stringify(d.requests[0]);
@@ -52,6 +53,7 @@ describe('review-agent boundary', () => {
     expect(actual).not.toContain(decision.org_id);
     expect(actual).not.toContain(decision.model_id);
     expect(actual).not.toContain(option.id);
+    for (const withheld of ['owner@example.invalid', 'PRIVATE PACK', 'Board Chair', 'PRIVATE COMMENT', 'https://internal.example/hidden', id(91)]) expect(actual).not.toContain(withheld);
     expect(d.requests[0]?.tools).toEqual([]);
     expect(d.choices).toContainEqual({ lens: 'challenge', runId: id(8), shareCost: false });
   });
