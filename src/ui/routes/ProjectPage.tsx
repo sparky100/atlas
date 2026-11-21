@@ -4,6 +4,7 @@ import { AppHeader } from '../components/AppHeader/AppHeader';
 import { Breadcrumb } from '../components/Breadcrumb/Breadcrumb';
 import { ModelNav } from '../components/ModelNav/ModelNav';
 import navStyles from '../components/ModelNav/ModelNav.module.css';
+import { PageIdentity } from '../components/PageIdentity/PageIdentity';
 import { Text } from '../components/Text/Text';
 import { ProjectView } from '../projects/ProjectView';
 import { useProject } from '../projects/useProject';
@@ -68,9 +69,7 @@ export function ProjectPage() {
           <EditingBranchBanner activeRef={ref} modelId={model.id} orgSlug={orgSlug ?? ''} modelSlug={model.slug} showModeShortcuts={false} />
           <Breadcrumb org={{ label: organisation?.name ?? '', href: `/o/${orgSlug ?? ''}` }} model={{ label: model.name, href: `/o/${orgSlug ?? ''}/m/${model.slug}` }} refLabel={refLabelOf(ref, branchLabel)} />
           <div className={styles.headerRow}>
-            <Text as="h1" size="2xl">
-              {title}
-            </Text>
+            <PageIdentity kind="Project" name={title} />
           </div>
           {state.status === 'loading' && <Loading />}
           {state.status === 'not_found' && <Text as="p">This project doesn't exist in this model, or you can't see it.</Text>}
