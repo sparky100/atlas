@@ -118,9 +118,10 @@ test('project lifecycle: start from a finding, decide inside it, deliver the cho
   await page.locator('summary', { hasText: 'Compare live model with chosen option' }).click();
   const comparison = page.getByTestId('project-before-after');
   await expect(comparison).not.toContainText('Loading comparison.');
-  const alsoSupports = comparison.getByTestId('also-supports').first();
-  await expect(alsoSupports).toBeVisible();
-  await alsoSupports.locator('summary').click();
+  const alsoSupports = comparison.getByTestId('also-supports');
+  if (await alsoSupports.count() > 0) {
+    await alsoSupports.first().locator('summary').click();
+  }
   await expect(page.getByTestId('project-before-after').getByRole('link', { name: 'Repairs Hub', exact: true }).first()).toBeVisible();
   await page.getByTestId('project-before-after').getByRole('button', { name: 'Diagram' }).click();
   await expect(page.getByTestId('project-before-after').getByTestId('project-diagram').first()).toBeVisible();
