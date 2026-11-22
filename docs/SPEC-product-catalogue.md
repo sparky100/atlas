@@ -60,7 +60,11 @@ All writes are platform-admin-only security-definer RPCs with optimistic
 fewer or more than 1-10 links in the pinned set, a claim marked pending review,
 or a pinned set that is not published. Existing published versions and saved
 option citations are not rewritten. `catalogue_entries.product_id` points at
-the canonical product; it is additive and nullable for legacy script loads.
+the canonical product; it is additive and null on existing published snapshots
+(the child-immutability trigger refuses updates to them) and for legacy script
+loads. The platform editor resolves those rows by code, then vendor/product.
+`20261122130000_catalogue_admin_backfill.sql` fills links and claims for the
+published rows already present when the first migration was applied.
 See [ADR-038](ADR-038-product-catalogue-admin.md).
 
 ## Verification and release

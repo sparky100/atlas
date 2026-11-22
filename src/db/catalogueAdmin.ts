@@ -231,12 +231,21 @@ export async function listCatalogueEntries(client: Client, catalogueId: UUID): P
 
 /** The canonical product IDs already in one published catalogue, used to start the next draft. */
 export async function listCatalogueProductIds(client: Client, catalogueId: UUID): Promise<UUID[]> {
-  const { data, error } = await client.from('catalogue_entries')
-    .select('product_id')
-    .eq('catalogue_id', catalogueId)
-    .not('product_id', 'is', null);
-  if (error) throw new Error(`listCatalogueProductIds: ${error.message}`);
-  return ((data as { product_id: string | null }[] | null) ?? []).flatMap((row) => (row.product_id === null ? [] : [row.product_id]));
+  const [entries, products] = await Promise.all([
+    client.from('catalogue_entries').select('product_id,code,product,vendor').eq('catalogue_id', catalogueId),
+    client.from('catalogue_products').select('id,code,product,vendor'),
+  ]);
+  if (entries.error) throw new Error(`listCatalogueProductIds: ${entries.error.message}`);
+  if (products.error) throw new Error(`listCatalogueProductIds: ${products.error.message}`);
+  const productRows = (products.data as { id: string; code: string; product: string; vendor: string }[] | null) ?? [];
+  const byCode = new Map(productRows.map((row) => [row.code, row.id]));
+  const normalise = (value: string) => value.trim().toLowerCase();
+  const byName = new Map(productRows.map((row) => [`${normalise(row.vendor)}\u0000${normalise(row.product)}`, row.id]));
+  return ((entries.data as { product_id: string | null; code: string; product: string; vendor: string }[] | null) ?? [])
+    .flatMap((row) => {
+      const id = row.product_id ?? byCode.get(row.code) ?? byName.get(`${normalise(row.vendor)}\u0000${normalise(row.product)}`);
+      return id === undefined ? [] : [id];
+    });
 }
 
 export async function listCatalogueDrafts(client: Client): Promise<CatalogueDraftRow[]> {

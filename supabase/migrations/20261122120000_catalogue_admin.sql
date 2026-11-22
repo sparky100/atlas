@@ -96,8 +96,11 @@ create table public.catalogue_draft_events (
 create index catalogue_draft_events_draft_idx on public.catalogue_draft_events(draft_id, happened_at);
 
 -- Existing entries keep their own snapshot. The new column is a permanent
--- pointer to the canonical product identity; null only for a legacy writer
--- that has not yet been taught about the library (scripts/loadCatalogue.ts).
+-- pointer to the canonical product identity. It is null for existing published
+-- entries because the immutability trigger refuses any update to them; the
+-- platform reader resolves those by code, then vendor/product. New public
+-- versions get the pointer at publication. A legacy script load that does not
+-- know about the library may also leave it null.
 alter table public.catalogue_entries
   add column product_id uuid references public.catalogue_products(id) on delete restrict;
 create index catalogue_entries_product_idx on public.catalogue_entries(product_id) where product_id is not null;
@@ -130,34 +133,44 @@ select gen_random_uuid(),
 from ranked
 where product_rank = 1;
 
+-- Only draft entries may be backfilled. The existing catalogue child
+-- immutability trigger deliberately refuses any update to a published entry,
+-- even an additive pointer. Published entries therefore keep product_id null;
+-- the admin reader resolves their product by code, then vendor/product.
 update public.catalogue_entries e
 set product_id = p.id
-from public.catalogue_products p
-where e.product_id is null
+from public.catalogue_products p, public.product_catalogues c
+where c.id = e.catalogue_id
+  and c.status = 'draft'
+  and e.product_id is null
   and lower(btrim(e.vendor)) = lower(btrim(p.vendor))
   and lower(btrim(e.product)) = lower(btrim(p.product));
 
 insert into public.catalogue_product_capabilities
   (product_id, capability_map_id, capability_code, capability_name, how_it_supports)
-select distinct on (e.product_id, m.id, l.capability_code)
-  e.product_id, m.id, l.capability_code, l.capability_name, l.how_it_supports
+select distinct on (p.id, m.id, l.capability_code)
+  p.id, m.id, l.capability_code, l.capability_name, l.how_it_supports
 from public.catalogue_entries e
+join public.catalogue_products p
+  on lower(btrim(e.vendor)) = lower(btrim(p.vendor))
+ and lower(btrim(e.product)) = lower(btrim(p.product))
 join public.product_catalogues c on c.id = e.catalogue_id
 join public.capability_maps m on m.sector = c.sector and m.version = c.capability_map_version
 join public.catalogue_entry_capabilities l on l.entry_id = e.id
-where e.product_id is not null
-  and exists (select 1 from public.capability_map_items i
+where exists (select 1 from public.capability_map_items i
     where i.map_id = m.id and i.code = l.capability_code and i.name = l.capability_name)
-order by e.product_id, m.id, l.capability_code, c.created_at, e.created_at
+order by p.id, m.id, l.capability_code, c.created_at, e.created_at
 on conflict do nothing;
 
 with candidates as (
-  select distinct on (e.product_id, q.kind, q.statement, q.source_url, q.source_date)
-    e.product_id, q.kind, q.statement, q.source_url, q.source_date, q.reviewed_by, q.reviewed_at
+  select distinct on (p.id, q.kind, q.statement, q.source_url, q.source_date)
+    p.id as product_id, q.kind, q.statement, q.source_url, q.source_date, q.reviewed_by, q.reviewed_at
   from public.catalogue_entries e
+  join public.catalogue_products p
+    on lower(btrim(e.vendor)) = lower(btrim(p.vendor))
+   and lower(btrim(e.product)) = lower(btrim(p.product))
   join public.catalogue_claims q on q.entry_id = e.id
-  where e.product_id is not null
-  order by e.product_id, q.kind, q.statement, q.source_url, q.source_date, q.reviewed_at desc, q.id
+  order by p.id, q.kind, q.statement, q.source_url, q.source_date, q.reviewed_at desc, q.id
 ), numbered as (
   select candidates.*,
     row_number() over (partition by product_id order by source_date, source_url, kind, statement) as position

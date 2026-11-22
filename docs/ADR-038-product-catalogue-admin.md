@@ -49,6 +49,9 @@ names stay internal to this admin view and are not shown to catalogue readers.
 - Sector fit remains explicit: a link is per capability-set version, not an
   implication that supporting one sector's capability supports another's.
 - Published catalogue content stays immutable. Corrections are a new version.
+  Existing published entries keep `product_id` null because the immutability
+  trigger refuses updates to them; the editor resolves those rows by code,
+  then normalised vendor/product. New public versions carry the pointer.
 - The repository JSON loader remains the bulk content path; once a catalogue
   is app-managed, new versions should be published from the platform editor so
   the canonical product library stays authoritative.
