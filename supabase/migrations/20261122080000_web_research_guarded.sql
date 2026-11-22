@@ -28,6 +28,42 @@ comment on column public.option_web_sources.assertion is 'D4: the claim this pag
 comment on column public.option_web_sources.checked_by is 'D4: the person who checked that the page supports the assertion.';
 comment on column public.option_web_sources.checked_at is 'D4: when that check was made.';
 
+-- A check is the caller's own: an insert may leave the check empty, but it
+-- may not attribute a check to someone else.
+alter policy option_web_sources_insert on public.option_web_sources
+  with check (
+    cited_by = (select auth.uid())
+    and (checked_by is null or checked_by = (select auth.uid()))
+    and exists (
+      select 1 from public.decisions d
+      where d.id = option_web_sources.decision_id
+        and d.status = 'proposed'
+        and atlas.has_role(d.org_id, 'owner', 'architect', 'contributor')
+    )
+    and exists (
+      select 1 from public.decision_links l
+      where l.decision_id = option_web_sources.decision_id
+        and l.linked_type = 'branch'
+        and l.linked_id = option_web_sources.branch_id
+    )
+  );
+
+-- The check time is server time, like `cited_at`; the UI's value only lets
+-- the all-or-none check pass before this trigger runs.
+create or replace function atlas.guard_option_web_sources_append_only()
+returns trigger language plpgsql set search_path = public, pg_temp as $$
+begin
+  if tg_op <> 'INSERT' then
+    raise exception 'option web sources are insert-only' using errcode = '23514';
+  end if;
+  new.cited_at := now();
+  if new.checked_by is not null then
+    new.checked_at := now();
+  end if;
+  return new;
+end;
+$$;
+
 create table public.web_research_requests (
   id uuid primary key default gen_random_uuid(),
   org_id uuid not null references public.organisations (id),
