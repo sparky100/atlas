@@ -118,6 +118,15 @@ export function WebResearchDialog({ decisionId, branchId, optionLabel, userId, e
     }
   }
 
+  function backToQuery(): void {
+    setPhase('query');
+    setResults([]);
+    setSelectedUrl(null);
+    setAssertion('');
+    setChecked(false);
+    setError(null);
+  }
+
   return (
     <dialog
       ref={dialogRef}
@@ -299,14 +308,7 @@ export function WebResearchDialog({ decisionId, branchId, optionLabel, userId, e
                   <Button
                     variant="ghost"
                     disabled={busy}
-                    onClick={() => {
-                      setPhase('query');
-                      setResults([]);
-                      setSelectedUrl(null);
-                      setAssertion('');
-                      setChecked(false);
-                      setError(null);
-                    }}
+                    onClick={backToQuery}
                   >
                     Search again
                   </Button>
@@ -319,6 +321,11 @@ export function WebResearchDialog({ decisionId, branchId, optionLabel, userId, e
               </Text>
             )}
             <div className={styles.actions}>
+              {selected === null && (
+                <Button variant="ghost" disabled={busy} onClick={backToQuery}>
+                  Search again
+                </Button>
+              )}
               <Button variant="ghost" disabled={busy} onClick={requestClose}>
                 Close
               </Button>
