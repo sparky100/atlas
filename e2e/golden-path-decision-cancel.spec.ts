@@ -59,6 +59,7 @@ test('cancel a decision: it stays in the log as cancelled with its reason, its d
   // The open decision blocks closing the project, and the Decisions item counts it.
   await openProject(page);
   await expectProposedDecisions(page, 1);
+  await page.getByText("Why can't this project close?").click();
   await expect(page.getByText('To close or cancel this project, first finish or cancel what is still open in it:')).toBeVisible();
   await expect(page.getByRole('button', { name: 'Close project' })).toHaveCount(0);
 
