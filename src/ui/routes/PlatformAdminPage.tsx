@@ -1,6 +1,7 @@
 import { Loading } from '../components/Loading/Loading';
 import { PlatformAdminOverview } from '../admin/PlatformAdminOverview';
 import { PlatformAdminView } from '../admin/PlatformAdminView';
+import { ReferenceMapAdmin } from '../admin/ReferenceMapAdmin';
 import { usePlatformAdmin } from '../admin/usePlatformAdmin';
 import { AppHeader } from '../components/AppHeader/AppHeader';
 import { EmptyState } from '../components/EmptyState/EmptyState';
@@ -26,7 +27,7 @@ import styles from './PlatformAdminPage.module.css';
 export function PlatformAdminPage() {
   const { userId } = useAuth();
   const { isPlatformAdmin, loading } = usePlatformAdmin(userId);
-  const sectionsState = useSettingsSectionsState('platform-admin', 'llm-proxy');
+  const sectionsState = useSettingsSectionsState('platform-admin', 'capability-sets');
 
   return (
     <div>
@@ -38,7 +39,8 @@ export function PlatformAdminPage() {
         {loading && <Loading />}
         {!loading && !isPlatformAdmin && <EmptyState>You don&apos;t have access to this page.</EmptyState>}
         {!loading && isPlatformAdmin && (
-          <SettingsSections state={sectionsState} ids={['llm-proxy', 'organisations', 'people']}>
+          <SettingsSections state={sectionsState} ids={['capability-sets', 'llm-proxy', 'organisations', 'people']}>
+            <ReferenceMapAdmin />
             <PlatformAdminView />
             <PlatformAdminOverview />
           </SettingsSections>
