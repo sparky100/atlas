@@ -35,4 +35,10 @@ The new draft claims use `reviewedBy: "Pending review"` as a deliberate publicat
 
 The same product is repeated across sectors. That is tolerable for this first editorial pass, but it can drift when a vendor renames or withdraws a product. Design a canonical product identity with sector-specific capability links and evidence, then migrate additively while preserving immutable published versions and saved option snapshots. Keep sector-specific fit distinct; do not imply that a product supporting one sector's capability automatically supports another's.
 
+This is now implemented by `20261122120000_catalogue_admin.sql` and
+`docs/ADR-038-product-catalogue-admin.md`: `/platform-admin` has one product
+library and per-sector catalogue publications. Existing published snapshots
+and saved citations are unchanged. New versions should be published from that
+editor so the canonical product library stays authoritative.
+
 The draft review fields also deserve a separate correction: drafts should permit an explicit unreviewed state without a fabricated review timestamp. Do not weaken the named-human publication gate. The no-money regex currently blocks legitimate product abbreviations such as “CAD” and capability names containing “Pricing”; a future contract change should distinguish sensitive values from ordinary names without exposing organisation money data.
