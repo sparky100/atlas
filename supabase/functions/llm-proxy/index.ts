@@ -776,6 +776,14 @@ Deno.serve(async (req: Request) => {
     }
 
     const keySource: 'app' | 'org' | 'trial' = orgApiKey !== null ? 'org' : trialRunId !== null ? 'trial' : 'app';
+    // D4 safety boundary: search is not a general proxy capability. Until the
+    // guarded Researcher exists, only a request carrying the server-only
+    // research credential may ask for it; everything else fails closed.
+    const researchSecret = Deno.env.get('ATLAS_RESEARCH_SECRET') ?? '';
+    const researchHeader = req.headers.get('x-atlas-research-secret') ?? '';
+    if (proxyRequest.webSearch !== undefined && (researchSecret === '' || researchHeader !== researchSecret)) {
+      return jsonResponse({ status: 'error', message: 'Web search is available only through the guarded Researcher.' }, 403);
+    }
     const config = await loadConfig(supabaseUrl, serviceRoleKey);
     const model = bodyRecord.modelTier === 'light' && orgApiKey !== null ? config.lightModel : bodyRecord.requireOrgKey === true && orgApiKey !== null ? config.agentStandardModel : config.model;
     const { rateLimitPerHour } = config;

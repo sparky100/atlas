@@ -50,7 +50,7 @@ function fakeClient(_url: string, key: string) {
 
 beforeAll(async () => {
   vi.stubGlobal('__atlasFakeCreateClient', fakeClient);
-  const env: Record<string, string> = { SUPABASE_URL: 'https://db.test', SUPABASE_ANON_KEY: 'anon', SUPABASE_SERVICE_ROLE_KEY: 'service', ANTHROPIC_API_KEY: 'platform-secret' };
+  const env: Record<string, string> = { SUPABASE_URL: 'https://db.test', SUPABASE_ANON_KEY: 'anon', SUPABASE_SERVICE_ROLE_KEY: 'service', ANTHROPIC_API_KEY: 'platform-secret', ATLAS_RESEARCH_SECRET: 'research-secret' };
   vi.stubGlobal('Deno', { env: { get: (key: string) => env[key] ?? null }, serve: (fn: typeof handler) => { handler = fn; } });
   const built = await build({
     entryPoints: ['supabase/functions/llm-proxy/index.ts'], bundle: true, write: false, format: 'esm', platform: 'neutral',
@@ -105,6 +105,14 @@ describe('llm-proxy reviewer key and tier on the actual edge entrypoint', () => 
     agentsEnabled = false;
     expect((await call({})).status).toBe(403);
     agentsEnabled = true;
+  });
+
+  it('refuses web search without the server research credential', async () => {
+    const before = providerCalls;
+    const response = await call({ webSearch: { maxUses: 1 } });
+    expect(response.status).toBe(403);
+    expect((await response.json()) as Record<string, unknown>).toMatchObject({ status: 'error', message: 'Web search is available only through the guarded Researcher.' });
+    expect(providerCalls).toBe(before);
   });
 
   it('uses the own key and records the run id, then refuses a key removed before a second call', async () => {

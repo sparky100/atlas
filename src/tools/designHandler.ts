@@ -13,7 +13,7 @@ import type { UUID } from '../contracts/delta';
 import { parseDesignerOptions, type DesignerOptionsResult } from '../contracts/designerOptions';
 import { runAsk } from './askLoop';
 import type { AskModelClient, AskResult } from './askLoop';
-import { designerBrief, designerSystemPrompt, DESIGNER_MAX_FINDING_CHARS, DESIGNER_MAX_WEB_SEARCHES } from './designPrompt';
+import { designerBrief, designerSystemPrompt, DESIGNER_MAX_FINDING_CHARS } from './designPrompt';
 import { catalogueRefKey, capabilityCode, capabilityTemplateRef } from './findCatalogueProducts';
 import { indexSnapshot } from './toolKit';
 import type { RunCostSharing, ToolContext, ToolStamp } from './types';
@@ -120,9 +120,6 @@ export async function handleDesign(deps: DesignHandlerDeps, body: unknown): Prom
     history: [],
     question: designerBrief({ elementId: parsed.elementId, finding: parsed.finding, webSearch: settings.keySet }),
     system: designerSystemPrompt(ctx.stamp.modelName, ctx.now().toISOString().slice(0, 10), { runCost }),
-    // D4: only the organisation's own key may pay for web search; the
-    // platform trial never does, and the proxy refuses it as well.
-    ...(settings.keySet ? { webSearch: { maxUses: DESIGNER_MAX_WEB_SEARCHES } } : {}),
     maxTokensPerRound: DESIGNER_MAX_TOKENS_PER_ROUND,
   });
   const design = parseDesignerOptions(result.answer);
