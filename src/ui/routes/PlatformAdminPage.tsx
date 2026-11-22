@@ -3,6 +3,7 @@ import { CatalogueAdmin } from '../admin/CatalogueAdmin';
 import { PlatformAdminOverview } from '../admin/PlatformAdminOverview';
 import { PlatformAdminView } from '../admin/PlatformAdminView';
 import { ReferenceMapAdmin } from '../admin/ReferenceMapAdmin';
+import { SampleModelAdmin } from '../admin/SampleModelAdmin';
 import { usePlatformAdmin } from '../admin/usePlatformAdmin';
 import { AppHeader } from '../components/AppHeader/AppHeader';
 import { EmptyState } from '../components/EmptyState/EmptyState';
@@ -40,9 +41,10 @@ export function PlatformAdminPage() {
         {loading && <Loading />}
         {!loading && !isPlatformAdmin && <EmptyState>You don&apos;t have access to this page.</EmptyState>}
         {!loading && isPlatformAdmin && (
-          <SettingsSections state={sectionsState} ids={['capability-sets', 'catalogue', 'llm-proxy', 'organisations', 'people']}>
+          <SettingsSections state={sectionsState} ids={['capability-sets', 'catalogue', 'sample-models', 'llm-proxy', 'organisations', 'people']}>
             <ReferenceMapAdmin />
             <CatalogueAdmin />
+            <SampleModelAdmin />
             <PlatformAdminView />
             <PlatformAdminOverview />
           </SettingsSections>

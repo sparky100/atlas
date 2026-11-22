@@ -23,10 +23,19 @@ export async function listSampleModels(supabase: Client): Promise<SampleModelSum
   const { data, error } = await supabase.from('sample_models').select('id, slug, version, name, description').order('version', { ascending: false });
   if (error) throw new Error(`listSampleModels: ${error.message}`);
   const rows = data as SampleModelSummary[];
+  // A platform admin can read withdrawn rows for management. The public offer
+  // must still hide them, so filter the same way the ordinary RLS policy does.
+  const slugs = [...new Set(rows.map((row) => row.slug))];
+  const withdrawn = new Set<string>();
+  await Promise.all(slugs.map(async (slug) => {
+    const result = await supabase.schema('atlas').rpc('sample_model_withdrawn', { p_slug: slug });
+    if (result.error) throw new Error(`listSampleModels: ${result.error.message}`);
+    if (result.data === true) withdrawn.add(slug);
+  }));
   const seen = new Set<string>();
   const newest: SampleModelSummary[] = [];
   for (const row of rows) {
-    if (seen.has(row.slug)) continue;
+    if (withdrawn.has(row.slug) || seen.has(row.slug)) continue;
     seen.add(row.slug);
     newest.push(row);
   }
@@ -44,7 +53,12 @@ export type PublishSampleResult = { ok: true; version: number; elements: number;
 export async function publishSampleModel(supabase: Client, input: PublishSampleInput, publishedBy: UUID): Promise<PublishSampleResult> {
   const { source } = input;
   const slug = input.slug.trim();
-  if (!SAMPLE_SLUG_PATTERN.test(slug)) return { ok: false, message: 'Use lowercase letters, numbers and single hyphens for the sample’s short name.' };
+  if (!SAMPLE_SLUG_PATTERN.test(slug)) return { ok: false, message: 'Use lowercase letters, numbers and single hyphens for the sample\'s short name.' };
+  // A withdrawn sample stays chosen-off until a platform admin reinstates it,
+  // so a new version cannot silently reappear in the picker.
+  const withdrawn = await supabase.schema('atlas').rpc('sample_model_withdrawn', { p_slug: slug });
+  if (withdrawn.error) return { ok: false, message: withdrawn.error.message };
+  if (withdrawn.data === true) return { ok: false, message: 'This sample is withdrawn. Reinstate it on the Platform admin page before publishing another version.' };
   const main = await getMainBranch(supabase, source.id);
   if (!main) return { ok: false, message: 'This model has no main branch to publish.' };
   const head = await loadMaterialisedHead(supabase, main.head_commit_id);
@@ -91,6 +105,11 @@ export type CopySampleResult = { ok: true; model: ModelRow; copiedElements: numb
  */
 export async function copySampleModel(supabase: Client, input: CopySampleInput): Promise<CopySampleResult> {
   const { sample, orgId, name, slug, authorId } = input;
+  // The RLS policy already hides a withdrawn sample from ordinary callers.
+  // This also stops a platform admin's stale picker from copying one.
+  const withdrawn = await supabase.schema('atlas').rpc('sample_model_withdrawn', { p_slug: sample.slug });
+  if (withdrawn.error) return { ok: false, message: withdrawn.error.message };
+  if (withdrawn.data === true) return { ok: false, message: 'That sample is no longer available.' };
   const { data: row, error: readError } = await supabase.from('sample_models').select('payload').eq('id', sample.id).maybeSingle();
   if (readError) return { ok: false, message: readError.message };
   if (!row) return { ok: false, message: 'That sample is no longer available.' };

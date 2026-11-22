@@ -12,6 +12,8 @@ The offer shows only to someone who can create a model (owner or architect) and 
 
 Sample content is **versioned, product-owned data**, not application code (rule 7, ADR-012): the `sample_models` table, no `org_id`, readable by every signed-in user, writable only by a platform admin. A platform admin publishes any model they can read from **Model settings → Publish as a sample model**. Each publish is a new version; earlier versions are kept, and the newest is the one offered. People who already added a sample keep their own copy.
 
+**Withdrawal (22 November 2026).** A platform admin can withdraw a sample from **Platform admin → Sample models**. Withdrawal is by slug, so every published version of that sample is hidden from ordinary signed-in users; platform admins still see the rows and the reason. A separate append-only `sample_model_withdrawal_events` history records who withdrew or reinstated it, when, and why. The published `sample_models` rows are never changed or deleted, and copies an organisation already made are its own models and are not recalled. A withdrawn slug cannot publish another version until it is reinstated; reinstatement makes the same slug available again. RLS hides withdrawn samples from ordinary users, so an old link or a known sample id cannot be used to copy one.
+
 Because a sample is published from a real model, it carries the capability elements and every fact's original source, reference, date and confidence (rule 4). The payload is scrubbed on publish: a fact's `asserted_by` becomes the nil id, a source's `uri` becomes null, and it names no capture job or person.
 
 ## How a copy works, and why there is no new database function
