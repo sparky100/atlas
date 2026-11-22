@@ -118,7 +118,7 @@ export async function handleDesign(deps: DesignHandlerDeps, body: unknown): Prom
     client: deps.createClient(model.orgId, deps.newRunId()),
     ctx,
     history: [],
-    question: designerBrief({ elementId: parsed.elementId, finding: parsed.finding, webSearch: settings.keySet }),
+    question: designerBrief({ elementId: parsed.elementId, finding: parsed.finding }),
     system: designerSystemPrompt(ctx.stamp.modelName, ctx.now().toISOString().slice(0, 10), { runCost }),
     maxTokensPerRound: DESIGNER_MAX_TOKENS_PER_ROUND,
   });

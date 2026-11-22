@@ -28,9 +28,6 @@ export function designerSystemPrompt(modelName: string, today: string, options: 
 export const DESIGNER_MAX_FINDING_CHARS = 1000;
 
 /** The one message the Designer is given: the person's finding and the element it is about. The element id is a real id, so the model looks it up itself. */
-export function designerBrief(input: { elementId: string; finding: string; webSearch?: boolean }): string {
-  const availability = input.webSearch === true
-    ? 'Web search is available for this run.'
-    : 'Web search is not available for this run; do not claim to have searched.';
-  return `The person's brief (draft options for this need): ${input.finding.trim().slice(0, DESIGNER_MAX_FINDING_CHARS)}\nThe system or element it is about has the id ${input.elementId}. Look it up, look at what it supports and what depends on it, then draft the options. ${availability}`;
+export function designerBrief(input: { elementId: string; finding: string }): string {
+  return `The person's brief (draft options for this need): ${input.finding.trim().slice(0, DESIGNER_MAX_FINDING_CHARS)}\nThe system or element it is about has the id ${input.elementId}. Look it up, look at what it supports and what depends on it, then draft the options. Web search is not available for this run; do not claim to have searched.`;
 }
