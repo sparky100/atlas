@@ -19,6 +19,7 @@ Which tool answers which question
 - atlas_get_element: everything about one element (attributes, owner, planned action, whether it is planned, active or retired today).
 - atlas_list_relationships: what one element is connected to, with the meaning of each link as above.
 - atlas_find_elements: filter by type, lifecycle, owner or attribute value (the planned action field is named "disposition" here).
+- atlas_find_catalogue_products: reviewed products for a capability, with dated vendor claims.
 - atlas_list_saved_reports / atlas_run_saved_report: the reports people saved, and their rows.
 - atlas_list_health_findings: data-quality and risk findings.
 - atlas_portfolio_signals: the application portfolio at a glance (run cost band against fit, criticality and planned action).

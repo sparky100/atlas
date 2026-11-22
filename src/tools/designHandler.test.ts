@@ -176,19 +176,14 @@ describe('handleDesign', () => {
     expect(outcome.design.problems.join(' ')).toContain('did not read');
   });
 
-  it('offers web search only when the organisation has its own key', async () => {
+  it('does not offer web search from the Designer', async () => {
     const offered: boolean[] = [];
-    const make = (keySet: boolean) => deps({
-      agentSettings: () => Promise.resolve({ ...ON, keySet }),
-      trialRunsLeft: () => Promise.resolve(1),
-      createClient: () => ({ complete: (request) => {
-        offered.push(request.webSearch !== undefined);
-        return Promise.resolve({ text: '{}', stopReason: 'end_turn', inputTokens: 1, outputTokens: 1 });
-      } }),
-    });
-    await handleDesign(make(true), body);
-    await handleDesign(make(false), body);
-    expect(offered).toEqual([true, false]);
+    const d = deps({ createClient: () => ({ complete: (request) => {
+      offered.push(request.webSearch !== undefined);
+      return Promise.resolve({ text: '{}', stopReason: 'end_turn', inputTokens: 1, outputTokens: 1 });
+    } }) });
+    await handleDesign(d, body);
+    expect(offered).toEqual([false]);
   });
 
   it('keeps a web page only when the search returned it, and reports the billed searches', async () => {
@@ -233,28 +228,21 @@ describe('the Designer prompt', () => {
     expect(prompt).toMatch(/"Replace with a product" and "Build ourselves", say in the summary whether the existing system would be retired/);
     expect(prompt).toMatch(/something to investigate and never as the conclusion/);
   });
-  it('allows web pages only when the search returned them, at most two and never as reviewed evidence', () => {
-    const prompt = designerSystemPrompt('Estate', '2026-11-19');
-    expect(prompt).toContain('you may search the web. Search at most twice.');
-    expect(prompt).toContain('never invent a URL');
-    expect(prompt).toContain('Web pages are not reviewed');
-    expect(prompt).toContain('"webRefs"');
-  });
   it('keeps the catalogue source detail out of the option text', () => {
     const prompt = designerSystemPrompt('Estate', '2026-11-19');
     expect(prompt).toContain('The catalogue evidence is only the vendor\'s own positioning,');
     expect(prompt).toContain('without its date or reviewer');
   });
-  it('caps catalogue lookups and puts the web search before more lookups', () => {
+  it('caps catalogue lookups and does not instruct a web search', () => {
     const prompt = designerSystemPrompt('Estate', '2026-11-19');
     expect(prompt).toContain('Call find_catalogue_products at most twice in a run');
-    expect(prompt).toContain('do the web search before any more lookups, then write the options');
+    expect(prompt).not.toContain('you may search the web');
+    expect(prompt).not.toContain('webRefs');
   });
   it('puts the element id and the finding in the brief', () => {
     expect(designerBrief({ elementId: ELEMENT, finding: 'Poor fit' })).toContain(ELEMENT);
   });
-  it('tells the Designer whether web search is available for this run', () => {
-    expect(designerBrief({ elementId: ELEMENT, finding: 'Poor fit', webSearch: true })).toContain('Web search is available for this run.');
+  it('says web search is not available in the Designer brief', () => {
     expect(designerBrief({ elementId: ELEMENT, finding: 'Poor fit' })).toContain('Web search is not available for this run');
   });
 });
