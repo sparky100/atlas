@@ -33,6 +33,7 @@
     "content:review-catalogue": "tsx scripts/reviewCatalogue.ts",
     "content:load-catalogue": "tsx scripts/loadCatalogue.ts",
     "content:publish-catalogue": "tsx scripts/publishCatalogue.ts",
+    "content:inventory": "tsx scripts/referenceInventory.ts",
     "check:case-collisions": "tsx scripts/checkCaseCollisions.ts",
     "backfill:commit-titles": "tsx scripts/backfillCommitTitles.ts",
     "backfill:capability-order": "tsx scripts/backfillCapabilityOrder.ts",
