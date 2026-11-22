@@ -89,8 +89,11 @@ describe('product catalogue and option evidence, real database', () => {
 
   async function seed(content: ProductCatalogueContent = structuredClone(catalogueFixture), sector?: string, seedMap = true) {
     const rows = catalogueToRows(content, randomUUID, '2026-11-20T10:00:00Z');
-    // Unique synthetic sectors avoid coupling tests to editorial content.
-    rows.catalogue.sector = sector ?? `test_${randomUUID()}`;
+    // Unique synthetic sectors avoid coupling tests to editorial content. No
+    // hyphens: the catalogue's no-price check treats a hyphen as a word
+    // boundary, so a random UUID segment such as "cad" or "aud" would look
+    // like a currency code and make this fixture randomly fail.
+    rows.catalogue.sector = sector ?? `test_${randomUUID().replaceAll('-', '')}`;
     const mapId = randomUUID();
     if (seedMap) {
       check(await service.from('capability_maps').insert({ id: mapId, sector: rows.catalogue.sector, version: content.capabilityMapVersion,
