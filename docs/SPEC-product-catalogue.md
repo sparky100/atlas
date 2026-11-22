@@ -1,8 +1,8 @@
 # Reviewed product catalogue: storage and provenance
 
-Status: foundations implemented on this branch; not yet released. No catalogue UI or Designer integration is included here.
+Status: storage, reader and platform-admin editor implemented; not yet released. The end-user Designer integration is unchanged.
 
-A catalogue is versioned product content, separate from an organisation's estate. A saved citation records what the catalogue said when a person added an option. It does not approve procurement or change the live model. The contract is `src/contracts/productCatalogue.ts`; the migration is `20261120050000_product_catalogue.sql`.
+A catalogue is versioned product content, separate from an organisation's estate. A saved citation records what the catalogue said when a person added an option. It does not approve procurement or change the live model. The reader contract is `src/contracts/productCatalogue.ts`; the foundations migration is `20261120050000_product_catalogue.sql`, and the platform editor is `20261122120000_catalogue_admin.sql`.
 
 ## Tables and access
 
@@ -43,6 +43,25 @@ One narrow internal helper, `atlas_private.lock_catalogue_option_decision`, take
 The snapshot trigger discards any client-supplied snapshot and builds the evidence from published catalogue rows. It also sets the citation time. `atlas_private.catalogue_entry_snapshot` is an invoker-only, unexposed projection shared by publication size validation and citation saving, so the two cannot disagree. Trigger-only functions are not callable through the API.
 
 A successful retry must carry the same original Designer provenance and the same set of citations. Different payloads under the same branch ID are refused rather than silently mixed. A retry never resets a subsequent human edit. These records are append-only, including for service-role updates/deletes. A later catalogue replacement or withdrawal never rewrites an option's saved evidence.
+
+## Platform editor and canonical product identity
+
+`/platform-admin` **Product catalogue** keeps one row per real product in
+`catalogue_products`, with its dated claims and capability links in
+`catalogue_product_capabilities`. A link names one exact `capability_maps`
+version and item, so one product can support capabilities in several sectors
+without a duplicate product row. `catalogue_drafts` selects product IDs for a
+sector version; publication writes the existing immutable entry snapshots and
+then publishes the parent catalogue. Reviewer names and `reviewed_by` remain
+internal to the admin view; the end-user reader does not show them.
+
+All writes are platform-admin-only security-definer RPCs with optimistic
+`edit_revision` checks. Publication refuses fewer or more than 1-8 claims,
+fewer or more than 1-10 links in the pinned set, a claim marked pending review,
+or a pinned set that is not published. Existing published versions and saved
+option citations are not rewritten. `catalogue_entries.product_id` points at
+the canonical product; it is additive and nullable for legacy script loads.
+See [ADR-038](ADR-038-product-catalogue-admin.md).
 
 ## Verification and release
 

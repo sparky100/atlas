@@ -7,11 +7,19 @@ A platform administrator is scoped to the whole deployment instead.
 
 ## What a platform admin can do today
 
-Two things, both at `/platform-admin`, reachable from the account menu once granted. Nothing else in this product checks platform-admin status.
+Three things, all at `/platform-admin`, reachable from the account menu once granted. Nothing else in this product checks platform-admin status.
 
 1. **See every organisation and person** (read-only). The Organisations list shows created date, people, elements on main, changes and active people in the last 30 days, last sign-in and last change. The People list shows email, each organisation with role and join date, sign-up date, last sign-in and last change, with a search by email. Anything with no sign-in or change in 30 days gets a "Not used in 30+ days" marker. Counts and dates only; no element names or other model content. "Last signed in" comes from `auth.users.last_sign_in_at`; "last change" is the newest commit the person (or organisation) made, so a read-only user shows "Never" for changes. Both come from `atlas.platform_admin_organisations()` / `atlas.platform_admin_people()` (`20261114080000_platform_admin_overview.sql`), which raise unless `atlas.is_platform_admin()` is exactly true (written `is not true`, so a NULL cannot pass), never consult org roles, and so refuse an organisation Owner.
 2. **View and change `llm-proxy`'s own application-level
 settings** (provider, model, per-org rate-limit cap, optionally the API key).
+3. **Edit the platform capability sets and the product catalogue**.
+   Capability sets use a guarded draft workspace and publish one fixed
+   `capability_maps` version (`docs/ADR-037-platform-capability-set-editor.md`).
+   The product catalogue has one row per real product, with capability links
+   into any number of capability-set versions. Sector catalogues are fixed
+   publication snapshots that select products and pin one published set
+   (`docs/ADR-038-product-catalogue-admin.md`). Both editors are
+   platform-admin-only; ordinary organisation owners cannot reach them.
 
 Provider is a real picker, not a label — `LLM_PROXY_PROVIDER_OPTIONS`
 (`src/ui/admin/useLlmProxyConfig.ts`) holds one entry today ("Anthropic"),
