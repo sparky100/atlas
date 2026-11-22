@@ -62,7 +62,7 @@ test('a platform admin can draft and edit a capability set from Home', async ({ 
   await section.getByRole('button', { name: 'Save draft' }).click();
   await expect(section.getByText(/Draft saved/)).toBeVisible();
   await page.reload();
-  await section.getByLabel('Capability set drafts').getByRole('button').filter({ hasText: /police/i }).first().click();
+  await section.getByLabel('Capability set drafts').getByRole('button').first().click();
   await section.getByLabel('Find a capability').fill('Connect a new customer');
   await section.getByRole('button', { name: /Connect a new customer/ }).click();
   await section.getByLabel('Search existing capability').fill('Connect a new customer');
