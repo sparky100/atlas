@@ -1,0 +1,24 @@
+.controls, .actions, .draftList { display: flex; align-items: center; flex-wrap: wrap; gap: var(--space-2); margin: var(--space-3) 0; }
+.controls label, .fields label, .tree label, .itemCard label { display: flex; flex-direction: column; gap: var(--space-1); min-width: 0; }
+.editor { margin-top: var(--space-4); border-top: 1px solid var(--border-strong); padding-top: var(--space-3); }
+.fields { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 18rem), 1fr)); gap: var(--space-3); }
+.split { display: grid; grid-template-columns: minmax(14rem, 1fr) minmax(18rem, 2fr); gap: var(--space-3); align-items: start; }
+.tree, .itemCard, .review { border: 1px solid var(--border-strong); border-radius: var(--radius-sm); padding: var(--space-3); background: var(--surface); min-width: 0; }
+.tree { display: flex; flex-direction: column; gap: var(--space-2); }
+.scroll { display: flex; flex-direction: column; max-height: 28rem; overflow: auto; }
+.scroll button { text-align: left; border: 0; border-bottom: 1px solid var(--border); background: transparent; padding: var(--space-2); color: var(--text); }
+.scroll button:hover, .scroll .active { background: var(--surface-raised); }
+.scroll small, .itemCard small, .draftList small { display: block; opacity: .7; }
+.itemCard { display: flex; flex-direction: column; gap: var(--space-2); }
+.identity { border-top: 1px solid var(--border-strong); padding-top: var(--space-3); display: flex; flex-direction: column; gap: var(--space-2); }
+.identity details, .match { border: 1px solid var(--border-strong); border-radius: var(--radius-sm); padding: var(--space-2); }
+.identity details[open] { display: flex; flex-direction: column; gap: var(--space-2); }
+.itemCard > summary { cursor: pointer; font-weight: 600; }
+.itemCard[open] > summary { margin-bottom: var(--space-3); }
+.itemCard[open] > label, .itemCard[open] > button, .itemCard[open] > strong, .itemCard[open] > span, .itemCard[open] > details { display: flex; margin-top: var(--space-2); }
+.cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 17rem), 1fr)); gap: var(--space-2); }
+.fields input, .fields textarea, .itemCard input, .itemCard select, .itemCard textarea, .tree input, .controls select { width: 100%; max-width: 100%; font: inherit; padding: var(--space-2); border: 1px solid var(--border-strong); border-radius: var(--radius-sm); background: var(--surface); color: var(--text); }
+.fields textarea, .itemCard textarea { min-height: 5rem; }
+.error { color: var(--danger-text, #a31d1d); }
+.review { margin: var(--space-3) 0; }
+@media (max-width: 700px) { .split { grid-template-columns: 1fr; } .scroll { max-height: 16rem; } .controls, .actions { align-items: stretch; flex-direction: column; } .controls > *, .actions button { width: 100%; } }
