@@ -10,6 +10,7 @@ let role = 'contributor';
 let member = true;
 let assistantEnabled = true;
 let agentsEnabled = true;
+let webSearchEnabled = true;
 let providerCalls = 0;
 let trialReads = 0;
 const logs: Record<string, unknown>[] = [];
@@ -36,7 +37,7 @@ function fakeClient(_url: string, key: string) {
         eq: (column, value) => { filters[String(column)] = value; return query; },
         gte: () => query,
         limit: () => query,
-        maybeSingle: () => Promise.resolve({ data: table === 'members' ? (filters.user_id ? { role } : member ? { user_id: 'user-1' } : null) : table === 'organisations' && service ? { ai_assistant_enabled: assistantEnabled, ai_agents_enabled: agentsEnabled, ai_agent_key_set: ownKey } : null, error: null }),
+        maybeSingle: () => Promise.resolve({ data: table === 'members' ? (filters.user_id ? { role } : member ? { user_id: 'user-1' } : null) : table === 'organisations' && service ? { ai_assistant_enabled: assistantEnabled, ai_agents_enabled: agentsEnabled, ai_agent_key_set: ownKey, ai_web_search_enabled: webSearchEnabled } : null, error: null }),
         insert: (row) => { logs.push(row); return Promise.resolve({ error: null }); },
         then: (resolve) => {
           if (table === 'llm_proxy_requests' && filters.key_source === 'trial') trialReads++;
@@ -113,6 +114,16 @@ describe('llm-proxy reviewer key and tier on the actual edge entrypoint', () => 
     expect(response.status).toBe(403);
     expect((await response.json()) as Record<string, unknown>).toMatchObject({ status: 'error', message: 'Web search is available only through the guarded Researcher.' });
     expect(providerCalls).toBe(before);
+  });
+
+  it('refuses a guarded web search while the organisation switch is off', async () => {
+    webSearchEnabled = false;
+    const before = providerCalls;
+    const response = await call({ webSearch: { maxUses: 1 } }, { 'x-atlas-research-secret': 'research-secret' });
+    expect(response.status).toBe(403);
+    expect((await response.json()) as Record<string, unknown>).toMatchObject({ status: 'error', message: 'Web research is switched off for this organisation. An owner can switch it on in organisation settings.' });
+    expect(providerCalls).toBe(before);
+    webSearchEnabled = true;
   });
 
   it('uses the own key and records the run id, then refuses a key removed before a second call', async () => {
