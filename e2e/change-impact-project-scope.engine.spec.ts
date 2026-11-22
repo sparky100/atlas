@@ -109,6 +109,7 @@ test('change page: an integration-only change shows the consumer\'s in-scope cap
   // scope, edited by no change — is affected, so nothing in scope reads as untouched.
   await page.goto(`/o/${orgSlug}/m/${modelSlug}/projects/${projectId}`);
   await expect(page.getByRole('heading', { name: 'Wayleaves', level: 1 })).toBeVisible();
+  await page.getByText('Review scope against draft changes').click();
   const scopeDiff = page.locator('div').filter({ has: page.getByRole('heading', { name: "Touched by this project's changes, not in scope" }) }).last();
   await expect(scopeDiff.getByRole('link', { name: 'GIS' })).toBeVisible();
   await expect(scopeDiff.getByRole('link', { name: 'ESCOMS' })).toHaveCount(0);

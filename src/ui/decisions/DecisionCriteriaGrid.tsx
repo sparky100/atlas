@@ -17,7 +17,7 @@ import { useCompactDecisionLayout } from './useCompactDecisionLayout';
 
 export interface DecisionCriteriaOption {
   branchId: UUID;
-  /** `intentHeaderLine(branch)` — may carry the "Exploring: " prefix this grid's own header strips before display (rule: "merge Options list into column headers... drop 'Exploring:' prefix"). */
+  /** `intentHeaderLine(branch)` - may carry an "Exploring: ", "Proposing: " or "Recording: " prefix this grid's own header strips before display (rule: "merge Options list into column headers... drop 'Exploring:' prefix"). The prefix changes when an option is chosen, so strip every intent prefix, not just the pre-choice one. */
   label: string;
   status: BranchStatus;
   isChosen: boolean;
@@ -73,10 +73,10 @@ interface EditingCell {
   criterionLabel: string;
 }
 
-const EXPLORING_PREFIX = /^Exploring:\s*/;
+const INTENT_PREFIX = /^(?:Exploring|Proposing|Recording):\s*/;
 
-function stripExploringPrefix(label: string): string {
-  return label.replace(EXPLORING_PREFIX, '');
+function stripIntentPrefix(label: string): string {
+  return label.replace(INTENT_PREFIX, '');
 }
 
 /**
@@ -223,7 +223,7 @@ export function DecisionCriteriaGrid({ decisionId, options, canRate, userId, nee
                     </Text>
                     <Link to={`/o/${orgSlug}/m/${modelSlug}/changes/${o.branchId}`}>
                       <Text as="span" size="md" className={styles.optionTitle}>
-                        {stripExploringPrefix(o.label)}
+                        {stripIntentPrefix(o.label)}
                       </Text>
                     </Link>
                     {o.provenance != null && <Chip tone="info">{o.provenance}</Chip>}
@@ -245,7 +245,7 @@ export function DecisionCriteriaGrid({ decisionId, options, canRate, userId, nee
                     )}
                     <div className={styles.optionHeaderActions}>
                       {canResearch && (
-                        <Button variant="secondary" onClick={() => { onResearch(o.branchId, stripExploringPrefix(o.label)); }}>
+                        <Button variant="secondary" onClick={() => { onResearch(o.branchId, stripIntentPrefix(o.label)); }}>
                           Research the web
                         </Button>
                       )}
@@ -314,7 +314,7 @@ export function DecisionCriteriaGrid({ decisionId, options, canRate, userId, nee
                         className={styles.cell}
                         disabled={!canRate}
                         onClick={() => {
-                          openEditor(o.branchId, stripExploringPrefix(o.label), criterion.key, criterion.label);
+                          openEditor(o.branchId, stripIntentPrefix(o.label), criterion.key, criterion.label);
                         }}
                       >
                         {rating ? <Chip tone={decisionRatingLevelTone(rating.level)}>{criterion.levelLabels[rating.level]}</Chip> : <span className={styles.notRated}>Not rated</span>}
@@ -335,14 +335,14 @@ export function DecisionCriteriaGrid({ decisionId, options, canRate, userId, nee
 
       {compact && <div className={styles.mobileCards} data-testid="decision-option-cards">
         {options.map((o) => (
-          <article key={o.branchId} className={styles.optionCard} data-testid="decision-option-card" aria-label={stripExploringPrefix(o.label)}>
+          <article key={o.branchId} className={styles.optionCard} data-testid="decision-option-card" aria-label={stripIntentPrefix(o.label)}>
             <div className={styles.optionHeaderTop}>
               {o.isChosen && <Chip tone="ok">chosen</Chip>}
               <Chip tone={branchStatusTone(o.status)}>{o.status}</Chip>
               <Text as="span" size="sm" tone="muted">{ratedCount(o.branchId)}/{DECISION_CRITERIA.length} rated</Text>
             </div>
             <Link to={`/o/${orgSlug}/m/${modelSlug}/changes/${o.branchId}`}>
-              <Text as="span" size="md" className={styles.optionTitle}>{stripExploringPrefix(o.label)}</Text>
+              <Text as="span" size="md" className={styles.optionTitle}>{stripIntentPrefix(o.label)}</Text>
             </Link>
             {o.provenance != null && <Text as="p" size="sm" tone="muted">{o.provenance}</Text>}
             <Text as="p" size="sm" tone={o.summary === null ? 'muted' : 'default'}>{o.summary ?? 'No changes recorded yet'}</Text>
@@ -359,7 +359,7 @@ export function DecisionCriteriaGrid({ decisionId, options, canRate, userId, nee
                 return (
                   <div key={criterion.key} className={styles.ratingRow} data-testid={`decision-rating-${criterion.key}`}>
                     <Text as="span" size="sm">{criterion.label}{criterion.key === 'timing' && neededBy !== null ? ` (needed by ${neededBy})` : ''}</Text>
-                    <button type="button" className={styles.cell} disabled={!canRate} onClick={() => { openEditor(o.branchId, stripExploringPrefix(o.label), criterion.key, criterion.label); }}>
+                    <button type="button" className={styles.cell} disabled={!canRate} onClick={() => { openEditor(o.branchId, stripIntentPrefix(o.label), criterion.key, criterion.label); }}>
                       {rating ? <Chip tone={decisionRatingLevelTone(rating.level)}>{criterion.levelLabels[rating.level]}</Chip> : <span className={styles.notRated}>Not rated</span>}
                       {rating?.note && <span className={styles.noteDot} aria-label="Has a note" title={rating.note}>•</span>}
                     </button>
@@ -369,7 +369,7 @@ export function DecisionCriteriaGrid({ decisionId, options, canRate, userId, nee
               })}
             </div>
             <div className={styles.optionHeaderActions}>
-              {canResearch && <Button variant="secondary" onClick={() => { onResearch(o.branchId, stripExploringPrefix(o.label)); }}>Research the web</Button>}
+              {canResearch && <Button variant="secondary" onClick={() => { onResearch(o.branchId, stripIntentPrefix(o.label)); }}>Research the web</Button>}
               <Link to={`/o/${orgSlug}/m/${modelSlug}/decisions/${decisionId}/options/${o.branchId}/landscape`}>Preview impact →</Link>
               {canEditOption(o) && <Button variant="secondary" onClick={() => { onWorkOnThisChange(o.branchId); }}>Edit this change</Button>}
               {o.canChoose && <Button variant="secondary" onClick={() => { onChoose(o.branchId); }}>Choose</Button>}
