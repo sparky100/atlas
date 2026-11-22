@@ -46,4 +46,30 @@ describe('pending options', () => {
     s.setItem(key, JSON.stringify({ savedAt: 1000, options: [{ ...option('a'), catalogueRefs: [valid, { sector: '', version: 0, entryCode: '' }] }] }));
     expect(loadPending(s, key, 2000)[0]?.catalogueRefs).toEqual([valid]);
   });
+  it('never brings a held element id back after restore', () => {
+    const s = memory();
+    const id = '11111111-1111-4111-8111-111111111111';
+    s.setItem(key, JSON.stringify({ savedAt: 1000, options: [{
+      ...option('a'),
+      title: `Keep [[element:${id}]]`,
+      summary: `Use [[element:${id}]].`,
+      toWeigh: `Check [[element:${id}]].`,
+      suggestedTitle: `Keep [[element:${id}]]`,
+      suggestedSummary: `Use [[element:${id}]].`,
+    }] }));
+    const loaded = loadPending(s, key, 2000)[0];
+    expect(loaded?.title).toBe('Keep an element in the model');
+    expect(loaded?.summary).toBe('Use an element in the model.');
+    expect(loaded?.toWeigh).toBe('Check an element in the model.');
+    expect(loaded?.suggestedTitle).toBe('Keep an element in the model');
+    expect(loaded?.suggestedSummary).toBe('Use an element in the model.');
+  });
+  it('sanitises markers before writing and before making a description', () => {
+    const s = memory();
+    const id = '11111111-1111-4111-8111-111111111111';
+    savePending(s, key, [{ ...option('a'), title: `Keep [[element:${id}]]`, summary: `Use [[element:${id}]].` }], 1000);
+    expect(s.data.get(key)).not.toContain(id);
+    expect(optionDescription({ summary: `Use [[element:${id}]].`, toWeigh: `Check [[element:${id}]].` }))
+      .toBe('Use an element in the model.\n\nTo weigh: Check an element in the model.');
+  });
 });

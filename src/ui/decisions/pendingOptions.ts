@@ -1,4 +1,5 @@
 import type { UUID } from '../../contracts/delta';
+import { citationsToNames } from '../../db/designAgent';
 import { catalogueCitationSchema, type CatalogueCitation } from '../../contracts/productCatalogue';
 
 /**
@@ -28,6 +29,22 @@ export interface PendingOption {
 
 export const PENDING_TTL_MS = 24 * 60 * 60 * 1000;
 
+/** Never show an element id. Old held drafts may still contain [[element:<id>]]; the name is gone, so use the same honest fallback as the Designer. */
+function clean(value: unknown): string {
+  return typeof value === 'string' ? citationsToNames(value, {}) : '';
+}
+
+function sanitiseOption(option: PendingOption): PendingOption {
+  return {
+    ...option,
+    title: clean(option.title),
+    summary: clean(option.summary),
+    toWeigh: clean(option.toWeigh),
+    suggestedTitle: clean(option.suggestedTitle),
+    suggestedSummary: clean(option.suggestedSummary),
+  };
+}
+
 export interface StorageLike {
   getItem(key: string): string | null;
   setItem(key: string, value: string): void;
@@ -48,7 +65,7 @@ export function savePending(storage: StorageLike, key: string, options: readonly
     storage.removeItem(key);
     return;
   }
-  const stored: Stored = { savedAt: now, options: [...options] };
+  const stored: Stored = { savedAt: now, options: options.map(sanitiseOption) };
   storage.setItem(key, JSON.stringify(stored));
 }
 
@@ -67,7 +84,18 @@ export function loadPending(storage: StorageLike, key: string, now: number): Pen
             return parsed.success ? [parsed.data] : [];
           })
         : [];
-      return [{ ...o, catalogueRefs: refs }];
+      const title = clean(o.title);
+      const summary = clean(o.summary);
+      return [{
+        ...o,
+        title,
+        summary,
+        toWeigh: clean(o.toWeigh),
+        suggestedTitle: clean(o.suggestedTitle) || title,
+        suggestedSummary: clean(o.suggestedSummary) || summary,
+        draftedAt: typeof o.draftedAt === 'string' ? o.draftedAt : new Date(now).toISOString(),
+        catalogueRefs: refs,
+      }];
     });
   } catch {
     storage.removeItem(key);
@@ -81,7 +109,9 @@ export function removePending(storage: StorageLike, key: string, id: UUID, now: 
 
 /** The text stored as the option's description: the plain summary, then what to weigh on its own line. */
 export function optionDescription(option: Pick<PendingOption, 'summary' | 'toWeigh'>): string {
-  return option.toWeigh.trim() === '' ? option.summary.trim() : `${option.summary.trim()}\n\nTo weigh: ${option.toWeigh.trim()}`;
+  const summary = citationsToNames(option.summary.trim(), {});
+  const toWeigh = citationsToNames(option.toWeigh.trim(), {});
+  return toWeigh === '' ? summary : `${summary}\n\nTo weigh: ${toWeigh}`;
 }
 
 /** The clock, read in one place so callers in render code do not each call it. */

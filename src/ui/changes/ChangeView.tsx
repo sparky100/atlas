@@ -14,6 +14,7 @@ import { Panel } from '../components/Panel/Panel';
 import { Text } from '../components/Text/Text';
 import { useAuth } from '../auth/useAuth';
 import { createChangeBranch, getMainBranch } from '../../db/branches';
+import { citationsToNames } from '../../db/designAgent';
 import type { AffectedCapability, ChangeAffectedValueStream } from '../../db/changeSummary';
 import type { MemberRole, SourceRow } from '../../db/types';
 import { useSelectedRef } from '../branches/useSelectedRef';
@@ -168,8 +169,8 @@ export function ChangeView({ orgId, modelId, branchId, orgSlug, modelSlug, role,
         orgId,
         modelId,
         name: `${branch.name}-copy-${crypto.randomUUID().slice(0, 8)}`,
-        ...(branch.title ? { title: branch.title } : {}),
-        ...(branch.description ? { description: branch.description } : {}),
+        ...(branch.title ? { title: citationsToNames(branch.title, {}) } : {}),
+        ...(branch.description ? { description: citationsToNames(branch.description, {}) } : {}),
         ...(branch.target_date ? { targetDate: branch.target_date } : {}),
         createdBy: userId ?? '',
         mainHeadCommitId: main.head_commit_id,
@@ -192,8 +193,8 @@ export function ChangeView({ orgId, modelId, branchId, orgSlug, modelSlug, role,
   };
 
   const startEditing = () => {
-    setTitle(branch.title ?? '');
-    setDescription(branch.description ?? '');
+    setTitle(citationsToNames(branch.title ?? '', {}));
+    setDescription(citationsToNames(branch.description ?? '', {}));
     setTargetDate(branch.target_date ?? '');
     setEditing(true);
   };
