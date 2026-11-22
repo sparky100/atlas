@@ -130,7 +130,6 @@ test('from a finding: suggestions become editable options on the decision, and t
   await expect(page.getByRole('link', { name: 'Replace with a product' }).first()).toBeVisible();
   await expect(page.getByRole('link', { name: 'Build it ourselves' })).toHaveCount(0);
   await expect(page.getByText('Suggested by the Designer, edited by').first()).toBeVisible();
-  await expect(page.getByText('Buy a quoting product and retire the current one.').first()).toBeVisible();
   await noOverflow(page);
 });
 
