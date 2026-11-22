@@ -26,7 +26,7 @@ There are 29 map-version files for 17 sectors and 17 catalogue-version files con
 | utility | 3 | draft | v1 draft | 7 |
 | water_wastewater | 1 | draft | v1 draft | 7 |
 
-The previous plan said Any Organisation v2 was absent from the repository. That is now stale: `content/capability-maps/any_organisation/2.json` exists as a draft with 70 items and six value streams. The electricity-network map v4 file is also a draft with 84 items. Simon's live query reported electricity-network catalogue v1 as **published** with 19 entries on 21 November 2026; that is a reported live/file status difference, not a result verified by this workspace.
+The previous plan said Any Organisation v2 was absent from the repository. That is now stale: `content/capability-maps/any_organisation/2.json` exists as a draft with 70 items and six value streams. The electricity-network map v4 file is also a draft with 84 items. Simon's live query reported electricity-network catalogue v1 as **published** with 19 entries on 21 November 2026. Simon confirmed on 22 November that the live database entries are correct. The live publication is the baseline; the draft label in the repository file is stale publication metadata, not evidence that live content should be withdrawn. The exact live content has not been queried from this workspace.
 
 ## Identity candidates, not automatic matches
 
@@ -44,7 +44,7 @@ pnpm content:inventory --live > reference-inventory.json
 
 The command performs only SELECTs. It pages reads, compares map items, map sources, value streams and enables links, and compares catalogue entries, support links and sourced claims. It reports live-only and repository-only sector/version keys, statuses, content differences, seeded-model counts per map, and saved option-citation counts per catalogue. It emits no organisation names, model names, user identities, reviewer names, or raw claims. The output should be reviewed privately because even counts and product names may be operationally sensitive. A missing or failed read stops the comparison; it does not silently treat a missing table as empty.
 
-The live pass remains necessary to identify spurious published map versions and cited versions before anyone deprecates, withdraws or remaps content. Sample-model payloads are not read by this command; their embedded map lineage needs a separate inspection if cited versions cannot be established from `sources`.
+Use the live pass to record the authoritative published versions and their citations, and to find repository files that need reconciliation. A difference is a review item, not a reason to alter a correct live entry. Do not deprecate, withdraw or remap live content merely to match a file. Sample-model payloads are not read by this command; their embedded map lineage needs a separate inspection if cited versions cannot be established from `sources`.
 
 ## D1–D4 integration boundary
 
