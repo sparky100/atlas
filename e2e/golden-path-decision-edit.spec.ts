@@ -19,7 +19,7 @@ test('edit a proposed decision: title, context, needed-by date and a concern; cl
   await expect(page.getByRole('heading', { name: 'What to replce BW with' })).toBeVisible();
   await expect(page.getByText('No context recorded.')).toBeVisible();
   await page.getByRole('button', { name: /Concerns/ }).click();
-  await expect(page.getByPlaceholder('Add a capability or system this decision concerns.')).toBeVisible();
+  await expect(page.getByPlaceholder(/Add a capability or system this decision concerns/)).toBeVisible();
 
   // Fix the title, add context and a needed-by date.
   await page.getByRole('button', { name: '✎ Edit decision' }).click();
