@@ -856,6 +856,12 @@ A published, versioned sample model a new organisation can copy into itself (`do
 
 `product_catalogues`, `catalogue_entries`, `catalogue_entry_capabilities`, `catalogue_claims` and `option_catalogue_sources` are specified in [SPEC-product-catalogue.md](SPEC-product-catalogue.md), including grants, publication locks, immutable snapshots and the atomic save RPC. Product content has no organisation data; citations inherit tenancy from their decision. This addition changes no model-history tables.
 
+#### Shared reference-capability identity (ADR-036)
+
+`20261122090000_reference_capabilities.sql` adds three empty platform-content tables. `reference_capabilities(id, stable_key, created_at)` has a unique lower-case stable key; it can be corrected while all revisions are draft, then is fixed once a revision is published. `reference_capability_revisions(capability_id, revision, name, definition, status, published_at, created_at)` has primary key `(capability_id, revision)` and immutable published rows. `reference_map_item_links(map_item_id, capability_id, capability_revision, review_basis, mapped_by, mapped_at)` has one row per existing `capability_map_items.id` and a foreign key to the exact revision. The linked revision must be published. An alignment of an already-published or deprecated map item can be inserted once but cannot be changed or removed; an alignment of a draft map item can be revised.
+
+No mapping is inferred or backfilled by the migration. Existing map IDs, seeded `templateRef`, organisation capabilities, catalogue citations, and the loader keep their meaning. The tables have RLS and a platform-admin-only select policy, no authenticated write grant, and a service-role write path reserved for reviewed backfill until the in-app admin operations arrive. See [ADR-036](ADR-036-reference-capability-identity.md) for the identity decision and the live-data reconciliation gate.
+
 ### 3.11 Saved reports, saved copies and dashboards
 
 Workflow records on the same tier as `projects` and `decisions` (ADR-027, `supabase/migrations/20261106010000_saved_reports.sql`): never a delta, never folded into a head, never in a version. Deleting every row of all four tables loses no model information (ADR-011's litmus test for the definitions; see `report_snapshots` for the one table that is a record rather than a hint). Contract: `src/contracts/reportSpec.ts` (`ReportSpec`, `parseReportSpec`); evaluator: `src/engine/reportQuery.ts`; rows and queries: `src/db/types.ts`, `src/db/reports.ts`.
