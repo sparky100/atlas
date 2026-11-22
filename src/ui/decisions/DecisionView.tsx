@@ -68,6 +68,7 @@ import type { OptionSource } from '../../contracts/optionSource';
 import { groupWhatChangesRows, type WhatChangesRow } from './whatChangesRows';
 import styles from './DecisionView.module.css';
 import { useCompactDecisionLayout } from './useCompactDecisionLayout';
+import { WebResearchDialog } from './WebResearchDialog';
 
 export interface DecisionViewProps {
   modelId: UUID;
@@ -79,6 +80,8 @@ export interface DecisionViewProps {
   assistantEnabled: boolean;
   agentsEnabled: boolean;
   keySet: boolean;
+  /** The organisation's guarded web research switch (default off). */
+  webSearchEnabled: boolean;
   shareCost: boolean;
   /** Lifted from `DecisionPage.tsx`'s own `useDecision` call, not fetched again here — the two used to each run their own independent copy of the same fetch (one for this view, one `DecisionPage.tsx` only ever read `.title` from), so a transient failure of either one alone could post the "Couldn't load this decision" banner even while the other succeeded and rendered full content underneath it (found in a walkthrough, issue-reported). One fetch, shared. */
   state: DecisionPageState;
@@ -104,7 +107,7 @@ export interface DecisionViewProps {
  * this here" (an element's own linked decisions) are also PR6, but live on
  * `DecisionsView.tsx`/`ElementDecisionsSection.tsx` respectively, not here.
  */
-export function DecisionView({ modelId, decisionId, orgId, orgSlug, modelSlug, role, assistantEnabled, agentsEnabled, keySet, shareCost, state, applyNewOption, applyNewConcern, applyDecisionUpdate, refreshOptionsAndArguments }: DecisionViewProps) {
+export function DecisionView({ modelId, decisionId, orgId, orgSlug, modelSlug, role, assistantEnabled, agentsEnabled, keySet, webSearchEnabled, shareCost, state, applyNewOption, applyNewConcern, applyDecisionUpdate, refreshOptionsAndArguments }: DecisionViewProps) {
   const { userId } = useAuth();
   const compact = useCompactDecisionLayout();
   const { branch: main } = useMainBranch(modelId);
@@ -138,6 +141,7 @@ export function DecisionView({ modelId, decisionId, orgId, orgSlug, modelSlug, r
   }
 
   const [addingOption, setAddingOption] = useState(false);
+  const [researchTarget, setResearchTarget] = useState<{ branchId: UUID; label: string } | null>(null);
   const [optionTitle, setOptionTitle] = useState('');
   const [choosingBranchId, setChoosingBranchId] = useState<UUID | null>(null);
   const [reasons, setReasons] = useState('');
@@ -201,6 +205,7 @@ export function DecisionView({ modelId, decisionId, orgId, orgSlug, modelSlug, r
 
   const { decision, links, linkedElementsById, linkedBranchesById, args } = state;
   const canAddOption = canCreateChangeBranch(role) && decision.status === 'proposed';
+  const canResearch = canAddOption && webSearchEnabled && assistantEnabled && agentsEnabled && keySet;
   const canChoose = canChooseDecisionOption(role) && decision.status === 'proposed';
   const canRate = canRateDecisionOption(role, decision);
   const chosenBranch = decision.branch_id !== null ? linkedBranchesById.get(decision.branch_id) : undefined;
@@ -562,6 +567,8 @@ export function DecisionView({ modelId, decisionId, orgId, orgSlug, modelSlug, r
                     setRef({ kind: 'branch', branchId });
                     void navigate(`/o/${orgSlug}/m/${modelSlug}/changes/${branchId}`);
                   }}
+                  canResearch={canResearch}
+                  onResearch={(branchId, label) => { setResearchTarget({ branchId, label }); }}
                   ratingsState={ratingsState}
                 />
                 </div>
@@ -932,6 +939,21 @@ export function DecisionView({ modelId, decisionId, orgId, orgSlug, modelSlug, r
         </Text>
         <CommentsSection key={commentsKey} orgId={orgId} modelId={modelId} userId={userId} role={role} anchorType="decision" anchorId={decisionId} branchId={null} />
       </Panel>
+
+      {researchTarget !== null && userId !== null && (
+        <WebResearchDialog
+          decisionId={decisionId}
+          branchId={researchTarget.branchId}
+          optionLabel={researchTarget.label}
+          userId={userId}
+          existingUrls={(sourcesByBranch.get(researchTarget.branchId) ?? []).flatMap((source) => (source.kind === 'web' ? [source.url] : []))}
+          onClose={() => { setResearchTarget(null); }}
+          onSaved={() => {
+            setResearchTarget(null);
+            void queryClient.invalidateQueries({ queryKey: ['optionSources', decisionId] });
+          }}
+        />
+      )}
     </div>
   );
 }

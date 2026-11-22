@@ -12,6 +12,9 @@ const row: OptionWebSourceRow = {
   retrieved_at: '2026-11-21T10:00:00Z',
   cited_by: 'user-1',
   cited_at: '2026-11-21T10:05:00Z',
+  assertion: null,
+  checked_by: null,
+  checked_at: null,
 };
 
 describe('optionWebSourcesFromRows', () => {
@@ -21,6 +24,7 @@ describe('optionWebSourcesFromRows', () => {
       url: 'https://vendor.example/evidence', title: 'Product evidence', publisher: 'Vendor Ltd',
       excerpt: 'The page says it records complaints.', retrievedAt: '2026-11-21T10:00:00Z',
       citedBy: 'user-1', citedAt: '2026-11-21T10:05:00Z',
+      assertion: null, checkedBy: null, checkedAt: null,
     });
   });
 

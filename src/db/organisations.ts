@@ -72,6 +72,8 @@ export interface UpdateOrganisationInput {
   aiShareRunCost?: boolean;
   /** Owner-only: switch agents on. Needs the AI assistant on and a saved key to have any effect. Off by default. */
   aiAgentsEnabled?: boolean;
+  /** Owner-only, D4: allow the guarded Researcher to search the public web. Off by default. */
+  aiWebSearchEnabled?: boolean;
 }
 
 /** Sprint 7j item 2: rename/slug — gated by `organisations_update`'s RLS (owner) and the column-restricted grant `20260911050000_organisation_settings.sql` adds (name/slug only). F3a adds `review_min_required_architects` to that grant (20260914060000). */
@@ -83,6 +85,7 @@ export async function updateOrganisation(supabase: Client, id: UUID, input: Upda
   if (input.aiAssistantEnabled !== undefined) patch.ai_assistant_enabled = input.aiAssistantEnabled;
   if (input.aiShareRunCost !== undefined) patch.ai_share_run_cost = input.aiShareRunCost;
   if (input.aiAgentsEnabled !== undefined) patch.ai_agents_enabled = input.aiAgentsEnabled;
+  if (input.aiWebSearchEnabled !== undefined) patch.ai_web_search_enabled = input.aiWebSearchEnabled;
   // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment -- untyped client; see module comment.
   const { data, error } = await supabase.from('organisations').update(patch).eq('id', id).select('*').single();
   if (error) throw new Error(`updateOrganisation: ${error.message}`);

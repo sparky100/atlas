@@ -116,8 +116,12 @@ function optionSourceLines(option: DecisionAdrExportOption): string[] {
   const lines = ['  - Sources:'];
   for (const source of sources) {
     if (source.kind === 'web') {
-      lines.push(`    - ${source.title} - ${source.url} (${source.publisher ?? 'web page'}; retrieved ${source.retrievedAt.slice(0, 10)}; unreviewed)`);
+      const checkedAt = source.checkedAt;
+      const checked = source.assertion !== null && checkedAt !== null;
+      const check = checked ? `checked by a person on ${checkedAt.slice(0, 10)}` : 'unreviewed';
+      lines.push(`    - ${source.title} - ${source.url} (${source.publisher ?? 'web page'}; retrieved ${source.retrievedAt.slice(0, 10)}; ${check})`);
       if (source.excerpt !== null) lines.push(`      - ${source.excerpt}`);
+      if (source.assertion !== null) lines.push(`      - Supports: ${source.assertion}`);
       continue;
     }
     const standing = source.standing === 'current'

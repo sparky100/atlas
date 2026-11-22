@@ -33,6 +33,8 @@ export interface OrganisationRow {
   ai_agents_enabled: boolean;
   /** Phase D: whether the organisation's own AI key is saved (in Vault, never readable by a client). Set only by the `org-ai-key` function; no client can update it. */
   ai_agent_key_set: boolean;
+  /** D4: an owner has switched the guarded public-web Researcher on. Off by default. */
+  ai_web_search_enabled: boolean;
   /** Calendar days a reviewer has to respond before a change review is flagged overdue (1–90, default 5). Set via `atlas.set_review_period` (owner/architect). */
   review_period_days: number;
   /** Months a value can go unchecked before it is flagged stale (1–60, default 12). Set via `atlas.set_stale_threshold` (owner/architect). */

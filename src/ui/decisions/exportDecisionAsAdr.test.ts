@@ -269,13 +269,15 @@ describe('exportDecisionAsAdrMarkdown', () => {
       kind: 'web', id: 'branch-1\u0000https://example.com/evidence', branchId: branch.id,
       url: 'https://example.com/evidence', title: 'Product evidence', publisher: 'Example', excerpt: 'The page says it records complaints.',
       retrievedAt: '2026-11-21T10:00:00Z', citedBy: 'user-1', citedAt: '2026-11-21T10:05:00Z',
+      assertion: 'It records complaints.', checkedBy: 'user-1', checkedAt: '2026-11-21T10:06:00Z',
     };
     const markdown = exportDecisionAsAdrMarkdown({
       decision: makeDecision(), ownerName: 'Alice', concerns: [], whatChangesRows: [], reasons: null,
       options: [{ branch, isChosen: false, ratings: [], sources: [source] }],
     });
     expect(markdown).toContain('  - Sources:');
-    expect(markdown).toContain('    - Product evidence - https://example.com/evidence (Example; retrieved 2026-11-21; unreviewed)');
+    expect(markdown).toContain('    - Product evidence - https://example.com/evidence (Example; retrieved 2026-11-21; checked by a person on 2026-11-21)');
     expect(markdown).toContain('      - The page says it records complaints.');
+    expect(markdown).toContain('      - Supports: It records complaints.');
   });
 });

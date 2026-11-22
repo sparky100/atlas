@@ -33,7 +33,7 @@ export function OptionSources({ sources }: { sources: readonly OptionSource[] })
         </Text>
         {hasWeb && (
           <Text as="p" size="xs" tone="muted">
-            Catalogue claims are reviewed; web pages are not.
+            Catalogue claims are reviewed; web pages are not. A checked web page shows what the person said it supports.
           </Text>
         )}
         <ul className={styles.list}>
@@ -70,10 +70,16 @@ export function OptionSources({ sources }: { sources: readonly OptionSource[] })
                   </a>
                   <Text as="p" size="xs" tone="muted">
                     {source.publisher ?? 'Web page'} · retrieved {source.retrievedAt.slice(0, 10)}
+                    {source.checkedAt !== null ? ` · checked by a person on ${source.checkedAt.slice(0, 10)}` : ' · not checked'}
                   </Text>
                   {source.excerpt !== null && (
                     <Text as="p" size="sm" tone="muted">
                       {source.excerpt}
+                    </Text>
+                  )}
+                  {source.assertion !== null && (
+                    <Text as="p" size="sm">
+                      Supports: {source.assertion}
                     </Text>
                   )}
                 </>
