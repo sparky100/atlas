@@ -10,6 +10,7 @@ let role = 'contributor';
 let member = true;
 let assistantEnabled = true;
 let agentsEnabled = true;
+let webSearchEnabled = true;
 let providerCalls = 0;
 let trialReads = 0;
 const logs: Record<string, unknown>[] = [];
@@ -36,7 +37,7 @@ function fakeClient(_url: string, key: string) {
         eq: (column, value) => { filters[String(column)] = value; return query; },
         gte: () => query,
         limit: () => query,
-        maybeSingle: () => Promise.resolve({ data: table === 'members' ? (filters.user_id ? { role } : member ? { user_id: 'user-1' } : null) : table === 'organisations' && service ? { ai_assistant_enabled: assistantEnabled, ai_agents_enabled: agentsEnabled, ai_agent_key_set: ownKey } : null, error: null }),
+        maybeSingle: () => Promise.resolve({ data: table === 'members' ? (filters.user_id ? { role } : member ? { user_id: 'user-1' } : null) : table === 'organisations' && service ? { ai_assistant_enabled: assistantEnabled, ai_agents_enabled: agentsEnabled, ai_agent_key_set: ownKey, ai_web_search_enabled: webSearchEnabled } : null, error: null }),
         insert: (row) => { logs.push(row); return Promise.resolve({ error: null }); },
         then: (resolve) => {
           if (table === 'llm_proxy_requests' && filters.key_source === 'trial') trialReads++;
@@ -65,8 +66,8 @@ beforeAll(async () => {
 });
 afterAll(() => { vi.unstubAllGlobals(); });
 
-async function call(fields: Record<string, unknown>) {
-  return handler(new Request('https://db.test/functions/v1/llm-proxy', { method: 'POST', headers: { Authorization: 'Bearer user', 'Content-Type': 'application/json' }, body: JSON.stringify({ orgId, useOrgKey: true, requireOrgKey: true, runId, messages: [{ role: 'user', content: 'Review' }], maxTokens: 100, ...fields }) }));
+async function call(fields: Record<string, unknown>, headers: Record<string, string> = {}) {
+  return handler(new Request('https://db.test/functions/v1/llm-proxy', { method: 'POST', headers: { Authorization: 'Bearer user', 'Content-Type': 'application/json', ...headers }, body: JSON.stringify({ orgId, useOrgKey: true, requireOrgKey: true, runId, messages: [{ role: 'user', content: 'Review' }], maxTokens: 100, ...fields }) }));
 }
 
 describe('llm-proxy reviewer key and tier on the actual edge entrypoint', () => {
@@ -115,6 +116,16 @@ describe('llm-proxy reviewer key and tier on the actual edge entrypoint', () => 
     expect(providerCalls).toBe(before);
   });
 
+  it('refuses a guarded web search while the organisation switch is off', async () => {
+    webSearchEnabled = false;
+    const before = providerCalls;
+    const response = await call({ webSearch: { maxUses: 1 } }, { 'x-atlas-research-secret': 'research-secret' });
+    expect(response.status).toBe(403);
+    expect((await response.json()) as Record<string, unknown>).toMatchObject({ status: 'error', message: 'Web research is switched off for this organisation. An owner can switch it on in organisation settings.' });
+    expect(providerCalls).toBe(before);
+    webSearchEnabled = true;
+  });
+
   it('uses the own key and records the run id, then refuses a key removed before a second call', async () => {
     const oldFetch = globalThis.fetch;
     vi.stubGlobal('fetch', (input: RequestInfo | URL) => {
@@ -133,10 +144,12 @@ describe('llm-proxy reviewer key and tier on the actual edge entrypoint', () => 
       const challenger = await call({});
       expect(challenger.status).toBe(200);
       expect(logs.at(-1)).toMatchObject({ key_source: 'org', run_id: runId, model: 'claude-sonnet-5-5' });
+      const researched = await call({ webSearch: { maxUses: 1 } }, { 'x-atlas-research-secret': 'research-secret' });
+      expect(researched.status).toBe(200);
       ownKey = false;
       const second = await call({ modelTier: 'light' });
       expect(second.status).toBe(403);
-      expect(providerCalls).toBe(2);
+      expect(providerCalls).toBe(3);
       expect(trialReads).toBe(0);
     } finally {
       ownKey = true;
