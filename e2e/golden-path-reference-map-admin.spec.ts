@@ -20,6 +20,23 @@ test('a platform admin can draft and edit a capability set from Home', async ({ 
   const service = createServiceRoleClient(env);
   const grant = await service.from('platform_admins').insert({ user_id: user.data.user.id, granted_by: null });
   if (grant.error) throw new Error(grant.error.message);
+  // A real published map gives the admin something to inspect before copying.
+  const existing = await service.from('capability_maps').select('id').eq('sector', 'police').eq('status', 'published').limit(1);
+  if (existing.error) throw new Error(existing.error.message);
+  if (!existing.data.length) {
+    const versions = await service.from('capability_maps').select('version').eq('sector', 'police');
+    if (versions.error) throw new Error(versions.error.message);
+    const mapId = randomUUID();
+    const version = Math.max(0, ...versions.data.map((row) => row.version as number)) + 1;
+    const insertMap = await service.from('capability_maps').insert({ id: mapId, sector: 'police', version,
+      status: 'draft', title: 'Policing capabilities', summary: 'A starting point for police services.', source_description: 'Platform reference content.' });
+    if (insertMap.error) throw new Error(insertMap.error.message);
+    const insertItem = await service.from('capability_map_items').insert({ id: randomUUID(), map_id: mapId, code: '1',
+      parent_code: null, name: 'Respond to incidents', description: 'Handle reported incidents.', level: 1, item_order: 10 });
+    if (insertItem.error) throw new Error(insertItem.error.message);
+    const publishMap = await service.from('capability_maps').update({ status: 'published', published_at: new Date().toISOString() }).eq('id', mapId);
+    if (publishMap.error) throw new Error(publishMap.error.message);
+  }
   await page.reload();
   await page.getByRole('button', { name: 'Account menu' }).click();
   await page.getByRole('link', { name: 'Platform admin' }).click();
@@ -27,6 +44,15 @@ test('a platform admin can draft and edit a capability set from Home', async ({ 
   const section = page.getByTestId('settings-section-capability-sets');
   await expect(section.getByRole('heading', { name: /Capability sets/ })).toBeVisible();
   await section.getByLabel('Sector').selectOption('police');
+  await section.getByRole('button', { name: 'View current set' }).click();
+  const preview = section.getByRole('region', { name: 'Capability set contents' });
+  await expect(preview.getByRole('heading', { level: 3 })).toBeVisible();
+  const capability = preview.getByRole('group', { name: 'Capabilities in this set' }).getByRole('button').first();
+  await capability.click();
+  await expect(preview.getByText(/Top level|Under /)).toBeVisible();
+  await preview.getByText(/Value streams \(/).click();
+  await preview.getByText(/Sources \(/).click();
+  await preview.getByRole('button', { name: 'Close view' }).click();
   await section.getByRole('button', { name: /Create v\d+ draft/ }).click();
   await expect(section.getByText(/draft created/)).toBeVisible();
   await section.getByLabel('Find a capability').fill('');

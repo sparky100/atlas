@@ -2,7 +2,7 @@ import { randomUUID } from 'node:crypto';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { createServiceRoleClient, createSupabaseClient, type Client } from './client';
 import { loadEnv } from './env';
-import { alignDraftItem, createReferenceMapDraft, publishReferenceMapDraft, saveReferenceMapDraft, validateReferenceMap, type ReferenceMapDraft } from './referenceMapAdmin';
+import { alignDraftItem, createReferenceMapDraft, publishReferenceMapDraft, readReferenceMap, saveReferenceMapDraft, validateReferenceMap, type ReferenceMapDraft } from './referenceMapAdmin';
 import type { CapabilityMapContent } from '../contracts/capabilityMapContent';
 
 const env = loadEnv();
@@ -60,6 +60,17 @@ describe('platform capability-set publishing, real database', () => {
   afterAll(async () => {
     await service.from('platform_admins').delete().eq('user_id', admin.id);
     for (const user of [admin, outside]) { await user.client.auth.signOut(); await service.auth.admin.deleteUser(user.id); }
+  });
+
+  it('reads the fixed published version before making a draft', async () => {
+    const snapshot = await readReferenceMap(admin.client, {
+      id: baseId, sector, version: 1, status: 'published', title: 'Original', published_at: null,
+      item_count: 1, seeded_model_count: 0,
+    });
+    expect(snapshot.version).toBe(1);
+    expect(snapshot.status).toBe('published');
+    expect(snapshot.items.map((item) => item.name)).toEqual(['Connect a customer']);
+    expect(snapshot.sourceDescription).toBe('Reviewed original.');
   });
 
   it('denies other authenticated callers, anon and direct writes', async () => {

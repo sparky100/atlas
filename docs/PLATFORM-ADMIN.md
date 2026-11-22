@@ -27,6 +27,10 @@ that's a real, named gap (CLAUDE.md rule 7), not silently implied to exist.
 A natural follow-up if it's ever needed: list `platform_admins`, grant/revoke
 via a new admin-gated RPC, the same shape as the two `llm-proxy` RPCs below.
 
+## Viewing a capability set before copying
+
+In **Platform admin → Capability sets**, choose a sector and select **View current set** before creating the next draft. The read-only view shows the published version, summary, searchable capability hierarchy and definitions, value-stream stages and their capability links, sources and origin. **Versions for [sector]** also lets you inspect older versions. An older version cannot be copied as a new draft; **Create draft from current** always uses the current published version. Viewing a set changes neither published content nor models previously seeded from it. On a narrow screen, the capability list and selected definition stack as cards.
+
 ## Granting the first (and only, for now) platform admin
 
 No self-serve path exists — granting platform-admin status is a one-off

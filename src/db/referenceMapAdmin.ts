@@ -84,8 +84,8 @@ export async function listReferenceMaps(client: Client): Promise<{ maps: Referen
   return { maps: maps.data as ReferenceMapSummary[], drafts: draftRows };
 }
 
-/** Rebuilds the existing published snapshot for editing; the public version is never updated. */
-export async function copyReferenceMap(client: Client, map: ReferenceMapSummary): Promise<CapabilityMapContent> {
+/** Reads one fixed map version, including its value streams and sources. */
+export async function readReferenceMap(client: Client, map: ReferenceMapSummary): Promise<CapabilityMapContent> {
   const [meta, items, sources, streamItems, enables] = await Promise.all([
     client.from('capability_maps').select('source_description,summary,title').eq('id', map.id).single(),
     client.from('capability_map_items').select('code,parent_code,name,description,level,item_order').eq('map_id', map.id).order('level').order('item_order'),
@@ -99,7 +99,7 @@ export async function copyReferenceMap(client: Client, map: ReferenceMapSummary)
   const edges = enables.data as { stage_code: string; capability_code: string }[];
   const byCode = new Map(itemRows.map((item) => [item.code, item.name]));
   const content = {
-    sector: map.sector, version: map.version + 1, status: 'draft',
+    sector: map.sector, version: map.version, status: map.status,
     title: (meta.data as { title: string | null }).title ?? map.sector,
     summary: (meta.data as { summary: string | null }).summary ?? '',
     sourceDescription: (meta.data as { source_description: string }).source_description,
@@ -113,7 +113,15 @@ export async function copyReferenceMap(client: Client, map: ReferenceMapSummary)
       })),
     })),
   };
-  const parsed = capabilityMapContentSchema.safeParse(content);
+  // An older published version may predate current validation rules. It can
+  // still be inspected; copying it for editing is validated separately.
+  return content as CapabilityMapContent;
+}
+
+/** Rebuilds a current published snapshot for editing; the public version is never updated. */
+export async function copyReferenceMap(client: Client, map: ReferenceMapSummary): Promise<CapabilityMapContent> {
+  const content = await readReferenceMap(client, map);
+  const parsed = capabilityMapContentSchema.safeParse({ ...content, version: map.version + 1, status: 'draft' });
   if (!parsed.success) throw new Error(`The published map could not be copied: ${parsed.error.issues.map((issue) => issue.message).join('; ')}`);
   return parsed.data;
 }

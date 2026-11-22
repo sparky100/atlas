@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import { SECTORS, capabilityMapContentSchema, type CapabilityMapContent } from '../../contracts/capabilityMapContent';
-import { alignDraftItem, copyReferenceMap, createReferenceMapDraft, listDraftAlignments, listReferenceMaps, publishReferenceMapDraft, saveReferenceMapDraft, searchCanonicalCapabilities, validateReferenceMap, type CanonicalCapabilityMatch, type DraftAlignment, type ReferenceMapDraft, type ReferenceMapSummary } from '../../db/referenceMapAdmin';
+import { alignDraftItem, copyReferenceMap, createReferenceMapDraft, listDraftAlignments, listReferenceMaps, publishReferenceMapDraft, readReferenceMap, saveReferenceMapDraft, searchCanonicalCapabilities, validateReferenceMap, type CanonicalCapabilityMatch, type DraftAlignment, type ReferenceMapDraft, type ReferenceMapSummary } from '../../db/referenceMapAdmin';
 import { SettingsSection } from '../components/SettingsSection/SettingsSection';
 import { supabase } from '../supabaseClient';
 import styles from './ReferenceMapAdmin.module.css';
@@ -37,6 +37,9 @@ export function ReferenceMapAdmin() {
   const [content, setContent] = useState<CapabilityMapContent | null>(null);
   const [selectedCode, setSelectedCode] = useState<string | null>(null);
   const [filter, setFilter] = useState('');
+  const [preview, setPreview] = useState<{ map: ReferenceMapSummary; content: CapabilityMapContent } | null>(null);
+  const [previewCode, setPreviewCode] = useState<string | null>(null);
+  const [previewFilter, setPreviewFilter] = useState('');
   const [sector, setSector] = useState<string>(SECTORS[0]);
   const [notice, setNotice] = useState('');
   const [error, setError] = useState('');
@@ -52,6 +55,7 @@ export function ReferenceMapAdmin() {
   useEffect(() => { void Promise.resolve().then(refresh).catch((cause: unknown) => { setError(String(cause)); }); }, [refresh]);
 
   const current = maps.find((m) => m.sector === sector && m.status === 'published');
+  const sectorMaps = maps.filter((m) => m.sector === sector).sort((a, b) => b.version - a.version);
   const nextVersion = Math.max(0, ...maps.filter((m) => m.sector === sector).map((m) => m.version), ...drafts.filter((d) => d.sector === sector).map((d) => d.version)) + 1;
   const dirty = draft !== null && content !== null && JSON.stringify(content) !== JSON.stringify(draft.content);
   const selected = content?.items.find((i) => i.code === selectedCode);
@@ -102,6 +106,11 @@ export function ReferenceMapAdmin() {
     setNotice(`${sector} v${String(nextVersion)} draft created. Existing models will not change when it is published.`);
   });
 
+  const viewMap = (map: ReferenceMapSummary) => void run(async () => {
+    const loaded = await readReferenceMap(supabase, map);
+    setPreview({ map, content: loaded }); setPreviewCode(null); setPreviewFilter('');
+  });
+
   const save = () => void run(async () => {
     if (!draft || !content) return;
     const revision = await saveReferenceMapDraft(supabase, draft, content);
@@ -124,7 +133,7 @@ export function ReferenceMapAdmin() {
   const publish = () => void run(async () => {
     if (!draft || !content || dirty || !issues || issues.length) return;
     const id = await publishReferenceMapDraft(supabase, draft);
-    await refresh(); setDraft(null); setContent(null); setBaseContent(null); setAlignments([]); setSelectedCode(null); setIssues(null);
+    await refresh(); setDraft(null); setContent(null); setBaseContent(null); setAlignments([]); setSelectedCode(null); setIssues(null); setPreview(null);
     setNotice(`Published ${draft.sector} v${String(draft.version)}. Existing seeded models remain unchanged. Map ID: ${id}`);
   });
 
@@ -147,18 +156,60 @@ export function ReferenceMapAdmin() {
     {error && <p role="alert" className={styles.error}>{error}</p>}
     {notice && <p role="status">{notice}</p>}
     <div className={styles.controls}>
-      <label>Sector <select value={sector} onChange={(e) => { setSector(e.target.value); }} disabled={busy}>{SECTORS.map((value) => <option key={value} value={value}>{value.replaceAll('_', ' ')}</option>)}</select></label>
+      <label>Sector <select value={sector} onChange={(e) => { setSector(e.target.value); setPreview(null); }} disabled={busy}>{SECTORS.map((value) => <option key={value} value={value}>{value.replaceAll('_', ' ')}</option>)}</select></label>
       <span>{current ? `Current: ${current.title ?? current.sector} v${String(current.version)}` : 'No published map'}</span>
+      {current && <button type="button" onClick={() => { viewMap(current); }} disabled={busy}>View current set</button>}
       <button type="button" onClick={start} disabled={busy || drafts.some((d) => d.sector === sector && d.status === 'draft')}>Create v{nextVersion} draft{current ? ' from current' : ''}</button>
     </div>
-    <details><summary>Map versions ({maps.length})</summary>
-      <div className={styles.cards}>{maps.map((map) => <div className={styles.itemCard} key={map.id}>
+    <details><summary>Versions for {sector.replaceAll('_', ' ')} ({sectorMaps.length})</summary>
+      <div className={styles.cards}>{sectorMaps.map((map) => <div className={styles.itemCard} key={map.id}>
         <strong>{map.title ?? map.sector} · v{map.version}</strong>
-        <span>{map.sector.replaceAll('_', ' ')} · {map.status}</span>
+        <span>{map.status === 'published' ? 'Current published version' : map.status}</span>
         <span>{map.item_count} capabilities · {map.seeded_model_count} models seeded</span>
         <span>{map.published_at ? `Published ${new Date(map.published_at).toLocaleDateString('en-GB')}` : 'Not published'}</span>
+        <button type="button" onClick={() => { viewMap(map); }} disabled={busy}>View v{map.version} contents</button>
       </div>)}</div>
     </details>
+    {preview && <section className={styles.preview} aria-label="Capability set contents">
+      <div className={styles.previewHeader}>
+        <div><h3>{preview.content.title} · v{preview.map.version}</h3><p>{preview.map.sector.replaceAll('_', ' ')} · {preview.map.status} · {preview.content.items.length} capabilities · {preview.content.valueStreams.length} value streams · {preview.map.seeded_model_count} seeded models</p></div>
+        <button type="button" onClick={() => { setPreview(null); }}>Close view</button>
+      </div>
+      <p>{preview.content.summary}</p>
+      <div className={styles.previewGrid}>
+        <div className={styles.tree}>
+          <label>Find in this set <input value={previewFilter} onChange={(e) => { setPreviewFilter(e.target.value); }} placeholder="Capability name or code" /></label>
+          <div className={styles.scroll} role="group" aria-label="Capabilities in this set">
+            {treeOrder(preview.content.items).filter((item) => `${item.name} ${item.code}`.toLowerCase().includes(previewFilter.toLowerCase())).map((item) =>
+              <button type="button" key={item.code} className={previewCode === item.code ? styles.active : ''} style={{ paddingLeft: `${String(8 + (item.level - 1) * 14)}px` }} onClick={() => { setPreviewCode(item.code); }}>
+                {item.name} <small>{item.code} · level {item.level}</small>
+              </button>)}
+            {previewFilter && !preview.content.items.some((item) => `${item.name} ${item.code}`.toLowerCase().includes(previewFilter.toLowerCase())) && <p>No matching capabilities.</p>}
+          </div>
+        </div>
+        <div className={styles.itemCard}>
+          {previewCode ? (() => {
+            const item = preview.content.items.find((candidate) => candidate.code === previewCode);
+            if (!item) return null;
+            const parent = preview.content.items.find((candidate) => candidate.code === item.parentCode);
+            return <><h4>{item.name}</h4><p>{parent ? `Under ${parent.name}` : 'Top level'} · {item.code}</p><p>{item.description?.trim() ? item.description : 'No definition recorded.'}</p></>;
+          })() : <p>Select a capability to read its definition and place in the set.</p>}
+        </div>
+      </div>
+      <details><summary>Value streams ({preview.content.valueStreams.length})</summary>
+        <div className={styles.cards}>{[...preview.content.valueStreams].sort((a, b) => a.order - b.order).map((stream) => <details className={styles.itemCard} key={stream.code}>
+          <summary>{stream.name} · {stream.stages.length} stages</summary>
+          {stream.description && <p>{stream.description}</p>}
+          <ol>{[...stream.stages].sort((a, b) => a.order - b.order).map((stage) => <li key={stage.code}><strong>{stage.name}</strong>{stage.description && <p>{stage.description}</p>}<small>Enabled by: {stage.enables.join(', ') || 'No capabilities recorded'}</small></li>)}</ol>
+        </details>)}</div>
+        {preview.content.valueStreams.length === 0 && <p>No value streams recorded in this version.</p>}
+      </details>
+      <details><summary>Sources ({preview.content.sources.length}) and origin</summary>
+        <p>{preview.content.sourceDescription || 'No origin recorded.'}</p>
+        <ul>{preview.content.sources.map((source, index) => <li key={index}>{source.url ? <a href={source.url} target="_blank" rel="noreferrer">{source.citation}</a> : source.citation} · reviewed {source.reviewedAt}</li>)}</ul>
+      </details>
+      <p className={styles.previewFoot}>{preview.map.status === 'published' ? 'This is the version used when creating the next draft for this sector.' : 'This earlier version is available to inspect. The next draft starts from the current published version.'} Viewing a set does not change it or any seeded model.</p>
+    </section>}
     <div className={styles.draftList} aria-label="Capability set drafts">{drafts.filter((d) => d.status === 'draft').map((entry) => <button type="button" key={entry.id} disabled={busy || dirty} onClick={() => { openDraft(entry); }}>
       {entry.content.title || entry.sector} · v{entry.version} <small>Edited {new Date(entry.updated_at).toLocaleDateString('en-GB')}</small>
     </button>)}</div>
