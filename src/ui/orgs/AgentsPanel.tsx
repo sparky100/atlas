@@ -15,12 +15,14 @@ export interface AgentsPanelProps {
   canManage: boolean;
   /** Switch agents on or off (the organisation's own update, owner-only through RLS). */
   onToggleAgents: (enabled: boolean) => void;
+  /** D4: switch the guarded public-web Researcher on or off (owner-only). */
+  onToggleWebResearch: (enabled: boolean) => void;
   saving: boolean;
   onChanged: (organisation: OrganisationRow) => void;
 }
 
 /** Phase D: the organisation's own AI key for agents, and the switch. */
-export function AgentsPanel({ organisation, canManage, onToggleAgents, saving, onChanged }: AgentsPanelProps) {
+export function AgentsPanel({ organisation, canManage, onToggleAgents, onToggleWebResearch, saving, onChanged }: AgentsPanelProps) {
   const [key, setKey] = useState('');
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
@@ -105,6 +107,25 @@ export function AgentsPanel({ organisation, canManage, onToggleAgents, saving, o
           Allow agents for this organisation
         </Text>
       </label>
+      <Text as="p" tone="muted" size="sm">
+        Web research is a separate switch. When it is on, an owner, architect or contributor can use the Researcher on a proposed decision to search the public web with the exact text they approve. The search is recorded, and a page is saved only after the person says what it supports and confirms they checked it. It uses the organisation&apos;s own AI key and is off by default.
+      </Text>
+      <label className={styles.checkRow}>
+        <input
+          type="checkbox"
+          checked={organisation.ai_web_search_enabled}
+          disabled={!canManage || saving || busy || !ready || !organisation.ai_agents_enabled || !keySet}
+          onChange={(e) => { onToggleWebResearch(e.target.checked); }}
+        />
+        <Text as="span" size="sm">
+          Allow web research for this organisation
+        </Text>
+      </label>
+      {!organisation.ai_agents_enabled || !keySet ? (
+        <Text as="p" tone="muted" size="sm">
+          Needs agents on and the organisation&apos;s own AI key.
+        </Text>
+      ) : null}
       {!ready && (
         <Text as="p" tone="muted" size="sm">
           Needs Ask Atlas switched on. An AI key is not needed to start, but without one only the free trial is available.

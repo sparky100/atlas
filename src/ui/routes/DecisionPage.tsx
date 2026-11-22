@@ -96,6 +96,7 @@ export function DecisionPage() {
             assistantEnabled={organisation?.ai_assistant_enabled === true}
             agentsEnabled={organisation?.ai_agents_enabled === true}
             keySet={organisation?.ai_agent_key_set === true}
+            webSearchEnabled={organisation?.ai_web_search_enabled === true}
             shareCost={organisation?.ai_share_run_cost === true}
             state={state}
             applyNewOption={applyNewOption}
