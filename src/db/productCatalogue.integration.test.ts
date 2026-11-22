@@ -89,8 +89,11 @@ describe('product catalogue and option evidence, real database', () => {
 
   async function seed(content: ProductCatalogueContent = structuredClone(catalogueFixture), sector?: string, seedMap = true) {
     const rows = catalogueToRows(content, randomUUID, '2026-11-20T10:00:00Z');
-    // Unique synthetic sectors avoid coupling tests to editorial content.
-    rows.catalogue.sector = sector ?? `test_${randomUUID()}`;
+    // Unique synthetic sectors avoid coupling tests to editorial content. No
+    // hyphens: the catalogue's no-price check treats a hyphen as a word
+    // boundary, so a random UUID segment such as "cad" or "aud" would look
+    // like a currency code and make this fixture randomly fail.
+    rows.catalogue.sector = sector ?? `test_${randomUUID().replaceAll('-', '')}`;
     const mapId = randomUUID();
     if (seedMap) {
       check(await service.from('capability_maps').insert({ id: mapId, sector: rows.catalogue.sector, version: content.capabilityMapVersion,
@@ -258,6 +261,60 @@ describe('product catalogue and option evidence, real database', () => {
     expect((await owner.client.from('option_web_sources').update({ title: 'Changed' }).eq('decision_id', m.decisionId)).error).not.toBeNull();
     expect((await owner.client.from('option_web_sources').delete().eq('decision_id', m.decisionId)).error).not.toBeNull();
     expect((await service.from('option_web_sources').delete().eq('decision_id', m.decisionId)).error).not.toBeNull();
+  });
+
+  it('saves the caller\'s own check with the page and stamps the check time on the server', async () => {
+    const m = await option();
+    await createDecisionLink(owner.client, { decisionId: m.decisionId, linkedType: 'branch', linkedId: m.branchId, createdBy: owner.id });
+    const base = {
+      decision_id: m.decisionId,
+      branch_id: m.branchId,
+      url: 'https://example.com/checked',
+      title: 'Checked evidence',
+      publisher: 'Example',
+      excerpt: 'It records complaints.',
+      retrieved_at: '2026-11-21T10:00:00Z',
+      cited_by: contributor.id,
+      assertion: 'It records complaints.',
+      checked_by: contributor.id,
+      checked_at: '2000-01-01T00:00:00Z',
+    };
+    check(await contributor.client.from('option_web_sources').insert(base));
+    const saved = at(await listOptionWebSources(viewer.client, m.decisionId));
+    expect(saved).toMatchObject({ assertion: 'It records complaints.', checkedBy: contributor.id });
+    expect(saved.checkedAt).not.toBe('2000-01-01T00:00:00Z');
+    // A check may be empty, but it can never be attributed to someone else.
+    expect((await contributor.client.from('option_web_sources').insert({ ...base, url: 'https://example.com/spoofed-check', checked_by: owner.id })).error).not.toBeNull();
+    // Assertion and check must arrive together.
+    expect((await contributor.client.from('option_web_sources').insert({ ...base, url: 'https://example.com/half-check', checked_by: null, checked_at: null })).error).not.toBeNull();
+  });
+
+  it('records web research requests append-only for decision members', async () => {
+    const m = await option();
+    await createDecisionLink(owner.client, { decisionId: m.decisionId, linkedType: 'branch', linkedId: m.branchId, createdBy: owner.id });
+    const row = {
+      id: randomUUID(),
+      org_id: orgId,
+      decision_id: m.decisionId,
+      branch_id: m.branchId,
+      requested_by: contributor.id,
+      query: 'Oracle utilities customer service',
+      status: 'ok',
+      result_count: 1,
+      urls: ['https://example.com/evidence'],
+      error: null,
+    };
+    check(await contributor.client.from('web_research_requests').insert(row));
+    const read = await viewer.client.from('web_research_requests').select('*').eq('decision_id', m.decisionId);
+    check(read);
+    expect(read.data).toHaveLength(1);
+    const outside = await outsider.client.from('web_research_requests').select('*').eq('decision_id', m.decisionId);
+    check(outside);
+    expect(outside.data).toEqual([]);
+    expect((await viewer.client.from('web_research_requests').insert({ ...row, id: randomUUID(), requested_by: viewer.id })).error).not.toBeNull();
+    expect((await contributor.client.from('web_research_requests').update({ status: 'error' }).eq('id', row.id)).error).not.toBeNull();
+    expect((await contributor.client.from('web_research_requests').delete().eq('id', row.id)).error).not.toBeNull();
+    expect((await service.from('web_research_requests').delete().eq('id', row.id)).error).not.toBeNull();
   });
 
   it('rolls back link and mark on a bad source, then safely retries with the same branch ID', async () => {

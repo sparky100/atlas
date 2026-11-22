@@ -42,6 +42,12 @@ export interface OptionWebSource extends OptionSourceCommon {
   publisher: string | null;
   excerpt: string | null;
   retrievedAt: string;
+  /** What the person checked this page supports. Null for a page saved before the guarded Researcher. */
+  assertion: string | null;
+  /** The person who made that check; null when no check was recorded. */
+  checkedBy: string | null;
+  /** When the check was made; null when no check was recorded. */
+  checkedAt: string | null;
 }
 
 /** Every source kind is kept behind `kind`, so a renderer that forgets one fails to type-check. */
@@ -58,4 +64,7 @@ export interface OptionWebSourceRow {
   retrieved_at: string;
   cited_by: string;
   cited_at: string;
+  assertion: string | null;
+  checked_by: string | null;
+  checked_at: string | null;
 }

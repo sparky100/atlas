@@ -14,6 +14,9 @@ export function optionWebSourcesFromRows(rows: readonly OptionWebSourceRow[]): O
     retrievedAt: row.retrieved_at,
     citedBy: row.cited_by,
     citedAt: row.cited_at,
+    assertion: row.assertion,
+    checkedBy: row.checked_by,
+    checkedAt: row.checked_at,
   }));
 }
 

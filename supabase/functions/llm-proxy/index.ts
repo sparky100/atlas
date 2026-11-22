@@ -741,9 +741,12 @@ Deno.serve(async (req: Request) => {
       const { data: own, error: ownError } = await callerClient.from('members').select('role').eq('org_id', orgId).eq('user_id', userData.user.id).maybeSingle();
       const role = (own as { role?: string } | null)?.role;
       if (ownError || (role !== 'owner' && role !== 'architect' && role !== 'contributor')) return refuse();
-      const { data: orgRow, error: orgError } = await serviceClient.from('organisations').select('ai_assistant_enabled, ai_agents_enabled, ai_agent_key_set').eq('id', orgId).maybeSingle();
-      const flags = orgRow as { ai_assistant_enabled?: boolean; ai_agents_enabled?: boolean; ai_agent_key_set?: boolean } | null;
+      const { data: orgRow, error: orgError } = await serviceClient.from('organisations').select('ai_assistant_enabled, ai_agents_enabled, ai_agent_key_set, ai_web_search_enabled').eq('id', orgId).maybeSingle();
+      const flags = orgRow as { ai_assistant_enabled?: boolean; ai_agents_enabled?: boolean; ai_agent_key_set?: boolean; ai_web_search_enabled?: boolean } | null;
       if (orgError || flags?.ai_assistant_enabled !== true || flags.ai_agents_enabled !== true) return refuse();
+      if (proxyRequest.webSearch !== undefined && flags.ai_web_search_enabled !== true) {
+        return jsonResponse({ status: 'error', message: 'Web research is switched off for this organisation. An owner can switch it on in organisation settings.' }, 403);
+      }
       if (bodyRecord.requireOrgKey === true && flags.ai_agent_key_set !== true) return jsonResponse({ status: 'error', message: "This request needs the organisation's own AI key." }, 403);
       if (flags.ai_agent_key_set === true) {
         const { data: savedKey, error: keyError } = await serviceClient.schema('atlas').rpc('org_ai_api_key', { p_org: orgId });

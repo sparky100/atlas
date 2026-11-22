@@ -272,7 +272,7 @@ export function OrganisationSettingsView({ organisation, role, userId, onChanged
       </SettingsSection>
 
       <SettingsSection id="agents" title="Agents" summary={organisation.ai_agents_enabled ? (organisation.ai_agent_key_set ? 'On' : 'On · free trial') : organisation.ai_agent_key_set ? 'Key set · off' : 'Off · no key'}>
-        <AgentsPanel organisation={organisation} canManage={canManage} saving={status === 'saving'} onChanged={onChanged} onToggleAgents={(enabled) => { void update({ aiAgentsEnabled: enabled }); }} />
+        <AgentsPanel organisation={organisation} canManage={canManage} saving={status === 'saving'} onChanged={onChanged} onToggleAgents={(enabled) => { void update({ aiAgentsEnabled: enabled }); }} onToggleWebResearch={(enabled) => { void update({ aiWebSearchEnabled: enabled }); }} />
       </SettingsSection>
 
       <SettingsSection id="members" title="Members" summary={`${String(members.length)} ${members.length === 1 ? 'person' : 'people'}`}>

@@ -47,8 +47,12 @@ export interface DecisionCriteriaGridProps {
   onChoose: (branchId: UUID) => void;
   /** Shown above the grid when this person cannot choose (not an owner or architect), so a missing Choose button is explained. `null` when they can, or the decision is no longer open. */
   chooseNote?: string | null;
-  /** `canCreateChangeBranch(role)` at the call site, ungated by `decision.status` (unlike `canAddOption`/`canChoose`) — this action is only ever offered on the *chosen* option, which by definition means the decision has already moved past `proposed`. */
+  /** `canCreateChangeBranch(role)` at the call site, ungated by `decision.status` (unlike `canAddOption`/`canChoose`) - this action is only ever offered on the *chosen* option, which by definition means the decision has already moved past `proposed`. */
   canWorkOnChange: boolean;
+  /** The organisations's guarded web research is on, the decision is proposed and the caller may contribute. */
+  canResearch: boolean;
+  /** Opens the Researcher for this option; the label is the person-facing option name shown in the dialog. */
+  onResearch: (branchId: UUID, label: string) => void;
   /** Selects this branch as the session's editing ref and navigates to its change page — the exact "Edit in this change" mechanism `ChangePage.tsx` already offers, reused rather than reinvented (item 5: "using the existing 'Work in this change' flow"). */
   onWorkOnThisChange: (branchId: UUID) => void;
   /**
@@ -99,7 +103,7 @@ function stripExploringPrefix(label: string): string {
  * only ever gets the person *into* the change workspace, never repeats
  * that flip.
  */
-export function DecisionCriteriaGrid({ decisionId, options, canRate, userId, neededBy, orgSlug, modelSlug, commitId, onChoose, chooseNote, canWorkOnChange, onWorkOnThisChange, ratingsState }: DecisionCriteriaGridProps) {
+export function DecisionCriteriaGrid({ decisionId, options, canRate, userId, neededBy, orgSlug, modelSlug, commitId, onChoose, chooseNote, canWorkOnChange, onWorkOnThisChange, canResearch, onResearch, ratingsState }: DecisionCriteriaGridProps) {
   const ratings = ratingsState.ratings;
   const compact = useCompactDecisionLayout();
   const [editing, setEditing] = useState<EditingCell | null>(null);
@@ -240,6 +244,11 @@ export function DecisionCriteriaGrid({ decisionId, options, canRate, userId, nee
                       </Text>
                     )}
                     <div className={styles.optionHeaderActions}>
+                      {canResearch && (
+                        <Button variant="secondary" onClick={() => { onResearch(o.branchId, stripExploringPrefix(o.label)); }}>
+                          Research the web
+                        </Button>
+                      )}
                       <Link to={`/o/${orgSlug}/m/${modelSlug}/decisions/${decisionId}/options/${o.branchId}/landscape`}>
                         <Text as="span" size="sm">
                           Preview impact →
@@ -360,6 +369,7 @@ export function DecisionCriteriaGrid({ decisionId, options, canRate, userId, nee
               })}
             </div>
             <div className={styles.optionHeaderActions}>
+              {canResearch && <Button variant="secondary" onClick={() => { onResearch(o.branchId, stripExploringPrefix(o.label)); }}>Research the web</Button>}
               <Link to={`/o/${orgSlug}/m/${modelSlug}/decisions/${decisionId}/options/${o.branchId}/landscape`}>Preview impact →</Link>
               {canEditOption(o) && <Button variant="secondary" onClick={() => { onWorkOnThisChange(o.branchId); }}>Edit this change</Button>}
               {o.canChoose && <Button variant="secondary" onClick={() => { onChoose(o.branchId); }}>Choose</Button>}
