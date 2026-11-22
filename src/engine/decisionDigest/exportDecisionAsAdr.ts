@@ -127,7 +127,7 @@ function optionSourceLines(option: DecisionAdrExportOption): string[] {
         : `saved from catalogue v${String(source.version)}, now withdrawn`;
     lines.push(`    - ${source.product} - ${source.vendor} (${standing})`);
     for (const claim of source.claims) {
-      lines.push(`      - ${claim.statement} - ${claim.sourceUrl} (source dated ${claim.sourceDate}; reviewed by ${claim.reviewedBy} on ${claim.reviewedAt})`);
+      lines.push(`      - ${claim.statement} - ${claim.sourceUrl} (source dated ${claim.sourceDate})`);
     }
   }
   return lines;

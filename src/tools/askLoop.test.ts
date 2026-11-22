@@ -70,6 +70,12 @@ describe('runAsk', () => {
     expect(requests[1]).not.toHaveProperty('webSearch');
   });
 
+  it('uses the caller\'s larger per-round token budget when given', async () => {
+    const { client, requests } = scripted([say('Done.')]);
+    await runAsk({ client, ctx: estateContext(), history: [], question: 'q', maxTokensPerRound: 4000 });
+    expect(requests[0]?.maxTokens).toBe(4000);
+  });
+
   it('removes a citation no tool returned and marks the answer ungrounded when none survive', async () => {
     const invented = uid(777);
     const { client } = scripted([call('t1', 'search_elements', { query: 'CRM' }), say(`See [[element:${invented}]].`)]);

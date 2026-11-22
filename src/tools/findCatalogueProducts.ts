@@ -26,7 +26,7 @@ const schema = z.object({ capability_element_id: uuidInput }).strict();
 export const findCatalogueProducts = defineTool({
   name: 'find_catalogue_products',
   description:
-    'Reviewed products from the published catalogue that support one capability. Give the id of a capability element. Returns product, vendor, summary, how it supports the capability, and dated sourced claims with the reviewer. These are candidates, not a recommendation or a procurement decision. A capability that was not created from a starter map returns an explanation and no products.',
+    'Reviewed products from the published catalogue that support one capability. Give the id of a capability element. Returns product, vendor, summary, how it supports the capability, and dated sourced claims. These are candidates, not a recommendation or a procurement decision. A capability that was not created from a starter map returns an explanation and no products.',
   schema,
   run: async (ctx, input) => {
     const index = indexSnapshot(await ctx.snapshot());
@@ -55,7 +55,6 @@ export const findCatalogueProducts = defineTool({
         kind: claim.kind,
         sourceUrl: claim.sourceUrl,
         sourceDate: claim.sourceDate,
-        reviewedBy: claim.reviewedBy,
       })),
     }));
     return okResult(
