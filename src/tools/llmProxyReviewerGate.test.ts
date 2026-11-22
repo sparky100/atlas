@@ -65,8 +65,8 @@ beforeAll(async () => {
 });
 afterAll(() => { vi.unstubAllGlobals(); });
 
-async function call(fields: Record<string, unknown>) {
-  return handler(new Request('https://db.test/functions/v1/llm-proxy', { method: 'POST', headers: { Authorization: 'Bearer user', 'Content-Type': 'application/json' }, body: JSON.stringify({ orgId, useOrgKey: true, requireOrgKey: true, runId, messages: [{ role: 'user', content: 'Review' }], maxTokens: 100, ...fields }) }));
+async function call(fields: Record<string, unknown>, headers: Record<string, string> = {}) {
+  return handler(new Request('https://db.test/functions/v1/llm-proxy', { method: 'POST', headers: { Authorization: 'Bearer user', 'Content-Type': 'application/json', ...headers }, body: JSON.stringify({ orgId, useOrgKey: true, requireOrgKey: true, runId, messages: [{ role: 'user', content: 'Review' }], maxTokens: 100, ...fields }) }));
 }
 
 describe('llm-proxy reviewer key and tier on the actual edge entrypoint', () => {
@@ -133,10 +133,12 @@ describe('llm-proxy reviewer key and tier on the actual edge entrypoint', () => 
       const challenger = await call({});
       expect(challenger.status).toBe(200);
       expect(logs.at(-1)).toMatchObject({ key_source: 'org', run_id: runId, model: 'claude-sonnet-5-5' });
+      const researched = await call({ webSearch: { maxUses: 1 } }, { 'x-atlas-research-secret': 'research-secret' });
+      expect(researched.status).toBe(200);
       ownKey = false;
       const second = await call({ modelTier: 'light' });
       expect(second.status).toBe(403);
-      expect(providerCalls).toBe(2);
+      expect(providerCalls).toBe(3);
       expect(trialReads).toBe(0);
     } finally {
       ownKey = true;
