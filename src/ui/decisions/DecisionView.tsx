@@ -113,7 +113,7 @@ export function DecisionView({ modelId, decisionId, orgId, orgSlug, modelSlug, r
   const compact = useCompactDecisionLayout();
   const { branch: main } = useMainBranch(modelId);
   const { members } = useMembers(orgId);
-  const optionsState = useDecisionOptions(applyCreatedOption, applyNewOption, applyDecisionUpdate, refreshOptionsAndArguments);
+  const optionsState = useDecisionOptions(applyCreatedOption, applyDecisionUpdate, refreshOptionsAndArguments);
   // Options kept from the Designer's suggestions are saved here as the page opens (journey proposal step 2).
   const pendingOptions = usePendingOptions({ orgId, modelId, decisionId, userId, projectId: state.status === 'ready' ? state.decision.project_id : null, canAdd: state.status === 'ready' && state.decision.status === 'proposed' && canCreateChangeBranch(role), applyNewOption });
   const navigate = useNavigate();
@@ -174,6 +174,12 @@ export function DecisionView({ modelId, decisionId, orgId, orgSlug, modelSlug, r
   for (const option of readyState?.options ?? []) {
     if (option.branch_id !== null) optionByBranchId.set(option.branch_id, option);
   }
+  const baselineOption = readyState === null
+    ? undefined
+    : readyState.options.find((option) => readyState.decision.baseline_option_id !== null
+      ? option.id === readyState.decision.baseline_option_id
+      : option.branch_id !== null && option.branch_id === readyState.decision.baseline_branch_id);
+  const baselineBranchId = baselineOption?.branch_id ?? readyState?.decision.baseline_branch_id ?? null;
   // Products belong beside a replacement decision, not on the capability page:
   // only when an option is a replace/build one, and only for the capabilities
   // this decision concerns.
@@ -203,7 +209,7 @@ export function DecisionView({ modelId, decisionId, orgId, orgSlug, modelSlug, r
         .map((l) => readyState.linkedBranchesById.get(l.linked_id))
         .filter((b): b is NonNullable<typeof b> => b !== undefined)
         // The "Stay as we are" baseline records no change, so it is not a column of "What changes": the Current column already is staying as we are.
-        .filter((b) => b.id !== readyState.decision.baseline_branch_id)
+        .filter((b) => b.id !== baselineBranchId)
         .map((b) => ({ branchId: b.id, baseCommitId: b.base_commit_id, headCommitId: b.head_commit_id, label: optionByBranchId.get(b.id)?.title ?? intentHeaderLine(b) }))
     : [];
   const estateSupporters = useEstateSuggestions(main?.head_commit_id ?? null, concernedCapabilityIds);
@@ -229,10 +235,10 @@ export function DecisionView({ modelId, decisionId, orgId, orgSlug, modelSlug, r
   const chosenOption = decision.branch_id !== null ? optionByBranchId.get(decision.branch_id) : undefined;
   // A candidate with no branch is still an option; only the baseline is
   // excluded from the comparison columns (the Current column covers it).
-  const scoredOptions = options.filter((o) => o.branch_id !== decision.baseline_branch_id);
+  const scoredOptions = options.filter((o) => o.id !== baselineOption?.id && (baselineBranchId === null || o.branch_id !== baselineBranchId));
   const secondOpinion = reviewerAvailability({ role, status: decision.status, optionCount: scoredOptions.length, assistantEnabled, agentsEnabled, keySet, ownerNames: ownerNames(members) });
   const canEditBaseline = canAddOption && canEditDecision(role, decision, userId);
-  const baselineBranch = decision.baseline_branch_id !== null ? linkedBranchesById.get(decision.baseline_branch_id) : undefined;
+  const baselineBranch = baselineBranchId !== null ? linkedBranchesById.get(baselineBranchId) : undefined;
   const approvers = members.filter((m) => m.member.role === 'owner' || m.member.role === 'architect');
   const ratedOptionIds = new Set<UUID>();
   for (const rating of ratingsState.ratings) {
@@ -250,7 +256,7 @@ export function DecisionView({ modelId, decisionId, orgId, orgSlug, modelSlug, r
     canAddOption,
     canChoose,
     chosenTitle: chosenOption?.title ?? (chosenBranch ? (chosenBranch.title ?? chosenBranch.name) : null),
-    chosenIsBaseline: decision.branch_id !== null && decision.branch_id === decision.baseline_branch_id,
+    chosenIsBaseline: chosenOption?.id === baselineOption?.id || (decision.branch_id !== null && decision.branch_id === baselineBranchId),
   });
 
   function onNextStepAction() {
@@ -539,25 +545,25 @@ export function DecisionView({ modelId, decisionId, orgId, orgSlug, modelSlug, r
               )}
             </div>
           )}
-          {baselineBranch !== undefined && (
+          {baselineOption !== undefined && (
             <DecisionBaselineCard
               key={`${decision.stay_risk}\u0000${decision.stay_reason}`}
               stayRisk={decision.stay_risk}
               stayReason={decision.stay_reason}
               canEdit={canEditBaseline}
-              canChoose={canChoose && baselineBranch.status === 'draft'}
-              isChosen={decision.branch_id === baselineBranch.id}
+              canChoose={canChoose && (baselineBranch === undefined || baselineBranch.status === 'draft')}
+              isChosen={chosenOption?.id === baselineOption.id}
               busy={optionsState.status === 'baseline'}
               onSave={(risk, reason) => {
                 void optionsState.saveBaselineText(decisionId, risk, reason);
               }}
               onChoose={() => {
-                setChoosing({ optionId: optionByBranchId.get(baselineBranch.id)?.id ?? null, branchId: baselineBranch.id });
+                setChoosing({ optionId: baselineOption.id, branchId: baselineOption.branch_id });
                 setReasons('');
               }}
             />
           )}
-          {decision.baseline_branch_id === null && canEditBaseline && userId !== null && (
+          {baselineOption === undefined && canEditBaseline && userId !== null && (
             <div className={styles.addOptionForm}>
               <Text as="p" tone="muted" size="sm">
                 Every decision compares its options against staying as we are. This one has no baseline yet.
@@ -583,7 +589,7 @@ export function DecisionView({ modelId, decisionId, orgId, orgSlug, modelSlug, r
                   branchId: b?.id ?? null,
                   label: o.title,
                   status: b?.status ?? 'draft',
-                  statusLabel: o.branch_id === null ? (decision.status === 'proposed' ? 'candidate' : 'cancelled') : undefined,
+                  statusLabel: o.branch_id === null ? (decision.status === 'proposed' ? 'candidate' : 'not chosen') : undefined,
                   isChosen: b?.id === decision.branch_id,
                   summary: b !== undefined && comparison.status === 'ready' ? (comparison.optionSummaries.get(b.id) ?? null) : null,
                   canChoose: canChoose && (b === undefined || b.status === 'draft'),

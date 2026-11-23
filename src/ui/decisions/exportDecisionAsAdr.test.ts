@@ -21,7 +21,7 @@ function makeDecision(overrides: Partial<DecisionRow> = {}): DecisionRow {
     decided_by: null,
     decided_at: null,
     cancel_reason: null,
-    reconsider_if: null, review_by: null, stay_risk: '', stay_reason: '', baseline_branch_id: null, branch_id: null,
+    reconsider_if: null, review_by: null, stay_risk: '', stay_reason: '', baseline_option_id: null, baseline_branch_id: null, branch_id: null,
     superseded_decision_id: null,
     project_id: null,
     created_by: 'user-1',

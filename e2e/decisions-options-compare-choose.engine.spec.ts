@@ -9,7 +9,7 @@
  * commit so its own row must differ from the other two), choose one,
  * confirm the decision closes and the chosen option's intent flips to
  * `propose`, submit/approve/merge it through F0/PR3's ordinary review
- * path unchanged, and confirm the other two options read `cancelled`.
+ * path unchanged, and confirm the other two branchless candidates read `not chosen`.
  *
  * Same "needs a real Supabase" limitation as every other spec here.
  */
@@ -31,7 +31,7 @@ function makeSupports(id: string, relationshipId: string, fromElementId: string,
   return { kind: 'relationship.create', id, relationshipId, relationshipType: 'supports', fromElementId, toElementId, attributes: { role: 'secondary' }, sourceId, confidence: 1 };
 }
 
-test('add three options to a decision, compare them, choose one; the chosen option flips to propose and merges through the ordinary review path; the others show cancelled', async ({ page, browser }) => {
+test('add three options to a decision, compare them, choose one; the chosen option flips to propose and merges through the ordinary review path; the others show not chosen', async ({ page, browser }) => {
   const env = loadEnv();
   const fixture = await bootstrapChangeBranchFixture(page, env, 'decisioncompare', 'Ledger Service');
   const { signedIn: owner, orgId, userId, orgSlug, modelId, modelSlug, systemId, seedSourceId } = fixture;
@@ -152,15 +152,15 @@ test('add three options to a decision, compare them, choose one; the chosen opti
   await expect(coverageRow).toContainText('1 system');
   await expect(coverageRow).toContainText('1 → 2 systems (+1)');
 
-  // 6. Options A and C read cancelled; option B's own page now reads
+  // 6. Options A and C are branchless candidates, so they read not chosen; option B's own page now reads
   // "Proposing: ..." (F0's own intent-flip) and goes through the ordinary
   // review path (F0/PR3), unchanged by any of this. Scoped to the criteria
   // grid specifically (the page's *first* table) — the "What changes"
   // table's own headers repeat each option's full, unstripped label too,
   // which would otherwise make this locator ambiguous.
   const criteriaGridTable = page.locator('table').first();
-  await expect(criteriaGridTable.locator('th', { hasText: 'Option 1' })).toContainText('cancelled');
-  await expect(criteriaGridTable.locator('th', { hasText: 'Option 3' })).toContainText('cancelled');
+  await expect(criteriaGridTable.locator('th', { hasText: 'Option 1' })).toContainText('not chosen');
+  await expect(criteriaGridTable.locator('th', { hasText: 'Option 3' })).toContainText('not chosen');
 
   await page.goto(`/o/${orgSlug}/m/${modelSlug}/changes/${optionBBranchId}`);
   await expect(page.getByRole('heading', { name: /^Proposing: Option 2/ })).toBeVisible();

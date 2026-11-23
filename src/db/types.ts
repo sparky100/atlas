@@ -464,7 +464,9 @@ export interface DecisionRow {
   stay_risk: string;
   /** Why we cannot or will not change (the baseline). Empty until written. */
   stay_reason: string;
-  /** Which of the decision's option branches is the baseline; `null` on decisions made before the baseline existed. */
+  /** Which of the decision's candidates is the "Stay as we are" baseline; it may have no delivery branch. */
+  baseline_option_id: UUID | null;
+  /** Compatibility pointer to the baseline's delivery branch while one exists; stage 4d removes it. */
   baseline_branch_id: UUID | null;
   /** The chosen option's branch, once accepted (PR5). */
   branch_id: UUID | null;

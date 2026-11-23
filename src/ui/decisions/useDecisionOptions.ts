@@ -2,7 +2,7 @@ import { useCallback, useState } from 'react';
 import type { UUID } from '../../contracts/delta';
 import { chooseDecisionOption, updateDecision } from '../../db/decisions';
 import { createDecisionOption, workOnDecisionOption } from '../../db/decisionOptions';
-import type { BranchRow, DecisionLinkRow, DecisionOptionRow, DecisionRow } from '../../db/types';
+import type { BranchRow, DecisionOptionRow, DecisionRow } from '../../db/types';
 import { supabase } from '../supabaseClient';
 import { addBaseline, type AddBaselineInput } from './addBaseline';
 
@@ -52,11 +52,9 @@ export interface UseDecisionOptionsResult {
  * the `useCallback` memoization below.
  */
 export function useDecisionOptions(
-  /** `useDecision.ts`'s own candidate patch - the branchless Add-an-option path. */
+  /** `useDecision.ts`'s own candidate patch - the branchless Add-an-option and baseline paths. */
   applyCreatedOption: (option: DecisionOptionRow) => void,
-  /** `useDecision.ts`'s own patch - see that file's doc comment. Called with an add-baseline/suggested-option branch and link; no re-fetch. */
-  applyNewOption: (link: DecisionLinkRow, branch: BranchRow) => void,
-  /** `useDecision.ts`'s own patch — called with `chooseDecisionOption`'s own return value; no re-fetch. */
+  /** `useDecision.ts`'s own patch - called with `chooseDecisionOption`'s own return value; no re-fetch. */
   applyDecisionUpdate: (decision: DecisionRow) => void,
   /** `useDecision.ts`'s own targeted refresh for exactly what Choose's RPC changes beyond the decision row itself (every option branch's status, the new argument row) — see that file's doc comment. */
   refreshOptionsAndArguments: () => Promise<void>,
@@ -111,7 +109,7 @@ export function useDecisionOptions(
       setStatus('baseline');
       try {
         const added = await addBaseline(input);
-        applyNewOption(added.link, added.branch);
+        applyCreatedOption(added.option);
         applyDecisionUpdate(added.decision);
         return true;
       } catch (e) {
@@ -121,7 +119,7 @@ export function useDecisionOptions(
         setStatus('idle');
       }
     },
-    [applyNewOption, applyDecisionUpdate],
+    [applyCreatedOption, applyDecisionUpdate],
   );
 
   const saveBaselineText = useCallback(
