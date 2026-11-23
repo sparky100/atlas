@@ -1,4 +1,5 @@
 import { NavLink } from 'react-router';
+import { useUnsavedChangesGuard } from './unsavedChanges';
 import styles from './PlatformAdminNav.module.css';
 
 const LINKS = [
@@ -11,6 +12,7 @@ const LINKS = [
 
 /** The platform-admin section's own navigation. Real links, so every area has a URL that survives refresh and a back button. */
 export function PlatformAdminNav() {
+  const guardLeave = useUnsavedChangesGuard();
   return (
     <nav className={styles.nav} aria-label="Platform admin">
       {LINKS.map((link) => (
@@ -19,6 +21,7 @@ export function PlatformAdminNav() {
           to={link.to}
           end={link.end}
           className={styles.link ?? ''}
+          onClick={guardLeave}
         >
           {link.label}
         </NavLink>

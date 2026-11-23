@@ -4,12 +4,15 @@ import { AppHeader } from '../components/AppHeader/AppHeader';
 import { EmptyState } from '../components/EmptyState/EmptyState';
 import { usePlatformAdmin } from '../admin/usePlatformAdmin';
 import { useAuth } from '../auth/useAuth';
+import { CapabilitySetDraftPage } from './platformAdmin/CapabilitySetDraftPage';
+import { CapabilitySetVersionPage } from './platformAdmin/CapabilitySetVersionPage';
 import { CapabilitySetsPage } from './platformAdmin/CapabilitySetsPage';
 import { CataloguePage } from './platformAdmin/CataloguePage';
 import { LlmProxyPage } from './platformAdmin/LlmProxyPage';
 import { OverviewPage } from './platformAdmin/OverviewPage';
 import { PlatformAdminNav } from './platformAdmin/PlatformAdminNav';
 import { SampleModelsPage } from './platformAdmin/SampleModelsPage';
+import { UnsavedChangesProvider } from './platformAdmin/unsavedChanges';
 import styles from './PlatformAdminPage.module.css';
 
 /**
@@ -42,17 +45,19 @@ export function PlatformAdminPage() {
         {loading && <Loading />}
         {!loading && !isPlatformAdmin && <EmptyState>You don&apos;t have access to this page.</EmptyState>}
         {!loading && isPlatformAdmin && (
-          <>
+          <UnsavedChangesProvider>
             <PlatformAdminNav />
             <Routes>
               <Route index element={<OverviewPage />} />
               <Route path="capability-sets" element={<CapabilitySetsPage />} />
+              <Route path="capability-sets/versions/:mapId" element={<CapabilitySetVersionPage />} />
+              <Route path="capability-sets/drafts/:draftId" element={<CapabilitySetDraftPage />} />
               <Route path="catalogue" element={<CataloguePage />} />
               <Route path="sample-models" element={<SampleModelsPage />} />
               <Route path="llm-proxy" element={<LlmProxyPage />} />
               <Route path="*" element={<Navigate to="/platform-admin" replace />} />
             </Routes>
-          </>
+          </UnsavedChangesProvider>
         )}
       </main>
     </div>
