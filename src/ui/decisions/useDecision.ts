@@ -3,8 +3,9 @@ import type { UUID } from '../../contracts/delta';
 import type { ElementsHeadRow } from '../../contracts/rows';
 import { getMainBranch, listBranchesByIds } from '../../db/branches';
 import { getDecision, listDecisionArgumentsForDecision, listDecisionLinksForDecision } from '../../db/decisions';
+import { getDecisionOptionForBranch, listDecisionOptions } from '../../db/decisionOptions';
 import { getElementsByIds } from '../../db/elements';
-import type { BranchRow, DecisionArgumentRow, DecisionLinkRow, DecisionRow } from '../../db/types';
+import type { BranchRow, DecisionArgumentRow, DecisionLinkRow, DecisionOptionRow, DecisionRow } from '../../db/types';
 import { reportError } from '../errors/errorBannerStore';
 import { supabase } from '../supabaseClient';
 
@@ -15,9 +16,11 @@ export interface DecisionPageData {
   links: DecisionLinkRow[];
   /** `linked_type: 'element'`/`'relationship'` links, resolved against main's current head — decisions are model-wide, never branch-scoped, so there is no other ref to resolve them against. Missing from the map only if the element/relationship has since been retracted past main's current head (the link row itself is never removed — SPEC §2's own append-only convention). */
   linkedElementsById: Map<UUID, ElementsHeadRow>;
-  /** `linked_type: 'branch'` links (F3's own options mechanism, PR5) — resolved eagerly here too, even though no option exists yet this PR, so the detail page needs no separate fetch once PR5 adds them. */
+  /** `linked_type: 'branch'` links (F3's own options mechanism, PR5) - the comparison and change views still use these. */
   linkedBranchesById: Map<UUID, BranchRow>;
-  /** Always empty until `atlas.choose_decision_option` (PR5) writes the chosen option's own reasons row — queried for real so the page renders an honest empty state, not a hardcoded one. */
+  /** D1 stage 1 candidate identities, in display order. Existing branch options are backfilled; the branch is still the delivery object. */
+  options: DecisionOptionRow[];
+  /** Always empty until `atlas.choose_decision_option` (PR5) writes the chosen option's own reasons row - queried for real so the page renders an honest empty state, not a hardcoded one. */
   args: DecisionArgumentRow[];
 }
 
@@ -37,12 +40,25 @@ export function applyDecisionUpdate(state: DecisionPageState, decision: Decision
   return state.status === 'ready' ? { ...state, decision } : state;
 }
 
-/** "Add an option"'s own two already-known results (the new branch, the link connecting it to this decision) appended directly — no fetch, no loading flash. Same reasoning and same no-op-before-ready stance as `applyDecisionUpdate`. */
-export function applyNewOption(state: DecisionPageState, link: DecisionLinkRow, branch: BranchRow): DecisionPageState {
+/** "Add an option"'s own already-known branch/link, appended directly - no fetch, no loading flash. Its option row is read separately below because the database trigger, not the client, now creates it. Same reasoning and same no-op-before-ready stance as `applyDecisionUpdate`. */
+export function applyNewOption(state: DecisionPageState, link: DecisionLinkRow, branch: BranchRow, option?: DecisionOptionRow): DecisionPageState {
   if (state.status !== 'ready') return state;
   const linkedBranchesById = new Map(state.linkedBranchesById);
   linkedBranchesById.set(branch.id, branch);
-  return { ...state, links: [...state.links, link], linkedBranchesById };
+  const next = { ...state, links: [...state.links, link], linkedBranchesById };
+  return option === undefined ? next : applyDecisionOption(next, option);
+}
+
+function optionOrder(a: DecisionOptionRow, b: DecisionOptionRow): number {
+  return a.position - b.position || a.created_at.localeCompare(b.created_at);
+}
+
+/** Adds or replaces one candidate row; used after the add-option trigger has written the identity. */
+export function applyDecisionOption(state: DecisionPageState, option: DecisionOptionRow): DecisionPageState {
+  if (state.status !== 'ready') return state;
+  const exists = state.options.some((o) => o.id === option.id);
+  const options = (exists ? state.options.map((o) => (o.id === option.id ? option : o)) : [...state.options, option]).sort(optionOrder);
+  return { ...state, options };
 }
 
 /** A concern added on the decision page — its link and the element it points at, appended directly; same no-op-before-ready stance as `applyNewOption`. */
@@ -66,10 +82,11 @@ export async function loadDecisionPageData(modelId: UUID, decisionId: UUID): Pro
   const decision = await getDecision(supabase, decisionId);
   if (!decision) return { status: 'not_found' };
 
-  const [links, args, main] = await Promise.all([
+  const [links, args, main, options] = await Promise.all([
     listDecisionLinksForDecision(supabase, decisionId),
     listDecisionArgumentsForDecision(supabase, decisionId),
     getMainBranch(supabase, modelId),
+    listDecisionOptions(supabase, decisionId),
   ]);
 
   const elementLinkIds = links.filter((l) => l.linked_type === 'element' || l.linked_type === 'relationship').map((l) => l.linked_id);
@@ -80,7 +97,7 @@ export async function loadDecisionPageData(modelId: UUID, decisionId: UUID): Pro
     branchLinkIds.length > 0 ? listBranchesByIds(supabase, branchLinkIds) : Promise.resolve([]),
   ]);
 
-  return { status: 'ready', decision, links, linkedElementsById: linkedElements, linkedBranchesById: new Map(linkedBranches.map((b) => [b.id, b])), args };
+  return { status: 'ready', decision, links, linkedElementsById: linkedElements, linkedBranchesById: new Map(linkedBranches.map((b) => [b.id, b])), options, args };
 }
 
 export interface UseDecisionResult {
@@ -145,6 +162,15 @@ export function useDecision(modelId: UUID, decisionId: UUID): UseDecisionResult 
 
   const applyNewOptionCallback = useCallback((link: DecisionLinkRow, branch: BranchRow) => {
     setState((prev) => applyNewOption(prev, link, branch));
+    // The branch link's database trigger creates the candidate row. Read back
+    // just that row; the branch/link patch above already rendered the change.
+    void getDecisionOptionForBranch(supabase, link.decision_id, branch.id)
+      .then((option) => {
+        if (option !== null) setState((prev) => applyDecisionOption(prev, option));
+      })
+      .catch((e: unknown) => {
+        reportError('Could not load the option that was just added.', e);
+      });
   }, []);
 
   const applyNewConcernCallback = useCallback((link: DecisionLinkRow, element: ElementsHeadRow) => {
@@ -154,8 +180,12 @@ export function useDecision(modelId: UUID, decisionId: UUID): UseDecisionResult 
   const refreshOptionsAndArguments = useCallback(async () => {
     if (state.status !== 'ready') return;
     const branchLinkIds = state.links.filter((l) => l.linked_type === 'branch').map((l) => l.linked_id);
-    const [branches, args] = await Promise.all([listBranchesByIds(supabase, branchLinkIds), listDecisionArgumentsForDecision(supabase, decisionId)]);
-    setState((prev) => (prev.status === 'ready' ? { ...prev, linkedBranchesById: new Map(branches.map((b) => [b.id, b])), args } : prev));
+    const [branches, args, options] = await Promise.all([
+      listBranchesByIds(supabase, branchLinkIds),
+      listDecisionArgumentsForDecision(supabase, decisionId),
+      listDecisionOptions(supabase, decisionId),
+    ]);
+    setState((prev) => (prev.status === 'ready' ? { ...prev, linkedBranchesById: new Map(branches.map((b) => [b.id, b])), options, args } : prev));
   }, [state, decisionId]);
 
   return { state, reload, applyDecisionUpdate: applyDecisionUpdateCallback, applyNewOption: applyNewOptionCallback, applyNewConcern: applyNewConcernCallback, refreshOptionsAndArguments };

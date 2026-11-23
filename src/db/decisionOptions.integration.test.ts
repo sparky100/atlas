@@ -4,8 +4,10 @@ import type { Client } from './client';
 import { createServiceRoleClient, createSupabaseClient } from './client';
 import { createChangeBranch, getMainBranch } from './branches';
 import { createDecision, createDecisionLink } from './decisions';
+import { listDecisionOptions } from './decisionOptions';
 import { insertOptionMark } from './decisionOptionMarks';
-import { upsertDecisionRating } from './decisionRatings';
+import { listDecisionRatingsForDecision, upsertDecisionRating } from './decisionRatings';
+import { listOptionSources } from './productCatalogue';
 import { loadEnv } from './env';
 import { createModel } from './models';
 import { createOrganisation } from './organisations';
@@ -64,6 +66,7 @@ describe('D1 candidate options, real database', () => {
     const { data, error } = await owner.client.from('decision_options').select('id, decision_id, branch_id, title, source').eq('id', optionId).single();
     expect(error).toBeNull();
     expect(data).toMatchObject({ decision_id: decisionId, branch_id: branchId, title: 'Use a product', source: 'manual' });
+    expect(await listDecisionOptions(owner.client, decisionId)).toEqual([expect.objectContaining({ id: optionId, branch_id: branchId })]);
   });
 
   it('records Designer provenance on the option and back on the mark', async () => {
@@ -81,6 +84,7 @@ describe('D1 candidate options, real database', () => {
       decisionId, branchId, criterion: 'vendorFit', level: 'acceptable', note: 'Worth checking.', ratedBy: owner.id,
     });
     expect(rating.option_id).toBe(optionId);
+    expect((await listDecisionRatingsForDecision(owner.client, decisionId))[0]?.option_id).toBe(optionId);
 
     const source = await owner.client.from('option_web_sources').insert({
       decision_id: decisionId, branch_id: branchId, url: 'https://example.test/quote-tool',
@@ -89,5 +93,8 @@ describe('D1 candidate options, real database', () => {
     }).select('option_id').single();
     expect(source.error).toBeNull();
     expect(source.data?.option_id).toBe(optionId);
+    expect(await listOptionSources(owner.client, decisionId)).toEqual([
+      expect.objectContaining({ kind: 'web', branchId, optionId }),
+    ]);
   });
 });

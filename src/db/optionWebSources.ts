@@ -7,6 +7,7 @@ export function optionWebSourcesFromRows(rows: readonly OptionWebSourceRow[]): O
     kind: 'web' as const,
     id: `${row.branch_id}\u0000${row.url}`,
     branchId: row.branch_id,
+    optionId: row.option_id ?? null,
     url: row.url,
     title: row.title,
     publisher: row.publisher,

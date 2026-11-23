@@ -20,7 +20,7 @@ const row: OptionWebSourceRow = {
 describe('optionWebSourcesFromRows', () => {
   it('maps the saved page to a web source and keeps the URL as its identity', () => {
     expect(optionWebSourcesFromRows([row])[0]).toEqual({
-      kind: 'web', id: 'branch-1\u0000https://vendor.example/evidence', branchId: 'branch-1',
+      kind: 'web', id: 'branch-1\u0000https://vendor.example/evidence', branchId: 'branch-1', optionId: null,
       url: 'https://vendor.example/evidence', title: 'Product evidence', publisher: 'Vendor Ltd',
       excerpt: 'The page says it records complaints.', retrievedAt: '2026-11-21T10:00:00Z',
       citedBy: 'user-1', citedAt: '2026-11-21T10:05:00Z',

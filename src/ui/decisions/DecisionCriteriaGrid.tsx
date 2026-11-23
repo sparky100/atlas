@@ -16,8 +16,14 @@ import styles from './DecisionCriteriaGrid.module.css';
 import { useCompactDecisionLayout } from './useCompactDecisionLayout';
 
 export interface DecisionCriteriaOption {
-  branchId: UUID;
-  /** `intentHeaderLine(branch)` - may carry an "Exploring: ", "Proposing: " or "Recording: " prefix this grid's own header strips before display (rule: "merge Options list into column headers... drop 'Exploring:' prefix"). The prefix changes when an option is chosen, so strip every intent prefix, not just the pre-choice one. */
+  /** The stable candidate identity. Ratings and sources now resolve through this. */
+  optionId: UUID;
+  /** The delivery change, when this candidate has one. A candidate with no branch renders read-only, with no change-page link. */
+  branchId: UUID | null;
+  /**
+   * The option's own name, not a branch intent line. Older branch labels may
+   * still carry "Exploring: "/"Proposing: " prefixes, so the grid strips them.
+   */
   label: string;
   status: BranchStatus;
   isChosen: boolean;
@@ -67,7 +73,8 @@ export interface DecisionCriteriaGridProps {
 }
 
 interface EditingCell {
-  branchId: UUID;
+  optionId: UUID;
+  branchId: UUID | null;
   branchLabel: string;
   criterion: DecisionCriterionKey;
   criterionLabel: string;
@@ -112,30 +119,31 @@ export function DecisionCriteriaGrid({ decisionId, options, canRate, userId, nee
 
   if (options.length === 0) return null;
 
-  /** An option is a change; while it is still a draft and the person may work on changes they can open it for editing, chosen or not. The chosen option keeps its own "Work on this as a change" action. */
+  /** An option is a change; while it is still a draft and the person may work on changes they can open it for editing, chosen or not. A candidate with no branch has nothing to open yet. */
   function canEditOption(o: DecisionCriteriaOption): boolean {
-    return canWorkOnChange && o.status === 'draft' && !o.isChosen;
+    return o.branchId !== null && canWorkOnChange && o.status === 'draft' && !o.isChosen;
   }
 
-  function ratingFor(branchId: UUID, criterion: DecisionCriterionKey): DecisionOptionRatingRow | undefined {
-    return ratings.find((r) => r.branch_id === branchId && r.criterion === criterion);
+  /** Read through the stable option id; fall back to the legacy branch key only for a row not yet backfilled. */
+  function ratingFor(o: DecisionCriteriaOption, criterion: DecisionCriterionKey): DecisionOptionRatingRow | undefined {
+    return ratings.find((r) => (r.option_id === o.optionId || (r.option_id == null && o.branchId !== null && r.branch_id === o.branchId)) && r.criterion === criterion);
   }
 
-  function ratedCount(branchId: UUID): number {
-    return ratings.filter((r) => r.branch_id === branchId).length;
+  function ratedCount(o: DecisionCriteriaOption): number {
+    return ratings.filter((r) => r.option_id === o.optionId || (r.option_id == null && o.branchId !== null && r.branch_id === o.branchId)).length;
   }
 
-  function openEditor(branchId: UUID, branchLabel: string, criterion: DecisionCriterionKey, criterionLabel: string) {
-    if (!canRate) return;
-    const existing = ratingFor(branchId, criterion);
-    setEditing({ branchId, branchLabel, criterion, criterionLabel });
+  function openEditor(o: DecisionCriteriaOption, criterion: DecisionCriterionKey, criterionLabel: string) {
+    if (!canRate || o.branchId === null) return;
+    const existing = ratingFor(o, criterion);
+    setEditing({ optionId: o.optionId, branchId: o.branchId, branchLabel: stripIntentPrefix(o.label), criterion, criterionLabel });
     setLevelDraft(existing?.level ?? null);
     setNoteDraft(existing?.note ?? '');
   }
 
   async function saveRating() {
-    if (!editing || !levelDraft || !userId) return;
-    const saved = await ratingsState.rateOption({ decisionId, branchId: editing.branchId, criterion: editing.criterion, level: levelDraft, note: noteDraft, userId });
+    if (!editing || !levelDraft || !userId || editing.branchId === null) return;
+    const saved = await ratingsState.rateOption({ decisionId, branchId: editing.branchId, optionId: editing.optionId, criterion: editing.criterion, level: levelDraft, note: noteDraft, userId });
     if (saved) setEditing(null);
   }
 
@@ -211,21 +219,29 @@ export function DecisionCriteriaGrid({ decisionId, options, canRate, userId, nee
                   How the options compare
                 </Text>
               </th>
-              {options.map((o) => (
-                <th key={o.branchId} className={o.summary === null ? styles.mutedHeaderCell : undefined}>
+              {options.map((o) => {
+                const branchId = o.branchId;
+                return (
+                <th key={o.optionId} className={o.summary === null ? styles.mutedHeaderCell : undefined}>
                   <div className={styles.optionHeader}>
                     <div className={styles.optionHeaderTop}>
                       {o.isChosen && <Chip tone="ok">chosen</Chip>}
-                      <Chip tone={branchStatusTone(o.status)}>{o.status}</Chip>
+                      <Chip tone={o.branchId === null ? 'neutral' : branchStatusTone(o.status)}>{o.branchId === null ? 'candidate' : o.status}</Chip>
                     </div>
                     <Text as="span" size="sm" tone="muted">
-                      A change
+                      {o.branchId === null ? 'An option' : 'A change'}
                     </Text>
-                    <Link to={`/o/${orgSlug}/m/${modelSlug}/changes/${o.branchId}`}>
+                    {o.branchId !== null ? (
+                      <Link to={`/o/${orgSlug}/m/${modelSlug}/changes/${o.branchId}`}>
+                        <Text as="span" size="md" className={styles.optionTitle}>
+                          {stripIntentPrefix(o.label)}
+                        </Text>
+                      </Link>
+                    ) : (
                       <Text as="span" size="md" className={styles.optionTitle}>
                         {stripIntentPrefix(o.label)}
                       </Text>
-                    </Link>
+                    )}
                     {o.provenance != null && <Chip tone="info">{o.provenance}</Chip>}
                     {o.description != null && o.description.trim() !== '' && (
                       <Text as="div" size="sm">
@@ -244,41 +260,43 @@ export function DecisionCriteriaGrid({ decisionId, options, canRate, userId, nee
                       </Text>
                     )}
                     <div className={styles.optionHeaderActions}>
-                      {canResearch && (
-                        <Button variant="secondary" onClick={() => { onResearch(o.branchId, stripIntentPrefix(o.label)); }}>
+                      {canResearch && branchId !== null && (
+                        <Button variant="secondary" onClick={() => { onResearch(branchId, stripIntentPrefix(o.label)); }}>
                           Research the web
                         </Button>
                       )}
-                      <Link to={`/o/${orgSlug}/m/${modelSlug}/decisions/${decisionId}/options/${o.branchId}/landscape`}>
-                        <Text as="span" size="sm">
-                          Preview impact →
-                        </Text>
-                      </Link>
-                      {canEditOption(o) && (
+                      {branchId !== null && (
+                        <Link to={`/o/${orgSlug}/m/${modelSlug}/decisions/${decisionId}/options/${branchId}/landscape`}>
+                          <Text as="span" size="sm">
+                            Preview impact →
+                          </Text>
+                        </Link>
+                      )}
+                      {canEditOption(o) && branchId !== null && (
                         <Button
                           variant="secondary"
                           onClick={() => {
-                            onWorkOnThisChange(o.branchId);
+                            onWorkOnThisChange(branchId);
                           }}
                         >
                           Edit this change
                         </Button>
                       )}
-                      {o.canChoose && (
+                      {o.canChoose && branchId !== null && (
                         <Button
                           variant="secondary"
                           onClick={() => {
-                            onChoose(o.branchId);
+                            onChoose(branchId);
                           }}
                         >
                           Choose
                         </Button>
                       )}
-                      {o.isChosen && canWorkOnChange && o.status === 'draft' && (
+                      {o.isChosen && canWorkOnChange && o.status === 'draft' && branchId !== null && (
                         <Button
                           variant="primary"
                           onClick={() => {
-                            onWorkOnThisChange(o.branchId);
+                            onWorkOnThisChange(branchId);
                           }}
                         >
                           Work on this as a change
@@ -286,11 +304,12 @@ export function DecisionCriteriaGrid({ decisionId, options, canRate, userId, nee
                       )}
                     </div>
                     <Text as="span" size="sm" tone="muted">
-                      {ratedCount(o.branchId)}/{DECISION_CRITERIA.length}
+                      {ratedCount(o)}/{DECISION_CRITERIA.length}
                     </Text>
                   </div>
                 </th>
-              ))}
+                );
+              })}
             </tr>
           </thead>
           <tbody>
@@ -306,15 +325,15 @@ export function DecisionCriteriaGrid({ decisionId, options, canRate, userId, nee
                   )}
                 </td>
                 {options.map((o) => {
-                  const rating = ratingFor(o.branchId, criterion.key);
+                  const rating = ratingFor(o, criterion.key);
                   return (
-                    <td key={o.branchId}>
+                    <td key={o.optionId}>
                       <button
                         type="button"
                         className={styles.cell}
-                        disabled={!canRate}
+                        disabled={!canRate || o.branchId === null}
                         onClick={() => {
-                          openEditor(o.branchId, stripIntentPrefix(o.label), criterion.key, criterion.label);
+                          openEditor(o, criterion.key, criterion.label);
                         }}
                       >
                         {rating ? <Chip tone={decisionRatingLevelTone(rating.level)}>{criterion.levelLabels[rating.level]}</Chip> : <span className={styles.notRated}>Not rated</span>}
@@ -334,16 +353,22 @@ export function DecisionCriteriaGrid({ decisionId, options, canRate, userId, nee
       </div>}
 
       {compact && <div className={styles.mobileCards} data-testid="decision-option-cards">
-        {options.map((o) => (
-          <article key={o.branchId} className={styles.optionCard} data-testid="decision-option-card" aria-label={stripIntentPrefix(o.label)}>
+        {options.map((o) => {
+          const branchId = o.branchId;
+          return (
+          <article key={o.optionId} className={styles.optionCard} data-testid="decision-option-card" aria-label={stripIntentPrefix(o.label)}>
             <div className={styles.optionHeaderTop}>
               {o.isChosen && <Chip tone="ok">chosen</Chip>}
-              <Chip tone={branchStatusTone(o.status)}>{o.status}</Chip>
-              <Text as="span" size="sm" tone="muted">{ratedCount(o.branchId)}/{DECISION_CRITERIA.length} rated</Text>
+              <Chip tone={o.branchId === null ? 'neutral' : branchStatusTone(o.status)}>{o.branchId === null ? 'candidate' : o.status}</Chip>
+              <Text as="span" size="sm" tone="muted">{ratedCount(o)}/{DECISION_CRITERIA.length} rated</Text>
             </div>
-            <Link to={`/o/${orgSlug}/m/${modelSlug}/changes/${o.branchId}`}>
+            {branchId !== null ? (
+              <Link to={`/o/${orgSlug}/m/${modelSlug}/changes/${branchId}`}>
+                <Text as="span" size="md" className={styles.optionTitle}>{stripIntentPrefix(o.label)}</Text>
+              </Link>
+            ) : (
               <Text as="span" size="md" className={styles.optionTitle}>{stripIntentPrefix(o.label)}</Text>
-            </Link>
+            )}
             {o.provenance != null && <Text as="p" size="sm" tone="muted">{o.provenance}</Text>}
             <Text as="p" size="sm" tone={o.summary === null ? 'muted' : 'default'}>{o.summary ?? 'No changes recorded yet'}</Text>
             {((o.description?.trim() ?? '') !== '' || (o.sources?.length ?? 0) > 0) && (
@@ -355,28 +380,29 @@ export function DecisionCriteriaGrid({ decisionId, options, canRate, userId, nee
             )}
             <div className={styles.ratingList}>
               {DECISION_CRITERIA.map((criterion) => {
-                const rating = ratingFor(o.branchId, criterion.key);
+                const rating = ratingFor(o, criterion.key);
                 return (
                   <div key={criterion.key} className={styles.ratingRow} data-testid={`decision-rating-${criterion.key}`}>
                     <Text as="span" size="sm">{criterion.label}{criterion.key === 'timing' && neededBy !== null ? ` (needed by ${neededBy})` : ''}</Text>
-                    <button type="button" className={styles.cell} disabled={!canRate} onClick={() => { openEditor(o.branchId, stripIntentPrefix(o.label), criterion.key, criterion.label); }}>
+                    <button type="button" className={styles.cell} disabled={!canRate || branchId === null} onClick={() => { openEditor(o, criterion.key, criterion.label); }}>
                       {rating ? <Chip tone={decisionRatingLevelTone(rating.level)}>{criterion.levelLabels[rating.level]}</Chip> : <span className={styles.notRated}>Not rated</span>}
                       {rating?.note && <span className={styles.noteDot} aria-label="Has a note" title={rating.note}>•</span>}
                     </button>
-                    {editing?.branchId === o.branchId && editing.criterion === criterion.key && renderRatingEditor()}
+                    {editing?.optionId === o.optionId && editing.criterion === criterion.key && renderRatingEditor()}
                   </div>
                 );
               })}
             </div>
             <div className={styles.optionHeaderActions}>
-              {canResearch && <Button variant="secondary" onClick={() => { onResearch(o.branchId, stripIntentPrefix(o.label)); }}>Research the web</Button>}
-              <Link to={`/o/${orgSlug}/m/${modelSlug}/decisions/${decisionId}/options/${o.branchId}/landscape`}>Preview impact →</Link>
-              {canEditOption(o) && <Button variant="secondary" onClick={() => { onWorkOnThisChange(o.branchId); }}>Edit this change</Button>}
-              {o.canChoose && <Button variant="secondary" onClick={() => { onChoose(o.branchId); }}>Choose</Button>}
-              {o.isChosen && canWorkOnChange && o.status === 'draft' && <Button variant="primary" onClick={() => { onWorkOnThisChange(o.branchId); }}>Work on this as a change</Button>}
+              {canResearch && branchId !== null && <Button variant="secondary" onClick={() => { onResearch(branchId, stripIntentPrefix(o.label)); }}>Research the web</Button>}
+              {branchId !== null && <Link to={`/o/${orgSlug}/m/${modelSlug}/decisions/${decisionId}/options/${branchId}/landscape`}>Preview impact →</Link>}
+              {canEditOption(o) && branchId !== null && <Button variant="secondary" onClick={() => { onWorkOnThisChange(branchId); }}>Edit this change</Button>}
+              {o.canChoose && branchId !== null && <Button variant="secondary" onClick={() => { onChoose(branchId); }}>Choose</Button>}
+              {o.isChosen && canWorkOnChange && o.status === 'draft' && branchId !== null && <Button variant="primary" onClick={() => { onWorkOnThisChange(branchId); }}>Work on this as a change</Button>}
             </div>
           </article>
-        ))}
+          );
+        })}
       </div>}
       {!compact && editing && <div className={styles.desktopEditor}>{renderRatingEditor()}</div>}
     </div>

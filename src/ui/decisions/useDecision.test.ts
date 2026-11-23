@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import type { BranchRow, DecisionArgumentRow, DecisionLinkRow, DecisionRow } from '../../db/types';
+import type { BranchRow, DecisionArgumentRow, DecisionLinkRow, DecisionOptionRow, DecisionRow } from '../../db/types';
 import { decisionComparisonKey } from './decisionComparisonKey';
 import { applyDecisionUpdate, applyNewConcern, applyNewOption, type DecisionPageState } from './useDecision';
 
@@ -71,6 +71,15 @@ function makeLink(overrides: Partial<DecisionLinkRow> = {}): DecisionLinkRow {
   };
 }
 
+function makeOption(overrides: Partial<DecisionOptionRow> = {}): DecisionOptionRow {
+  return {
+    id: 'option-1', decision_id: DECISION_ID, branch_id: BRANCH_ID, title: 'Option A', summary: '', to_weigh: '',
+    position: 1, source: 'manual', agent: null, drafted_at: null, draft_run_id: null, edited_by: null, edited_at: null,
+    created_by: 'user-1', created_at: '2026-01-01T00:00:00Z', updated_by: 'user-1', updated_at: '2026-01-01T00:00:00Z',
+    ...overrides,
+  };
+}
+
 function readyState(overrides: Partial<Extract<DecisionPageState, { status: 'ready' }>> = {}): DecisionPageState {
   return {
     status: 'ready',
@@ -78,6 +87,7 @@ function readyState(overrides: Partial<Extract<DecisionPageState, { status: 'rea
     links: [],
     linkedElementsById: new Map(),
     linkedBranchesById: new Map(),
+    options: [],
     args: [],
     ...overrides,
   };
@@ -113,6 +123,13 @@ describe('applyNewOption', () => {
     if (next.status !== 'ready') throw new Error('expected ready');
     expect(next.links).toEqual([link]);
     expect(next.linkedBranchesById.get(BRANCH_ID)).toBe(branch);
+  });
+
+  it('also keeps the option identity when the trigger-created row is read back', () => {
+    const option = makeOption();
+    const next = applyNewOption(readyState(), makeLink(), makeBranch(), option);
+    if (next.status !== 'ready') throw new Error('expected ready');
+    expect(next.options).toEqual([option]);
   });
 
   it('never produces a loading state — a no-op before the first load completes', () => {

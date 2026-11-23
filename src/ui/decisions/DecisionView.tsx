@@ -16,7 +16,7 @@ import { Text } from '../components/Text/Text';
 import { useAuth } from '../auth/useAuth';
 import { useMainBranch } from '../branches/useMainBranch';
 import { useSelectedRef } from '../branches/useSelectedRef';
-import type { BranchRow, DecisionLinkRow, DecisionRow, MemberRole } from '../../db/types';
+import type { BranchRow, DecisionLinkRow, DecisionOptionRow, DecisionRow, MemberRole } from '../../db/types';
 import { intentHeaderLine } from '../changes/branchIntent';
 import { profileLabel } from '../comments/profileLabel';
 import { chooseNote } from './chooseNote';
@@ -61,7 +61,7 @@ import type { DecisionPageState } from './useDecision';
 import { useDecisionComparison, type DecisionComparisonOption } from './useDecisionComparison';
 import { useDecisionOptions } from './useDecisionOptions';
 import { usePendingOptions } from './usePendingOptions';
-import { optionProvenance } from './optionProvenance';
+import { optionProvenance, optionRowProvenance } from './optionProvenance';
 import { useDecisionRatings } from './useDecisionRatings';
 import { useOptionSources } from './useOptionSources';
 import type { OptionSource } from '../../contracts/optionSource';
@@ -134,10 +134,16 @@ export function DecisionView({ modelId, decisionId, orgId, orgSlug, modelSlug, r
   // pack, the grid and (later) the option page all read this same shape.
   const optionSources = useOptionSources(decisionId);
   const sourcesByBranch = new Map<string, OptionSource[]>();
+  const sourcesByOption = new Map<string, OptionSource[]>();
   for (const source of optionSources.data ?? []) {
-    const list = sourcesByBranch.get(source.branchId) ?? [];
-    list.push(source);
-    sourcesByBranch.set(source.branchId, list);
+    const branchList = sourcesByBranch.get(source.branchId) ?? [];
+    branchList.push(source);
+    sourcesByBranch.set(source.branchId, branchList);
+    if (source.optionId != null) {
+      const optionList = sourcesByOption.get(source.optionId) ?? [];
+      optionList.push(source);
+      sourcesByOption.set(source.optionId, optionList);
+    }
   }
 
   const [addingOption, setAddingOption] = useState(false);
@@ -163,6 +169,10 @@ export function DecisionView({ modelId, decisionId, orgId, orgSlug, modelSlug, r
   const readyState = state.status === 'ready' ? state : null;
   const elementLinks = readyState ? readyState.links.filter((l) => l.linked_type === 'element' || l.linked_type === 'relationship') : [];
   const branchLinks = readyState ? readyState.links.filter((l) => l.linked_type === 'branch') : [];
+  const optionByBranchId = new Map<UUID, DecisionOptionRow>();
+  for (const option of readyState?.options ?? []) {
+    if (option.branch_id !== null) optionByBranchId.set(option.branch_id, option);
+  }
   // Products belong beside a replacement decision, not on the capability page:
   // only when an option is a replace/build one, and only for the capabilities
   // this decision concerns.
@@ -170,11 +180,17 @@ export function DecisionView({ modelId, decisionId, orgId, orgSlug, modelSlug, r
     const element = readyState?.linkedElementsById.get(link.linked_id);
     return element?.element_type === 'capability' ? [element] : [];
   });
-  const hasReplaceOrBuildOption = branchLinks.some((link) => {
-    const branch = readyState?.linkedBranchesById.get(link.linked_id);
-    const kind = branch ? optionKindOf(branch.title ?? branch.name) : null;
-    return kind === 'replace' || kind === 'build';
-  });
+  const readyOptions = readyState?.options ?? [];
+  const hasReplaceOrBuildOption = readyOptions.length > 0
+    ? readyOptions.some((option) => {
+        const kind = optionKindOf(option.title);
+        return kind === 'replace' || kind === 'build';
+      })
+    : branchLinks.some((link) => {
+        const branch = readyState?.linkedBranchesById.get(link.linked_id);
+        const kind = optionKindOf(branch?.title ?? branch?.name ?? '');
+        return kind === 'replace' || kind === 'build';
+      });
   const concernedCapabilityIds = readyState ? elementLinks.map((l) => l.linked_id).filter((id) => readyState.linkedElementsById.get(id)?.element_type === 'capability') : [];
   // F6.3 (Part B) rule 5: a system/container concern gets its own outcome
   // row (unchanged/retired/replaced by X) alongside a capability concern's
@@ -187,7 +203,7 @@ export function DecisionView({ modelId, decisionId, orgId, orgSlug, modelSlug, r
         .filter((b): b is NonNullable<typeof b> => b !== undefined)
         // The "Stay as we are" baseline records no change, so it is not a column of "What changes": the Current column already is staying as we are.
         .filter((b) => b.id !== readyState.decision.baseline_branch_id)
-        .map((b) => ({ branchId: b.id, baseCommitId: b.base_commit_id, headCommitId: b.head_commit_id, label: intentHeaderLine(b) }))
+        .map((b) => ({ branchId: b.id, baseCommitId: b.base_commit_id, headCommitId: b.head_commit_id, label: optionByBranchId.get(b.id)?.title ?? intentHeaderLine(b) }))
     : [];
   const estateSupporters = useEstateSuggestions(main?.head_commit_id ?? null, concernedCapabilityIds);
   const comparison = useDecisionComparison(modelId, main?.head_commit_id ?? null, concernedCapabilityIds, otherConcernElementIds, comparisonOptions);
@@ -203,25 +219,36 @@ export function DecisionView({ modelId, decisionId, orgId, orgSlug, modelSlug, r
   if (state.status === 'not_found') return <Text as="p">No decision found for this id.</Text>;
   if (state.status === 'error') return <Text as="p">{state.message}</Text>;
 
-  const { decision, links, linkedElementsById, linkedBranchesById, args } = state;
+  const { decision, links, linkedElementsById, linkedBranchesById, options, args } = state;
   const canAddOption = canCreateChangeBranch(role) && decision.status === 'proposed';
   const canResearch = canAddOption && webSearchEnabled && assistantEnabled && agentsEnabled && keySet;
   const canChoose = canChooseDecisionOption(role) && decision.status === 'proposed';
   const canRate = canRateDecisionOption(role, decision);
   const chosenBranch = decision.branch_id !== null ? linkedBranchesById.get(decision.branch_id) : undefined;
-  const scoredLinks = branchLinks.filter((l) => l.linked_id !== decision.baseline_branch_id);
-  const secondOpinion = reviewerAvailability({ role, status: decision.status, optionCount: scoredLinks.length, assistantEnabled, agentsEnabled, keySet, ownerNames: ownerNames(members) });
+  const chosenOption = decision.branch_id !== null ? optionByBranchId.get(decision.branch_id) : undefined;
+  // A candidate with no branch is still an option; only the baseline is
+  // excluded from the comparison columns (the Current column covers it).
+  const scoredOptions = options.filter((o) => o.branch_id !== decision.baseline_branch_id);
+  const secondOpinion = reviewerAvailability({ role, status: decision.status, optionCount: scoredOptions.length, assistantEnabled, agentsEnabled, keySet, ownerNames: ownerNames(members) });
   const canEditBaseline = canAddOption && canEditDecision(role, decision, userId);
   const baselineBranch = decision.baseline_branch_id !== null ? linkedBranchesById.get(decision.baseline_branch_id) : undefined;
   const approvers = members.filter((m) => m.member.role === 'owner' || m.member.role === 'architect');
-  const ratedBranchIds = new Set(ratingsState.ratings.map((r) => r.branch_id));
+  const ratedOptionIds = new Set<UUID>();
+  for (const rating of ratingsState.ratings) {
+    if (rating.option_id != null) {
+      ratedOptionIds.add(rating.option_id);
+    } else {
+      const option = optionByBranchId.get(rating.branch_id);
+      if (option !== undefined) ratedOptionIds.add(option.id);
+    }
+  }
   const nextStep = decisionNextStep({
     status: decision.status,
-    optionCount: scoredLinks.length,
-    ratedOptionCount: scoredLinks.filter((l) => ratedBranchIds.has(l.linked_id)).length,
+    optionCount: scoredOptions.length,
+    ratedOptionCount: scoredOptions.filter((o) => ratedOptionIds.has(o.id)).length,
     canAddOption,
     canChoose,
-    chosenTitle: chosenBranch ? intentHeaderLine(chosenBranch) : null,
+    chosenTitle: chosenOption?.title ?? (chosenBranch ? intentHeaderLine(chosenBranch) : null),
   });
 
   function onNextStepAction() {
@@ -383,7 +410,7 @@ export function DecisionView({ modelId, decisionId, orgId, orgSlug, modelSlug, r
             <Text as="h3" size="sm" tone="muted">
               What we chose
             </Text>
-            <Text as="p">{chosenBranch !== undefined ? (chosenBranch.title ?? chosenBranch.name) : 'An option that is no longer linked to this decision.'}</Text>
+            <Text as="p">{chosenOption?.title ?? (chosenBranch !== undefined ? (chosenBranch.title ?? chosenBranch.name) : 'An option that is no longer linked to this decision.')}</Text>
             {decision.decided_at !== null && (
               <Text as="p" size="sm" tone="muted">
                 Decided {decision.decided_at.slice(0, 10)}
@@ -472,9 +499,9 @@ export function DecisionView({ modelId, decisionId, orgId, orgSlug, modelSlug, r
       )}
 
       {nextStep !== null && decision.status === 'proposed' && <DecisionNextStepCard step={nextStep} onAction={onNextStepAction} busy={askBusy} askedNames={askedNames} error={askError} showSecondOpinion={secondOpinion.available} />}
-      {(branchLinks.length > 0 || canAddOption) && (
+      {(options.length > 0 || canAddOption) && (
         <Panel>
-          <CollapsibleSection title="Options" meta={`(${String(branchLinks.length)})`}>
+          <CollapsibleSection title="Options" meta={`(${String(options.length)})`}>
           {pendingOptions.waiting > 0 && (
             <div role={pendingOptions.status === 'failed' ? 'alert' : 'status'} data-testid="pending-options">
               {pendingOptions.status === 'failed' ? (
@@ -530,22 +557,24 @@ export function DecisionView({ modelId, decisionId, orgId, orgSlug, modelSlug, r
               </Button>
             </div>
           )}
-          {branchLinks.length === 0 || scoredLinks.length === 0 ? null : (
+          {scoredOptions.length === 0 ? null : (
             (() => {
-              const criteriaOptions: DecisionCriteriaOption[] = scoredLinks
-                .map((link) => linkedBranchesById.get(link.linked_id))
-                .filter((b): b is NonNullable<typeof b> => b !== undefined)
-                .map((b) => ({
-                  branchId: b.id,
-                  label: intentHeaderLine(b),
-                  status: b.status,
-                  isChosen: decision.branch_id === b.id,
-                  summary: comparison.status === 'ready' ? (comparison.optionSummaries.get(b.id) ?? null) : null,
-                  canChoose: canChoose && b.status === 'draft',
-                  description: b.description,
-                  provenance: optionProvenance(pendingOptions.marks.get(b.id), (id) => profileLabel(members.find((m) => m.member.user_id === id)?.profile)),
-                  sources: sourcesByBranch.get(b.id) ?? [],
-                }));
+              const nameOf = (id: UUID) => profileLabel(members.find((m) => m.member.user_id === id)?.profile);
+              const criteriaOptions: DecisionCriteriaOption[] = scoredOptions.map((o) => {
+                const b = o.branch_id !== null ? linkedBranchesById.get(o.branch_id) : undefined;
+                return {
+                  optionId: o.id,
+                  branchId: b?.id ?? null,
+                  label: o.title,
+                  status: b?.status ?? 'draft',
+                  isChosen: b?.id === decision.branch_id,
+                  summary: b !== undefined && comparison.status === 'ready' ? (comparison.optionSummaries.get(b.id) ?? null) : null,
+                  canChoose: canChoose && b?.status === 'draft',
+                  description: o.summary.trim() !== '' ? o.summary : (b?.description ?? null),
+                  provenance: optionRowProvenance(o, nameOf) ?? optionProvenance(b ? pendingOptions.marks.get(b.id) : undefined, nameOf),
+                  sources: sourcesByOption.get(o.id) ?? (b ? sourcesByBranch.get(b.id) : undefined) ?? [],
+                };
+              });
               return (
                 <div id="decision-compare">
                 <DecisionCriteriaGrid
@@ -582,7 +611,7 @@ export function DecisionView({ modelId, decisionId, orgId, orgSlug, modelSlug, r
           )}
 
           {/* Starting points are for beginning a list of options. Once there are options (the Designer's, or ones added by hand) they are already in the list, so they are not shown again (Simon, 2026-11-20). */}
-          {canAddOption && scoredLinks.length === 0 && estateSupporters !== null && concernedCapabilityIds.length > 0 && (
+          {canAddOption && scoredOptions.length === 0 && estateSupporters !== null && concernedCapabilityIds.length > 0 && (
             <div data-testid="option-suggestions">
               <Text as="p" size="sm" tone="muted">
                 Starting points, read from what Atlas holds (no AI). They are only suggestions: add one, change it, or ignore them.
