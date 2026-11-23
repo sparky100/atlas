@@ -68,9 +68,9 @@ test('a decision concerning a system directly, with an option that removes it fr
   // file's own module comment) has nothing to block.
   const decisionUrlMatch = /\/decisions\/([^/?]+)/.exec(page.url());
   if (!decisionUrlMatch?.[1]) throw new Error(`could not read the decision id out of ${page.url()}`);
-  await page.goto(`/o/${orgSlug}/m/${modelSlug}/changes`);
-  const optionRow = page.locator('li', { hasText: 'Option 1' });
-  await optionRow.getByRole('link', { name: 'Open →' }).click();
+  // The candidate has no branch until Work on this option creates one.
+  await page.locator('th', { hasText: 'Option 1' }).getByRole('button', { name: 'Work on this option' }).click();
+  await expect(page).toHaveURL(/\/changes\//);
   const optionBranchIdMatch = /\/changes\/([^/?]+)/.exec(page.url());
   if (!optionBranchIdMatch?.[1]) throw new Error(`could not read the option's branch id out of ${page.url()}`);
   const optionBranchId = optionBranchIdMatch[1];

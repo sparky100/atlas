@@ -7,8 +7,10 @@ export function compactDecision(page: Page): boolean {
 }
 
 export function optionSurface(page: Page, title: string): Locator {
-  if (compactDecision(page)) return page.getByTestId('decision-option-card').filter({ has: page.getByRole('link', { name: title, exact: true }) });
-  return page.getByTestId('decision-criteria-grid').locator('th').filter({ has: page.getByRole('link', { name: title, exact: true }) });
+  // A candidate with no delivery branch has no change-page link yet, so find
+  // it by its header text rather than by a link.
+  if (compactDecision(page)) return page.getByTestId('decision-option-card').filter({ hasText: title });
+  return page.getByTestId('decision-criteria-grid').locator('th').filter({ hasText: title });
 }
 
 export async function ratingControl(page: Page, title: string, criterion: string): Promise<Locator> {

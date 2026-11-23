@@ -38,7 +38,7 @@ export function DecisionPage() {
   // fetching its own second, independent copy (it used to; see
   // `DecisionView.tsx`'s own doc comment on why that duplication was
   // worth removing, not just wasteful).
-  const { state, applyNewOption, applyNewConcern, applyDecisionUpdate, refreshOptionsAndArguments } = useDecision(model?.id ?? '', decisionId ?? '');
+  const { state, applyCreatedOption, applyNewOption, applyNewConcern, applyDecisionUpdate, refreshOptionsAndArguments } = useDecision(model?.id ?? '', decisionId ?? '');
   const title = state.status === 'ready' ? state.decision.title : 'Decision';
 
   // The decision page is main-context by design ("decisions are model-wide,
@@ -99,6 +99,7 @@ export function DecisionPage() {
             webSearchEnabled={organisation?.ai_web_search_enabled === true}
             shareCost={organisation?.ai_share_run_cost === true}
             state={state}
+            applyCreatedOption={applyCreatedOption}
             applyNewOption={applyNewOption}
             applyNewConcern={applyNewConcern}
             applyDecisionUpdate={applyDecisionUpdate}

@@ -9,9 +9,10 @@ export type DecisionRatingsStatus = 'loading' | 'idle' | 'saving';
 
 export interface RateOptionInput {
   decisionId: UUID;
-  branchId: UUID;
-  /** The candidate identity the cell belongs to; the database fills it when the caller is still branch-only. */
-  optionId?: UUID | null;
+  /** Null for a candidate with no delivery branch. */
+  branchId: UUID | null;
+  /** The candidate identity the cell belongs to. */
+  optionId: UUID;
   criterion: DecisionRatingCriterion;
   level: DecisionRatingLevelValue;
   /** Blank/whitespace-only is stored as `null` — "not rated"'s own note-indicator dot never lights up for a note that's only ever been empty. */
@@ -34,15 +35,19 @@ export interface UseDecisionRatingsResult {
   rateOption: (input: RateOptionInput) => Promise<boolean>;
 }
 
-/** `(branch_id, criterion)` — the same pair `decision_option_ratings`'s own primary key (minus `decision_id`, constant per hook instance) and `upsertDecisionRating`'s own `onConflict` target use, so a merge/lookup here never drifts from what the database itself treats as "the same cell". */
-export function ratingKey(branchId: UUID, criterion: string): string {
-  return `${branchId}:${criterion}`;
+/** `(option_id, criterion)` - the same pair `decision_option_ratings`'s own primary key (minus `decision_id`, constant per hook instance) and `upsertDecisionRating`'s own `onConflict` target use. A legacy row with no option id falls back to its branch id. */
+export function ratingKey(ownerId: string | null, criterion: string): string {
+  return `${ownerId ?? ''}:${criterion}`;
 }
 
-/** Replaces the row matching `row`'s own key, or appends it — the one place a cell's value ever changes in local state, whether from an optimistic write, a save's real response, or a background refetch. */
+function ratingOwnerId(row: DecisionOptionRatingRow): string | null {
+  return row.option_id ?? row.branch_id;
+}
+
+/** Replaces the row matching `row`'s own key, or appends it - the one place a cell's value ever changes in local state, whether from an optimistic write, a save's real response, or a background refetch. */
 export function upsertRatingByKey(rows: readonly DecisionOptionRatingRow[], row: DecisionOptionRatingRow): DecisionOptionRatingRow[] {
-  const key = ratingKey(row.branch_id, row.criterion);
-  const index = rows.findIndex((r) => ratingKey(r.branch_id, r.criterion) === key);
+  const key = ratingKey(ratingOwnerId(row), row.criterion);
+  const index = rows.findIndex((r) => ratingKey(ratingOwnerId(r), r.criterion) === key);
   if (index === -1) return [...rows, row];
   const next = [...rows];
   next[index] = row;
@@ -61,11 +66,11 @@ export function upsertRatingByKey(rows: readonly DecisionOptionRatingRow[], row:
  * own read yet) is kept too, not dropped.
  */
 export function mergeQuietRefetch(prev: readonly DecisionOptionRatingRow[], fresh: readonly DecisionOptionRatingRow[], pendingKeys: ReadonlySet<string>): DecisionOptionRatingRow[] {
-  const prevByKey = new Map(prev.map((r) => [ratingKey(r.branch_id, r.criterion), r]));
+  const prevByKey = new Map(prev.map((r) => [ratingKey(ratingOwnerId(r), r.criterion), r]));
   const result: DecisionOptionRatingRow[] = [];
   const seenKeys = new Set<string>();
   for (const row of fresh) {
-    const key = ratingKey(row.branch_id, row.criterion);
+    const key = ratingKey(ratingOwnerId(row), row.criterion);
     seenKeys.add(key);
     const pendingRow = pendingKeys.has(key) ? prevByKey.get(key) : undefined;
     result.push(pendingRow ?? row);
@@ -153,14 +158,14 @@ export function useDecisionRatings(modelId: UUID, decisionId: UUID): UseDecision
         setError(`Note must be ${String(DECISION_RATING_NOTE_MAX_LENGTH)} characters or fewer.`);
         return false;
       }
-      const key = ratingKey(input.branchId, input.criterion);
+      const key = ratingKey(input.optionId, input.criterion);
       pendingKeysRef.current.add(key);
       setError(null);
       setStatus('saving');
-      const optimistic: DecisionOptionRatingRow = { decision_id: input.decisionId, branch_id: input.branchId, option_id: input.optionId ?? null, criterion: input.criterion, level: input.level, note, rated_by: input.userId, rated_at: new Date().toISOString() };
+      const optimistic: DecisionOptionRatingRow = { decision_id: input.decisionId, branch_id: input.branchId, option_id: input.optionId, criterion: input.criterion, level: input.level, note, rated_by: input.userId, rated_at: new Date().toISOString() };
       setRatings((prev) => upsertRatingByKey(prev, optimistic));
       try {
-        const saved = await upsertDecisionRating(supabase, { decisionId: input.decisionId, branchId: input.branchId, optionId: input.optionId ?? null, criterion: input.criterion, level: input.level, note, ratedBy: input.userId });
+        const saved = await upsertDecisionRating(supabase, { decisionId: input.decisionId, branchId: input.branchId, optionId: input.optionId, criterion: input.criterion, level: input.level, note, ratedBy: input.userId });
         setRatings((prev) => upsertRatingByKey(prev, saved));
         return true;
       } catch (e) {

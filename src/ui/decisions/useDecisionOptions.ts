@@ -1,43 +1,37 @@
 import { useCallback, useState } from 'react';
 import type { UUID } from '../../contracts/delta';
-import { createChangeBranch, getMainBranch } from '../../db/branches';
-import { chooseDecisionOption, createDecisionLink, updateDecision } from '../../db/decisions';
-import type { BranchRow, DecisionLinkRow, DecisionRow } from '../../db/types';
+import { chooseDecisionOption, updateDecision } from '../../db/decisions';
+import { createDecisionOption, workOnDecisionOption } from '../../db/decisionOptions';
+import type { BranchRow, DecisionLinkRow, DecisionOptionRow, DecisionRow } from '../../db/types';
 import { supabase } from '../supabaseClient';
 import { addBaseline, type AddBaselineInput } from './addBaseline';
 
-export type DecisionOptionsStatus = 'idle' | 'adding' | 'choosing' | 'baseline';
+export type DecisionOptionsStatus = 'idle' | 'adding' | 'choosing' | 'baseline' | 'working';
 
 export interface AddOptionInput {
-  orgId: UUID;
-  modelId: UUID;
   decisionId: UUID;
-  /** What the person typed — the short code behind the option is made from it. */
+  /** What the person typed. No delivery branch is created until someone works on it. */
   title: string;
   userId: UUID;
-  /** ADR-024 P1: the decision's own project — an option is always created in it (the database refuses a mismatched option link). */
-  projectId: UUID | null;
 }
 
 export interface UseDecisionOptionsResult {
   status: DecisionOptionsStatus;
   error: string | null;
   /**
-   * F3's own "Add an option" — creates a fresh `explore`-intent change
-   * branch forked from main's current head, then links it to the decision
-   * (`linked_type: 'branch'`). Pure composition of two already-existing
-   * primitives (`createChangeBranch`, `createDecisionLink`), not a new
-   * RPC — mirrors `useDecisions.ts`'s own reasoning for why creating a
-   * decision and linking its initial concerns is two plain inserts, not
-   * one atomic call.
+   * F3's own "Add an option" - writes a candidate row with no delivery
+   * branch. The branch is created only by `workOnOption`, so adding a
+   * candidate does not appear in the Changes list or reserve a branch.
    */
   addOption: (input: AddOptionInput) => Promise<boolean>;
+  /** Creates the delivery branch only when this option is actually worked on, then refreshes the page data. */
+  workOnOption: (optionId: UUID) => Promise<BranchRow | null>;
   /** Gives a decision that has none its "Stay as we are" baseline option (`addBaseline.ts`). */
   addBaselineOption: (input: AddBaselineInput) => Promise<boolean>;
   /** Saves the baseline's two plain-text answers (operational risk of staying, what speaks for staying, or holds us back from changing). */
   saveBaselineText: (decisionId: UUID, stayRisk: string, stayReason: string) => Promise<boolean>;
   /** F3's own "Choose" — `atlas.choose_decision_option` in one call (`src/db/decisions.ts`'s `chooseDecisionOption`). Optionally records what would make the choice be reconsidered, and a review date. */
-  chooseOption: (decisionId: UUID, branchId: UUID, reasons: string, reconsider?: { reconsiderIf: string; reviewBy: string }) => Promise<boolean>;
+  chooseOption: (decisionId: UUID, optionId: UUID | null, branchId: UUID | null, reasons: string, reconsider?: { reconsiderIf: string; reviewBy: string }) => Promise<boolean>;
 }
 
 /**
@@ -46,21 +40,21 @@ export interface UseDecisionOptionsResult {
  * everything after each action") — each patches local state directly
  * from its own write's already-known result, the same "no full-page
  * loading state after the first load" approach `useDecisionRatings.ts`
- * already established for ratings. `addOption` needs no server re-read
- * at all (`createChangeBranch`/`createDecisionLink` already return
- * everything `applyNewOption` needs); `chooseOption` patches the decision
- * row immediately, then awaits `refreshOptionsAndArguments` for the one
- * side effect (every other option's status/intent) the RPC's own return
- * doesn't carry.
+ * already established for ratings. `addOption` patches in the candidate
+ * row it just wrote; `workOnOption` and `chooseOption` await
+ * `refreshOptionsAndArguments` for the branch/link/status changes their
+ * RPCs make beyond the single row each can return.
  *
- * Three direct callbacks, not one bundled object — a call site would
+ * Four direct callbacks, not one bundled object - a call site would
  * have to build a fresh object literal every render to pass a single
  * param, which would change identity every render even when the
  * individual callbacks are themselves `useCallback`-stable, defeating
  * the `useCallback` memoization below.
  */
 export function useDecisionOptions(
-  /** `useDecision.ts`'s own patch — see that file's doc comment. Called with `createChangeBranch`/`createDecisionLink`'s own already-known results; no re-fetch. */
+  /** `useDecision.ts`'s own candidate patch - the branchless Add-an-option path. */
+  applyCreatedOption: (option: DecisionOptionRow) => void,
+  /** `useDecision.ts`'s own patch - see that file's doc comment. Called with an add-baseline/suggested-option branch and link; no re-fetch. */
   applyNewOption: (link: DecisionLinkRow, branch: BranchRow) => void,
   /** `useDecision.ts`'s own patch — called with `chooseDecisionOption`'s own return value; no re-fetch. */
   applyDecisionUpdate: (decision: DecisionRow) => void,
@@ -80,23 +74,8 @@ export function useDecisionOptions(
       setError(null);
       setStatus('adding');
       try {
-        const main = await getMainBranch(supabase, input.modelId);
-        if (!main?.head_commit_id) {
-          setError('This model has no commits yet — there is nothing to base an option on.');
-          return false;
-        }
-        const branch = await createChangeBranch(supabase, {
-          id: crypto.randomUUID(),
-          orgId: input.orgId,
-          modelId: input.modelId,
-          title: trimmedTitle,
-          createdBy: input.userId,
-          mainHeadCommitId: main.head_commit_id,
-          intent: 'explore',
-          projectId: input.projectId,
-        });
-        const link = await createDecisionLink(supabase, { decisionId: input.decisionId, linkedType: 'branch', linkedId: branch.id, createdBy: input.userId });
-        applyNewOption(link, branch);
+        const option = await createDecisionOption(supabase, { decisionId: input.decisionId, title: trimmedTitle, createdBy: input.userId });
+        applyCreatedOption(option);
         return true;
       } catch (e) {
         setError(e instanceof Error ? e.message : 'Could not add this option.');
@@ -105,7 +84,25 @@ export function useDecisionOptions(
         setStatus('idle');
       }
     },
-    [applyNewOption],
+    [applyCreatedOption],
+  );
+
+  const workOnOption = useCallback(
+    async (optionId: UUID): Promise<BranchRow | null> => {
+      setError(null);
+      setStatus('working');
+      try {
+        const branch = await workOnDecisionOption(supabase, optionId);
+        await refreshOptionsAndArguments();
+        return branch;
+      } catch (e) {
+        setError(e instanceof Error ? e.message : 'Could not start work on this option.');
+        return null;
+      } finally {
+        setStatus('idle');
+      }
+    },
+    [refreshOptionsAndArguments],
   );
 
   const addBaselineOption = useCallback(
@@ -145,7 +142,7 @@ export function useDecisionOptions(
   );
 
   const chooseOption = useCallback(
-    async (decisionId: UUID, branchId: UUID, reasons: string, reconsider?: { reconsiderIf: string; reviewBy: string }): Promise<boolean> => {
+    async (decisionId: UUID, optionId: UUID | null, branchId: UUID | null, reasons: string, reconsider?: { reconsiderIf: string; reviewBy: string }): Promise<boolean> => {
       if (reasons.trim().length === 0) {
         setError('Reasons are required.');
         return false;
@@ -153,7 +150,15 @@ export function useDecisionOptions(
       setError(null);
       setStatus('choosing');
       try {
-        const decision = await chooseDecisionOption(supabase, decisionId, branchId, reasons.trim(), {
+        let chosenBranchId = branchId;
+        if (chosenBranchId === null) {
+          if (optionId === null) {
+            setError('This option has no change to choose yet.');
+            return false;
+          }
+          chosenBranchId = (await workOnDecisionOption(supabase, optionId)).id;
+        }
+        const decision = await chooseDecisionOption(supabase, decisionId, chosenBranchId, reasons.trim(), {
           ...(reconsider !== undefined && reconsider.reconsiderIf.trim().length > 0 ? { reconsiderIf: reconsider.reconsiderIf.trim() } : {}),
           ...(reconsider !== undefined && reconsider.reviewBy.length > 0 ? { reviewBy: reconsider.reviewBy } : {}),
         });
@@ -170,5 +175,5 @@ export function useDecisionOptions(
     [applyDecisionUpdate, refreshOptionsAndArguments],
   );
 
-  return { status, error, addOption, addBaselineOption, saveBaselineText, chooseOption };
+  return { status, error, addOption, workOnOption, addBaselineOption, saveBaselineText, chooseOption };
 }

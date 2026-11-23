@@ -106,18 +106,19 @@ export interface UseDecisionResult {
   reload: () => void;
   /** Choose's own decision-row patch — see `applyDecisionUpdate`'s own doc comment. */
   applyDecisionUpdate: (decision: DecisionRow) => void;
+  /** Add-an-option's own candidate row, for the branchless path. */
+  applyCreatedOption: (option: DecisionOptionRow) => void;
   /** Add-an-option's own link+branch patch — see `applyNewOption`'s own doc comment. */
   applyNewOption: (link: DecisionLinkRow, branch: BranchRow) => void;
   /** A newly added concern's link and element — see `applyNewConcern`'s own doc comment. */
   applyNewConcern: (link: DecisionLinkRow, element: ElementsHeadRow) => void;
   /**
-   * Choose's own "refresh only the affected data": re-reads just the
-   * branch-linked options' rows (every other draft option gets cancelled
-   * by `atlas.choose_decision_option` itself, and the chosen one's own
-   * intent flips — neither comes back in that RPC's own return) and the
-   * arguments list (the RPC's own new `decision_arguments` row) — never
-   * `links`/`main`/`linkedElementsById`, which Choose never touches. No
-   * loading flash, same as the two `apply*` patches above.
+   * Re-reads the links, branch-linked options, candidates and arguments
+   * after a write whose side effects the client cannot know exactly. It is
+   * used by Choose (other draft options get cancelled, the chosen branch's
+   * intent flips) and by Work on this option (a branch and its link are
+   * created). It never re-reads main or linked elements. No loading flash,
+   * same as the two `apply*` patches above.
    */
   refreshOptionsAndArguments: () => Promise<void>;
 }
@@ -160,6 +161,10 @@ export function useDecision(modelId: UUID, decisionId: UUID): UseDecisionResult 
     setState((prev) => applyDecisionUpdate(prev, decision));
   }, []);
 
+  const applyCreatedOptionCallback = useCallback((option: DecisionOptionRow) => {
+    setState((prev) => applyDecisionOption(prev, option));
+  }, []);
+
   const applyNewOptionCallback = useCallback((link: DecisionLinkRow, branch: BranchRow) => {
     setState((prev) => applyNewOption(prev, link, branch));
     // The branch link's database trigger creates the candidate row. Read back
@@ -179,14 +184,17 @@ export function useDecision(modelId: UUID, decisionId: UUID): UseDecisionResult 
 
   const refreshOptionsAndArguments = useCallback(async () => {
     if (state.status !== 'ready') return;
-    const branchLinkIds = state.links.filter((l) => l.linked_type === 'branch').map((l) => l.linked_id);
-    const [branches, args, options] = await Promise.all([
-      listBranchesByIds(supabase, branchLinkIds),
+    const [links, args, options] = await Promise.all([
+      listDecisionLinksForDecision(supabase, decisionId),
       listDecisionArgumentsForDecision(supabase, decisionId),
       listDecisionOptions(supabase, decisionId),
     ]);
-    setState((prev) => (prev.status === 'ready' ? { ...prev, linkedBranchesById: new Map(branches.map((b) => [b.id, b])), options, args } : prev));
+    const branchIds = new Set<string>();
+    for (const link of links) if (link.linked_type === 'branch') branchIds.add(link.linked_id);
+    for (const option of options) if (option.branch_id !== null) branchIds.add(option.branch_id);
+    const branches = branchIds.size > 0 ? await listBranchesByIds(supabase, [...branchIds]) : [];
+    setState((prev) => (prev.status === 'ready' ? { ...prev, links, linkedBranchesById: new Map(branches.map((b) => [b.id, b])), options, args } : prev));
   }, [state, decisionId]);
 
-  return { state, reload, applyDecisionUpdate: applyDecisionUpdateCallback, applyNewOption: applyNewOptionCallback, applyNewConcern: applyNewConcernCallback, refreshOptionsAndArguments };
+  return { state, reload, applyDecisionUpdate: applyDecisionUpdateCallback, applyCreatedOption: applyCreatedOptionCallback, applyNewOption: applyNewOptionCallback, applyNewConcern: applyNewConcernCallback, refreshOptionsAndArguments };
 }

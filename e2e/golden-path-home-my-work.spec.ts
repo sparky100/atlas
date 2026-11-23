@@ -24,6 +24,10 @@ test('My work lists the project, not the decision options inside it', async ({ p
   await page.getByPlaceholder("What's this option? (e.g. Replace with Workday)").fill('Build Repairs Hub');
   await page.getByRole('button', { name: 'Add option' }).click();
   await expect(page.getByText('Build Repairs Hub').first()).toBeVisible();
+  // A candidate becomes a change only when someone works on it; this test is
+  // about the project → decision → change hierarchy.
+  await page.getByRole('button', { name: 'Work on this option' }).first().click();
+  await expect(page).toHaveURL(/\/changes\//);
 
   await goToModelHome(page);
   // The visit to Overview above is remembered, so switch back to My work.

@@ -86,6 +86,7 @@ export interface DecisionViewProps {
   /** Lifted from `DecisionPage.tsx`'s own `useDecision` call, not fetched again here — the two used to each run their own independent copy of the same fetch (one for this view, one `DecisionPage.tsx` only ever read `.title` from), so a transient failure of either one alone could post the "Couldn't load this decision" banner even while the other succeeded and rendered full content underneath it (found in a walkthrough, issue-reported). One fetch, shared. */
   state: DecisionPageState;
   /** `useDecision.ts`'s own patches — see that file's doc comments. Passed straight through to `useDecisionOptions` so Add-an-option/Choose never trigger this page's own full `reload()`/loading flash any more. */
+  applyCreatedOption: (option: DecisionOptionRow) => void;
   applyNewOption: (link: DecisionLinkRow, branch: BranchRow) => void;
   applyNewConcern: (link: DecisionLinkRow, element: ElementsHeadRow) => void;
   applyDecisionUpdate: (decision: DecisionRow) => void;
@@ -107,12 +108,12 @@ export interface DecisionViewProps {
  * this here" (an element's own linked decisions) are also PR6, but live on
  * `DecisionsView.tsx`/`ElementDecisionsSection.tsx` respectively, not here.
  */
-export function DecisionView({ modelId, decisionId, orgId, orgSlug, modelSlug, role, assistantEnabled, agentsEnabled, keySet, webSearchEnabled, shareCost, state, applyNewOption, applyNewConcern, applyDecisionUpdate, refreshOptionsAndArguments }: DecisionViewProps) {
+export function DecisionView({ modelId, decisionId, orgId, orgSlug, modelSlug, role, assistantEnabled, agentsEnabled, keySet, webSearchEnabled, shareCost, state, applyCreatedOption, applyNewOption, applyNewConcern, applyDecisionUpdate, refreshOptionsAndArguments }: DecisionViewProps) {
   const { userId } = useAuth();
   const compact = useCompactDecisionLayout();
   const { branch: main } = useMainBranch(modelId);
   const { members } = useMembers(orgId);
-  const optionsState = useDecisionOptions(applyNewOption, applyDecisionUpdate, refreshOptionsAndArguments);
+  const optionsState = useDecisionOptions(applyCreatedOption, applyNewOption, applyDecisionUpdate, refreshOptionsAndArguments);
   // Options kept from the Designer's suggestions are saved here as the page opens (journey proposal step 2).
   const pendingOptions = usePendingOptions({ orgId, modelId, decisionId, userId, projectId: state.status === 'ready' ? state.decision.project_id : null, canAdd: state.status === 'ready' && state.decision.status === 'proposed' && canCreateChangeBranch(role), applyNewOption });
   const navigate = useNavigate();
@@ -149,7 +150,7 @@ export function DecisionView({ modelId, decisionId, orgId, orgSlug, modelSlug, r
   const [addingOption, setAddingOption] = useState(false);
   const [researchTarget, setResearchTarget] = useState<{ branchId: UUID; label: string } | null>(null);
   const [optionTitle, setOptionTitle] = useState('');
-  const [choosingBranchId, setChoosingBranchId] = useState<UUID | null>(null);
+  const [choosing, setChoosing] = useState<{ optionId: UUID | null; branchId: UUID | null } | null>(null);
   const [reasons, setReasons] = useState('');
   const [reconsiderIf, setReconsiderIf] = useState('');
   const [reviewBy, setReviewBy] = useState('');
@@ -160,8 +161,8 @@ export function DecisionView({ modelId, decisionId, orgId, orgSlug, modelSlug, r
   const [askError, setAskError] = useState<string | null>(null);
   const [commentsKey, setCommentsKey] = useState(0);
   useEffect(() => {
-    if (choosingBranchId !== null) requestAnimationFrame(() => document.getElementById('decision-confirm-choice')?.scrollIntoView({ behavior: 'smooth', block: 'start' }));
-  }, [choosingBranchId]);
+    if (choosing !== null) requestAnimationFrame(() => document.getElementById('decision-confirm-choice')?.scrollIntoView({ behavior: 'smooth', block: 'start' }));
+  }, [choosing]);
 
   // Every hook above must run unconditionally (rules of hooks) — the
   // comparison hook too, even before `state` has resolved to `ready`;
@@ -237,7 +238,7 @@ export function DecisionView({ modelId, decisionId, orgId, orgSlug, modelSlug, r
   for (const rating of ratingsState.ratings) {
     if (rating.option_id != null) {
       ratedOptionIds.add(rating.option_id);
-    } else {
+    } else if (rating.branch_id !== null) {
       const option = optionByBranchId.get(rating.branch_id);
       if (option !== undefined) ratedOptionIds.add(option.id);
     }
@@ -281,7 +282,15 @@ export function DecisionView({ modelId, decisionId, orgId, orgSlug, modelSlug, r
     }
   }
 
-  // Prompt pack F3 PR6's "Export as ADR markdown" — assembled from data
+  function workOnOption(optionId: UUID) {
+    void optionsState.workOnOption(optionId).then((branch) => {
+      if (branch === null) return;
+      setRef({ kind: 'branch', branchId: branch.id });
+      void navigate(`/o/${orgSlug}/m/${modelSlug}/changes/${branch.id}`);
+    });
+  }
+
+  // Prompt pack F3 PR6's "Export as ADR markdown" - assembled from data
   // this page has already loaded (no second round trip).
   const ownerName = profileLabel(members.find((m) => m.member.user_id === decision.owner_id)?.profile);
 
@@ -541,7 +550,7 @@ export function DecisionView({ modelId, decisionId, orgId, orgSlug, modelSlug, r
                 void optionsState.saveBaselineText(decisionId, risk, reason);
               }}
               onChoose={() => {
-                setChoosingBranchId(baselineBranch.id);
+                setChoosing({ optionId: optionByBranchId.get(baselineBranch.id)?.id ?? null, branchId: baselineBranch.id });
                 setReasons('');
               }}
             />
@@ -572,9 +581,10 @@ export function DecisionView({ modelId, decisionId, orgId, orgSlug, modelSlug, r
                   branchId: b?.id ?? null,
                   label: o.title,
                   status: b?.status ?? 'draft',
+                  statusLabel: o.branch_id === null ? (decision.status === 'proposed' ? 'candidate' : 'cancelled') : undefined,
                   isChosen: b?.id === decision.branch_id,
                   summary: b !== undefined && comparison.status === 'ready' ? (comparison.optionSummaries.get(b.id) ?? null) : null,
-                  canChoose: canChoose && b?.status === 'draft',
+                  canChoose: canChoose && (b === undefined || b.status === 'draft'),
                   description: o.summary.trim() !== '' ? o.summary : (b?.description ?? null),
                   provenance: optionRowProvenance(o, nameOf) ?? optionProvenance(b ? pendingOptions.marks.get(b.id) : undefined, nameOf),
                   sources: sourcesByOption.get(o.id) ?? (b ? sourcesByBranch.get(b.id) : undefined) ?? [],
@@ -591,16 +601,18 @@ export function DecisionView({ modelId, decisionId, orgId, orgSlug, modelSlug, r
                   orgSlug={orgSlug}
                   modelSlug={modelSlug}
                   commitId={main?.head_commit_id ?? null}
-                  onChoose={(branchId) => {
-                    setChoosingBranchId(branchId);
+                  onChoose={(optionId, branchId) => {
+                    setChoosing({ optionId, branchId });
                     setReasons('');
                   }}
                   chooseNote={decision.status === 'proposed' && !canChooseDecisionOption(role) ? chooseNote(members.filter((m) => m.member.role === 'owner' || m.member.role === 'architect').map((m) => profileLabel(m.profile))) : null}
                   canWorkOnChange={canCreateChangeBranch(role)}
+                  canWorkOnCandidate={canCreateChangeBranch(role) && decision.status === 'proposed'}
                   onWorkOnThisChange={(branchId) => {
                     setRef({ kind: 'branch', branchId });
                     void navigate(`/o/${orgSlug}/m/${modelSlug}/changes/${branchId}`);
                   }}
+                  onWorkOnOption={workOnOption}
                   canResearch={canResearch}
                   onResearch={(branchId, label) => { setResearchTarget({ branchId, label }); }}
                   ratingsState={ratingsState}
@@ -672,7 +684,7 @@ export function DecisionView({ modelId, decisionId, orgId, orgSlug, modelSlug, r
                 disabled={optionsState.status === 'adding' || optionTitle.trim().length === 0}
                 onClick={() => {
                   if (!userId) return;
-                  void optionsState.addOption({ orgId, modelId, decisionId, title: optionTitle, userId, projectId: decision.project_id }).then((added) => {
+                  void optionsState.addOption({ decisionId, title: optionTitle, userId }).then((added) => {
                     if (added) setAddingOption(false);
                   });
                 }}
@@ -700,11 +712,14 @@ export function DecisionView({ modelId, decisionId, orgId, orgSlug, modelSlug, r
         return <CapabilityProducts key={capability.element_id} templateRef={templateRef} title={`Products that can support ${capability.name}`} />;
       })}
 
-      {comparisonOptions.length > 0 && (
+      {(comparisonOptions.length > 0 || scoredOptions.length > 0) && (
         <div id="decision-effects">
         <Panel>
           <CollapsibleSection title="What each option changes" meta="per option">
 
+          {comparison.status === 'empty' && scoredOptions.length > 0 && (
+            <Text as="p">These options don't change the structure of anything in scope.</Text>
+          )}
           {comparison.status === 'loading' && (
             <Text as="p" tone="muted" size="sm">
               Comparing…
@@ -865,7 +880,7 @@ export function DecisionView({ modelId, decisionId, orgId, orgSlug, modelSlug, r
         />
       )}
 
-      {choosingBranchId !== null && (
+      {choosing !== null && (
         <div id="decision-confirm-choice"><Panel>
           <Text as="h2" size="lg">Confirm the choice</Text>
             <div className={styles.field}>
@@ -908,9 +923,9 @@ export function DecisionView({ modelId, decisionId, orgId, orgSlug, modelSlug, r
                   variant="primary"
                   disabled={optionsState.status === 'choosing' || reasons.trim().length === 0}
                   onClick={() => {
-                    void optionsState.chooseOption(decisionId, choosingBranchId, reasons, { reconsiderIf, reviewBy }).then((chosen) => {
+                    void optionsState.chooseOption(decisionId, choosing.optionId, choosing.branchId, reasons, { reconsiderIf, reviewBy }).then((chosen) => {
                       if (chosen) {
-                        setChoosingBranchId(null);
+                        setChoosing(null);
                         setReconsiderIf('');
                         setReviewBy('');
                       }
@@ -922,7 +937,7 @@ export function DecisionView({ modelId, decisionId, orgId, orgSlug, modelSlug, r
                 <Button
                   variant="ghost"
                   onClick={() => {
-                    setChoosingBranchId(null);
+                    setChoosing(null);
                   }}
                 >
                   Cancel

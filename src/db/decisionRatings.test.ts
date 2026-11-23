@@ -44,9 +44,9 @@ describe('decisionRatings.ts touches only decision_option_ratings', () => {
   });
 
   it('upsertDecisionRating calls .from() exactly once, for decision_option_ratings', async () => {
-    const row = { decision_id: 'decision-1', branch_id: 'branch-1', criterion: 'cost', level: 'favourable', note: null, rated_by: 'user-1', rated_at: '2026-01-01T00:00:00Z' };
+    const row = { decision_id: 'decision-1', branch_id: 'branch-1', option_id: 'option-1', criterion: 'cost', level: 'favourable', note: null, rated_by: 'user-1', rated_at: '2026-01-01T00:00:00Z' };
     const { client, calledTables } = createFakeClient({ data: row, error: null });
-    await upsertDecisionRating(client, { decisionId: 'decision-1', branchId: 'branch-1', criterion: 'cost', level: 'favourable', note: null, ratedBy: 'user-1' });
+    await upsertDecisionRating(client, { decisionId: 'decision-1', branchId: 'branch-1', optionId: 'option-1', criterion: 'cost', level: 'favourable', note: null, ratedBy: 'user-1' });
     expect(calledTables).toEqual(['decision_option_ratings']);
   });
 });
