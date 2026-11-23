@@ -65,6 +65,6 @@ export interface CatalogueClaimRow {
   source_url: string; source_date: string; reviewed_by: string; reviewed_at: string; created_at: string;
 }
 export interface OptionCatalogueSourceRow {
-  decision_id: string; branch_id: string; catalogue_sector: string; catalogue_version: number; entry_code: string;
+  decision_id: string; branch_id: string; option_id?: string | null; catalogue_sector: string; catalogue_version: number; entry_code: string;
   snapshot: CatalogueSnapshot; cited_by: string; cited_at: string;
 }
