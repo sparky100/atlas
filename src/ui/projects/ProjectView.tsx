@@ -445,7 +445,7 @@ function ProjectDecision({ decision, options, changes, modelId, projectId, mainH
     : option.branch_id !== null && option.branch_id === decision.baseline_branch_id);
   const baselineBranchId = baselineOption?.branch_id ?? decision.baseline_branch_id;
   const isBaseline = chosenOption?.id === baselineOption?.id || (decision.branch_id !== null && decision.branch_id === baselineBranchId);
-  const alternatives = options.filter((option) => option.id !== baselineOption?.id && option.branch_id !== baselineBranchId);
+  const alternatives = options.filter((option) => option.id !== baselineOption?.id && (baselineBranchId === null || option.branch_id !== baselineBranchId));
   const decisionHref = `${base}/decisions/${decision.id}`;
   return <article className={styles.decisionCard}>
     <div className={styles.decisionTop}>

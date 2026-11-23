@@ -235,7 +235,7 @@ export function DecisionView({ modelId, decisionId, orgId, orgSlug, modelSlug, r
   const chosenOption = decision.branch_id !== null ? optionByBranchId.get(decision.branch_id) : undefined;
   // A candidate with no branch is still an option; only the baseline is
   // excluded from the comparison columns (the Current column covers it).
-  const scoredOptions = options.filter((o) => o.id !== baselineOption?.id && o.branch_id !== baselineBranchId);
+  const scoredOptions = options.filter((o) => o.id !== baselineOption?.id && (baselineBranchId === null || o.branch_id !== baselineBranchId));
   const secondOpinion = reviewerAvailability({ role, status: decision.status, optionCount: scoredOptions.length, assistantEnabled, agentsEnabled, keySet, ownerNames: ownerNames(members) });
   const canEditBaseline = canAddOption && canEditDecision(role, decision, userId);
   const baselineBranch = baselineBranchId !== null ? linkedBranchesById.get(baselineBranchId) : undefined;
