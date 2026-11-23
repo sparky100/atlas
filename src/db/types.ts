@@ -482,6 +482,18 @@ export interface DecisionRow {
   created_at: string;
 }
 
+/** Phase 2a: what a research search or catalogue lookup could not find. Content is insert-only; removal is allowed while the decision is proposed. */
+export interface DecisionGapRow {
+  id: UUID;
+  decision_id: UUID;
+  branch_id: UUID | null;
+  option_id: UUID | null;
+  origin: 'research' | 'catalogue' | 'manual';
+  body: string;
+  created_by: UUID;
+  created_at: string;
+}
+
 /** A frozen, versioned copy of a decision write-up (Phase B3). Insert-only; written only by `atlas.freeze_decision_pack`. */
 export interface DecisionPackRow {
   id: UUID;

@@ -29,6 +29,8 @@ import { ownerNames } from '../orgs/ownerNames';
 import { reviewerAvailability } from './reviewerAvailability';
 import { SecondOpinion } from './SecondOpinion';
 import { KeptQuestions } from './KeptQuestions';
+import { DecisionGaps } from './DecisionGaps';
+import { recordDecisionGap } from '../../db/decisionGaps';
 import { CapabilityProducts } from '../elements/CapabilityProducts';
 import { optionKindOf } from '../changes/optionDraftActions';
 import { attributesRecord } from '../elements/attributesRecord';
@@ -932,6 +934,21 @@ export function DecisionView({ modelId, decisionId, orgId, orgSlug, modelSlug, r
         }}
       />
 
+      <DecisionGaps
+        decisionId={decisionId}
+        userId={userId}
+        role={role}
+        canRemove={canAddOption}
+        nameOfUser={(id) => {
+          const member = members.find((m) => m.member.user_id === id);
+          return member ? profileLabel(member.profile) : 'a former member';
+        }}
+        optionNameFor={(gap) => {
+          if (gap.branchId === null) return null;
+          return optionByBranchId.get(gap.branchId)?.title ?? linkedBranchesById.get(gap.branchId)?.title ?? null;
+        }}
+      />
+
       {decision.status === 'accepted' && chosenBranch !== undefined && (
         <DecisionGoLive
           branch={chosenBranch}
@@ -1071,6 +1088,16 @@ export function DecisionView({ modelId, decisionId, orgId, orgSlug, modelSlug, r
           onSaved={() => {
             setResearchTarget(null);
             void queryClient.invalidateQueries({ queryKey: ['optionSources', decisionId] });
+          }}
+          onRecordGap={async (body) => {
+            await recordDecisionGap(supabase, {
+              decisionId,
+              branchId: researchTarget.branchId,
+              userId,
+              body,
+              origin: 'research',
+            });
+            void queryClient.invalidateQueries({ queryKey: ['decisionGaps', decisionId] });
           }}
           onUseAsOption={async (candidate, optionId) => {
             const title = researchOptionTitle(candidate);
