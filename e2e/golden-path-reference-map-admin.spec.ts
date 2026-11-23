@@ -41,7 +41,9 @@ test('a platform admin can draft and edit a capability set from Home', async ({ 
   await page.getByRole('button', { name: 'Account menu' }).click();
   await page.getByRole('link', { name: 'Platform admin' }).click();
   await expect(page.getByRole('heading', { name: 'Platform admin' })).toBeVisible();
-  const section = page.getByTestId('settings-section-capability-sets');
+  await page.getByRole('link', { name: 'Capability sets' }).click();
+  await expect(page.getByRole('heading', { name: 'Capability sets', exact: true })).toBeVisible();
+  const section = page.getByTestId('capability-sets-admin');
   await expect(section.getByRole('heading', { name: /Capability sets/ })).toBeVisible();
   await section.getByLabel('Sector').selectOption('police');
   await section.getByRole('button', { name: 'View current set' }).click();

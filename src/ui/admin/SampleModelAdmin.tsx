@@ -22,7 +22,7 @@ function formatDate(value: string | null): string {
  * users but never edits or deletes a published version. Existing copies in
  * organisations are their own models and are not recalled.
  */
-export function SampleModelAdmin() {
+export function SampleModelAdmin({ embedded = false }: { embedded?: boolean }) {
   const [samples, setSamples] = useState<SampleModelAdminSummary[]>([]);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
@@ -65,8 +65,8 @@ export function SampleModelAdmin() {
   const shared = samples.filter((sample) => sample.shared).length;
   const withdrawn = samples.length - shared;
 
-  return (
-    <SettingsSection id="sample-models" title="Sample models" summary={`${String(shared)} shared · ${String(withdrawn)} withdrawn`}>
+  const body = (
+    <>
       <Text as="p" tone="muted" size="sm">
         Published sample models that new organisations can start from. Withdrawing hides every version of a sample from ordinary users, but keeps the published rows for audit. Copies already made by organisations are their own models and are not recalled.
       </Text>
@@ -115,6 +115,12 @@ export function SampleModelAdmin() {
           )}
         </li>)}
       </ul>}
+    </>
+  );
+
+  return embedded ? body : (
+    <SettingsSection id="sample-models" title="Sample models" summary={`${String(shared)} shared · ${String(withdrawn)} withdrawn`}>
+      {body}
     </SettingsSection>
   );
 }

@@ -22,7 +22,7 @@ function treeOrder(items: Item[]): Item[] {
   return [...result, ...items.filter((item) => !visited.has(item.code))];
 }
 
-export function ReferenceMapAdmin() {
+export function ReferenceMapAdmin({ embedded = false }: { embedded?: boolean }) {
   const [maps, setMaps] = useState<ReferenceMapSummary[]>([]);
   const [drafts, setDrafts] = useState<ReferenceMapDraft[]>([]);
   const [draft, setDraft] = useState<ReferenceMapDraft | null>(null);
@@ -151,7 +151,8 @@ export function ReferenceMapAdmin() {
     await refresh(); setIssues(null); setNotice(`Identity reviewed for ${selected.name}. Validate again before publishing.`);
   });
 
-  return <SettingsSection id="capability-sets" title="Capability sets" summary={`${String(maps.filter((m) => m.status === 'published').length)} published · ${String(drafts.filter((d) => d.status === 'draft').length)} drafts`}>
+  const body = (
+    <>
     <p>Manage platform starter maps here. A draft stays private to platform admins until publication. Publishing creates a new fixed version; it does not update models already seeded from an earlier version.</p>
     {error && <p role="alert" className={styles.error}>{error}</p>}
     {notice && <p role="status">{notice}</p>}
@@ -294,5 +295,12 @@ export function ReferenceMapAdmin() {
         {baseContent && <p>Compared with the starting version: {content.items.filter((i) => !baseContent.items.some((old) => old.code === i.code)).length} capabilities added, {baseContent.items.filter((old) => !content.items.some((i) => i.code === old.code)).length} removed, {content.items.filter((i) => baseContent.items.some((old) => old.code === i.code && (old.name !== i.name || old.description !== i.description || old.parentCode !== i.parentCode || old.order !== i.order))).length} changed. Sources {JSON.stringify(content.sources) === JSON.stringify(baseContent.sources) ? 'unchanged' : 'changed'}; value streams {JSON.stringify(content.valueStreams) === JSON.stringify(baseContent.valueStreams) ? 'unchanged' : 'changed'}. A code change appears as a removal and addition and needs a fresh canonical alignment. Earlier versions and seeded models stay unchanged.</p>}
       </div>}
     </div>}
-  </SettingsSection>;
+    </>
+  );
+
+  return embedded ? body : (
+    <SettingsSection id="capability-sets" title="Capability sets" summary={`${String(maps.filter((m) => m.status === 'published').length)} published · ${String(drafts.filter((d) => d.status === 'draft').length)} drafts`}>
+      {body}
+    </SettingsSection>
+  );
 }

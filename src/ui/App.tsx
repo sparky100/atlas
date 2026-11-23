@@ -101,7 +101,7 @@ export function App() {
               {/* Sprint F7 item 3: reachable only via a real recovery-link session — see ResetPasswordPage.tsx's own comment for why this sits inside RequireAuth rather than needing its own guard. */}
               <Route path="/reset-password" element={<ResetPasswordPage />} />
               {/* Atlas's first cross-org role (supabase/migrations/20260917030000_platform_admin.sql) — top-level, not org-scoped, same reasoning /profile above. No router-level role gate: the page itself checks usePlatformAdmin, matching every other authorization check in this codebase (RequireAuth is authentication-only). */}
-              <Route path="/platform-admin" element={<PlatformAdminPage />} />
+              <Route path="/platform-admin/*" element={<PlatformAdminPage />} />
               <Route path="/o/:orgSlug" element={<OrgHome />} />
               <Route path="/o/:orgSlug/settings" element={<OrganisationSettingsPage />} />
               <Route element={<ModelRouteGate />}>

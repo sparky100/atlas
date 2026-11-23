@@ -30,7 +30,7 @@ import styles from './PlatformAdminView.module.css';
  * an extra option rather than silently replaced, so opening this form
  * never itself changes what's live.
  */
-export function PlatformAdminView() {
+export function PlatformAdminView({ embedded = false }: { embedded?: boolean }) {
   const { status, error, provider, model, rateLimitPerHour, hasApiKey, setProvider, setModel, setRateLimitPerHour, save } = useLlmProxyConfig();
   const [apiKeyInput, setApiKeyInput] = useState('');
   const providerId = useId();
@@ -57,8 +57,8 @@ export function PlatformAdminView() {
     });
   };
 
-  return (
-    <SettingsSection id="llm-proxy" title="LLM proxy" summary={hasApiKey ? `${provider} · key set` : 'Using function defaults'}>
+  const body = (
+    <>
       <Text as="p" tone="muted" size="sm">
         Application-level overrides for the `llm-proxy` edge function — read by every organisation, not per-org. Falls back to the function&apos;s own Supabase secrets when unset.
       </Text>
@@ -172,6 +172,12 @@ export function PlatformAdminView() {
           {error}
         </Text>
       )}
+    </>
+  );
+
+  return embedded ? body : (
+    <SettingsSection id="llm-proxy" title="LLM proxy" summary={hasApiKey ? `${provider} · key set` : 'Using function defaults'}>
+      {body}
     </SettingsSection>
   );
 }

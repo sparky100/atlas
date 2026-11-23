@@ -54,7 +54,7 @@ function emptyProduct(): CatalogueProductContent {
   return { code: '', product: '', vendor: '', summary: '', capabilities: [], claims: [] };
 }
 
-export function CatalogueAdmin() {
+export function CatalogueAdmin({ embedded = false }: { embedded?: boolean }) {
   const [products, setProducts] = useState<CatalogueProductSummary[]>([]);
   const [versions, setVersions] = useState<CatalogueVersionSummary[]>([]);
   const [drafts, setDrafts] = useState<CatalogueDraftRow[]>([]);
@@ -282,9 +282,13 @@ export function CatalogueAdmin() {
     setDraftIssues(null);
   };
 
-  if (loading) return <SettingsSection id="catalogue" title="Product catalogue" summary="Loading"><p>Loading the product library.</p></SettingsSection>;
+  if (loading) {
+    const loadingBody = <p>Loading the product library.</p>;
+    return embedded ? loadingBody : <SettingsSection id="catalogue" title="Product catalogue" summary="Loading">{loadingBody}</SettingsSection>;
+  }
 
-  return <SettingsSection id="catalogue" title="Product catalogue" summary={`${String(products.length)} products · ${String(versions.filter((version) => version.status === 'published' && version.withdrawn_at === null).length)} current catalogues · ${String(drafts.filter((draft) => draft.status === 'draft').length)} drafts`}>
+  const body = (
+    <>
     <p>One product appears once here, with capability links into any number of capability sets. A sector catalogue is a fixed publication that selects products and pins one published capability set. Publishing does not change earlier versions, saved option citations or organisation models.</p>
     {error && <p role="alert" className={styles.error}>{error}</p>}
     {notice && <p role="status">{notice}</p>}
@@ -439,5 +443,12 @@ export function CatalogueAdmin() {
         {draftIssues && <div className={styles.review} role="status"><h5>Publication review</h5>{draftIssues.length ? <ul>{draftIssues.map((issue, index) => <li key={index}>{issue}</li>)}</ul> : <p>Validation passed. Save the draft, then publish.</p>}</div>}
       </div>}
     </section>
-  </SettingsSection>;
+    </>
+  );
+
+  return embedded ? body : (
+    <SettingsSection id="catalogue" title="Product catalogue" summary={`${String(products.length)} products · ${String(versions.filter((version) => version.status === 'published' && version.withdrawn_at === null).length)} current catalogues · ${String(drafts.filter((draft) => draft.status === 'draft').length)} drafts`}>
+      {body}
+    </SettingsSection>
+  );
 }
