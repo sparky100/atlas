@@ -1,5 +1,6 @@
 import { useEffect, useId, useMemo, useRef, useState } from 'react';
 import type { UUID } from '../../contracts/delta';
+import { DECISION_GAP_BODY_MAX, decisionGapProblem } from '../../contracts/decisionGap';
 import type { WebResearchCandidate } from '../../contracts/webResearch';
 import { requestWebResearch, saveCheckedWebSource } from '../../db/webResearch';
 import { Button } from '../components/Button/Button';
@@ -36,6 +37,8 @@ export interface WebResearchDialogProps {
   onSaved: () => void;
   /** Creates a new option from a returned page. Returns a warning when the option was made but its source was not saved. */
   onUseAsOption: (candidate: WebResearchCandidate, optionId: UUID) => Promise<string | null>;
+  /** Saves a short note about what the search could not find, on this option. */
+  onRecordGap: (body: string) => Promise<void>;
 }
 
 /**
@@ -64,6 +67,7 @@ export function WebResearchDialog({
   onClose,
   onSaved,
   onUseAsOption,
+  onRecordGap,
 }: WebResearchDialogProps) {
   const dialogRef = useRef<HTMLDialogElement>(null);
   const queryRef = useRef<HTMLTextAreaElement>(null);
@@ -107,13 +111,17 @@ export function WebResearchDialog({
   const [checked, setChecked] = useState(false);
   const [saving, setSaving] = useState(false);
   const [addingUrl, setAddingUrl] = useState<string | null>(null);
+  const [gapOpen, setGapOpen] = useState(false);
+  const [gapBody, setGapBody] = useState('');
+  const [gapSaving, setGapSaving] = useState(false);
+  const [gapError, setGapError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   const chips = chipsState ?? suggestion.chips;
   const query = queryState ?? suggestion.query;
   const approved = approvedQuery === query && query.trim() !== '';
-  const busy = searching || saving || addingUrl !== null;
+  const busy = searching || saving || addingUrl !== null || gapSaving;
   const existing = new Set(existingUrls);
   const citedElsewhere = new Set(citedElsewhereUrls);
   const earlierSearch = new Set(earlierSearchUrls);
@@ -187,6 +195,9 @@ export function WebResearchDialog({
       setSelectedUrl(null);
       setAssertion('');
       setChecked(false);
+      setGapOpen(false);
+      setGapBody('');
+      setGapError(null);
       setPhase('results');
     } catch (e) {
       setError(e instanceof Error ? e.message : 'The web search failed. Try again.');
@@ -231,6 +242,26 @@ export function WebResearchDialog({
     }
   }
 
+  async function saveGap(): Promise<void> {
+    const problem = decisionGapProblem(gapBody);
+    if (problem !== null) {
+      setGapError(problem);
+      return;
+    }
+    setGapSaving(true);
+    setGapError(null);
+    try {
+      await onRecordGap(gapBody.trim());
+      setGapOpen(false);
+      setGapBody('');
+      setNotice('Recorded what you could not find.');
+    } catch (e) {
+      setGapError(e instanceof Error ? e.message : 'Could not save what you could not find. Try again.');
+    } finally {
+      setGapSaving(false);
+    }
+  }
+
   function select(candidate: WebResearchCandidate): void {
     setSelectedUrl(candidate.url);
     setAssertion('');
@@ -247,6 +278,9 @@ export function WebResearchDialog({
     setSelectedUrl(null);
     setAssertion('');
     setChecked(false);
+    setGapOpen(false);
+    setGapBody('');
+    setGapError(null);
     setNotice(null);
     setError(null);
   }
@@ -518,6 +552,48 @@ export function WebResearchDialog({
                 Choose one page to check and save, or use a page as the basis of a new option.
               </Text>
             )}
+            <div className={styles.gapBlock} data-testid="research-gap">
+              {!gapOpen ? (
+                <Button variant="ghost" disabled={busy} onClick={() => { setGapOpen(true); setGapError(null); }} data-testid="research-record-gap">
+                  Record what we could not find
+                </Button>
+              ) : (
+                <>
+                  <Text as="h3" size="sm">What could you not find?</Text>
+                  <Text as="p" size="sm" tone="muted">
+                    A short note is saved on this option and shown on the decision. It does not change the model.
+                  </Text>
+                  <textarea
+                    className={styles.textarea}
+                    rows={2}
+                    maxLength={DECISION_GAP_BODY_MAX}
+                    value={gapBody}
+                    disabled={gapSaving}
+                    onChange={(event) => {
+                      setGapBody(event.target.value);
+                      setGapError(null);
+                    }}
+                    placeholder="For example: no published source says whether the vendor supports single sign-on."
+                  />
+                  <Text as="p" size="xs" tone="muted">
+                    {gapBody.trim().length}/{DECISION_GAP_BODY_MAX} characters
+                  </Text>
+                  {gapError !== null && (
+                    <div role="alert">
+                      <Text as="p" size="sm">{gapError}</Text>
+                    </div>
+                  )}
+                  <div className={styles.actions}>
+                    <Button variant="primary" disabled={gapSaving || decisionGapProblem(gapBody) !== null} onClick={() => void saveGap()}>
+                      {gapSaving ? 'Saving.' : 'Save what we could not find'}
+                    </Button>
+                    <Button variant="ghost" disabled={gapSaving} onClick={() => { setGapOpen(false); setGapBody(''); setGapError(null); }}>
+                      Cancel
+                    </Button>
+                  </div>
+                </>
+              )}
+            </div>
             {notice !== null && (
               <div role="status">
                 <Text as="p" size="sm">{notice}</Text>
