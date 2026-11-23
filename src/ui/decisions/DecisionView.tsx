@@ -29,6 +29,8 @@ import { ownerNames } from '../orgs/ownerNames';
 import { reviewerAvailability } from './reviewerAvailability';
 import { SecondOpinion } from './SecondOpinion';
 import { KeptQuestions } from './KeptQuestions';
+import { DecisionGaps } from './DecisionGaps';
+import { recordDecisionGap } from '../../db/decisionGaps';
 import { CapabilityProducts } from '../elements/CapabilityProducts';
 import { optionKindOf } from '../changes/optionDraftActions';
 import { attributesRecord } from '../elements/attributesRecord';
@@ -64,11 +66,17 @@ import { usePendingOptions } from './usePendingOptions';
 import { optionProvenance, optionRowProvenance } from './optionProvenance';
 import { useDecisionRatings } from './useDecisionRatings';
 import { useOptionSources } from './useOptionSources';
-import type { OptionSource } from '../../contracts/optionSource';
+import type { OptionCatalogueSource, OptionSource } from '../../contracts/optionSource';
 import { groupWhatChangesRows, type WhatChangesRow } from './whatChangesRows';
 import styles from './DecisionView.module.css';
 import { useCompactDecisionLayout } from './useCompactDecisionLayout';
 import { WebResearchDialog } from './WebResearchDialog';
+import { useDecisionCapabilityConcerns } from './useDecisionCapabilityConcerns';
+import { addResearchOption } from './addResearchOption';
+import { listEarlierResearchUrls } from '../../db/webResearch';
+import { researchOptionTitle } from './researchOptionText';
+import { mergeKnownCatalogueProducts, type KnownCatalogueProduct } from './researchCatalogueMatches';
+import { useDecisionCatalogueProducts } from './useDecisionCatalogueProducts';
 
 export interface DecisionViewProps {
   modelId: UUID;
@@ -164,6 +172,14 @@ export function DecisionView({ modelId, decisionId, orgId, orgSlug, modelSlug, r
     if (choosing !== null) requestAnimationFrame(() => document.getElementById('decision-confirm-choice')?.scrollIntoView({ behavior: 'smooth', block: 'start' }));
   }, [choosing]);
 
+  // Only read the decision's egress record while the Researcher is open: it
+  // costs nothing on an ordinary page load and shows earlier pages as reuse.
+  const { data: earlierResearchUrls = [] } = useQuery({
+    queryKey: ['webResearchRequests', decisionId],
+    queryFn: () => listEarlierResearchUrls(supabase, decisionId),
+    enabled: researchTarget !== null,
+  });
+
   // Every hook above must run unconditionally (rules of hooks) — the
   // comparison hook too, even before `state` has resolved to `ready`;
   // it degrades to its own `'empty'` state on an empty/not-yet-loaded input.
@@ -214,6 +230,39 @@ export function DecisionView({ modelId, decisionId, orgId, orgSlug, modelSlug, r
     : [];
   const estateSupporters = useEstateSuggestions(main?.head_commit_id ?? null, concernedCapabilityIds);
   const comparison = useDecisionComparison(modelId, main?.head_commit_id ?? null, concernedCapabilityIds, otherConcernElementIds, comparisonOptions);
+  // The Researcher's safe query chips: capabilities linked to the decision
+  // directly, plus those reached through a linked system's `supports` edges.
+  const concernedCapabilities = useDecisionCapabilityConcerns({
+    commitId: main?.head_commit_id ?? null,
+    links: readyState?.links ?? [],
+    linkedElementsById: readyState?.linkedElementsById ?? new Map(),
+    enabled: researchTarget !== null,
+  });
+  // Reviewed catalogue products already cited on this decision, used only to
+  // mark a web page as "looks like the same product", never to invent a match.
+  const savedCatalogueProducts: KnownCatalogueProduct[] = (() => {
+    const byProduct = new Map<string, KnownCatalogueProduct>();
+    for (const source of optionSources.data ?? []) {
+      if (source.kind !== 'catalogue') continue;
+      const key = `${source.vendor}\u0000${source.product}`;
+      const urls = source.claims.map((claim) => claim.sourceUrl);
+      const existing = byProduct.get(key);
+      byProduct.set(key, existing === undefined
+        ? { product: source.product, vendor: source.vendor, sourceUrls: urls }
+        : { ...existing, sourceUrls: [...new Set([...existing.sourceUrls, ...urls])] });
+    }
+    return [...byProduct.values()];
+  })();
+  // Products the current published catalogue holds for the decision's direct
+  // capability concerns, so a returned page can be recognised even before any
+  // option has cited that product.
+  const currentCatalogueProducts = useDecisionCatalogueProducts({
+    enabled: researchTarget !== null,
+    modelId,
+    links: readyState?.links ?? [],
+    linkedElementsById: readyState?.linkedElementsById ?? new Map(),
+  });
+  const knownCatalogueProducts = mergeKnownCatalogueProducts(savedCatalogueProducts, currentCatalogueProducts);
 
   // Choosing or cancelling in place changes how many decisions are proposed — the Decisions nav badge re-reads.
   const queryClient = useQueryClient();
@@ -229,6 +278,15 @@ export function DecisionView({ modelId, decisionId, orgId, orgSlug, modelSlug, r
   const { decision, links, linkedElementsById, linkedBranchesById, options, args } = state;
   const canAddOption = canCreateChangeBranch(role) && decision.status === 'proposed';
   const canResearch = canAddOption && webSearchEnabled && assistantEnabled && agentsEnabled && keySet;
+  // Product and vendor names are safe context only when they are already
+  // structured sources on the option, never parsed from its free-text summary.
+  const reviewedNamesFor = (targetBranchId: UUID): { productNames: string[]; vendorNames: string[] } => {
+    const sources = (sourcesByBranch.get(targetBranchId) ?? []).filter((source): source is OptionCatalogueSource => source.kind === 'catalogue');
+    return {
+      productNames: [...new Set(sources.map((source) => source.product))],
+      vendorNames: [...new Set(sources.map((source) => source.vendor))],
+    };
+  };
   const canChoose = canChooseDecisionOption(role) && decision.status === 'proposed';
   const canRate = canRateDecisionOption(role, decision);
   const chosenBranch = decision.branch_id !== null ? linkedBranchesById.get(decision.branch_id) : undefined;
@@ -876,6 +934,21 @@ export function DecisionView({ modelId, decisionId, orgId, orgSlug, modelSlug, r
         }}
       />
 
+      <DecisionGaps
+        decisionId={decisionId}
+        userId={userId}
+        role={role}
+        canRemove={canAddOption}
+        nameOfUser={(id) => {
+          const member = members.find((m) => m.member.user_id === id);
+          return member ? profileLabel(member.profile) : 'a former member';
+        }}
+        optionNameFor={(gap) => {
+          if (gap.branchId === null) return null;
+          return optionByBranchId.get(gap.branchId)?.title ?? linkedBranchesById.get(gap.branchId)?.title ?? null;
+        }}
+      />
+
       {decision.status === 'accepted' && chosenBranch !== undefined && (
         <DecisionGoLive
           branch={chosenBranch}
@@ -1002,12 +1075,46 @@ export function DecisionView({ modelId, decisionId, orgId, orgSlug, modelSlug, r
           decisionId={decisionId}
           branchId={researchTarget.branchId}
           optionLabel={researchTarget.label}
+          decisionTitle={decision.title}
+          capabilityNames={concernedCapabilities.map((capability) => capability.name)}
+          productNames={reviewedNamesFor(researchTarget.branchId).productNames}
+          vendorNames={reviewedNamesFor(researchTarget.branchId).vendorNames}
+          catalogueProducts={knownCatalogueProducts}
           userId={userId}
           existingUrls={(sourcesByBranch.get(researchTarget.branchId) ?? []).flatMap((source) => (source.kind === 'web' ? [source.url] : []))}
+          citedElsewhereUrls={(optionSources.data ?? []).flatMap((source) => (source.kind === 'web' && source.branchId !== researchTarget.branchId ? [source.url] : []))}
+          earlierSearchUrls={earlierResearchUrls}
           onClose={() => { setResearchTarget(null); }}
           onSaved={() => {
             setResearchTarget(null);
             void queryClient.invalidateQueries({ queryKey: ['optionSources', decisionId] });
+          }}
+          onRecordGap={async (body) => {
+            await recordDecisionGap(supabase, {
+              decisionId,
+              branchId: researchTarget.branchId,
+              userId,
+              body,
+              origin: 'research',
+            });
+            void queryClient.invalidateQueries({ queryKey: ['decisionGaps', decisionId] });
+          }}
+          onUseAsOption={async (candidate, optionId) => {
+            const title = researchOptionTitle(candidate);
+            const already = (readyState?.options ?? []).find((option) => option.title.trim().toLowerCase() === title.toLowerCase());
+            if (already !== undefined) return `An option for this page already exists: ${already.title}.`;
+            const result = await addResearchOption({
+              orgId,
+              modelId,
+              decisionId,
+              userId,
+              projectId: decision.project_id,
+              candidate,
+              optionId,
+            });
+            applyNewOption(result.link, result.branch);
+            void queryClient.invalidateQueries({ queryKey: ['optionSources', decisionId] });
+            return result.sourceError;
           }}
         />
       )}

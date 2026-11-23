@@ -1,10 +1,15 @@
-import { useEffect, useId, useRef, useState } from 'react';
+import { useEffect, useId, useMemo, useRef, useState } from 'react';
 import type { UUID } from '../../contracts/delta';
+import { DECISION_GAP_BODY_MAX, decisionGapProblem } from '../../contracts/decisionGap';
 import type { WebResearchCandidate } from '../../contracts/webResearch';
 import { requestWebResearch, saveCheckedWebSource } from '../../db/webResearch';
 import { Button } from '../components/Button/Button';
 import { Text } from '../components/Text/Text';
 import { supabase } from '../supabaseClient';
+import { researchOptionTitle } from './researchOptionText';
+import { ResearchResultCard, type ResearchCardAction } from './ResearchResultCard';
+import { catalogueMatchFor, type KnownCatalogueProduct } from './researchCatalogueMatches';
+import { buildResearchQuery, suggestResearchQuery } from './researchQuerySuggestion';
 import { researchQueryProblem, WEB_RESEARCH_QUERY_MAX } from './webResearchQuery';
 import styles from './WebResearchDialog.module.css';
 
@@ -12,11 +17,28 @@ export interface WebResearchDialogProps {
   decisionId: UUID;
   branchId: UUID;
   optionLabel: string;
+  /** The decision's own title, used only to suggest a query, never sent automatically. */
+  decisionTitle: string;
+  /** Capabilities the decision concerns, from structured links. */
+  capabilityNames: readonly string[];
+  /** Products and vendors already saved with this option as reviewed catalogue sources. */
+  productNames?: readonly string[];
+  vendorNames?: readonly string[];
+  /** Reviewed catalogue products, so a web page can be marked as "looks like the same product". */
+  catalogueProducts?: readonly KnownCatalogueProduct[];
   userId: UUID;
   /** Pages already saved with this option, so a second save does not collide. */
   existingUrls: readonly string[];
+  /** Pages saved with another option of this decision, shown as reuse rather than rediscovered. */
+  citedElsewhereUrls?: readonly string[];
+  /** Pages an earlier approved search on this decision returned. */
+  earlierSearchUrls?: readonly string[];
   onClose: () => void;
   onSaved: () => void;
+  /** Creates a new option from a returned page. Returns a warning when the option was made but its source was not saved. */
+  onUseAsOption: (candidate: WebResearchCandidate, optionId: UUID) => Promise<string | null>;
+  /** Saves a short note about what the search could not find, on this option. */
+  onRecordGap: (body: string) => Promise<void>;
 }
 
 /**
@@ -25,29 +47,87 @@ export interface WebResearchDialogProps {
  * sentence, then says what one page supports and confirms they checked it.
  * Nothing is saved until that check; the search itself is already recorded in
  * `web_research_requests` by the server.
+ *
+ * A suggested query is offered from structured fields on screen, but nothing
+ * is searched automatically: the same exact-text approval still stands.
  */
-export function WebResearchDialog({ decisionId, branchId, optionLabel, userId, existingUrls, onClose, onSaved }: WebResearchDialogProps) {
+export function WebResearchDialog({
+  decisionId,
+  branchId,
+  optionLabel,
+  decisionTitle,
+  capabilityNames,
+  productNames = [],
+  vendorNames = [],
+  catalogueProducts = [],
+  userId,
+  existingUrls,
+  citedElsewhereUrls = [],
+  earlierSearchUrls = [],
+  onClose,
+  onSaved,
+  onUseAsOption,
+  onRecordGap,
+}: WebResearchDialogProps) {
   const dialogRef = useRef<HTMLDialogElement>(null);
   const queryRef = useRef<HTMLTextAreaElement>(null);
   const headingId = useId();
   const queryId = useId();
-  const [query, setQuery] = useState('');
-  const [approved, setApproved] = useState(false);
+
+  // Stable keys keep the suggestion memo from rebuilding on every render while
+  // still reacting when a late capability read arrives.
+  const capabilityKey = capabilityNames.join('\u0000');
+  const productKey = productNames.join('\u0000');
+  const vendorKey = vendorNames.join('\u0000');
+  const suggestion = useMemo(() => {
+    const split = (key: string) => (key === '' ? [] : key.split('\u0000'));
+    return suggestResearchQuery({
+      optionLabel,
+      decisionTitle,
+      capabilityNames: split(capabilityKey),
+      productNames: split(productKey),
+      vendorNames: split(vendorKey),
+    });
+  }, [optionLabel, decisionTitle, capabilityKey, productKey, vendorKey]);
+
+  // The suggestion is the default; state holds only what the person changes.
+  // A late capability read therefore improves an untouched suggestion without
+  // ever overwriting an edit, and no synchronising effect is needed.
+  const [chipsState, setChipsState] = useState<string[] | null>(null);
+  const [queryState, setQueryState] = useState<string | null>(null);
+  const [approvedQuery, setApprovedQuery] = useState<string | null>(null);
   const [phase, setPhase] = useState<'query' | 'results'>('query');
   const [searching, setSearching] = useState(false);
   const [searchedQuery, setSearchedQuery] = useState('');
   const [searchedAt, setSearchedAt] = useState<string | null>(null);
   const [results, setResults] = useState<WebResearchCandidate[]>([]);
+  const [dismissed, setDismissed] = useState<string[]>([]);
+  const [added, setAdded] = useState<Record<string, string>>({});
+  // One stable id per page, so a retry after a partial failure finishes the
+  // same option instead of creating a second one.
+  const [optionIds, setOptionIds] = useState<Record<string, UUID>>({});
   const [selectedUrl, setSelectedUrl] = useState<string | null>(null);
   const [assertion, setAssertion] = useState('');
   const [checked, setChecked] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [addingUrl, setAddingUrl] = useState<string | null>(null);
+  const [gapOpen, setGapOpen] = useState(false);
+  const [gapBody, setGapBody] = useState('');
+  const [gapSaving, setGapSaving] = useState(false);
+  const [gapError, setGapError] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  const busy = searching || saving;
+  const chips = chipsState ?? suggestion.chips;
+  const query = queryState ?? suggestion.query;
+  const approved = approvedQuery === query && query.trim() !== '';
+  const busy = searching || saving || addingUrl !== null || gapSaving;
   const existing = new Set(existingUrls);
-  const available = results.filter((candidate) => !existing.has(candidate.url));
-  const selected = available.find((candidate) => candidate.url === selectedUrl) ?? null;
+  const citedElsewhere = new Set(citedElsewhereUrls);
+  const earlierSearch = new Set(earlierSearchUrls);
+  const visible = results.filter((candidate) => !dismissed.includes(candidate.url));
+  const selectable = results.filter((candidate) => !existing.has(candidate.url) && added[candidate.url] === undefined && !dismissed.includes(candidate.url));
+  const selected = selectable.find((candidate) => candidate.url === selectedUrl) ?? null;
 
   useEffect(() => {
     const dialog = dialogRef.current;
@@ -75,6 +155,22 @@ export function WebResearchDialog({ decisionId, branchId, optionLabel, userId, e
     onClose();
   }
 
+  function removeChip(chip: string): void {
+    const remaining = chips.filter((value) => value !== chip);
+    const queryStillMatchesChips = query === buildResearchQuery(chips);
+    setChipsState(remaining);
+    if (queryStillMatchesChips) setQueryState(buildResearchQuery(remaining));
+    setApprovedQuery(null);
+    setError(null);
+  }
+
+  function clearSuggestion(): void {
+    setChipsState([]);
+    setQueryState('');
+    setApprovedQuery(null);
+    setError(null);
+  }
+
   async function runSearch(): Promise<void> {
     const problem = researchQueryProblem(query);
     if (problem !== null) {
@@ -88,14 +184,20 @@ export function WebResearchDialog({ decisionId, branchId, optionLabel, userId, e
     const exact = query.trim();
     setSearching(true);
     setError(null);
+    setNotice(null);
     try {
       const response = await requestWebResearch(supabase, { decisionId, branchId, query: exact });
       setSearchedQuery(exact);
       setSearchedAt(response.searchedAt);
       setResults(response.candidates);
+      setDismissed([]);
+      setAdded({});
       setSelectedUrl(null);
       setAssertion('');
       setChecked(false);
+      setGapOpen(false);
+      setGapBody('');
+      setGapError(null);
       setPhase('results');
     } catch (e) {
       setError(e instanceof Error ? e.message : 'The web search failed. Try again.');
@@ -118,13 +220,173 @@ export function WebResearchDialog({ decisionId, branchId, optionLabel, userId, e
     }
   }
 
-  function backToQuery(): void {
-    setPhase('query');
-    setResults([]);
-    setSelectedUrl(null);
+  async function addAsOption(candidate: WebResearchCandidate): Promise<void> {
+    setAddingUrl(candidate.url);
+    setError(null);
+    setNotice(null);
+    try {
+      const optionId = optionIds[candidate.url] ?? crypto.randomUUID();
+      if (optionIds[candidate.url] === undefined) setOptionIds((prev) => ({ ...prev, [candidate.url]: optionId }));
+      const warning = await onUseAsOption(candidate, optionId);
+      setAdded((prev) => ({ ...prev, [candidate.url]: researchOptionTitle(candidate) }));
+      if (selectedUrl === candidate.url) {
+        setSelectedUrl(null);
+        setAssertion('');
+        setChecked(false);
+      }
+      setNotice(warning ?? `Added a new option: ${researchOptionTitle(candidate)}.`);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Could not add an option from this page. Try again.');
+    } finally {
+      setAddingUrl(null);
+    }
+  }
+
+  async function saveGap(): Promise<void> {
+    const problem = decisionGapProblem(gapBody);
+    if (problem !== null) {
+      setGapError(problem);
+      return;
+    }
+    setGapSaving(true);
+    setGapError(null);
+    try {
+      await onRecordGap(gapBody.trim());
+      setGapOpen(false);
+      setGapBody('');
+      setNotice('Recorded what you could not find.');
+    } catch (e) {
+      setGapError(e instanceof Error ? e.message : 'Could not save what you could not find. Try again.');
+    } finally {
+      setGapSaving(false);
+    }
+  }
+
+  function select(candidate: WebResearchCandidate): void {
+    setSelectedUrl(candidate.url);
     setAssertion('');
     setChecked(false);
     setError(null);
+    setNotice(null);
+  }
+
+  function backToQuery(): void {
+    setPhase('query');
+    setResults([]);
+    setDismissed([]);
+    setAdded({});
+    setSelectedUrl(null);
+    setAssertion('');
+    setChecked(false);
+    setGapOpen(false);
+    setGapBody('');
+    setGapError(null);
+    setNotice(null);
+    setError(null);
+  }
+
+  function statusFor(candidate: WebResearchCandidate): { label: string; tone: 'neutral' | 'warn' | 'ok' | 'info' } {
+    if (existing.has(candidate.url)) return { label: 'Already saved with this option', tone: 'neutral' };
+    if (added[candidate.url] !== undefined) return { label: 'Added as an option', tone: 'ok' };
+    if (citedElsewhere.has(candidate.url)) return { label: 'Cited by another option', tone: 'info' };
+    if (earlierSearch.has(candidate.url)) return { label: 'Found in an earlier search', tone: 'info' };
+    if (catalogueMatchFor(candidate, catalogueProducts) !== null) return { label: 'Possible catalogue product', tone: 'warn' };
+    return { label: 'Unreviewed web page', tone: 'warn' };
+  }
+
+  function whyFor(candidate: WebResearchCandidate): string {
+    const match = catalogueMatchFor(candidate, catalogueProducts);
+    if (match !== null) {
+      return `This looks like the reviewed catalogue product ${match.product}. Check it before treating it as the same product.`;
+    }
+    return 'Matched the query you approved.';
+  }
+
+  function actionsFor(candidate: WebResearchCandidate): ResearchCardAction[] {
+    const saved = existing.has(candidate.url);
+    const addedTitle = added[candidate.url];
+    const actions: ResearchCardAction[] = [];
+    if (!saved && addedTitle === undefined) {
+      actions.push({
+        label: 'Save as evidence',
+        variant: 'primary',
+        disabled: busy,
+        testId: 'research-save-as-evidence',
+        onClick: () => { select(candidate); },
+      });
+      actions.push({
+        label: 'Use as an option',
+        disabled: busy,
+        testId: 'research-use-as-option',
+        onClick: () => { void addAsOption(candidate); },
+      });
+    }
+    actions.push({ label: 'Open page', href: candidate.url });
+    actions.push({
+      label: 'Dismiss',
+      variant: 'ghost',
+      disabled: busy,
+      onClick: () => { setDismissed((prev) => [...prev, candidate.url]); },
+    });
+    return actions;
+  }
+
+  function renderCheck() {
+    return (
+      <div className={styles.checkBlock}>
+        <Text as="h3" size="sm">
+          What does this page support?
+        </Text>
+        <Text as="p" size="sm" tone="muted">
+          Write one sentence, in your own words. A reader will see it as your check, not as a catalogue claim.
+        </Text>
+        <textarea
+          className={styles.textarea}
+          rows={2}
+          maxLength={500}
+          value={assertion}
+          disabled={saving}
+          onChange={(event) => {
+            setAssertion(event.target.value);
+            setError(null);
+          }}
+          placeholder="For example: Oracle lists utility customer service as a product."
+        />
+        <Text as="p" size="xs" tone="muted">
+          {assertion.trim().length}/500 characters
+        </Text>
+        <label className={styles.checkRow}>
+          <input
+            type="checkbox"
+            checked={checked}
+            disabled={saving || assertion.trim() === ''}
+            onChange={(event) => {
+              setChecked(event.target.checked);
+              setError(null);
+            }}
+          />
+          <Text as="span" size="sm">
+            I opened this page and checked that it supports this statement.
+          </Text>
+        </label>
+        <div className={styles.actions}>
+          <Button variant="primary" disabled={saving || assertion.trim() === '' || !checked} onClick={() => void save()}>
+            {saving ? 'Saving.' : 'Save page and check'}
+          </Button>
+          <Button
+            variant="ghost"
+            disabled={busy}
+            onClick={() => {
+              setSelectedUrl(null);
+              setAssertion('');
+              setChecked(false);
+            }}
+          >
+            Choose another page
+          </Button>
+        </div>
+      </div>
+    );
   }
 
   return (
@@ -155,8 +417,29 @@ export function WebResearchDialog({ decisionId, branchId, optionLabel, userId, e
         {phase === 'query' ? (
           <>
             <Text as="p" size="sm" tone="muted">
-              Write what you want to find on the public web. The exact text below is sent to Anthropic&apos;s web search and recorded with the decision. Do not include private model, customer or organisation detail.
+              The exact text below is sent to Anthropic&apos;s web search and recorded with the decision. Do not include private model, customer or organisation detail.
             </Text>
+            {chips.length > 0 && (
+              <div className={styles.suggestions} data-testid="research-suggestions">
+                <Text as="p" size="sm" tone="muted">
+                  Suggested from this option. Remove any part you do not want to search for.
+                </Text>
+                <div className={styles.chips}>
+                  {chips.map((chip) => (
+                    <button
+                      key={chip}
+                      type="button"
+                      className={styles.chip}
+                      disabled={searching}
+                      onClick={() => { removeChip(chip); }}
+                      aria-label={`Remove ${chip} from the suggested query`}
+                    >
+                      {chip} <span aria-hidden="true">×</span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
             <label htmlFor={queryId}>
               <Text as="span" size="sm">
                 What should the Researcher search for?
@@ -171,8 +454,8 @@ export function WebResearchDialog({ decisionId, branchId, optionLabel, userId, e
               value={query}
               disabled={searching}
               onChange={(event) => {
-                setQuery(event.target.value);
-                setApproved(false);
+                setQueryState(event.target.value);
+                setApprovedQuery(null);
                 setError(null);
               }}
               placeholder="For example: Oracle utilities customer service billing"
@@ -186,7 +469,7 @@ export function WebResearchDialog({ decisionId, branchId, optionLabel, userId, e
                 checked={approved}
                 disabled={searching || query.trim() === ''}
                 onChange={(event) => {
-                  setApproved(event.target.checked);
+                  setApprovedQuery(event.target.checked ? query : null);
                   setError(null);
                 }}
               />
@@ -194,10 +477,20 @@ export function WebResearchDialog({ decisionId, branchId, optionLabel, userId, e
                 I approve this exact text for a public web search.
               </Text>
             </label>
+            {notice !== null && (
+              <div role="status">
+                <Text as="p" size="sm">{notice}</Text>
+              </div>
+            )}
             <div className={styles.actions}>
               <Button variant="primary" disabled={searching || query.trim() === '' || !approved} onClick={() => void runSearch()}>
                 {searching ? 'Searching.' : 'Search the web'}
               </Button>
+              {(query !== '' || chips.length > 0) && (
+                <Button variant="ghost" disabled={busy} onClick={clearSuggestion}>
+                  Clear
+                </Button>
+              )}
               <Button variant="ghost" disabled={busy} onClick={requestClose}>
                 Cancel
               </Button>
@@ -215,117 +508,101 @@ export function WebResearchDialog({ decisionId, branchId, optionLabel, userId, e
               </Text>
             )}
             <Text as="h3" size="sm">
-              Pages the search returned
+              What the search returned
             </Text>
             {results.length === 0 ? (
               <Text as="p" size="sm">
                 No pages came back. Try a different query.
               </Text>
-            ) : available.length === 0 ? (
+            ) : visible.length === 0 ? (
               <Text as="p" size="sm">
-                Every page returned is already saved with this option. Try a different query.
+                No pages are left to look at. Search again or close.
               </Text>
             ) : (
-              <div className={styles.results} role="radiogroup" aria-label="Pages returned by the search">
-                {available.map((candidate) => (
-                  <label key={candidate.url} className={[styles.candidate, selectedUrl === candidate.url ? styles.candidateSelected : ''].filter(Boolean).join(' ')}>
-                    <input
-                      type="radio"
-                      name="web-research-candidate"
-                      checked={selectedUrl === candidate.url}
-                      onChange={() => {
-                        setSelectedUrl(candidate.url);
-                        setAssertion('');
-                        setChecked(false);
-                        setError(null);
-                      }}
-                    />
-                    <span className={styles.candidateBody}>
-                      <a href={candidate.url} target="_blank" rel="noreferrer">
-                        <Text as="span" size="sm">
-                          {candidate.title}
-                        </Text>
-                      </a>
-                      <Text as="span" size="xs" tone="muted">
-                        {candidate.publisher === '' ? candidate.url : candidate.publisher}
-                      </Text>
-                      {candidate.excerpt !== null ? (
-                        <Text as="span" size="sm" tone="muted">
-                          “{candidate.excerpt}”
-                        </Text>
-                      ) : (
-                        <Text as="span" size="xs" tone="muted">
-                          No excerpt was returned. Open the page and read it before saving.
-                        </Text>
-                      )}
-                    </span>
-                  </label>
-                ))}
+              <div className={styles.results} aria-label="Pages returned by the search">
+                {visible.map((candidate) => {
+                  const isSelected = selectedUrl === candidate.url && !existing.has(candidate.url) && added[candidate.url] === undefined;
+                  return (
+                    <ResearchResultCard
+                      key={candidate.url}
+                      testId="research-result"
+                      kind="web"
+                      title={candidate.title}
+                      source={candidate.publisher === '' ? candidate.url : candidate.publisher}
+                      whyMatched={whyFor(candidate)}
+                      evidence={candidate.excerpt === null
+                        ? [{ text: 'No excerpt was returned. Open the page and read it before saving.' }]
+                        : [{ text: `“${candidate.excerpt}”` }]}
+                      status={statusFor(candidate)}
+                      url={candidate.url}
+                      selectable={!existing.has(candidate.url) && added[candidate.url] === undefined}
+                      selected={isSelected}
+                      onSelect={() => { select(candidate); }}
+                      actions={actionsFor(candidate)}
+                    >
+                      {isSelected && renderCheck()}
+                    </ResearchResultCard>
+                  );
+                })}
               </div>
             )}
 
-            {selected !== null && (
-              <div className={styles.checkBlock}>
-                <Text as="h3" size="sm">
-                  What does this page support?
-                </Text>
-                <Text as="p" size="sm" tone="muted">
-                  Write one sentence, in your own words. A reader will see it as your check, not as a catalogue claim.
-                </Text>
-                <textarea
-                  className={styles.textarea}
-                  rows={2}
-                  maxLength={500}
-                  value={assertion}
-                  disabled={saving}
-                  onChange={(event) => {
-                    setAssertion(event.target.value);
-                    setError(null);
-                  }}
-                  placeholder="For example: Oracle lists utility customer service as a product."
-                />
-                <Text as="p" size="xs" tone="muted">
-                  {assertion.trim().length}/500 characters
-                </Text>
-                <label className={styles.checkRow}>
-                  <input
-                    type="checkbox"
-                    checked={checked}
-                    disabled={saving || assertion.trim() === ''}
-                    onChange={(event) => {
-                      setChecked(event.target.checked);
-                      setError(null);
-                    }}
-                  />
-                  <Text as="span" size="sm">
-                    I opened this page and checked that it supports this statement.
-                  </Text>
-                </label>
-                <div className={styles.actions}>
-                  <Button variant="primary" disabled={saving || assertion.trim() === '' || !checked} onClick={() => void save()}>
-                    {saving ? 'Saving.' : 'Save page and check'}
-                  </Button>
-                  <Button
-                    variant="ghost"
-                    disabled={busy}
-                    onClick={backToQuery}
-                  >
-                    Search again
-                  </Button>
-                </div>
-              </div>
-            )}
-            {selected === null && available.length > 0 && (
+            {visible.length > 0 && selected === null && selectable.length > 0 && (
               <Text as="p" size="sm" tone="muted">
-                Choose one page to check and save.
+                Choose one page to check and save, or use a page as the basis of a new option.
               </Text>
             )}
-            <div className={styles.actions}>
-              {selected === null && (
-                <Button variant="ghost" disabled={busy} onClick={backToQuery}>
-                  Search again
+            <div className={styles.gapBlock} data-testid="research-gap">
+              {!gapOpen ? (
+                <Button variant="ghost" disabled={busy} onClick={() => { setGapOpen(true); setGapError(null); }} data-testid="research-record-gap">
+                  Record what we could not find
                 </Button>
+              ) : (
+                <>
+                  <Text as="h3" size="sm">What could you not find?</Text>
+                  <Text as="p" size="sm" tone="muted">
+                    A short note is saved on this option and shown on the decision. It does not change the model.
+                  </Text>
+                  <textarea
+                    className={styles.textarea}
+                    rows={2}
+                    maxLength={DECISION_GAP_BODY_MAX}
+                    value={gapBody}
+                    disabled={gapSaving}
+                    onChange={(event) => {
+                      setGapBody(event.target.value);
+                      setGapError(null);
+                    }}
+                    placeholder="For example: no published source says whether the vendor supports single sign-on."
+                  />
+                  <Text as="p" size="xs" tone="muted">
+                    {gapBody.trim().length}/{DECISION_GAP_BODY_MAX} characters
+                  </Text>
+                  {gapError !== null && (
+                    <div role="alert">
+                      <Text as="p" size="sm">{gapError}</Text>
+                    </div>
+                  )}
+                  <div className={styles.actions}>
+                    <Button variant="primary" disabled={gapSaving || decisionGapProblem(gapBody) !== null} onClick={() => void saveGap()}>
+                      {gapSaving ? 'Saving.' : 'Save what we could not find'}
+                    </Button>
+                    <Button variant="ghost" disabled={gapSaving} onClick={() => { setGapOpen(false); setGapBody(''); setGapError(null); }}>
+                      Cancel
+                    </Button>
+                  </div>
+                </>
               )}
+            </div>
+            {notice !== null && (
+              <div role="status">
+                <Text as="p" size="sm">{notice}</Text>
+              </div>
+            )}
+            <div className={styles.actions}>
+              <Button variant="ghost" disabled={busy} onClick={backToQuery}>
+                Search again
+              </Button>
               <Button variant="ghost" disabled={busy} onClick={requestClose}>
                 Close
               </Button>

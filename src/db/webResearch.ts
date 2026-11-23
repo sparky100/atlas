@@ -32,6 +32,29 @@ export async function requestWebResearch(
   return { candidates: result.candidates, searchedAt: result.searchedAt };
 }
 
+/**
+ * URLs this decision's earlier approved searches returned. The egress record is
+ * append-only and member-readable; this is only for showing "you have seen this
+ * page before" in the Researcher, never for reusing a query automatically.
+ */
+export async function listEarlierResearchUrls(client: Client, decisionId: UUID): Promise<string[]> {
+  const { data, error } = await client
+    .from('web_research_requests')
+    .select('urls')
+    .eq('decision_id', decisionId)
+    .order('created_at', { ascending: false })
+    .limit(20);
+  if (error) throw new Error(`listEarlierResearchUrls: ${error.message}`);
+  const urls = new Set<string>();
+  for (const row of (data as { urls?: unknown }[] | null) ?? []) {
+    if (!Array.isArray(row.urls)) continue;
+    for (const url of row.urls) {
+      if (typeof url === 'string' && url.startsWith('https://')) urls.add(url);
+    }
+  }
+  return [...urls];
+}
+
 export interface SaveCheckedWebSourceInput {
   decisionId: UUID;
   branchId: UUID;

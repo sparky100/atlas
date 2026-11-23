@@ -10,7 +10,7 @@
  * The Designer writes nothing. Its draft is text for a person to read and edit.
  */
 import type { UUID } from '../contracts/delta';
-import { parseDesignerOptions, type DesignerOptionsResult } from '../contracts/designerOptions';
+import { parseDesignerOptions, type DesignerCatalogueProduct, type DesignerOptionsResult } from '../contracts/designerOptions';
 import { runAsk } from './askLoop';
 import type { AskModelClient, AskResult } from './askLoop';
 import { designerBrief, designerSystemPrompt, DESIGNER_MAX_FINDING_CHARS } from './designPrompt';
@@ -72,11 +72,16 @@ export function parseDesignBody(body: unknown): ParsedDesign | string {
   return { modelId: r.modelId, elementId: r.elementId, finding: r.finding.trim() };
 }
 
-/** Citation keys the run actually read from the catalogue. A cited product not in this set was never returned by a tool, so it is dropped. */
-async function returnedCatalogueKeys(ctx: ToolContext, toolUses: readonly { name: string; input: Record<string, unknown>; ok: boolean }[]): Promise<Set<string>> {
+/**
+ * The products the run actually read from the catalogue, keyed by citation.
+ * A cited product not in this map was never returned by a tool, so it is
+ * dropped. The same map gives the card its display data: name, vendor, how it
+ * supports the capability and the dated claims — never a count alone.
+ */
+async function returnedCatalogueProducts(ctx: ToolContext, toolUses: readonly { name: string; input: Record<string, unknown>; ok: boolean }[]): Promise<Map<string, DesignerCatalogueProduct>> {
   const ids = [...new Set(toolUses.filter((u) => u.name === 'find_catalogue_products' && u.ok).map((u) => u.input.capability_element_id).filter((v): v is string => typeof v === 'string'))];
-  const allowed = new Set<string>();
-  if (ids.length === 0 || ctx.catalogueForCapability === undefined) return allowed;
+  const products = new Map<string, DesignerCatalogueProduct>();
+  if (ids.length === 0 || ctx.catalogueForCapability === undefined) return products;
   const index = indexSnapshot(await ctx.snapshot());
   for (const id of ids) {
     const element = index.byId.get(id);
@@ -84,9 +89,20 @@ async function returnedCatalogueKeys(ctx: ToolContext, toolUses: readonly { name
     if (templateRef === null) continue;
     const catalogue = await ctx.catalogueForCapability({ templateRef, code: capabilityCode(element?.attributes) });
     if (catalogue === null) continue;
-    for (const entry of catalogue.entries) allowed.add(catalogueRefKey({ sector: catalogue.sector, version: catalogue.catalogueVersion, entryCode: entry.code }));
+    for (const entry of catalogue.entries) {
+      const ref = { sector: catalogue.sector, version: catalogue.catalogueVersion, entryCode: entry.code };
+      products.set(catalogueRefKey(ref), {
+        ref,
+        product: entry.product,
+        vendor: entry.vendor,
+        summary: entry.summary,
+        capabilityName: catalogue.capabilityName,
+        howItSupports: entry.howItSupports,
+        claims: entry.claims.map((claim) => ({ statement: claim.statement, kind: claim.kind, sourceUrl: claim.sourceUrl, sourceDate: claim.sourceDate })),
+      });
+    }
   }
-  return allowed;
+  return products;
 }
 
 export async function handleDesign(deps: DesignHandlerDeps, body: unknown): Promise<DesignOutcome> {
@@ -135,12 +151,16 @@ export async function handleDesign(deps: DesignHandlerDeps, body: unknown): Prom
       ? 'One web page was left out because the search did not return it. Add it by hand only if you have checked it yourself.'
       : `${String(droppedWebRefs)} web pages were left out because the search did not return them. Add one by hand only if you have checked it yourself.`);
   }
-  const allowedCatalogueRefs = await returnedCatalogueKeys(ctx, result.toolUses);
+  const returnedProducts = await returnedCatalogueProducts(ctx, result.toolUses);
   let droppedCatalogueRefs = 0;
   for (const option of design.options) {
-    const kept = option.catalogueRefs.filter((ref) => allowedCatalogueRefs.has(catalogueRefKey(ref)));
+    const kept = option.catalogueRefs.filter((ref) => returnedProducts.has(catalogueRefKey(ref)));
     droppedCatalogueRefs += option.catalogueRefs.length - kept.length;
     option.catalogueRefs = kept;
+    option.catalogueProducts = kept.flatMap((ref): DesignerCatalogueProduct[] => {
+      const product = returnedProducts.get(catalogueRefKey(ref));
+      return product === undefined ? [] : [product];
+    });
   }
   if (droppedCatalogueRefs > 0) {
     design.problems.push(droppedCatalogueRefs === 1
