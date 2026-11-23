@@ -24,6 +24,7 @@ import type { CommitEnvelope, Delta } from '../contracts/delta';
 import { createChangeBranch, getBranch, getMainBranch } from './branches';
 import type { Client } from './client';
 import { createServiceRoleClient, createSupabaseClient } from './client';
+import { createDecisionOption } from './decisionOptions';
 import { commitToBranch } from './commits';
 import { createComment, listCommentsForAnchor } from './comments';
 import {
@@ -387,7 +388,7 @@ describe('decisions/decision_links/decision_arguments/assumptions/evidence again
       const main = await getMainBranch(alice.client, modelId);
       if (!main?.head_commit_id) throw new Error('main branch not found');
       const decision = await createDecision(alice.client, { id: randomUUID(), orgId, modelId, title: 'Baseline record', statement: 'context', ownerId: alice.id, createdBy: alice.id });
-      expect(decision).toMatchObject({ stay_risk: '', stay_reason: '', baseline_branch_id: null });
+      expect(decision).toMatchObject({ stay_risk: '', stay_reason: '', baseline_option_id: null, baseline_branch_id: null });
       const baseline = await createChangeBranch(alice.client, { id: randomUUID(), orgId, modelId, name: `baseline-${randomUUID().slice(0, 8)}`, createdBy: alice.id, intent: 'explore', mainHeadCommitId: main.head_commit_id });
       const stranger = await createChangeBranch(alice.client, { id: randomUUID(), orgId, modelId, name: `not-an-option-${randomUUID().slice(0, 8)}`, createdBy: alice.id, intent: 'explore', mainHeadCommitId: main.head_commit_id });
       await createDecisionLink(alice.client, { decisionId: decision.id, linkedType: 'branch', linkedId: baseline.id, createdBy: alice.id });
@@ -408,6 +409,18 @@ describe('decisions/decision_links/decision_arguments/assumptions/evidence again
       // A signed-in user from a different organisation cannot touch the baseline fields.
       const outsider = await createSignedInUser('baseline-outsider');
       await expect(updateDecision(outsider.client, decision.id, { stayRisk: 'not mine' })).rejects.toThrow();
+    });
+
+    it('records a baseline candidate with no delivery branch', async () => {
+      const decision = await createDecision(alice.client, { id: randomUUID(), orgId, modelId, title: 'Branchless baseline', statement: 'context', ownerId: alice.id, createdBy: alice.id });
+      const baseline = await createDecisionOption(alice.client, { decisionId: decision.id, title: 'Stay as we are', createdBy: alice.id });
+      const other = await createDecision(alice.client, { id: randomUUID(), orgId, modelId, title: 'Other decision', statement: 'context', ownerId: alice.id, createdBy: alice.id });
+      const otherOption = await createDecisionOption(alice.client, { decisionId: other.id, title: 'Not this one', createdBy: alice.id });
+
+      await expect(updateDecision(alice.client, decision.id, { baselineOptionId: otherOption.id })).rejects.toThrow(/baseline must be one of/);
+
+      const described = await updateDecision(alice.client, decision.id, { baselineOptionId: baseline.id, stayRisk: 'Vendor support ends in March' });
+      expect(described).toMatchObject({ baseline_option_id: baseline.id, baseline_branch_id: null, stay_risk: 'Vendor support ends in March' });
     });
 
     it('a signed-in user from a different organisation cannot choose an option on this decision', async () => {

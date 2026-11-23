@@ -26,7 +26,7 @@ export interface DecisionCriteriaOption {
    */
   label: string;
   status: BranchStatus;
-  /** The word shown for a candidate with no branch: "candidate" while open, "cancelled" once the decision is closed. */
+  /** The word shown for a candidate with no branch: "candidate" while open, "not chosen" once the decision is closed. */
   statusLabel?: string | undefined;
   isChosen: boolean;
   /** One-line derived summary of what this option does vs main ("Retires PM, adds Hana equivalent, re-points 4 flows"), or `null` for an empty-delta option — this header column renders muted and shows "No changes recorded yet" instead (decision 3, the sprint's own go-ahead). */

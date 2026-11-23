@@ -440,8 +440,12 @@ function ProjectDecision({ decision, options, changes, modelId, projectId, mainH
   const [compareOpen, setCompareOpen] = useState(false);
   const chosenOption = options.find((option) => option.branch_id !== null && option.branch_id === decision.branch_id);
   const chosen = chosenOption?.branch_id != null ? changes.find((branch) => branch.id === chosenOption.branch_id) : undefined;
-  const isBaseline = decision.branch_id !== null && decision.branch_id === decision.baseline_branch_id;
-  const alternatives = options.filter((option) => option.branch_id !== decision.baseline_branch_id);
+  const baselineOption = options.find((option) => decision.baseline_option_id !== null
+    ? option.id === decision.baseline_option_id
+    : option.branch_id !== null && option.branch_id === decision.baseline_branch_id);
+  const baselineBranchId = baselineOption?.branch_id ?? decision.baseline_branch_id;
+  const isBaseline = chosenOption?.id === baselineOption?.id || (decision.branch_id !== null && decision.branch_id === baselineBranchId);
+  const alternatives = options.filter((option) => option.id !== baselineOption?.id && option.branch_id !== baselineBranchId);
   const decisionHref = `${base}/decisions/${decision.id}`;
   return <article className={styles.decisionCard}>
     <div className={styles.decisionTop}>

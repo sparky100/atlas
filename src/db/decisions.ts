@@ -281,7 +281,9 @@ export interface UpdateDecisionInput {
   /** The baseline's two plain-text answers ("Stay as we are"). */
   stayRisk?: string;
   stayReason?: string;
-  /** Which option branch is the baseline; must already be linked to the decision (a trigger checks). */
+  /** Which candidate is the baseline; must already belong to the decision (a trigger checks). */
+  baselineOptionId?: UUID | null;
+  /** Legacy branch pointer; stage 4d removes it. */
   baselineBranchId?: UUID | null;
   /** A person edited an agent-drafted context; only ever set to true. */
   aiDraftEdited?: boolean;
@@ -303,6 +305,7 @@ export async function updateDecision(supabase: Client, decisionId: UUID, input: 
   if (input.lensMapUrl !== undefined) patch.lens_map_url = input.lensMapUrl;
   if (input.stayRisk !== undefined) patch.stay_risk = input.stayRisk;
   if (input.stayReason !== undefined) patch.stay_reason = input.stayReason;
+  if (input.baselineOptionId !== undefined) patch.baseline_option_id = input.baselineOptionId;
   if (input.baselineBranchId !== undefined) patch.baseline_branch_id = input.baselineBranchId;
   if (input.aiDraftEdited !== undefined) patch.ai_draft_edited = input.aiDraftEdited;
   const { data, error } = await supabase.from('decisions').update(patch).eq('id', decisionId).select('*');

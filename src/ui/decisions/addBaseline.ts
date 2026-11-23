@@ -1,7 +1,7 @@
 import type { UUID } from '../../contracts/delta';
-import { createChangeBranch, getMainBranch } from '../../db/branches';
-import { createDecisionLink, updateDecision } from '../../db/decisions';
-import type { BranchRow, DecisionLinkRow, DecisionRow } from '../../db/types';
+import { createDecisionOption } from '../../db/decisionOptions';
+import { updateDecision } from '../../db/decisions';
+import type { DecisionOptionRow, DecisionRow } from '../../db/types';
 import { supabase } from '../supabaseClient';
 
 /** The title every baseline option carries. */
@@ -17,34 +17,26 @@ export interface AddBaselineInput {
 }
 
 export interface AddedBaseline {
-  link: DecisionLinkRow;
-  branch: BranchRow;
+  option: DecisionOptionRow;
   decision: DecisionRow;
 }
 
 /**
- * Gives a proposed decision its "Stay as we are" baseline: an empty
- * explore-intent change branch, linked as an option like any other, then
- * recorded on the decision as its baseline. Three plain writes composed here
- * (the same shape as `useDecisionOptions`'s `addOption`); if the last one fails
- * the baseline is still a normal option, and running this again is harmless to
- * everything but a duplicate option, so callers only offer it when
- * `decision.baseline_branch_id` is null.
+ * Gives a proposed decision its "Stay as we are" baseline: a candidate with
+ * no delivery branch, then recorded on the decision as its baseline. Nobody
+ * has to work on the baseline, so there is nothing to fork and no empty
+ * change to show in the Changes list.
+ *
+ * `orgId`, `modelId` and `projectId` are kept in the input because the
+ * callers already have them and later branches take the same shape; the
+ * candidate itself is decided only by the decision id.
  */
 export async function addBaseline(input: AddBaselineInput): Promise<AddedBaseline> {
-  const main = await getMainBranch(supabase, input.modelId);
-  if (!main?.head_commit_id) throw new Error('This model has no commits yet — there is nothing to base the baseline on.');
-  const branch = await createChangeBranch(supabase, {
-    id: crypto.randomUUID(),
-    orgId: input.orgId,
-    modelId: input.modelId,
+  const option = await createDecisionOption(supabase, {
+    decisionId: input.decisionId,
     title: BASELINE_TITLE,
     createdBy: input.userId,
-    mainHeadCommitId: main.head_commit_id,
-    intent: 'explore',
-    projectId: input.projectId,
   });
-  const link = await createDecisionLink(supabase, { decisionId: input.decisionId, linkedType: 'branch', linkedId: branch.id, createdBy: input.userId });
-  const decision = await updateDecision(supabase, input.decisionId, { baselineBranchId: branch.id });
-  return { link, branch, decision };
+  const decision = await updateDecision(supabase, input.decisionId, { baselineOptionId: option.id });
+  return { option, decision };
 }
