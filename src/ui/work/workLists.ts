@@ -1,6 +1,5 @@
 import type { UUID } from '../../contracts/delta';
-import type { DecisionOptionLink } from '../../db/decisions';
-import type { BranchRow, DecisionRow, ProjectRow } from '../../db/types';
+import type { BranchRow, DecisionOptionRow, DecisionRow, ProjectRow } from '../../db/types';
 import { projectIsOpen, projectStatusLabel } from '../projects/projectModel';
 import { decisionStatusLabel } from '../decisions/decisionStatus';
 
@@ -25,13 +24,15 @@ export interface WorkLists {
 
 const OPEN_BRANCH: ReadonlySet<BranchRow['status']> = new Set(['draft', 'proposed', 'in_review', 'approved']);
 
-export function buildWorkLists(branches: readonly BranchRow[], decisions: readonly DecisionRow[], projects: readonly ProjectRow[], optionLinks: readonly DecisionOptionLink[]): WorkLists {
+export function buildWorkLists(branches: readonly BranchRow[], decisions: readonly DecisionRow[], projects: readonly ProjectRow[], options: readonly DecisionOptionRow[]): WorkLists {
   const byTitle = (a: WorkListItem, b: WorkListItem) => a.title.localeCompare(b.title);
   const decisionById = new Map(decisions.map((d) => [d.id, d]));
   const decisionOfBranch = new Map<UUID, UUID>();
-  for (const l of optionLinks) if (!decisionOfBranch.has(l.branchId)) decisionOfBranch.set(l.branchId, l.decisionId);
+  for (const option of options) {
+    if (option.branch_id !== null && !decisionOfBranch.has(option.branch_id)) decisionOfBranch.set(option.branch_id, option.decision_id);
+  }
 
-  const optionIds = new Set(optionLinks.map((l) => l.branchId));
+  const optionIds = new Set(options.flatMap((option) => (option.branch_id === null ? [] : [option.branch_id])));
   const plural = (n: number, word: string) => `${String(n)} ${word}${n === 1 ? '' : 's'}`;
   const projectItems = projects
     .filter((p) => projectIsOpen(p.status))

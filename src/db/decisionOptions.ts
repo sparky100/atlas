@@ -1,6 +1,7 @@
 import type { UUID } from '../contracts/delta';
 import { assertRealId } from './assertRealId';
 import type { Client } from './client';
+import { selectAll } from './selectAll';
 import type { BranchRow, DecisionOptionRow } from './types';
 
 /**
@@ -18,6 +19,32 @@ export async function listDecisionOptions(client: Client, decisionId: UUID): Pro
     .order('created_at');
   if (error) throw new Error(`listDecisionOptions: ${error.message}`);
   return (data as DecisionOptionRow[] | null) ?? [];
+}
+
+/** Every candidate of the model's decisions, branchless ones included, through one inner embed on `decisions.model_id`. */
+export async function listDecisionOptionsForModel(client: Client, modelId: UUID): Promise<DecisionOptionRow[]> {
+  assertRealId('listDecisionOptionsForModel', 'model_id', modelId);
+  const rows = await selectAll<DecisionOptionRow>(
+    client
+      .from('decision_options')
+      .select('*, decisions!inner(model_id)', { count: 'exact' })
+      .eq('decisions.model_id', modelId)
+      .order('position'),
+  );
+  return rows;
+}
+
+/** Every candidate of the decisions in this project, branchless ones included. */
+export async function listDecisionOptionsForProject(client: Client, projectId: UUID): Promise<DecisionOptionRow[]> {
+  assertRealId('listDecisionOptionsForProject', 'project_id', projectId);
+  const rows = await selectAll<DecisionOptionRow>(
+    client
+      .from('decision_options')
+      .select('*, decisions!inner(project_id)', { count: 'exact' })
+      .eq('decisions.project_id', projectId)
+      .order('position'),
+  );
+  return rows;
 }
 
 export interface CreateDecisionOptionInput {

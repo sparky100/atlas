@@ -6,7 +6,7 @@ import { createDecision, createDecisionLink } from '../../db/decisions';
 import { orderOpenWork } from './openWorkOrder';
 import { createEvidence } from '../../db/evidence';
 import { addProjectLink, removeProjectLink, setProjectStatus, updateProject } from '../../db/projects';
-import type { BranchRow, DecisionRow, MemberRole, ProjectRow } from '../../db/types';
+import type { BranchRow, DecisionOptionRow, DecisionRow, MemberRole, ProjectRow } from '../../db/types';
 import { useMainBranch } from '../branches/useMainBranch';
 import { INTENT_LABEL } from '../changes/branchIntent';
 import { branchStatusTone } from '../changes/branchStatus';
@@ -82,7 +82,7 @@ export interface ProjectViewProps {
  */
 export function ProjectView({ data, modelName, orgId, modelId, orgSlug, modelSlug, userId, role, today, reload, designerAvailable = false, designerUnavailable = null }: ProjectViewProps) {
   const [editingProject, setEditingProject] = useState(false);
-  const { project, decisions, constrainingDecisions, changes, optionLinks, links, evidence, touched, elementsById } = data;
+  const { project, decisions, constrainingDecisions, changes, options, links, evidence, touched, elementsById } = data;
   const { members } = useMembers(orgId);
   const { branch: main } = useMainBranch(modelId);
   const canEdit = canEditProject(role, project, userId);
@@ -108,6 +108,7 @@ export function ProjectView({ data, modelName, orgId, modelId, orgSlug, modelSlu
   const scopeNamesOfType = (types: readonly string[]) => scopeIds.filter((id) => types.includes(elementsById.get(id)?.element_type ?? '')).map((id) => elementName(id));
   const suggestedTitle = suggestDecisionTitle(scopeNamesOfType(['system', 'container']), scopeNamesOfType(['capability']));
   const canDecide = canStartDecision(role);
+  const optionLinks = options.flatMap((option) => option.branch_id === null ? [] : [{ decisionId: option.decision_id, branchId: option.branch_id }]);
   const optionIds = new Set(optionLinks.map((link) => link.branchId));
   const standaloneChanges = changes.filter((change) => !optionIds.has(change.id));
   const acceptance = proposalAcceptance({ isApprover: canAcceptProject(role), userId, proposedBy: project.created_by, approvers: members.filter((m) => m.member.role === 'owner' || m.member.role === 'architect').map((m) => ({ userId: m.member.user_id, name: profileLabel(m.profile) })) });
@@ -253,7 +254,7 @@ export function ProjectView({ data, modelName, orgId, modelId, orgSlug, modelSlu
           {decisions.length > 0 && (
             <div className={styles.decisionList}>
               {decisions.map((d) => (
-                <ProjectDecision key={d.id} decision={d} options={changes.filter((c) => optionLinks.some((link) => link.decisionId === d.id && link.branchId === c.id))} modelId={modelId} projectId={project.id} mainHeadCommitId={main?.head_commit_id ?? null} capabilities={data.journeyCapabilities.map((c) => ({ id: c.id, name: c.name }))} scopeSystemIds={scopeSystemIds} base={base} overdue={isDecisionOverdue(d, today)} />
+                <ProjectDecision key={d.id} decision={d} options={options.filter((o) => o.decision_id === d.id)} changes={changes} modelId={modelId} projectId={project.id} mainHeadCommitId={main?.head_commit_id ?? null} capabilities={data.journeyCapabilities.map((c) => ({ id: c.id, name: c.name }))} scopeSystemIds={scopeSystemIds} base={base} overdue={isDecisionOverdue(d, today)} />
               ))}
             </div>
           )}
@@ -432,14 +433,15 @@ function ChangeLine({ change, href }: { change: BranchRow; href: string }) {
   );
 }
 
-function ProjectDecision({ decision, options, modelId, projectId, mainHeadCommitId, capabilities, scopeSystemIds, base, overdue }: {
-  decision: DecisionRow; options: BranchRow[]; modelId: UUID; projectId: UUID; mainHeadCommitId: UUID | null;
+function ProjectDecision({ decision, options, changes, modelId, projectId, mainHeadCommitId, capabilities, scopeSystemIds, base, overdue }: {
+  decision: DecisionRow; options: DecisionOptionRow[]; changes: BranchRow[]; modelId: UUID; projectId: UUID; mainHeadCommitId: UUID | null;
   capabilities: { id: UUID; name: string }[]; scopeSystemIds: ReadonlySet<UUID>; base: string; overdue: boolean;
 }) {
   const [compareOpen, setCompareOpen] = useState(false);
-  const chosen = options.find((option) => option.id === decision.branch_id);
+  const chosenOption = options.find((option) => option.branch_id !== null && option.branch_id === decision.branch_id);
+  const chosen = chosenOption?.branch_id != null ? changes.find((branch) => branch.id === chosenOption.branch_id) : undefined;
   const isBaseline = decision.branch_id !== null && decision.branch_id === decision.baseline_branch_id;
-  const alternatives = options.filter((option) => option.id !== decision.baseline_branch_id);
+  const alternatives = options.filter((option) => option.branch_id !== decision.baseline_branch_id);
   const decisionHref = `${base}/decisions/${decision.id}`;
   return <article className={styles.decisionCard}>
     <div className={styles.decisionTop}>
@@ -457,7 +459,7 @@ function ProjectDecision({ decision, options, modelId, projectId, mainHeadCommit
       <div className={styles.chosen}>
         {isBaseline ? <Text as="p" size="sm"><strong>Chosen:</strong> Stay as we are. No model change is planned for this decision.</Text> : (
           <>
-            <Text as="p" size="sm"><strong>Chosen:</strong> {chosen ? <Link to={`${base}/changes/${chosen.id}`}>{chosen.title ?? chosen.name}</Link> : decision.branch_id ? <Link to={`${base}/changes/${decision.branch_id}`}>Open chosen option</Link> : 'Option not recorded'} {chosen && <Chip tone={branchStatusTone(chosen.status)}>{chosen.status === 'merged' ? 'Merged into live model' : `Model change: ${chosen.status.replace('_', ' ')}`}</Chip>}</Text>
+            <Text as="p" size="sm"><strong>Chosen:</strong> {chosenOption ? <Link to={chosenOption.branch_id !== null ? `${base}/changes/${chosenOption.branch_id}` : decisionHref}>{chosenOption.title}</Link> : decision.branch_id ? <Link to={`${base}/changes/${decision.branch_id}`}>Open chosen option</Link> : 'Option not recorded'} {chosen && <Chip tone={branchStatusTone(chosen.status)}>{chosen.status === 'merged' ? 'Merged into live model' : `Model change: ${chosen.status.replace('_', ' ')}`}</Chip>}</Text>
             {chosen && mainHeadCommitId !== null && chosen.status !== 'merged' && chosen.status !== 'cancelled' && chosen.status !== 'rejected' && chosen.status !== 'archived' && capabilities.length > 0 && (
               <details className={styles.disclosure} onToggle={(event) => { setCompareOpen(event.currentTarget.open); }}><summary>Compare live model with chosen option</summary>
                 {compareOpen && <ProjectBeforeAfter embedded modelId={modelId} comparisonId={projectId} mainHeadCommitId={mainHeadCommitId} changes={[chosen]} capabilities={capabilities} scopeSystemIds={scopeSystemIds} decisions={[decision]} base={base} />}
@@ -759,7 +761,7 @@ function ProjectEditPanel({ project, members, onSaved, onEditingChange }: { proj
  * each linking to its own page where its own existing action ends it — the
  * project never cancels anything itself.
  */
-function ProjectStatusPanel({ project, changes, decisions, optionLinks, base, acceptance, isProposer, onChanged }: { project: ProjectRow; changes: BranchRow[]; decisions: DecisionRow[]; optionLinks: ProjectData['optionLinks']; base: string; isProposer: boolean; acceptance: ProposalAcceptance; onChanged: () => void }) {
+function ProjectStatusPanel({ project, changes, decisions, optionLinks, base, acceptance, isProposer, onChanged }: { project: ProjectRow; changes: BranchRow[]; decisions: DecisionRow[]; optionLinks: { decisionId: UUID; branchId: UUID }[]; base: string; isProposer: boolean; acceptance: ProposalAcceptance; onChanged: () => void }) {
   const [reason, setReason] = useState('');
   const [mode, setMode] = useState<'idle' | 'cancelling'>('idle');
   const [error, setError] = useState<string | null>(null);
