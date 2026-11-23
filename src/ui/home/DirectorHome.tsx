@@ -73,16 +73,10 @@ export function DirectorHome({ data, reload, modelId, userId, role, orgSlug, mod
   if (data.tiles.length === 0) {
     return (
       <div className={styles.empty}>
-        <div className={styles.emptyTiles} aria-hidden="true">
-          <span className={styles.emptyTile} />
-          <span className={styles.emptyTile} />
-          <span className={styles.emptyTile} />
-          <span className={styles.emptyTile} />
-        </div>
         <Text as="h2" size="xl">
           The map is empty
         </Text>
-        <Text as="p" tone="muted">
+        <Text as="p" tone="muted" className={styles.emptyIntro}>
           Exposure, changes, and versions all read off the capability map — there's nothing to show until it has at least one capability.
         </Text>
         <CapabilityMapImportPanel modelId={modelId} userId={userId} onImported={reload} />
