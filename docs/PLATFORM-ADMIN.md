@@ -42,10 +42,12 @@ else in this product checks platform-admin status.
    (`docs/ADR-038-product-catalogue-admin.md`). Both editors are
    platform-admin-only; ordinary organisation owners cannot reach them.
 4. **Withdraw or reinstate a published sample model** at
-   `/platform-admin/sample-models`. A sample is withdrawn by its slug, which
-   hides every version from ordinary users without editing or deleting the
-   published rows. The reason, actor and time are recorded; existing
-   organisation copies are untouched. See `docs/ADR-033-sample-models.md`.
+   `/platform-admin/sample-models`, with each sample's own page at
+   `/platform-admin/sample-models/:slug`. A sample is withdrawn
+   by its slug, which hides every version from ordinary users without editing
+   or deleting the published rows. The reason, actor and time are recorded;
+   existing organisation copies are untouched. See
+   `docs/ADR-033-sample-models.md`.
 
 Reviewer metadata is audit data. A new catalogue claim or capability-set
 source records the acting platform admin automatically; the name is never
