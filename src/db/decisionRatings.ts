@@ -18,6 +18,7 @@
  */
 import { assertRealId } from './assertRealId';
 import type { Client } from './client';
+import { getDecisionOptionForBranch } from './decisionOptions';
 import type { DecisionOptionRatingRow, DecisionRatingCriterion, DecisionRatingLevelValue } from './types';
 import type { UUID } from '../contracts/delta';
 
@@ -30,8 +31,9 @@ export async function listDecisionRatingsForDecision(supabase: Client, decisionI
 
 export interface UpsertDecisionRatingInput {
   decisionId: UUID;
-  branchId: UUID;
-  /** D1 stage 1: the stable candidate identity. The compatibility trigger fills it when omitted. */
+  /** Null for a candidate with no delivery branch. */
+  branchId: UUID | null;
+  /** The stable candidate identity. If omitted, it is resolved from `branchId` for older callers. */
   optionId?: UUID | null;
   criterion: DecisionRatingCriterion;
   level: DecisionRatingLevelValue;
@@ -41,9 +43,11 @@ export interface UpsertDecisionRatingInput {
 }
 
 export async function upsertDecisionRating(supabase: Client, input: UpsertDecisionRatingInput): Promise<DecisionOptionRatingRow> {
-  const row = { decision_id: input.decisionId, branch_id: input.branchId, option_id: input.optionId ?? null, criterion: input.criterion, level: input.level, note: input.note, rated_by: input.ratedBy, rated_at: new Date().toISOString() };
+  const optionId = input.optionId ?? (input.branchId === null ? null : (await getDecisionOptionForBranch(supabase, input.decisionId, input.branchId))?.id ?? null);
+  if (optionId === null) throw new Error('upsertDecisionRating: this rating has no candidate option');
+  const row = { decision_id: input.decisionId, branch_id: input.branchId, option_id: optionId, criterion: input.criterion, level: input.level, note: input.note, rated_by: input.ratedBy, rated_at: new Date().toISOString() };
   // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment -- untyped client; see branches.ts's module comment.
-  const { data, error } = await supabase.from('decision_option_ratings').upsert(row, { onConflict: 'decision_id,branch_id,criterion' }).select('*').single();
+  const { data, error } = await supabase.from('decision_option_ratings').upsert(row, { onConflict: 'decision_id,option_id,criterion' }).select('*').single();
   if (error) throw new Error(`upsertDecisionRating: ${error.message}`);
   return data as DecisionOptionRatingRow;
 }

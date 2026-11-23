@@ -3,8 +3,8 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import type { Client } from './client';
 import { createServiceRoleClient, createSupabaseClient } from './client';
 import { createChangeBranch, getMainBranch } from './branches';
-import { createDecision, createDecisionLink } from './decisions';
-import { listDecisionOptions } from './decisionOptions';
+import { createDecision, createDecisionLink, listDecisionLinksForDecision } from './decisions';
+import { createDecisionOption, listDecisionOptions, workOnDecisionOption } from './decisionOptions';
 import { insertOptionMark } from './decisionOptionMarks';
 import { listDecisionRatingsForDecision, upsertDecisionRating } from './decisionRatings';
 import { listOptionSources } from './productCatalogue';
@@ -96,5 +96,29 @@ describe('D1 candidate options, real database', () => {
     expect(await listOptionSources(owner.client, decisionId)).toEqual([
       expect.objectContaining({ kind: 'web', branchId, optionId }),
     ]);
+  });
+
+  it('adds a candidate without a branch and creates one only when it is worked on', async () => {
+    const candidate = await createDecisionOption(owner.client, {
+      decisionId, title: 'Build it ourselves', summary: 'Use the existing team.', createdBy: owner.id,
+    });
+    expect(candidate.branch_id).toBeNull();
+    const candidateRating = await upsertDecisionRating(owner.client, {
+      decisionId, branchId: null, optionId: candidate.id, criterion: 'cost', level: 'favourable', note: null, ratedBy: owner.id,
+    });
+    expect(candidateRating).toMatchObject({ branch_id: null, option_id: candidate.id });
+
+    const branch = await workOnDecisionOption(owner.client, candidate.id);
+    expect(branch).toMatchObject({ model_id: modelId, title: 'Build it ourselves', intent: 'explore', status: 'draft' });
+
+    const { data: stored, error } = await owner.client.from('decision_options').select('branch_id').eq('id', candidate.id).single();
+    expect(error).toBeNull();
+    expect(stored?.branch_id).toBe(branch.id);
+
+    const links = await listDecisionLinksForDecision(owner.client, decisionId);
+    expect(links).toEqual(expect.arrayContaining([expect.objectContaining({ linked_type: 'branch', linked_id: branch.id })]));
+    const optionsForBranch = await owner.client.from('decision_options').select('id').eq('decision_id', decisionId).eq('branch_id', branch.id);
+    expect(optionsForBranch.error).toBeNull();
+    expect(optionsForBranch.data).toEqual([{ id: candidate.id }]);
   });
 });

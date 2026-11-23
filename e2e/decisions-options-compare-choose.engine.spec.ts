@@ -85,9 +85,10 @@ test('add three options to a decision, compare them, choose one; the chosen opti
   // actually differ per option, not just echo main's for all three.
   const decisionUrlMatch = /\/decisions\/([^/?]+)/.exec(page.url());
   if (!decisionUrlMatch?.[1]) throw new Error(`could not read the decision id out of ${page.url()}`);
-  await page.goto(`/o/${orgSlug}/m/${modelSlug}/changes`);
-  const optionBRow = page.locator('li', { hasText: 'Option 2' });
-  await optionBRow.getByRole('link', { name: 'Open →' }).click();
+  // Adding an option creates no branch now. Work on B is what creates its
+  // delivery branch, and it is the only option that gets an extra commit.
+  const optionBHeaderForWork = page.locator('th', { hasText: 'Option 2' });
+  await optionBHeaderForWork.getByRole('button', { name: 'Work on this option' }).click();
   const optionBBranchIdMatch = /\/changes\/([^/?]+)/.exec(page.url());
   if (!optionBBranchIdMatch?.[1]) throw new Error(`could not read option B's branch id out of ${page.url()}`);
   const optionBBranchId = optionBBranchIdMatch[1];

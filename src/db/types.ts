@@ -598,7 +598,8 @@ export type DecisionRatingLevelValue = 'favourable' | 'acceptable' | 'unfavourab
 /** The literal shape of a row in `decision_option_ratings` — one row per (decision, option, criterion), primary key `(decision_id, branch_id, criterion)` so no `id` column of its own. Read-only once the decision is no longer `proposed` (RLS, `20260929010000_decision_option_ratings.sql`) — not enforced client-side, the same "the database is the real gate" posture every other read-only-after-a-status-change table in this schema already takes. */
 export interface DecisionOptionRatingRow {
   decision_id: UUID;
-  branch_id: UUID;
+  /** Retained for branch-backed options; null for a candidate not worked on yet. */
+  branch_id: UUID | null;
   option_id?: UUID | null;
   criterion: DecisionRatingCriterion;
   level: DecisionRatingLevelValue;
