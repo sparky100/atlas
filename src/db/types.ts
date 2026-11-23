@@ -527,6 +527,7 @@ export interface DecisionArgumentRow {
 export interface DecisionOptionMarkRow {
   decision_id: UUID;
   branch_id: UUID;
+  option_id?: UUID | null;
   agent: 'designer';
   drafted_at: string;
   draft_run_id: UUID | null;
@@ -572,6 +573,7 @@ export type DecisionRatingLevelValue = 'favourable' | 'acceptable' | 'unfavourab
 export interface DecisionOptionRatingRow {
   decision_id: UUID;
   branch_id: UUID;
+  option_id?: UUID | null;
   criterion: DecisionRatingCriterion;
   level: DecisionRatingLevelValue;
   note: string | null;

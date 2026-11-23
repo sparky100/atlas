@@ -57,6 +57,7 @@ export type OptionSource = OptionCatalogueSource | OptionWebSource;
 export interface OptionWebSourceRow {
   decision_id: string;
   branch_id: string;
+  option_id?: string | null;
   url: string;
   title: string;
   publisher: string | null;
