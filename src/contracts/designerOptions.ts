@@ -27,6 +27,25 @@ export interface DesignerWebRef {
   title: string;
 }
 
+export interface DesignerCatalogueClaim {
+  statement: string;
+  kind: string;
+  sourceUrl: string;
+  sourceDate: string;
+}
+
+/** One reviewed product the Designer actually read for an option, with the evidence behind it. */
+export interface DesignerCatalogueProduct {
+  ref: CatalogueCitation;
+  product: string;
+  vendor: string;
+  summary: string;
+  /** The capability the catalogue linked this product to, for the card's "why it matched" line. */
+  capabilityName: string;
+  howItSupports: string;
+  claims: DesignerCatalogueClaim[];
+}
+
 export interface DesignerOptionDraft {
   title: string;
   /** One or two plain sentences on what the option is. */
@@ -35,6 +54,8 @@ export interface DesignerOptionDraft {
   toWeigh: string;
   /** Products the Designer actually read from the published catalogue for this option; empty for every other kind of option. */
   catalogueRefs: CatalogueCitation[];
+  /** The same products in display form, so the card can show names, vendors and claims instead of a count. */
+  catalogueProducts: DesignerCatalogueProduct[];
   /** Pages the web search actually returned and the Designer cited; empty when it did not search or found nothing suitable. */
   webRefs: DesignerWebRef[];
 }
@@ -94,6 +115,46 @@ function catalogueRefs(value: unknown): CatalogueCitation[] {
   return refs;
 }
 
+export function catalogueRefKeyOf(ref: CatalogueCitation): string {
+  return `${ref.sector}\u0000${String(ref.version)}\u0000${ref.entryCode}`;
+}
+
+/**
+ * Reads the catalogue cards an agent run attached, without trusting its text.
+ * A card is kept only when its citation is valid, it names a product and a
+ * vendor, and it is one of the products the run actually read. The server
+ * already filtered the cards; this is the UI's own shape check for stored
+ * drafts and older replies.
+ */
+export function parseCatalogueProducts(value: unknown): DesignerCatalogueProduct[] {
+  if (!Array.isArray(value)) return [];
+  const out: DesignerCatalogueProduct[] = [];
+  const text = (v: unknown, max: number) => (typeof v === 'string' ? v.trim().slice(0, max) : '');
+  for (const raw of value) {
+    if (!isRecord(raw)) continue;
+    const ref = catalogueCitationSchema.safeParse(raw.ref);
+    if (!ref.success) continue;
+    const product = text(raw.product, 120);
+    const vendor = text(raw.vendor, 120);
+    if (product === '' || vendor === '') continue;
+    const key = catalogueRefKeyOf(ref.data);
+    if (out.some((item) => catalogueRefKeyOf(item.ref) === key)) continue;
+    const claims: DesignerCatalogueClaim[] = Array.isArray(raw.claims)
+      ? raw.claims.flatMap((claim): DesignerCatalogueClaim[] => {
+          if (!isRecord(claim)) return [];
+          const statement = text(claim.statement, 400);
+          const sourceUrl = text(claim.sourceUrl, 2000);
+          const sourceDate = text(claim.sourceDate, 40);
+          if (statement === '' || sourceUrl === '' || sourceDate === '') return [];
+          return [{ statement, kind: text(claim.kind, 40), sourceUrl, sourceDate }];
+        })
+      : [];
+    out.push({ ref: ref.data, product, vendor, summary: text(raw.summary, 500), capabilityName: text(raw.capabilityName, 200), howItSupports: text(raw.howItSupports, 300), claims });
+    if (out.length >= DESIGNER_CATALOGUE_REFS_MAX) break;
+  }
+  return out;
+}
+
 /** Shape-only check here; whether the search actually returned each page is checked by the run that searched. */
 function webRefs(value: unknown): DesignerWebRef[] {
   if (!Array.isArray(value)) return [];
@@ -147,7 +208,7 @@ export function parseDesignerOptions(answer: string): DesignerOptionsResult {
       continue;
     }
     seen.add(key);
-    options.push({ title, summary, toWeigh: text(r.toWeigh, DESIGNER_WEIGH_MAX), catalogueRefs: catalogueRefs(r.catalogueRefs), webRefs: webRefs(r.webRefs) });
+    options.push({ title, summary, toWeigh: text(r.toWeigh, DESIGNER_WEIGH_MAX), catalogueRefs: catalogueRefs(r.catalogueRefs), catalogueProducts: [], webRefs: webRefs(r.webRefs) });
   }
   if (dropped > 0 && rawOptions.length > 0) problems.push(dropped === 1 ? 'One suggested option was left out because it was incomplete.' : `${String(dropped)} suggested options were left out because they were incomplete.`);
   if (options.length < DESIGNER_OPTIONS_MIN) problems.push(options.length === 0 ? 'The Designer gave no usable options.' : 'The Designer gave fewer options than expected.');

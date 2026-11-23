@@ -1,0 +1,51 @@
+.card {
+  display: grid;
+  gap: var(--space-2);
+  padding: var(--space-3);
+  border: var(--border-width) solid var(--border-strong);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  min-width: 0;
+}
+
+.selected {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 var(--border-width) var(--accent);
+}
+
+.head {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-2);
+  justify-content: space-between;
+  flex-wrap: wrap;
+}
+
+.radio {
+  margin-top: 0.35em;
+}
+
+.titleBlock {
+  display: grid;
+  gap: var(--space-1);
+  min-width: 0;
+  flex: 1 1 16rem;
+}
+
+.evidence {
+  display: grid;
+  gap: var(--space-1);
+  margin: 0;
+  padding-left: var(--space-3);
+}
+
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.actionLink {
+  font-size: var(--text-sm-size);
+}

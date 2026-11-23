@@ -1,5 +1,6 @@
 import type { UUID } from '../../contracts/delta';
 import { citationsToNames } from '../../db/designAgent';
+import { parseCatalogueProducts, type DesignerCatalogueProduct } from '../../contracts/designerOptions';
 import { catalogueCitationSchema, type CatalogueCitation } from '../../contracts/productCatalogue';
 
 /**
@@ -25,6 +26,8 @@ export interface PendingOption {
   draftedAt: string;
   /** Reviewed catalogue products the Designer read for this option. Saved as citations when the option is added. */
   catalogueRefs: CatalogueCitation[];
+  /** The same products in display form, so a card can show names, vendors and claims. */
+  catalogueProducts?: DesignerCatalogueProduct[];
 }
 
 export const PENDING_TTL_MS = 24 * 60 * 60 * 1000;
@@ -95,6 +98,7 @@ export function loadPending(storage: StorageLike, key: string, now: number): Pen
         suggestedSummary: clean(o.suggestedSummary) || summary,
         draftedAt: typeof o.draftedAt === 'string' ? o.draftedAt : new Date(now).toISOString(),
         catalogueRefs: refs,
+        catalogueProducts: parseCatalogueProducts(o.catalogueProducts),
       }];
     });
   } catch {
