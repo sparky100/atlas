@@ -125,11 +125,11 @@ test('rate decision options on judgement criteria, leave some unrated, choose on
   await expect(optionAHeader).toContainText('chosen');
   await expect(costControl).toContainText('Low');
 
-  // Decision-side-completion item 5: "Work on this as a change" enters the
+  // Decision-side-completion item 5: "Work on this option" enters the
   // change workspace and selects the chosen option as the session's
   // editing ref, the exact same editing-ref mechanism the change
-  // page itself offers — never a second, invented mechanism.
-  await optionAHeader.getByRole('button', { name: 'Work on this as a change' }).click();
+  // page itself offers - never a second, invented mechanism.
+  await optionAHeader.getByRole('button', { name: 'Work on this option' }).click();
   await expect(page).toHaveURL(/\/changes\//);
   await expect(page.getByRole('button', { name: 'Editing in this change' })).toBeVisible();
 });

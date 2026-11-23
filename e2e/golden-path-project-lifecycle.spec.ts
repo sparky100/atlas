@@ -89,7 +89,7 @@ test('project lifecycle: start from a finding, decide inside it, deliver the cho
   await expect(page.getByText('accepted', { exact: true }).first()).toBeVisible();
 
   // 4. Design the chosen option: work on it as a change and add the system.
-  await hubHeader.getByRole('button', { name: 'Work on this as a change' }).click();
+  await hubHeader.getByRole('button', { name: 'Work on this option' }).click();
   await expect(page.getByRole('button', { name: 'Editing in this change' })).toBeVisible();
   await expect(page.getByRole('link', { name: PROJECT_TITLE }).first()).toBeVisible();
   await goToModelHome(page);

@@ -1,5 +1,5 @@
 /** What the decision page tells this person to do next: one sentence and, at most, one action. Driven by the decision's state and the viewer's role (CLAUDE.md UX rules 4 and 7). */
-export type DecisionNextAction = 'add-option' | 'compare' | 'choose' | 'ask-to-choose' | 'none';
+export type DecisionNextAction = 'add-option' | 'compare' | 'choose' | 'ask-to-choose' | 'open-delivery' | 'none';
 
 export interface DecisionNextStepInput {
   status: 'proposed' | 'accepted' | 'rejected' | 'superseded';
@@ -11,6 +11,8 @@ export interface DecisionNextStepInput {
   canChoose: boolean;
   /** Title of the chosen option, once there is one. */
   chosenTitle: string | null;
+  /** True when the chosen option is the "stay as we are" baseline, so there is no delivery change to open. */
+  chosenIsBaseline?: boolean;
 }
 
 export interface DecisionNextStep {
@@ -23,7 +25,18 @@ export interface DecisionNextStep {
 export function decisionNextStep(i: DecisionNextStepInput): DecisionNextStep | null {
   if (i.status === 'rejected' || i.status === 'superseded') return null;
   if (i.status === 'accepted') {
-    return { title: 'Chosen', body: i.chosenTitle !== null ? `${i.chosenTitle} was chosen. Draft and submit its changes next.` : 'An option was chosen. Draft and submit its changes next.', action: 'none', actionLabel: null };
+    if (i.chosenIsBaseline === true) {
+      return { title: 'Chosen', body: 'Staying as we are was chosen. No model change is planned.', action: 'none', actionLabel: null };
+    }
+    if (i.chosenTitle === null) {
+      return { title: 'Chosen', body: 'An option was chosen. Its delivery change is no longer linked to this decision.', action: 'none', actionLabel: null };
+    }
+    return {
+      title: 'Chosen',
+      body: `${i.chosenTitle} was chosen. Open it to draft and submit the delivery.`,
+      action: 'open-delivery',
+      actionLabel: 'Open the chosen option',
+    };
   }
   if (i.optionCount === 0) {
     return i.canAddOption
