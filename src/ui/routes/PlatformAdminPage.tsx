@@ -45,11 +45,11 @@ export function PlatformAdminPage() {
           <>
             <PlatformAdminNav />
             <Routes>
-              <Route path="/platform-admin" element={<OverviewPage />} />
-              <Route path="/platform-admin/capability-sets" element={<CapabilitySetsPage />} />
-              <Route path="/platform-admin/catalogue" element={<CataloguePage />} />
-              <Route path="/platform-admin/sample-models" element={<SampleModelsPage />} />
-              <Route path="/platform-admin/llm-proxy" element={<LlmProxyPage />} />
+              <Route index element={<OverviewPage />} />
+              <Route path="capability-sets" element={<CapabilitySetsPage />} />
+              <Route path="catalogue" element={<CataloguePage />} />
+              <Route path="sample-models" element={<SampleModelsPage />} />
+              <Route path="llm-proxy" element={<LlmProxyPage />} />
               <Route path="*" element={<Navigate to="/platform-admin" replace />} />
             </Routes>
           </>
