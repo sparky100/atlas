@@ -67,7 +67,7 @@ test('project pack: decide and design inside a project, attach evidence, downloa
   await expect(page.getByText('accepted', { exact: true }).first()).toBeVisible();
 
   // Design the chosen option: add the system in its change.
-  await hubHeader.getByRole('button', { name: 'Work on this as a change' }).click();
+  await hubHeader.getByRole('button', { name: 'Work on this option' }).click();
   await expect(page.getByRole('button', { name: 'Editing in this change' })).toBeVisible();
   await goToModelHome(page);
   await addSystemFromHome(page, { name: 'Repairs Hub', description: 'Schedules and tracks housing repairs.', capabilityName: 'Housing Repairs' });

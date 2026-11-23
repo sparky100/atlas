@@ -95,7 +95,7 @@ function stripIntentPrefix(label: string): string {
  * Decision-side-completion item 5: once an option is chosen (and still a
  * `draft` branch — the only status a change branch is ever committable
  * to, same guard `ChangePage.tsx`'s own "Edit in this change" uses), its
- * header also offers "Work on this as a change" — no new mechanism, just
+ * header also offers "Work on this option" — no new mechanism, just
  * `onWorkOnThisChange` selecting the branch as the session's editing ref
  * and navigating to its change page, the exact same thing `ChangePage.tsx`'s
  * own button does. `atlas.choose_decision_option` already flips the chosen
@@ -112,7 +112,7 @@ export function DecisionCriteriaGrid({ decisionId, options, canRate, userId, nee
 
   if (options.length === 0) return null;
 
-  /** An option is a change; while it is still a draft and the person may work on changes they can open it for editing, chosen or not. The chosen option keeps its own "Work on this as a change" action. */
+  /** An option is backed by a change; while it is still a draft and the person may work on changes they can open it for editing, chosen or not. The chosen option keeps its own "Work on this option" action. */
   function canEditOption(o: DecisionCriteriaOption): boolean {
     return canWorkOnChange && o.status === 'draft' && !o.isChosen;
   }
@@ -219,7 +219,7 @@ export function DecisionCriteriaGrid({ decisionId, options, canRate, userId, nee
                       <Chip tone={branchStatusTone(o.status)}>{o.status}</Chip>
                     </div>
                     <Text as="span" size="sm" tone="muted">
-                      A change
+                      An option
                     </Text>
                     <Link to={`/o/${orgSlug}/m/${modelSlug}/changes/${o.branchId}`}>
                       <Text as="span" size="md" className={styles.optionTitle}>
@@ -240,7 +240,7 @@ export function DecisionCriteriaGrid({ decisionId, options, canRate, userId, nee
                     <OptionSources sources={o.sources ?? []} />
                     {o.summary === null && canEditOption(o) && (
                       <Text as="p" size="sm" tone="muted">
-                        Use Edit this change to draft it.
+                        Use Work on this option to draft it.
                       </Text>
                     )}
                     <div className={styles.optionHeaderActions}>
@@ -261,7 +261,7 @@ export function DecisionCriteriaGrid({ decisionId, options, canRate, userId, nee
                             onWorkOnThisChange(o.branchId);
                           }}
                         >
-                          Edit this change
+                          Work on this option
                         </Button>
                       )}
                       {o.canChoose && (
@@ -281,7 +281,7 @@ export function DecisionCriteriaGrid({ decisionId, options, canRate, userId, nee
                             onWorkOnThisChange(o.branchId);
                           }}
                         >
-                          Work on this as a change
+                          Work on this option
                         </Button>
                       )}
                     </div>
@@ -371,9 +371,9 @@ export function DecisionCriteriaGrid({ decisionId, options, canRate, userId, nee
             <div className={styles.optionHeaderActions}>
               {canResearch && <Button variant="secondary" onClick={() => { onResearch(o.branchId, stripIntentPrefix(o.label)); }}>Research the web</Button>}
               <Link to={`/o/${orgSlug}/m/${modelSlug}/decisions/${decisionId}/options/${o.branchId}/landscape`}>Preview impact →</Link>
-              {canEditOption(o) && <Button variant="secondary" onClick={() => { onWorkOnThisChange(o.branchId); }}>Edit this change</Button>}
+              {canEditOption(o) && <Button variant="secondary" onClick={() => { onWorkOnThisChange(o.branchId); }}>Work on this option</Button>}
               {o.canChoose && <Button variant="secondary" onClick={() => { onChoose(o.branchId); }}>Choose</Button>}
-              {o.isChosen && canWorkOnChange && o.status === 'draft' && <Button variant="primary" onClick={() => { onWorkOnThisChange(o.branchId); }}>Work on this as a change</Button>}
+              {o.isChosen && canWorkOnChange && o.status === 'draft' && <Button variant="primary" onClick={() => { onWorkOnThisChange(o.branchId); }}>Work on this option</Button>}
             </div>
           </article>
         ))}
