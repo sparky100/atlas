@@ -257,6 +257,18 @@ export async function listCatalogueDrafts(client: Client): Promise<CatalogueDraf
     .map((row) => ({ ...row, content: catalogueDraftContentSchema.parse(row.content) }));
 }
 
+export async function readCatalogueDraft(client: Client, draftId: UUID): Promise<CatalogueDraftRow> {
+  const { data, error } = await client.from('catalogue_drafts')
+    .select('id,base_catalogue_id,sector,version,content,edit_revision,status,published_catalogue_id,updated_at')
+    .eq('id', draftId)
+    .single();
+  if (error) throw new Error(`readCatalogueDraft: ${error.message}`);
+  return {
+    ...(data as Omit<CatalogueDraftRow, 'content'> & { content: unknown }),
+    content: catalogueDraftContentSchema.parse((data as { content: unknown }).content),
+  };
+}
+
 export async function createCatalogueDraft(
   client: Client,
   sector: string,

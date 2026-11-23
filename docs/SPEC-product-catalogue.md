@@ -46,14 +46,16 @@ A successful retry must carry the same original Designer provenance and the same
 
 ## Platform editor and canonical product identity
 
-`/platform-admin` **Product catalogue** keeps one row per real product in
+`/platform-admin/catalogue` keeps one row per real product in
 `catalogue_products`, with its dated claims and capability links in
 `catalogue_product_capabilities`. A link names one exact `capability_maps`
 version and item, so one product can support capabilities in several sectors
 without a duplicate product row. `catalogue_drafts` selects product IDs for a
 sector version; publication writes the existing immutable entry snapshots and
-then publishes the parent catalogue. Reviewer names and `reviewed_by` remain
-internal to the admin view; the end-user reader does not show them.
+then publishes the parent catalogue. The reviewer is recorded automatically
+as the acting platform admin and retained for audit; it is not displayed in
+the admin editor, the catalogue reader, an exported document or a decision
+pack.
 
 All writes are platform-admin-only security-definer RPCs with optimistic
 `edit_revision` checks. Publication refuses fewer or more than 1-8 claims,
