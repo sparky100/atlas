@@ -3,7 +3,7 @@ import type { OptionSource } from '../../contracts/optionSource';
 import { DECISION_CRITERIA, decisionCriterionLevelLabel } from '../../contracts/decisionCriteria';
 import type { UUID } from '../../contracts/delta';
 import type { ElementsHeadRow } from '../../contracts/rows';
-import type { BranchRow, DecisionArgumentRow, DecisionLinkRow, DecisionOptionRatingRow, DecisionRow } from '../../db/types';
+import type { BranchRow, DecisionArgumentRow, DecisionLinkRow, DecisionOptionRatingRow, DecisionOptionRow, DecisionRow } from '../../db/types';
 import type { DecisionAdrExportInput, DecisionAdrExportOptionRating } from './exportDecisionAsAdr';
 import type { WhatChangesRow } from './whatChangesType';
 
@@ -26,7 +26,7 @@ export function decisionConcernIds(links: readonly DecisionLinkRow[], linkedElem
   };
 }
 
-/** The decision's options — its `branch` links, resolved, in link order. */
+/** Legacy branch options from `decision_links`, for callers without candidate rows yet. */
 export function decisionOptionBranches(links: readonly DecisionLinkRow[], linkedBranchesById: ReadonlyMap<UUID, BranchRow>): BranchRow[] {
   return links
     .filter((l) => l.linked_type === 'branch')
@@ -34,10 +34,12 @@ export function decisionOptionBranches(links: readonly DecisionLinkRow[], linked
     .filter((b): b is BranchRow => b !== undefined);
 }
 
-/** One option's recorded ratings, in `DECISION_CRITERIA`'s presentation order, with display labels. */
-export function optionRatingsFor(ratings: readonly Pick<DecisionOptionRatingRow, 'branch_id' | 'criterion' | 'level' | 'note'>[], branchId: UUID): DecisionAdrExportOptionRating[] {
+type AdrRating = Pick<DecisionOptionRatingRow, 'branch_id' | 'criterion' | 'level' | 'note'> & { option_id?: UUID | null };
+
+/** One option's recorded ratings, in `DECISION_CRITERIA`'s presentation order, with display labels. Option id wins; a legacy row with no option id falls back to its branch. */
+export function optionRatingsFor(ratings: readonly AdrRating[], optionId: UUID | null | undefined, branchId: UUID | null | undefined): DecisionAdrExportOptionRating[] {
   return DECISION_CRITERIA.map((criterion) => {
-    const rating = ratings.find((r) => r.branch_id === branchId && r.criterion === criterion.key);
+    const rating = ratings.find((r) => ((optionId != null && r.option_id === optionId) || (r.option_id == null && branchId != null && r.branch_id === branchId)) && r.criterion === criterion.key);
     if (!rating) return null;
     return { criterionLabel: criterion.label, levelLabel: decisionCriterionLevelLabel(criterion.key, rating.level) ?? rating.level, note: rating.note };
   }).filter((r): r is NonNullable<typeof r> => r !== null);
@@ -48,8 +50,10 @@ export interface DecisionAdrSource {
   links: readonly DecisionLinkRow[];
   linkedElementsById: ReadonlyMap<UUID, ElementsHeadRow>;
   linkedBranchesById: ReadonlyMap<UUID, BranchRow>;
+  /** D1 stage 4: the decision's candidates, branchless ones included. Omitted only by the older reviewer digest, which still resolves branch links. */
+  options?: readonly DecisionOptionRow[];
   args: readonly DecisionArgumentRow[];
-  ratings: readonly (DecisionOptionRatingRow | Pick<DecisionOptionRatingRow, 'branch_id' | 'criterion' | 'level' | 'note'>)[];
+  ratings: readonly (DecisionOptionRatingRow | AdrRating)[];
   /** The principles the decision follows or departs from (`adrPrincipleItems`); omitted or empty prints nothing. */
   principles?: DecisionAdrExportInput['principles'];
   /** Titles of the goals the concerned capabilities serve (`goalTitlesServedBy`); omitted or empty prints nothing. */
@@ -59,13 +63,40 @@ export interface DecisionAdrSource {
   ownerName: string;
   /** D2 PR 4: questions an AI reviewer drafted that a person kept. Optional/empty prints no section. */
   keptQuestions?: readonly DecisionAgentNote[];
-  /** Catalogue citations saved with each option, by branch. Optional/empty prints no Sources block. */
+  /** Catalogue and web citations saved with each candidate, by option id. Optional/empty prints no Sources block. */
+  sourcesByOption?: ReadonlyMap<UUID, readonly OptionSource[]>;
+  /** Legacy fallback for a source row saved before option ids were backfilled. */
   sourcesByBranch?: ReadonlyMap<UUID, readonly OptionSource[]>;
 }
 
 export function buildDecisionAdrExportInput(source: DecisionAdrSource): DecisionAdrExportInput {
-  const { decision, links, linkedElementsById, linkedBranchesById, args, ratings, whatChangesRows, ownerName, principles, goalsServed, keptQuestions, sourcesByBranch } = source;
+  const { decision, links, linkedElementsById, linkedBranchesById, options, args, ratings, whatChangesRows, ownerName, principles, goalsServed, keptQuestions, sourcesByOption, sourcesByBranch } = source;
   const { capabilityIds, otherElementIds } = decisionConcernIds(links, linkedElementsById);
+  const optionInputs = options === undefined
+    ? decisionOptionBranches(links, linkedBranchesById).map((branch) => ({
+        optionId: branch.id,
+        title: branch.title ?? branch.name,
+        about: branch.description ?? '',
+        branch,
+        status: branch.status,
+        isChosen: branch.id === decision.branch_id,
+        sources: sourcesByBranch?.get(branch.id) ?? [],
+        ratings: optionRatingsFor(ratings, null, branch.id),
+      }))
+    : options.map((option) => {
+        const branch = option.branch_id === null ? null : (linkedBranchesById.get(option.branch_id) ?? null);
+        const sources = sourcesByOption?.get(option.id) ?? (branch === null ? [] : (sourcesByBranch?.get(branch.id) ?? []));
+        return {
+          optionId: option.id,
+          title: option.title,
+          about: option.summary,
+          branch,
+          status: branch?.status ?? ('candidate' as const),
+          isChosen: branch !== null && branch.id === decision.branch_id,
+          sources,
+          ratings: optionRatingsFor(ratings, option.id, option.branch_id),
+        };
+      });
   return {
     decision,
     ownerName,
@@ -73,10 +104,16 @@ export function buildDecisionAdrExportInput(source: DecisionAdrSource): Decision
       .map((id) => linkedElementsById.get(id))
       .filter((e): e is ElementsHeadRow => e !== undefined)
       .map((e) => ({ name: e.name, typeLabel: e.element_type })),
-    options: decisionOptionBranches(links, linkedBranchesById).map((b) => {
-      const sources = sourcesByBranch?.get(b.id) ?? [];
-      return { branch: b, isChosen: b.id === decision.branch_id, ratings: optionRatingsFor(ratings, b.id), ...(sources.length > 0 ? { sources } : {}) };
-    }),
+    options: optionInputs.map((option) => ({
+      optionId: option.optionId,
+      title: option.title,
+      about: option.about,
+      branch: option.branch,
+      status: option.status,
+      isChosen: option.isChosen,
+      ratings: option.ratings,
+      ...(option.sources.length > 0 ? { sources: option.sources } : {}),
+    })),
     whatChangesRows,
     ...(principles !== undefined ? { principles } : {}),
     ...(goalsServed !== undefined ? { goalsServed } : {}),

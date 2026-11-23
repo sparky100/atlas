@@ -45,9 +45,18 @@ export interface DecisionAdrExportOptionRating {
 }
 
 export interface DecisionAdrExportOption {
-  branch: BranchRow;
+  /** The candidate's stable id (`decision_options.id`); absent only in older test/legacy callers. */
+  optionId?: UUID;
+  /** The candidate's own title, used when it has no delivery change. */
+  title?: string;
+  /** What the person wrote about the candidate, used when it has no delivery change. */
+  about?: string;
+  /** The delivery change, when one exists; null for an untouched candidate. */
+  branch: BranchRow | null;
+  /** Candidate while no delivery change exists; otherwise the branch's own status. */
+  status?: BranchRow['status'] | 'candidate';
   isChosen: boolean;
-  /** This option's own recorded ratings, already resolved to the criterion's/level's own display label (`decisionCriterionLevelLabel`) and in `DECISION_CRITERIA`'s own presentation order — the same labels and order the criteria grid itself shows, never a raw criterion/level key. Empty when nothing on this option has been rated yet. */
+  /** This option's own recorded ratings, already resolved to the criterion's/level's own display label (`decisionCriterionLevelLabel`) and in `DECISION_CRITERIA`'s own presentation order - the same labels and order the criteria grid itself shows, never a raw criterion/level key. Empty when nothing on this option has been rated yet. */
   ratings: readonly DecisionAdrExportOptionRating[];
   /** Catalogue or web evidence saved with this option. Optional/empty prints no Sources block, so an older pack reads as it did. */
   sources?: readonly OptionSource[];
@@ -81,11 +90,15 @@ function statusLine(decision: DecisionRow): string {
   return decision.decided_at ? `${label} — decided ${decision.decided_at.slice(0, 10)}` : label;
 }
 
+function optionTitle(option: DecisionAdrExportOption): string {
+  return option.title ?? (option.branch === null ? 'Untitled candidate' : (option.branch.title ?? option.branch.name));
+}
+
 /** The outcome in one plain line, so a reader meets it before the detail. */
 function outcomeLine(decision: DecisionRow, options: readonly DecisionAdrExportOption[]): string {
   if (decision.status === 'accepted') {
     const chosen = options.find((o) => o.isChosen);
-    return chosen ? `Chose ${chosen.branch.title ?? chosen.branch.name}` : 'An option was chosen, but it is no longer linked to this decision';
+    return chosen ? `Chose ${optionTitle(chosen)}` : 'An option was chosen, but it is no longer linked to this decision';
   }
   if (decision.status === 'rejected') return 'Cancelled without choosing an option';
   return 'Not yet decided';
@@ -93,15 +106,16 @@ function outcomeLine(decision: DecisionRow, options: readonly DecisionAdrExportO
 
 /** What the option is, in one line, when someone wrote it down (a Designer suggestion the person kept, or their own words). */
 function optionAboutLines(option: DecisionAdrExportOption): string[] {
-  const about = (option.branch.description ?? '').replace(/\s+/g, ' ').trim();
+  const about = (option.about ?? option.branch?.description ?? '').replace(/\s+/g, ' ').trim();
   return about === '' ? [] : [`  - About: ${about}`];
 }
 
 function optionLine(option: DecisionAdrExportOption): string {
-  const label = intentHeaderLine(option.branch);
+  const label = option.branch === null ? (option.title ?? 'Untitled candidate') : intentHeaderLine(option.branch);
   if (option.isChosen) return `- **${label}** — chosen`;
-  if (option.branch.status === 'cancelled') return `- ${label} — not chosen`;
-  return `- ${label} — ${option.branch.status}`;
+  if (option.status === 'cancelled' || option.branch?.status === 'cancelled') return `- ${label} — not chosen`;
+  if (option.branch === null || option.status === 'candidate') return `- ${label} — candidate`;
+  return `- ${label} — ${option.status ?? option.branch.status}`;
 }
 
 /** One indented sub-bullet per rating, in the order the caller supplied (`DECISION_CRITERIA`'s own presentation order) — no ratings at all renders nothing, not an empty "no ratings" line, matching this file's own "only render what the decision actually has" rule. */
@@ -218,7 +232,7 @@ export function exportDecisionAsAdrMarkdown(input: DecisionAdrExportInput): stri
     lines.push('');
     lines.push('## What changes (evidence)');
     lines.push('');
-    const optionLabelsByBranchId = new Map(options.map((o) => [o.branch.id, intentHeaderLine(o.branch)]));
+    const optionLabelsByBranchId = new Map(options.flatMap((o) => (o.branch === null ? [] : [[o.branch.id, intentHeaderLine(o.branch)] as const])));
     for (const row of whatChangesRows) lines.push(whatChangesRowLine(row, optionLabelsByBranchId));
   }
 
@@ -242,7 +256,7 @@ export function exportDecisionAsAdrMarkdown(input: DecisionAdrExportInput): stri
   if (decision.status === 'accepted') {
     const chosen = options.find((o) => o.isChosen);
     // The option by its own title — not `intentHeaderLine`, whose "Proposing: …" prefix made "We will Proposing: X" read wrongly.
-    lines.push(chosen ? `Chosen option: **${chosen.branch.title ?? chosen.branch.name}**.` : 'An option was chosen, but it is no longer linked to this decision.');
+    lines.push(chosen ? `Chosen option: **${optionTitle(chosen)}**.` : 'An option was chosen, but it is no longer linked to this decision.');
     if (reasons && reasons.trim().length > 0) {
       lines.push('');
       lines.push(reasons);
