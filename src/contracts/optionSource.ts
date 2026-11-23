@@ -1,9 +1,11 @@
 import type { CatalogueClaim, CatalogueStanding } from './productCatalogue';
 
 interface OptionSourceCommon {
-  /** Stable within a decision: the branch plus the source's own identity. */
+  /** Stable within a decision: the option (or, before the backfill, its branch) plus the source's own identity. */
   id: string;
   branchId: string;
+  /** D1 stage 1: the stable candidate identity. Absent only for a row created before the compatibility trigger existed. */
+  optionId?: string | null;
   citedBy: string;
   citedAt: string;
 }

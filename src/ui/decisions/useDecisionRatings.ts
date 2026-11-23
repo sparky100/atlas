@@ -10,6 +10,8 @@ export type DecisionRatingsStatus = 'loading' | 'idle' | 'saving';
 export interface RateOptionInput {
   decisionId: UUID;
   branchId: UUID;
+  /** The candidate identity the cell belongs to; the database fills it when the caller is still branch-only. */
+  optionId?: UUID | null;
   criterion: DecisionRatingCriterion;
   level: DecisionRatingLevelValue;
   /** Blank/whitespace-only is stored as `null` — "not rated"'s own note-indicator dot never lights up for a note that's only ever been empty. */
@@ -155,10 +157,10 @@ export function useDecisionRatings(modelId: UUID, decisionId: UUID): UseDecision
       pendingKeysRef.current.add(key);
       setError(null);
       setStatus('saving');
-      const optimistic: DecisionOptionRatingRow = { decision_id: input.decisionId, branch_id: input.branchId, criterion: input.criterion, level: input.level, note, rated_by: input.userId, rated_at: new Date().toISOString() };
+      const optimistic: DecisionOptionRatingRow = { decision_id: input.decisionId, branch_id: input.branchId, option_id: input.optionId ?? null, criterion: input.criterion, level: input.level, note, rated_by: input.userId, rated_at: new Date().toISOString() };
       setRatings((prev) => upsertRatingByKey(prev, optimistic));
       try {
-        const saved = await upsertDecisionRating(supabase, { decisionId: input.decisionId, branchId: input.branchId, criterion: input.criterion, level: input.level, note, ratedBy: input.userId });
+        const saved = await upsertDecisionRating(supabase, { decisionId: input.decisionId, branchId: input.branchId, optionId: input.optionId ?? null, criterion: input.criterion, level: input.level, note, ratedBy: input.userId });
         setRatings((prev) => upsertRatingByKey(prev, saved));
         return true;
       } catch (e) {
