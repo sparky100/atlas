@@ -18,10 +18,9 @@ where o.decision_id = r.decision_id
   and o.branch_id = r.branch_id
   and r.option_id is null;
 
-alter table decision_option_ratings alter column branch_id drop not null;
 alter table decision_option_ratings alter column option_id set not null;
-
 alter table decision_option_ratings drop constraint decision_option_ratings_pkey;
+alter table decision_option_ratings alter column branch_id drop not null;
 alter table decision_option_ratings add primary key (decision_id, option_id, criterion);
 
 drop policy decision_option_ratings_insert on decision_option_ratings;
