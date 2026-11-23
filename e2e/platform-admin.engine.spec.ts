@@ -16,7 +16,6 @@ import { randomUUID } from 'node:crypto';
 import { expect, test, type Page } from '@playwright/test';
 import { createServiceRoleClient, createSupabaseClient } from '../src/db/client';
 import { loadEnv } from '../src/db/env';
-import { expandAllSettingsSections } from './fixtures/settings';
 
 async function signUp(page: Page, prefix: string): Promise<{ email: string; password: string }> {
   const email = `${prefix}-${randomUUID()}@example.test`;
@@ -49,9 +48,9 @@ test('a platform admin can view and change LLM proxy settings from the user menu
   await page.getByRole('button', { name: 'Account menu' }).click();
   await page.getByRole('link', { name: 'Platform admin' }).click();
   await expect(page.getByRole('heading', { name: 'Platform admin' })).toBeVisible();
-  await expandAllSettingsSections(page);
 
-  // Organisations and People lists: the admin's own account shows up, with a join date and a last sign-in.
+  // Organisations and People are the overview's two open-by-default sections;
+  // there is no "Expand all" control on this page any more.
   await expect(page.getByRole('heading', { name: /^Organisations/ })).toBeVisible();
   await expect(page.getByRole('heading', { name: /^People/ })).toBeVisible();
   await page.getByLabel('Search people by email').fill(email);
@@ -59,6 +58,8 @@ test('a platform admin can view and change LLM proxy settings from the user menu
   await page.screenshot({ path: 'test-results/platform-admin-overview.png', fullPage: true });
   await page.getByLabel('Search people by email').fill('');
 
+  await page.getByRole('link', { name: 'LLM proxy' }).click();
+  await expect(page.getByRole('heading', { name: 'LLM proxy' })).toBeVisible();
   await page.getByLabel('Model').selectOption('claude-sonnet-5');
   await page.getByLabel(/Rate limit/).fill('42');
   await page.getByRole('button', { name: 'Save', exact: true }).click();
@@ -69,9 +70,9 @@ test('a platform admin can view and change LLM proxy settings from the user menu
   await expect(page.getByLabel(/Rate limit/)).toHaveValue('42');
 });
 
-test('a non-admin visiting /platform-admin sees no access, not the settings form', async ({ page }) => {
+test('a non-admin visiting a platform-admin sub-route sees no access, not the settings form', async ({ page }) => {
   await signUp(page, 'platform-admin-non');
-  await page.goto('/platform-admin');
+  await page.goto('/platform-admin/catalogue');
   await expect(page.getByText("You don't have access to this page.")).toBeVisible();
   await expect(page.getByLabel('Model')).toHaveCount(0);
 });

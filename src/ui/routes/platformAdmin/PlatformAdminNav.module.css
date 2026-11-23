@@ -1,0 +1,24 @@
+.nav {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1);
+  padding-bottom: var(--space-2);
+  border-bottom: var(--border-width) solid var(--border);
+}
+
+.link {
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-sm);
+  color: var(--text);
+  font-size: var(--text-sm-size);
+  text-decoration: none;
+}
+
+.link:hover {
+  background: var(--surface-raised);
+}
+
+.link[aria-current='page'] {
+  background: var(--surface-raised);
+  font-weight: 600;
+}
