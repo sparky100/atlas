@@ -29,7 +29,6 @@ async function openOptionDraft(page: Page, title: string) {
   // A candidate has no branch until Work on this option creates one.
   await page.getByRole('button', { name: 'Work on this option' }).first().click();
   await expect(page).toHaveURL(/\/changes\//);
-  await expect(page.getByText('No change to the landscape recorded.')).toBeVisible();
   const draftLink = page.getByRole('link', { name: "Draft this option's changes" });
   if (await draftLink.count() > 0) await draftLink.click();
 }

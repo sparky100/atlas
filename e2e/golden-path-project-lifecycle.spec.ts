@@ -90,7 +90,8 @@ test('project lifecycle: start from a finding, decide inside it, deliver the cho
 
   // 4. Design the chosen option: work on it as a change and add the system.
   await hubHeader.getByRole('button', { name: 'Work on this option' }).click();
-  await expect(page.getByRole('link', { name: "Draft this option's changes" })).toBeVisible();
+  await expect(page).toHaveURL(/\/changes\//);
+  await expect(page.getByRole('button', { name: 'Editing in this change' })).toBeVisible();
   await expect(page.getByRole('link', { name: PROJECT_TITLE }).first()).toBeVisible();
   await goToModelHome(page);
   await addSystemFromHome(page, { name: 'Repairs Hub', description: 'Schedules and tracks housing repairs.', capabilityName: 'Housing Repairs' });
