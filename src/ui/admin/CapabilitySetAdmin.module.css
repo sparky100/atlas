@@ -1,3 +1,7 @@
+.page { display: flex; flex-direction: column; gap: var(--space-3); }
+.backLink { align-self: flex-start; font-size: var(--text-sm-size); }
+.stickyActions { position: sticky; top: 0; z-index: 2; background: var(--bg); padding: var(--space-2) 0; }
+.subheading { margin: var(--space-4) 0 0; }
 .controls, .actions, .draftList { display: flex; align-items: center; flex-wrap: wrap; gap: var(--space-2); margin: var(--space-3) 0; }
 .controls label, .fields label, .tree label, .itemCard label { display: flex; flex-direction: column; gap: var(--space-1); min-width: 0; }
 .editor { margin-top: var(--space-4); border-top: 1px solid var(--border-strong); padding-top: var(--space-3); }
@@ -10,6 +14,7 @@
 .scroll button:hover, .scroll .active { background: var(--surface-raised); }
 .scroll small, .itemCard small, .draftList small { display: block; opacity: .7; }
 .itemCard { display: flex; flex-direction: column; gap: var(--space-2); }
+.itemCard h2 { margin: 0; font-size: var(--text-lg-size); }
 .identity { border-top: 1px solid var(--border-strong); padding-top: var(--space-3); display: flex; flex-direction: column; gap: var(--space-2); }
 .identity details, .match { border: 1px solid var(--border-strong); border-radius: var(--radius-sm); padding: var(--space-2); }
 .identity details[open] { display: flex; flex-direction: column; gap: var(--space-2); }
