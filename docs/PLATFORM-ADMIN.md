@@ -7,24 +7,50 @@ A platform administrator is scoped to the whole deployment instead.
 
 ## What a platform admin can do today
 
-Four things, all at `/platform-admin`, reachable from the account menu once granted. Nothing else in this product checks platform-admin status.
+These are reached from `/platform-admin`, each on its own route (the section
+opens with a nav and every area has a URL that survives refresh). Nothing
+else in this product checks platform-admin status.
 
-1. **See every organisation and person** (read-only). The Organisations list shows created date, people, elements on main, changes and active people in the last 30 days, last sign-in and last change. The People list shows email, each organisation with role and join date, sign-up date, last sign-in and last change, with a search by email. Anything with no sign-in or change in 30 days gets a "Not used in 30+ days" marker. Counts and dates only; no element names or other model content. "Last signed in" comes from `auth.users.last_sign_in_at`; "last change" is the newest commit the person (or organisation) made, so a read-only user shows "Never" for changes. Both come from `atlas.platform_admin_organisations()` / `atlas.platform_admin_people()` (`20261114080000_platform_admin_overview.sql`), which raise unless `atlas.is_platform_admin()` is exactly true (written `is not true`, so a NULL cannot pass), never consult org roles, and so refuse an organisation Owner.
-2. **View and change `llm-proxy`'s own application-level
-settings** (provider, model, per-org rate-limit cap, optionally the API key).
-3. **Edit the platform capability sets and the product catalogue**.
-   Capability sets use a guarded draft workspace and publish one fixed
+1. **See every organisation and person** (read-only) at `/platform-admin`.
+   The Organisations list shows created date, people, elements on main,
+   changes and active people in the last 30 days, last sign-in and last
+   change. The People list shows email, each organisation with role and join
+   date, sign-up date, last sign-in and last change, with a search by email.
+   Anything with no sign-in or change in 30 days gets a "Not used in 30+ days"
+   marker. Counts and dates only; no element names or other model content.
+   "Last signed in" comes from `auth.users.last_sign_in_at`; "last change" is
+   the newest commit the person (or organisation) made, so a read-only user
+   shows "Never" for changes. Both come from
+   `atlas.platform_admin_organisations()` / `atlas.platform_admin_people()`
+   (`20261114080000_platform_admin_overview.sql`), which raise unless
+   `atlas.is_platform_admin()` is exactly true (written `is not true`, so a
+   NULL cannot pass), never consult org roles, and so refuse an organisation
+   Owner.
+2. **View and change `llm-proxy`'s own application-level settings** at
+   `/platform-admin/llm-proxy` (provider, model, per-org rate-limit cap,
+   optionally the API key).
+3. **Edit the platform capability sets and the product catalogue**:
+   `/platform-admin/capability-sets` lists sectors and versions, a version has
+   its own read-only page, and a draft has its own editor;
+   `/platform-admin/catalogue` lists the product library, and
+   `/platform-admin/catalogue/sectors` lists the sector catalogues and their
+   drafts. Capability sets use a guarded draft workspace and publish one fixed
    `capability_maps` version (`docs/ADR-037-platform-capability-set-editor.md`).
    The product catalogue has one row per real product, with capability links
    into any number of capability-set versions. Sector catalogues are fixed
    publication snapshots that select products and pin one published set
    (`docs/ADR-038-product-catalogue-admin.md`). Both editors are
    platform-admin-only; ordinary organisation owners cannot reach them.
-4. **Withdraw or reinstate a published sample model**. A sample is withdrawn
-   by its slug, which hides every version from ordinary users without editing
-   or deleting the published rows. The reason, actor and time are recorded;
-   existing organisation copies are untouched. See
-   `docs/ADR-033-sample-models.md`.
+4. **Withdraw or reinstate a published sample model** at
+   `/platform-admin/sample-models`. A sample is withdrawn by its slug, which
+   hides every version from ordinary users without editing or deleting the
+   published rows. The reason, actor and time are recorded; existing
+   organisation copies are untouched. See `docs/ADR-033-sample-models.md`.
+
+Reviewer metadata is audit data. A new catalogue claim or capability-set
+source records the acting platform admin automatically; the name is never
+displayed in the admin UI, any catalogue reader view, an exported document or
+a decision pack.
 
 Provider is a real picker, not a label — `LLM_PROXY_PROVIDER_OPTIONS`
 (`src/ui/admin/useLlmProxyConfig.ts`) holds one entry today ("Anthropic"),

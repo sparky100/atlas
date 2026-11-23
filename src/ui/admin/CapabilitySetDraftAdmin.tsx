@@ -20,6 +20,7 @@ import { Text } from '../components/Text/Text';
 import { supabase } from '../supabaseClient';
 import { useUnsavedChanges } from '../routes/platformAdmin/unsavedChanges';
 import { treeOrder, type CapabilitySetItem as Item } from './capabilitySetTree';
+import { useActingAdminName } from './useActingAdminName';
 import styles from './CapabilitySetAdmin.module.css';
 
 const BASE = '/platform-admin/capability-sets';
@@ -36,6 +37,7 @@ type Stage = Stream['stages'][number];
  */
 export function CapabilitySetDraftAdmin({ draftId }: { draftId: string }) {
   const navigate = useNavigate();
+  const actingAdminName = useActingAdminName();
   const [draft, setDraft] = useState<ReferenceMapDraft | null>(null);
   const [baseContent, setBaseContent] = useState<CapabilityMapContent | null>(null);
   const [alignments, setAlignments] = useState<DraftAlignment[]>([]);
@@ -94,6 +96,10 @@ export function CapabilitySetDraftAdmin({ draftId }: { draftId: string }) {
     finally { setBusy(false); }
   };
   const change = (next: CapabilityMapContent) => { setContent(next); setIssues(null); };
+  const withReviewer = (value: CapabilityMapContent): CapabilityMapContent => ({
+    ...value,
+    sources: value.sources.map((source) => source.reviewedBy.trim() === '' ? { ...source, reviewedBy: actingAdminName } : source),
+  });
   const updateItem = (code: string, patch: Partial<Item>) => {
     if (!content) return;
     change({ ...content, items: content.items.map((item) => item.code === code ? { ...item, ...patch } : item) });
@@ -111,17 +117,20 @@ export function CapabilitySetDraftAdmin({ draftId }: { draftId: string }) {
 
   const save = () => void run(async () => {
     if (!draft || !content) return;
-    const revision = await saveReferenceMapDraft(supabase, draft, content);
-    setDraft({ ...draft, content, edit_revision: revision });
+    const saved = withReviewer(content);
+    const revision = await saveReferenceMapDraft(supabase, draft, saved);
+    setContent(saved);
+    setDraft({ ...draft, content: saved, edit_revision: revision });
     setNotice(`Draft saved (revision ${String(revision)}).`);
   });
 
   const validate = () => void run(async () => {
     if (!content) return;
-    const local = capabilityMapContentSchema.safeParse(content);
+    const checked = withReviewer(content);
+    const local = capabilityMapContentSchema.safeParse(checked);
     const localIssues = local.success ? [] : local.error.issues.map((issue) => `${issue.path.join('.') || 'Map'}: ${issue.message}`);
-    const serverIssues = await validateReferenceMap(supabase, content);
-    const missing = content.items.filter((item) => !alignments.some((alignment) => alignment.item_code === item.code
+    const serverIssues = await validateReferenceMap(supabase, checked);
+    const missing = checked.items.filter((item) => !alignments.some((alignment) => alignment.item_code === item.code
       && alignment.reviewed_name === item.name && alignment.reviewed_description === (item.description ?? '')));
     const identityIssues = missing.length ? [`Review the canonical identity for ${String(missing.length)} capabilities. Select each item in the tree to use an existing identity or create one.`] : [];
     setIssues([...localIssues, ...serverIssues, ...identityIssues]);
@@ -234,15 +243,14 @@ export function CapabilitySetDraftAdmin({ draftId }: { draftId: string }) {
       </div>
 
       <h2>Sources</h2>
-      <p>Evidence and review details are part of the published record. Reviewer names are internal to this admin view.</p>
+      <p>Evidence and review details are part of the published record. The reviewer is recorded automatically and kept internal.</p>
       <div className={styles.cards}>{content.sources.map((source, index) => <details className={styles.itemCard} key={index}><summary>{source.citation || 'New source'}</summary>
         <label>Citation <input value={source.citation} onChange={(e) => { change({ ...content, sources: content.sources.map((s, n) => n === index ? { ...s, citation: e.target.value } : s) }); }} /></label>
         <label>URL <input type="url" value={source.url ?? ''} onChange={(e) => { change({ ...content, sources: content.sources.map((s, n) => n === index ? { ...s, url: e.target.value } : s) }); }} /></label>
-        <label>Reviewed by <input value={source.reviewedBy} onChange={(e) => { change({ ...content, sources: content.sources.map((s, n) => n === index ? { ...s, reviewedBy: e.target.value } : s) }); }} /></label>
         <label>Review date <input type="date" value={source.reviewedAt} onChange={(e) => { change({ ...content, sources: content.sources.map((s, n) => n === index ? { ...s, reviewedAt: e.target.value } : s) }); }} /></label>
         <button type="button" onClick={() => { change({ ...content, sources: content.sources.filter((_, n) => n !== index) }); }}>Remove source</button>
       </details>)}</div>
-      <button type="button" onClick={() => { change({ ...content, sources: [...content.sources, { citation: '', url: '', reviewedBy: '', reviewedAt: new Date().toISOString().slice(0, 10) }] }); }}>Add source</button>
+      <button type="button" onClick={() => { change({ ...content, sources: [...content.sources, { citation: '', url: '', reviewedBy: actingAdminName, reviewedAt: new Date().toISOString().slice(0, 10) }] }); }}>Add source</button>
 
       <h2>Value streams ({content.valueStreams.length})</h2>
       <p>Stages refer to capabilities by their exact name. Check these links after renaming a capability.</p>

@@ -39,8 +39,12 @@ All writes are platform-admin-only `SECURITY DEFINER` operations. The browser
 has no direct write grant. Saving a product or draft is optimistic on
 `edit_revision`; an outdated editor must reload. Product claims may be kept
 while incomplete, but publication requires 1-8 claims per product, no claim
-marked pending review, and 1-10 capability links in the pinned set. Reviewer
-names stay internal to this admin view and are not shown to catalogue readers.
+marked pending review, and 1-10 capability links in the pinned set. The
+reviewer is recorded automatically as the acting platform admin and retained
+for audit; it is not displayed in the admin UI, the catalogue reader or an
+exported pack. **Amended 23 November 2026:** list → detail routes (products,
+sector catalogues, versions and drafts) replace the single long catalogue
+section.
 
 ## Consequences
 
