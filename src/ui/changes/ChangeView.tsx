@@ -249,15 +249,9 @@ export function ChangeView({ orgId, modelId, branchId, orgSlug, modelSlug, role,
           </div>
           <div className={styles.headerActions}>
             {isOption && canEdit && branch.status === 'draft' && (
-              isSelected ? (
-                <Button variant="secondary" disabled>
-                  Editing this option
-                </Button>
-              ) : (
-                <LinkButton to={editInLandscapeHref} variant="primary">
-                  {hasEdits ? 'Carry on editing' : "Draft this option's changes"}
-                </LinkButton>
-              )
+              <LinkButton to={editInLandscapeHref} variant={isSelected ? 'primary' : 'secondary'}>
+                {hasEdits ? 'Carry on editing' : "Draft this option's changes"}
+              </LinkButton>
             )}
             {!isOption && canEdit && branch.status === 'draft' && (
               <Button
