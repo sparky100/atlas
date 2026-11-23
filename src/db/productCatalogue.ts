@@ -287,6 +287,27 @@ export async function listCurrentCatalogueEntriesForCapability(client: Client, m
     .sort((a, b) => a.product.localeCompare(b.product));
 }
 
+/**
+ * Current published products for the capability an element is, resolved from
+ * the element's own starter-map link (or its stable code when that link is
+ * stale). Used to recognise a returned web page as a product the catalogue
+ * already holds; it never creates a product or a recommendation.
+ */
+export async function currentCatalogueEntriesForCapabilityElement(
+  client: Client,
+  modelId: string,
+  attributes: unknown,
+): Promise<CatalogueEntry[]> {
+  if (typeof attributes !== 'object' || attributes === null || Array.isArray(attributes)) return [];
+  const attrs = attributes as Record<string, unknown>;
+  const templateRef = typeof attrs.templateRef === 'string' && attrs.templateRef.trim() !== '' ? attrs.templateRef : null;
+  const code = typeof attrs.code === 'string' && attrs.code.trim() !== '' ? attrs.code.trim() : '';
+  const match = templateRef !== null ? await capabilityMapMatch(client, templateRef) : null;
+  const resolved = match ?? (code !== '' ? await publishedCapabilityMatchForModel(client, modelId, code) : null);
+  if (resolved === null) return [];
+  return listCurrentCatalogueEntriesForCapability(client, { sector: resolved.sector, capabilityCode: resolved.capabilityCode });
+}
+
 /** One entry by the citation stored on an option or a pack, with its standing. */
 export async function catalogueEntryByCitation(client: Client, citation: CatalogueCitation): Promise<CitedCatalogueEntry | null> {
   const catalogue = await client

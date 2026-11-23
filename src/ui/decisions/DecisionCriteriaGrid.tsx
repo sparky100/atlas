@@ -10,6 +10,7 @@ import { Chip } from '../components/Chip/Chip';
 import { ClampedText } from '../components/ClampedText/ClampedText';
 import { Text } from '../components/Text/Text';
 import { OptionSources } from './OptionSources';
+import { stripIntentPrefix } from './optionLabel';
 import type { OptionSource } from '../../contracts/optionSource';
 import type { UseDecisionRatingsResult } from './useDecisionRatings';
 import styles from './DecisionCriteriaGrid.module.css';
@@ -84,12 +85,6 @@ interface EditingCell {
   branchLabel: string;
   criterion: DecisionCriterionKey;
   criterionLabel: string;
-}
-
-const INTENT_PREFIX = /^(?:Exploring|Proposing|Recording):\s*/;
-
-function stripIntentPrefix(label: string): string {
-  return label.replace(INTENT_PREFIX, '');
 }
 
 /**

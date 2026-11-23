@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { parseDesignerOptions } from './designerOptions';
+import { parseCatalogueProducts, parseDesignerOptions } from './designerOptions';
 
 const good = { options: [{ title: 'Configure what we run', summary: 'Use the quoting module as is.', toWeigh: 'Fit.' }, { title: 'Replace with a product', summary: 'Buy one.', toWeigh: '' }], gaps: ['No owner recorded'], stayNote: 'Quotes stay slow.' };
 
@@ -46,6 +46,26 @@ describe('parseDesignerOptions', () => {
     expect(r.options[0]?.webRefs).toEqual([ref, { url: 'https://vendor.example/third', title: 'Third' }]);
     expect(parseDesignerOptions(JSON.stringify({ options: [{ title: 'Keep', summary: 'As is.' }] })).options[0]?.webRefs).toEqual([]);
   });
+  it('keeps well-formed catalogue product cards and drops malformed or duplicate ones', () => {
+    const ref = { sector: 'electricity_network', version: 2, entryCode: 'crm-x' };
+    const card = {
+      ref,
+      product: 'CRM X',
+      vendor: 'Vendor Ltd',
+      summary: 'A CRM.',
+      capabilityName: 'Complaints',
+      howItSupports: 'Records complaints.',
+      claims: [{ statement: 'Records complaints.', kind: 'functional', sourceUrl: 'https://vendor.example/crm', sourceDate: '2026-01-01' }],
+    };
+    expect(parseCatalogueProducts([
+      card,
+      card,
+      { ...card, ref: { sector: '', version: 0, entryCode: '' } },
+      { ...card, product: '' },
+      { ...card, ref: { sector: 'electricity_network', version: 2, entryCode: 'other' }, product: 'CRM Y', claims: [{ statement: '', sourceUrl: '', sourceDate: '' }] },
+    ])).toEqual([card, { ...card, ref: { sector: 'electricity_network', version: 2, entryCode: 'other' }, product: 'CRM Y', claims: [] }]);
+  });
+
   it('keeps a full "what to weigh" up to the larger limit and cuts a longer one at a word boundary', () => {
     const long = 'The catalogue evidence is only the vendor own positioning. '.repeat(8);
     const r = parseDesignerOptions(JSON.stringify({ options: [{ title: 'Replace', summary: 'Buy.', toWeigh: long }], gaps: [], stayNote: '' }));
