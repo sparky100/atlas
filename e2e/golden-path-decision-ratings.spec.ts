@@ -111,7 +111,7 @@ test('rate decision options on judgement criteria, leave some unrated, choose on
   // The rejected option (Option 2) stays visible in the grid, not removed —
   // its own column, status chip, and previously-recorded rating remain.
   await expect(optionBHeader).toBeVisible();
-  await expect(optionBHeader).toContainText('cancelled');
+  await expect(optionBHeader).toContainText('not chosen');
   await expect(timingControl).toContainText('After end date');
 
   // A comment write doesn't blank the page either — same marker, still
