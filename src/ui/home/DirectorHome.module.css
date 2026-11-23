@@ -310,28 +310,20 @@
   padding: var(--space-2);
 }
 
-/* Empty state (new model): dashed placeholder tiles at 55% opacity, then
-   the explanation and the one action — CapabilityMapImportPanel, which
-   already lists the real published sectors dynamically rather than a
-   hand-maintained dropdown. */
+/* Empty state (new model): the explanation, then CapabilityMapImportPanel,
+   which lists the real published sectors dynamically rather than a
+   hand-maintained dropdown. No decorative placeholder tiles: they stood in
+   for capability cards that don't exist yet and read as broken boxes. The
+   door keeps the content width it is given so the starter-map grid can use
+   a wide screen; only the prose is capped, so a line stays readable. */
 .empty {
   display: flex;
   flex-direction: column;
   gap: var(--space-3);
-  max-width: 640px;
 }
 
-.emptyTiles {
-  display: grid;
-  grid-template-columns: repeat(4, 1fr);
-  gap: var(--space-3);
-}
-
-.emptyTile {
-  height: var(--tile-min-height);
-  border: var(--border-width) dashed var(--border-strong);
-  border-radius: var(--radius-sm);
-  opacity: 0.55;
+.emptyIntro {
+  max-width: 65ch;
 }
 
 @media (max-width: 1000px) {
@@ -344,10 +336,6 @@
     display: grid;
     grid-template-columns: repeat(2, minmax(0, 1fr));
     align-items: start;
-  }
-
-  .emptyTiles {
-    grid-template-columns: 1fr;
   }
 }
 

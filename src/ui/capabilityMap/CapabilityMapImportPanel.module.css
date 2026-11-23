@@ -1,3 +1,10 @@
+/* The panel uses the page's full content width at the empty-model door, so
+   the card grid below can use a wide screen; prose and the search field keep
+   a readable, conventional measure instead of stretching line-length. */
+.intro {
+  max-width: 65ch;
+}
+
 .search {
   display: flex;
   align-items: center;
@@ -7,6 +14,7 @@
 
 .searchInput {
   flex: 1;
+  max-width: 480px;
   height: var(--row-height);
   padding: 0 var(--space-2);
   border-radius: var(--radius-sm);
