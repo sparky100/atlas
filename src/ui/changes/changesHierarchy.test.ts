@@ -3,7 +3,7 @@ import type { BranchRow, DecisionOptionRow, DecisionRow, ProjectRow } from '../.
 import { buildChangesHierarchy } from './changesHierarchy';
 
 const branch = (id: string, over: Partial<BranchRow> = {}) => ({ id, name: id, title: id, project_id: null, ...over }) as unknown as BranchRow;
-const decision = (id: string, project_id: string | null = null) => ({ id, title: id, project_id }) as unknown as DecisionRow;
+const decision = (id: string, project_id: string | null = null) => ({ id, title: id, project_id, status: 'proposed' }) as unknown as DecisionRow;
 const project = (id: string) => ({ id, title: id }) as unknown as ProjectRow;
 const option = (id: string, decisionId: string, branchId: string | null = null) => ({ id, decision_id: decisionId, branch_id: branchId, title: id, position: 0 }) as DecisionOptionRow;
 
