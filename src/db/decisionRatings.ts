@@ -31,6 +31,8 @@ export async function listDecisionRatingsForDecision(supabase: Client, decisionI
 export interface UpsertDecisionRatingInput {
   decisionId: UUID;
   branchId: UUID;
+  /** D1 stage 1: the stable candidate identity. The compatibility trigger fills it when omitted. */
+  optionId?: UUID | null;
   criterion: DecisionRatingCriterion;
   level: DecisionRatingLevelValue;
   /** `null` clears the note (still a valid rating, per `isValidDecisionRatingNote`'s own "null/empty is always valid") — trimmed and length-checked by the caller (`useDecisionRatings.ts`) before this is ever called; the database's own `check` constraint is the last-resort backstop, not the primary validation point. */
@@ -39,7 +41,7 @@ export interface UpsertDecisionRatingInput {
 }
 
 export async function upsertDecisionRating(supabase: Client, input: UpsertDecisionRatingInput): Promise<DecisionOptionRatingRow> {
-  const row = { decision_id: input.decisionId, branch_id: input.branchId, criterion: input.criterion, level: input.level, note: input.note, rated_by: input.ratedBy, rated_at: new Date().toISOString() };
+  const row = { decision_id: input.decisionId, branch_id: input.branchId, option_id: input.optionId ?? null, criterion: input.criterion, level: input.level, note: input.note, rated_by: input.ratedBy, rated_at: new Date().toISOString() };
   // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment -- untyped client; see branches.ts's module comment.
   const { data, error } = await supabase.from('decision_option_ratings').upsert(row, { onConflict: 'decision_id,branch_id,criterion' }).select('*').single();
   if (error) throw new Error(`upsertDecisionRating: ${error.message}`);

@@ -522,6 +522,32 @@ export interface DecisionArgumentRow {
   created_at: string;
 }
 
+/**
+ * A decision's own candidate (`decision_options`, D1 stage 1). `branch_id` is
+ * null for a candidate that has not been worked on or chosen yet. The legacy
+ * branch option still exists; this row is the stable identity the page now
+ * reads and the identity ratings, marks and sources will move onto.
+ */
+export interface DecisionOptionRow {
+  id: UUID;
+  decision_id: UUID;
+  branch_id: UUID | null;
+  title: string;
+  summary: string;
+  to_weigh: string;
+  position: number;
+  source: 'manual' | 'designer';
+  agent: 'designer' | null;
+  drafted_at: string | null;
+  draft_run_id: UUID | null;
+  edited_by: UUID | null;
+  edited_at: string | null;
+  created_by: UUID;
+  created_at: string;
+  updated_by: UUID;
+  updated_at: string;
+}
+
 /** The literal shape of a row in `decision_links` — a polymorphic link from a decision to whatever it concerns (`element`/`relationship`) or offers as an option (`branch`, F3's own options mechanism) or cites (`assumption`/`evidence`). Primary key `(decision_id, linked_type, linked_id)`, so no `id` column of its own. */
 /** The literal shape of a row in `decision_option_marks` (`20261120010000_decision_option_marks.sql`). */
 export interface DecisionOptionMarkRow {
