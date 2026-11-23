@@ -76,6 +76,10 @@ test('a platform admin can view and change LLM proxy settings from the user menu
   await page.getByRole('link', { name: 'Sector catalogues' }).click();
   await expect(page.getByRole('heading', { name: 'Sector catalogues' })).toBeVisible();
   await expect(page.getByTestId('catalogue-sectors-admin')).toBeVisible();
+
+  await page.getByRole('link', { name: 'Sample models' }).click();
+  await expect(page.getByRole('heading', { name: 'Sample models' })).toBeVisible();
+  await expect(page.getByTestId('sample-models-admin')).toBeVisible();
 });
 
 test('a non-admin visiting a platform-admin sub-route sees no access, not the settings form', async ({ page }) => {

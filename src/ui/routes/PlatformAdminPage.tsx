@@ -16,6 +16,7 @@ import { CatalogueVersionPage } from './platformAdmin/CatalogueVersionPage';
 import { LlmProxyPage } from './platformAdmin/LlmProxyPage';
 import { OverviewPage } from './platformAdmin/OverviewPage';
 import { PlatformAdminNav } from './platformAdmin/PlatformAdminNav';
+import { SampleModelPage } from './platformAdmin/SampleModelPage';
 import { SampleModelsPage } from './platformAdmin/SampleModelsPage';
 import { UnsavedChangesProvider } from './platformAdmin/unsavedChanges';
 import styles from './PlatformAdminPage.module.css';
@@ -65,6 +66,7 @@ export function PlatformAdminPage() {
               <Route path="catalogue/sectors/:sector/versions/:catalogueId" element={<CatalogueVersionPage />} />
               <Route path="catalogue/sectors/:sector/drafts/:draftId" element={<CatalogueDraftPage />} />
               <Route path="sample-models" element={<SampleModelsPage />} />
+              <Route path="sample-models/:slug" element={<SampleModelPage />} />
               <Route path="llm-proxy" element={<LlmProxyPage />} />
               <Route path="*" element={<Navigate to="/platform-admin" replace />} />
             </Routes>
