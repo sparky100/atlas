@@ -19,8 +19,13 @@ describe('decisionNextStep', () => {
     expect(decisionNextStep({ ...base, canChoose: true })?.action).toBe('choose');
     expect(decisionNextStep({ ...base, canChoose: true, ratedOptionCount: 3 })?.action).toBe('choose');
   });
-  it('says what was chosen, and shows nothing for a cancelled decision', () => {
-    expect(decisionNextStep({ ...base, status: 'accepted', chosenTitle: 'Build ourselves' })?.body).toMatch(/Build ourselves was chosen/);
+  it('says what was chosen, offers the delivery, and shows nothing for a cancelled decision', () => {
+    const accepted = decisionNextStep({ ...base, status: 'accepted', chosenTitle: 'Build ourselves' });
+    expect(accepted?.body).toMatch(/Build ourselves was chosen/);
+    expect(accepted?.action).toBe('open-delivery');
+    expect(accepted?.actionLabel).toBe('Open the chosen option');
+    expect(decisionNextStep({ ...base, status: 'accepted', chosenTitle: null })?.action).toBe('none');
+    expect(decisionNextStep({ ...base, status: 'accepted', chosenTitle: 'Stay as we are', chosenIsBaseline: true })?.action).toBe('none');
     expect(decisionNextStep({ ...base, status: 'rejected' })).toBeNull();
   });
 });

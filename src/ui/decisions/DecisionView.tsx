@@ -221,11 +221,16 @@ export function DecisionView({ modelId, decisionId, orgId, orgSlug, modelSlug, r
     ratedOptionCount: scoredLinks.filter((l) => ratedBranchIds.has(l.linked_id)).length,
     canAddOption,
     canChoose,
-    chosenTitle: chosenBranch ? intentHeaderLine(chosenBranch) : null,
+    chosenTitle: chosenBranch ? (chosenBranch.title ?? chosenBranch.name) : null,
+    chosenIsBaseline: decision.branch_id !== null && decision.branch_id === decision.baseline_branch_id,
   });
 
   function onNextStepAction() {
     if (!nextStep) return;
+    if (nextStep.action === 'open-delivery') {
+      if (decision.branch_id !== null) void navigate(`/o/${orgSlug}/m/${modelSlug}/changes/${decision.branch_id}`);
+      return;
+    }
     if (nextStep.action === 'compare' || nextStep.action === 'choose') {
       document.getElementById(nextStep.action === 'choose' && comparisonOptions.length > 0 ? 'decision-effects' : 'decision-compare')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
       return;
@@ -471,7 +476,7 @@ export function DecisionView({ modelId, decisionId, orgId, orgSlug, modelSlug, r
         </Text>
       )}
 
-      {nextStep !== null && decision.status === 'proposed' && <DecisionNextStepCard step={nextStep} onAction={onNextStepAction} busy={askBusy} askedNames={askedNames} error={askError} showSecondOpinion={secondOpinion.available} />}
+      {nextStep !== null && <DecisionNextStepCard step={nextStep} onAction={onNextStepAction} busy={askBusy} askedNames={askedNames} error={askError} showSecondOpinion={secondOpinion.available} />}
       {(branchLinks.length > 0 || canAddOption) && (
         <Panel>
           <CollapsibleSection title="Options" meta={`(${String(branchLinks.length)})`}>
@@ -577,7 +582,7 @@ export function DecisionView({ modelId, decisionId, orgId, orgSlug, modelSlug, r
           )}
           {branchLinks.some((link) => !linkedBranchesById.get(link.linked_id)) && (
             <Text as="p" tone="muted" size="sm">
-              A linked change that no longer resolves.
+              A linked option that no longer resolves.
             </Text>
           )}
 
@@ -669,7 +674,7 @@ export function DecisionView({ modelId, decisionId, orgId, orgSlug, modelSlug, r
       {comparisonOptions.length > 0 && (
         <div id="decision-effects">
         <Panel>
-          <CollapsibleSection title="What changes" meta="per option">
+          <CollapsibleSection title="What each option changes" meta="per option">
 
           {comparison.status === 'loading' && (
             <Text as="p" tone="muted" size="sm">
@@ -724,7 +729,7 @@ export function DecisionView({ modelId, decisionId, orgId, orgSlug, modelSlug, r
                   {compact && (visible.length > 0 || whatChangesExpanded) && (
                     <div className={styles.mobileChangeCards} data-testid="what-changes-cards">
                       {comparison.options.map((option) => option.branchId !== null && (
-                        <article key={option.branchId} className={styles.changeCard} aria-label={`What changes — ${option.label}`}>
+                        <article key={option.branchId} className={styles.changeCard} aria-label={`What this option changes — ${option.label}`}>
                           <Text as="h3" size="md">{option.label}</Text>
                           {comparison.mainDriftedByBranchId.has(option.branchId) && (
                             <Text as="p" size="sm" tone="muted">The live model has moved since this option was started.</Text>

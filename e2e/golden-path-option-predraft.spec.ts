@@ -86,7 +86,7 @@ test('an empty Build option offers to retire the existing system and replace it 
   // Arriving by nav with the option selected lands the same way: re-open the
   // option for editing (the banner's back link is still offered there), then
   // return via the Decisions nav instead of the banner.
-  await page.getByRole('button', { name: 'Edit this change' }).click();
+  await page.getByRole('button', { name: 'Work on this option' }).click();
   await expect(page).toHaveURL(/\/changes\//);
   await expect(page.getByRole('status').filter({ hasText: 'Editing in change' }).getByRole('link', { name: 'Back to the decision' })).toBeVisible();
   await clickNavItem(page, 'Decisions');
