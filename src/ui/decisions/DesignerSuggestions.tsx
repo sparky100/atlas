@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import type { UUID } from '../../contracts/delta';
-import { DESIGNER_SUMMARY_MAX, DESIGNER_TITLE_MAX, DESIGNER_WEIGH_MAX, type DesignerWebRef } from '../../contracts/designerOptions';
+import { catalogueRefKeyOf, DESIGNER_SUMMARY_MAX, DESIGNER_TITLE_MAX, DESIGNER_WEIGH_MAX, type DesignerCatalogueProduct, type DesignerWebRef } from '../../contracts/designerOptions';
 import { runDesigner, type DesignerDraft } from '../../db/designAgent';
 import { DESIGNER_MAX_FINDING_CHARS } from '../../tools/designPrompt';
 import { Button } from '../components/Button/Button';
@@ -10,6 +10,8 @@ import { ownerNames as namesOfOwners } from '../orgs/ownerNames';
 import { Chip } from '../components/Chip/Chip';
 import { Text } from '../components/Text/Text';
 import { supabase } from '../supabaseClient';
+import { ResearchResultCard } from './ResearchResultCard';
+import { hostOf } from './researchCatalogueMatches';
 import { designerCostLine, designerTrialLine } from './designerRequest';
 import { useDesignerTrial } from './useDesignerTrial';
 import { clockNow, loadPending, pendingKey, savePending, type PendingOption } from './pendingOptions';
@@ -47,7 +49,25 @@ export interface DesignerSuggestionsProps {
 const isEdited = (c: PendingOption) => c.title.trim() !== c.suggestedTitle.trim() || c.summary.trim() !== c.suggestedSummary.trim();
 
 function newCards(draft: DesignerDraft, draftedAt: string): SuggestionCard[] {
-  return draft.options.map((o) => ({ id: crypto.randomUUID(), title: o.title, summary: o.summary, toWeigh: o.toWeigh, suggestedTitle: o.title, suggestedSummary: o.summary, draftedAt, catalogueRefs: o.catalogueRefs, webRefs: o.webRefs, included: true }));
+  return draft.options.map((o) => ({ id: crypto.randomUUID(), title: o.title, summary: o.summary, toWeigh: o.toWeigh, suggestedTitle: o.title, suggestedSummary: o.summary, draftedAt, catalogueRefs: o.catalogueRefs, catalogueProducts: o.catalogueProducts, webRefs: o.webRefs, included: true }));
+}
+
+/** The option a person gets when they pick one reviewed product out of a replacement card. */
+function productSuggestion(product: DesignerCatalogueProduct, draftedAt: string): SuggestionCard {
+  const title = `Use ${product.product}`.slice(0, DESIGNER_TITLE_MAX);
+  const summary = `${product.product} by ${product.vendor}. ${product.howItSupports}`.trim().slice(0, DESIGNER_SUMMARY_MAX);
+  return {
+    id: crypto.randomUUID(),
+    title,
+    summary,
+    toWeigh: '',
+    suggestedTitle: title,
+    suggestedSummary: summary,
+    draftedAt,
+    catalogueRefs: [product.ref],
+    catalogueProducts: [product],
+    included: true,
+  };
 }
 
 /**
@@ -78,6 +98,9 @@ export function DesignerSuggestions({ orgId, userId, modelId, elementId, brief, 
 
   const all = [...cards, ...earlier];
   const included = all.filter((c) => c.included && c.title.trim() !== '' && c.summary.trim() !== '');
+  // Only a product-specific option counts as "already an option"; the
+  // replacement card that carries the same refs is not itself a product choice.
+  const usedCatalogueRefs = new Set(all.filter((card) => /^use\s/i.test(card.title)).flatMap((card) => card.catalogueRefs.map(catalogueRefKeyOf)));
 
   useEffect(() => {
     onChange({ options: included, draftedAt: included.length > 0 ? (included[0]?.draftedAt ?? null) : null, anyEdited: included.some(isEdited) });
@@ -137,15 +160,42 @@ export function DesignerSuggestions({ orgId, userId, modelId, elementId, brief, 
     setEarlier(apply);
   }
 
+  function addProductOption(product: DesignerCatalogueProduct): void {
+    setCards((prev) => [productSuggestion(product, new Date().toISOString()), ...prev]);
+  }
+
+  function renderProduct(product: DesignerCatalogueProduct) {
+    const key = catalogueRefKeyOf(product.ref);
+    const used = usedCatalogueRefs.has(key);
+    return (
+      <ResearchResultCard
+        key={key}
+        testId="designer-catalogue-product"
+        kind="catalogue"
+        title={product.product}
+        source={product.vendor}
+        whyMatched={product.howItSupports === ''
+          ? (product.capabilityName === '' ? 'Supports the capability this option concerns.' : `Supports ${product.capabilityName}.`)
+          : `Supports ${product.capabilityName === '' ? 'this capability' : product.capabilityName}: ${product.howItSupports}`}
+        evidence={product.claims.slice(0, 3).map((claim) => ({ text: claim.statement, sourceUrl: claim.sourceUrl, sourceDate: claim.sourceDate }))}
+        status={{ label: 'Reviewed catalogue product', tone: 'ok' }}
+        actions={[{
+          label: used ? 'Already an option' : 'Use this product',
+          variant: 'secondary',
+          disabled: used,
+          testId: 'designer-use-product',
+          onClick: () => { addProductOption(product); },
+        }]}
+      />
+    );
+  }
+
   function renderCard(c: SuggestionCard) {
     const edited = isEdited(c);
     return (
       <li key={c.id} className={[styles.card, c.included ? undefined : styles.cardLeftOut].filter(Boolean).join(' ')} data-testid="suggestion-card">
         <div className={styles.cardHead}>
           <Chip tone="info">{edited ? 'Suggested by the Designer, edited by you' : 'Suggested by the Designer'}</Chip>
-          {c.catalogueRefs.length > 0 && (
-            <Chip tone="neutral">{c.catalogueRefs.length === 1 ? '1 reviewed product' : `${String(c.catalogueRefs.length)} reviewed products`}</Chip>
-          )}
           <label className={styles.include}>
             <input type="checkbox" checked={c.included} onChange={(e) => { update(c.id, { included: e.target.checked }); }} />
             <Text as="span" size="sm">{c.included ? 'Include' : 'Left out'}</Text>
@@ -154,16 +204,33 @@ export function DesignerSuggestions({ orgId, userId, modelId, elementId, brief, 
         <input className={formStyles.input} type="text" aria-label="Option title" maxLength={DESIGNER_TITLE_MAX} value={c.title} onChange={(e) => { update(c.id, { title: e.target.value }); }} />
         <textarea className={formStyles.textarea} aria-label="What this option is" maxLength={DESIGNER_SUMMARY_MAX} value={c.summary} onChange={(e) => { update(c.id, { summary: e.target.value }); }} />
         <textarea className={formStyles.textarea} aria-label="What to weigh" placeholder="What to weigh" maxLength={DESIGNER_WEIGH_MAX} value={c.toWeigh} onChange={(e) => { update(c.id, { toWeigh: e.target.value }); }} />
+        {(c.catalogueProducts ?? []).length > 0 && (
+          <div data-testid="suggestion-catalogue-products" className={styles.evidenceBlock}>
+            <Text as="p" size="xs" tone="muted">
+              Reviewed catalogue products the Designer read for this option. They are candidates, not a recommendation.
+            </Text>
+            <div className={styles.productList}>
+              {(c.catalogueProducts ?? []).map((product) => renderProduct(product))}
+            </div>
+          </div>
+        )}
         {(c.webRefs ?? []).length > 0 && (
-          <div data-testid="suggestion-web-sources">
+          <div data-testid="suggestion-web-sources" className={styles.evidenceBlock}>
             <Text as="p" size="xs" tone="muted">Web pages found for this option. They are not saved yet and are not reviewed; check them yourself.</Text>
-            <ul>
+            <div className={styles.productList}>
               {(c.webRefs ?? []).map((ref) => (
-                <li key={ref.url}>
-                  <a href={ref.url} target="_blank" rel="noreferrer">{ref.title}</a>
-                </li>
+                <ResearchResultCard
+                  key={ref.url}
+                  kind="web"
+                  title={ref.title}
+                  source={hostOf(ref.url) || ref.url}
+                  whyMatched="Found by an earlier web search for this option."
+                  status={{ label: 'Unreviewed web page', tone: 'warn' }}
+                  url={ref.url}
+                  actions={[{ label: 'Open page', href: ref.url }]}
+                />
               ))}
-            </ul>
+            </div>
           </div>
         )}
       </li>

@@ -154,7 +154,7 @@ describe('handleDesign', () => {
       ...estateContext({ snapshot: estateSnapshot({ elements: [element(70, 'capability', 'Complaints', { templateRef: uid(700) })] }) }),
       catalogueForCapability: () => Promise.resolve({
         sector: 'electricity_network', capabilityCode: '5.4', capabilityName: 'Complaints', catalogueVersion: 2,
-        entries: [{ id: 'e1', code: 'crm-x', product: 'CRM X', vendor: 'Vendor Ltd', summary: 'A CRM.', howItSupports: 'Records complaints.', claims: [] }],
+        entries: [{ id: 'e1', code: 'crm-x', product: 'CRM X', vendor: 'Vendor Ltd', summary: 'A CRM.', howItSupports: 'Records complaints.', claims: [{ statement: 'Records complaints.', kind: 'functional', sourceUrl: 'https://vendor.example/crm', sourceDate: '2026-01-01', reviewedBy: 'Simmodlr', reviewedAt: '2026-01-02' }] }],
       }),
     };
     const answer = JSON.stringify({ options: [{ title: 'Replace', summary: 'Buy a CRM.', catalogueRefs: [{ sector: 'electricity_network', version: 2, entryCode: 'crm-x' }] }, { title: 'Build', summary: 'Build it.', catalogueRefs: [{ sector: 'electricity_network', version: 2, entryCode: 'not-returned' }] }], gaps: [], stayNote: '' });
@@ -172,7 +172,17 @@ describe('handleDesign', () => {
     expect(outcome.status).toBe('done');
     if (outcome.status !== 'done') return;
     expect(outcome.design.options[0]?.catalogueRefs).toEqual([{ sector: 'electricity_network', version: 2, entryCode: 'crm-x' }]);
+    expect(outcome.design.options[0]?.catalogueProducts).toEqual([{
+      ref: { sector: 'electricity_network', version: 2, entryCode: 'crm-x' },
+      product: 'CRM X',
+      vendor: 'Vendor Ltd',
+      summary: 'A CRM.',
+      capabilityName: 'Complaints',
+      howItSupports: 'Records complaints.',
+      claims: [{ statement: 'Records complaints.', kind: 'functional', sourceUrl: 'https://vendor.example/crm', sourceDate: '2026-01-01' }],
+    }]);
     expect(outcome.design.options[1]?.catalogueRefs).toEqual([]);
+    expect(outcome.design.options[1]?.catalogueProducts).toEqual([]);
     expect(outcome.design.problems.join(' ')).toContain('did not read');
   });
 

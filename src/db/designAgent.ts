@@ -1,5 +1,5 @@
 import type { UUID } from '../contracts/delta';
-import { DESIGNER_CATALOGUE_REFS_MAX, DESIGNER_WEB_REFS_MAX, type DesignerOptionDraft, type DesignerWebRef } from '../contracts/designerOptions';
+import { DESIGNER_CATALOGUE_REFS_MAX, DESIGNER_WEB_REFS_MAX, parseCatalogueProducts, type DesignerOptionDraft, type DesignerWebRef } from '../contracts/designerOptions';
 import { catalogueCitationSchema, type CatalogueCitation } from '../contracts/productCatalogue';
 import type { Client } from './client';
 
@@ -97,7 +97,7 @@ export function interpretDesignerReply(body: unknown): DesignerDraft {
     };
     const options = (Array.isArray(r.design.options) ? r.design.options : []).flatMap((o): DesignerOptionDraft[] => {
       const x = typeof o === 'object' && o !== null ? (o as Record<string, unknown>) : {};
-      return typeof x.title === 'string' && typeof x.summary === 'string' ? [{ title: plain(x.title), summary: plain(x.summary), toWeigh: typeof x.toWeigh === 'string' ? plain(x.toWeigh) : '', catalogueRefs: refs(x.catalogueRefs), webRefs: webRefs(x.webRefs) }] : [];
+      return typeof x.title === 'string' && typeof x.summary === 'string' ? [{ title: plain(x.title), summary: plain(x.summary), toWeigh: typeof x.toWeigh === 'string' ? plain(x.toWeigh) : '', catalogueRefs: refs(x.catalogueRefs), catalogueProducts: parseCatalogueProducts(x.catalogueProducts), webRefs: webRefs(x.webRefs) }] : [];
     });
     const problems = strings(r.design.problems);
     if (options.length === 0 && problems.length === 0) problems.push('The Designer gave no usable options.');
