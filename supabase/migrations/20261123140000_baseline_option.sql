@@ -13,12 +13,20 @@ alter table decisions add column baseline_option_id uuid references decision_opt
 create index decisions_baseline_option_idx on decisions (baseline_option_id) where baseline_option_id is not null;
 
 -- Existing baselines already have one candidate row per branch option.
+--
+-- This is compatibility metadata, not a user edit. The normal update guard
+-- refuses every write to a decision that has left `proposed`, which would
+-- abort this backfill on the first accepted or rejected decision in a
+-- populated database. Backfills are exactly the case the trigger's
+-- proposed-only rule does not cover.
+alter table decisions disable trigger decisions_guard_update;
 update decisions d
 set baseline_option_id = o.id
 from decision_options o
 where o.decision_id = d.id
   and o.branch_id = d.baseline_branch_id
   and d.baseline_option_id is null;
+alter table decisions enable trigger decisions_guard_update;
 
 comment on column decisions.baseline_option_id is 'Which of this decision''s candidates is the "Stay as we are" baseline. It may have no delivery branch. Null on decisions made before the baseline existed.';
 grant update (baseline_option_id) on decisions to authenticated;
