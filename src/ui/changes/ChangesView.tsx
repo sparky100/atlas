@@ -96,7 +96,7 @@ export function ChangesView({ modelId, orgId, userId, orgSlug, modelSlug, canCre
   // Project, then decision, then change (Simon, 2026-11-19): open changes sit under their decision and project; only a change in neither is listed on its own, in the sections below. Until the projects and decisions load, every change is listed on its own, as before.
   const hierarchyData = useChangesHierarchyData(modelId);
   const openBranches = branches.filter((b) => OPEN_CHANGE_STATUSES.includes(b.status));
-  const hierarchy = hierarchyData ? buildChangesHierarchy(openBranches, hierarchyData.decisions, hierarchyData.projects, hierarchyData.optionLinks) : null;
+  const hierarchy = hierarchyData ? buildChangesHierarchy(openBranches, hierarchyData.decisions, hierarchyData.projects, hierarchyData.options) : null;
   const standaloneIds = hierarchy ? new Set(hierarchy.standalone.map((b) => b.id)) : null;
   const { waitingForReview, openByIntent, merged, cancelled, closed } = groupChangesList(standaloneIds ? branches.filter((b) => !OPEN_CHANGE_STATUSES.includes(b.status) || standaloneIds.has(b.id)) : branches);
   // A standard change: start a "propose" change with a plain title, select it, then
@@ -112,7 +112,7 @@ export function ChangesView({ modelId, orgId, userId, orgSlug, modelSlug, canCre
       else void navigate(`${base}/e/${system.id}?${refParam}&action=${kind === 'retire' ? 'retire' : 'edit'}`);
     });
   };
-  const hasOpen = openBranches.length > 0;
+  const hasOpen = openBranches.length > 0 || (hierarchyData?.options.length ?? 0) > 0;
   const endedSections = [
     { title: 'Merged', branches: merged },
     { title: 'Cancelled', branches: cancelled },
@@ -291,7 +291,7 @@ export function ChangesView({ modelId, orgId, userId, orgSlug, modelSlug, canCre
           </Text>
         </Panel>
       )}
-      {branches.length === 0 && status !== 'loading' && <EmptyState>No changes yet. {canCreate ? 'Create one above.' : 'Nobody has proposed one.'}</EmptyState>}
+      {branches.length === 0 && (hierarchyData?.options.length ?? 0) === 0 && status !== 'loading' && <EmptyState>No changes yet. {canCreate ? 'Create one above.' : 'Nobody has proposed one.'}</EmptyState>}
       {branches.length > 0 && !hasOpen && status !== 'loading' && <EmptyState>No open changes.{canCreate ? ' Create one above.' : ''}</EmptyState>}
       {hierarchy !== null && hierarchy.projects.length > 0 && (
         <CollapsibleSection title="In projects" meta={`(${String(hierarchy.projects.reduce((n, p) => n + p.changes.length + p.decisions.reduce((m, d) => m + d.options.length, 0), 0))})`}>
@@ -404,8 +404,20 @@ function DecisionGroup({
         Decision: <Link to={`/o/${orgSlug}/m/${modelSlug}/decisions/${block.decision.id}`}>{block.decision.title}</Link>
       </Text>
       <ul className={styles.list}>
-        {block.options.map((branch) => (
-          <ChangeRow key={branch.id} branch={branch} orgSlug={orgSlug} modelSlug={modelSlug} unresolvedCount={threadCounts?.get(branch.id)?.open} summary={summaries?.get(branch.id)} />
+        {block.options.map((item) => item.branch !== null ? (
+          <ChangeRow key={item.id} branch={item.branch} orgSlug={orgSlug} modelSlug={modelSlug} unresolvedCount={threadCounts?.get(item.branch.id)?.open} summary={summaries?.get(item.branch.id)} />
+        ) : (
+          <li key={item.id} className={styles.row}>
+            <div>
+              <Link to={`/o/${orgSlug}/m/${modelSlug}/decisions/${block.decision.id}`}>
+                <Text as="span" size="lg">{item.title}</Text>
+              </Link>
+              <div className={styles.rowMeta}>
+                <Chip tone="neutral">candidate</Chip>
+                <Text as="span" tone="faint" size="xs">No delivery change yet</Text>
+              </div>
+            </div>
+          </li>
         ))}
       </ul>
     </div>

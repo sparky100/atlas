@@ -1,6 +1,5 @@
 import type { UUID } from '../../contracts/delta';
-import type { DecisionOptionLink } from '../../db/decisions';
-import type { BranchRow, DecisionRow, ProjectRow } from '../../db/types';
+import type { BranchRow, DecisionOptionRow, DecisionRow, ProjectRow } from '../../db/types';
 
 /**
  * Home's "My work" card (Simon, 2026-11-19): projects first, then decisions,
@@ -26,12 +25,14 @@ export function buildMyWorkRows(
   openBranches: readonly BranchRow[],
   decisions: readonly DecisionRow[],
   projects: readonly ProjectRow[],
-  optionLinks: readonly DecisionOptionLink[],
+  options: readonly DecisionOptionRow[],
 ): MyWorkRow[] {
   const decisionById = new Map(decisions.map((d) => [d.id, d]));
   const projectById = new Map(projects.map((p) => [p.id, p]));
   const decisionOfBranch = new Map<UUID, UUID>();
-  for (const l of optionLinks) if (!decisionOfBranch.has(l.branchId)) decisionOfBranch.set(l.branchId, l.decisionId);
+  for (const option of options) {
+    if (option.branch_id !== null && !decisionOfBranch.has(option.branch_id)) decisionOfBranch.set(option.branch_id, option.decision_id);
+  }
 
   const projectRows = new Map<UUID, MyWorkRow>();
   const decisionRows = new Map<UUID, MyWorkRow>();
@@ -66,16 +67,16 @@ export function myWorkDetail(row: MyWorkRow): string {
 
 export interface DecisionWithOptions {
   decision: DecisionRow;
-  /** The open changes that are this decision's options. */
-  options: BranchRow[];
+  /** The candidates that are this decision's options, branchless ones included. */
+  options: DecisionOptionRow[];
 }
 
+const byOptionTitle = (a: DecisionOptionRow, b: DecisionOptionRow) => a.title.localeCompare(b.title);
 const byBranchTitle = (a: BranchRow, b: BranchRow) => (a.title ?? a.name).localeCompare(b.title ?? b.name);
 
-/** The open option changes inside one decision. */
-export function decisionOptions(decisionId: UUID, openBranches: readonly BranchRow[], optionLinks: readonly DecisionOptionLink[]): BranchRow[] {
-  const ids = new Set(optionLinks.filter((l) => l.decisionId === decisionId).map((l) => l.branchId));
-  return openBranches.filter((b) => ids.has(b.id)).sort(byBranchTitle);
+/** The candidates inside one decision. */
+export function decisionOptions(decisionId: UUID, options: readonly DecisionOptionRow[]): DecisionOptionRow[] {
+  return options.filter((o) => o.decision_id === decisionId).sort(byOptionTitle);
 }
 
 /**
@@ -88,14 +89,14 @@ export function projectChildren(
   projectId: UUID,
   openBranches: readonly BranchRow[],
   decisions: readonly DecisionRow[],
-  optionLinks: readonly DecisionOptionLink[],
+  options: readonly DecisionOptionRow[],
 ): { decisions: DecisionWithOptions[]; changes: BranchRow[] } {
-  const optionIds = new Set(optionLinks.map((l) => l.branchId));
+  const optionIds = new Set(options.flatMap((o) => (o.branch_id === null ? [] : [o.branch_id])));
   return {
     decisions: decisions
       .filter((d) => d.project_id === projectId && d.status === 'proposed')
       .sort((a, b) => a.title.localeCompare(b.title))
-      .map((decision) => ({ decision, options: decisionOptions(decision.id, openBranches, optionLinks) })),
+      .map((decision) => ({ decision, options: decisionOptions(decision.id, options) })),
     changes: openBranches.filter((b) => b.project_id === projectId && !optionIds.has(b.id)).sort(byBranchTitle),
   };
 }

@@ -1,6 +1,9 @@
 import type { UUID } from '../contracts/delta';
 import { assertRealId } from './assertRealId';
 import type { Client } from './client';
+import { listDecisionsForModel } from './decisions';
+import { listDecisionsForProject } from './projects';
+import { selectAll } from './selectAll';
 import type { BranchRow, DecisionOptionRow } from './types';
 
 /**
@@ -18,6 +21,37 @@ export async function listDecisionOptions(client: Client, decisionId: UUID): Pro
     .order('created_at');
   if (error) throw new Error(`listDecisionOptions: ${error.message}`);
   return (data as DecisionOptionRow[] | null) ?? [];
+}
+
+const OPTION_DECISION_CHUNK = 50;
+
+async function listDecisionOptionsForDecisions(client: Client, decisionIds: readonly UUID[]): Promise<DecisionOptionRow[]> {
+  const rows: DecisionOptionRow[] = [];
+  for (let offset = 0; offset < decisionIds.length; offset += OPTION_DECISION_CHUNK) {
+    const chunk = decisionIds.slice(offset, offset + OPTION_DECISION_CHUNK);
+    rows.push(...(await selectAll<DecisionOptionRow>(
+      client
+        .from('decision_options')
+        .select('*', { count: 'exact' })
+        .in('decision_id', chunk)
+        .order('position'),
+    )));
+  }
+  return rows;
+}
+
+/** Every candidate of the model's decisions, branchless ones included. */
+export async function listDecisionOptionsForModel(client: Client, modelId: UUID): Promise<DecisionOptionRow[]> {
+  assertRealId('listDecisionOptionsForModel', 'model_id', modelId);
+  const decisions = await listDecisionsForModel(client, modelId);
+  return listDecisionOptionsForDecisions(client, decisions.map((decision) => decision.id));
+}
+
+/** Every candidate of the decisions in this project, branchless ones included. */
+export async function listDecisionOptionsForProject(client: Client, projectId: UUID): Promise<DecisionOptionRow[]> {
+  assertRealId('listDecisionOptionsForProject', 'project_id', projectId);
+  const decisions = await listDecisionsForProject(client, projectId);
+  return listDecisionOptionsForDecisions(client, decisions.map((decision) => decision.id));
 }
 
 export interface CreateDecisionOptionInput {

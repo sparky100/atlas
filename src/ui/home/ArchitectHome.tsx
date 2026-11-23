@@ -10,7 +10,7 @@ import { Panel } from '../components/Panel/Panel';
 import { Text } from '../components/Text/Text';
 import { describeLifecycleMismatch } from '../../engine/elementRead/lifecycleDateMismatch';
 import type { ElementsHeadRow } from '../../contracts/rows';
-import type { BranchRow, MemberRole } from '../../db/types';
+import type { DecisionOptionRow, MemberRole } from '../../db/types';
 import type { BoundaryCrossing, ExternalInterfaceCrossing, ExternalOrganisationAccess, PlatformFlowEndpoint, UnlabeledVerbRelationship } from '../../db/healthFindings';
 import { formatDate, formatRelativeTime } from '../time';
 import { formatProjectProgress, projectStatusLabel, projectStatusTone, projectsWaitingForAcceptance } from '../projects/projectModel';
@@ -207,7 +207,7 @@ export function ArchitectHome({ data, modelId, mainCommitIdHint, insights, role,
   // empty in that case, and the panels that show them render a muted
   // "Loading…" instead, rather than an empty/misleadingly-clear state.
   const insightsData = insights.status === 'ready' ? insights.data : null;
-  const myWorkRows = buildMyWorkRows(data.myOpenBranches, data.allDecisions, data.allProjects, data.optionLinks);
+  const myWorkRows = buildMyWorkRows(data.myOpenBranches, data.allDecisions, data.allProjects, data.options);
   // Three sections, in this order, nothing listed twice (Simon, 2026-11-19): projects (with their decisions and changes inside), decisions outside a project, changes outside both.
   const ownedDecisionsOutside = data.myOwnedWork.decisions.filter(({ projectTitle }) => projectTitle === null);
   const standaloneChangeRows = myWorkRows.filter((row) => row.kind === 'change');
@@ -782,7 +782,7 @@ export function ArchitectHome({ data, modelId, mainCommitIdHint, insights, role,
                       {project.target_date !== null ? `target ${formatDate(project.target_date)} · ` : ''}
                       {formatProjectProgress(progress)}
                     </Text>
-                    <ProjectChildren modelHref={modelHref} children={projectChildren(project.id, data.allOpenBranches, data.allDecisions, data.optionLinks)} />
+                    <ProjectChildren modelHref={modelHref} children={projectChildren(project.id, data.allOpenBranches, data.allDecisions, data.options)} />
                   </li>
                 ))}
               </ul>
@@ -817,7 +817,7 @@ export function ArchitectHome({ data, modelId, mainCommitIdHint, insights, role,
                         {[decision.needed_by !== null ? `needed by ${formatDate(decision.needed_by)}` : null, projectTitle !== null ? `in ${projectTitle}` : null].filter((part): part is string => part !== null).join(' · ')}
                       </Text>
                     )}
-                    <OptionList modelHref={modelHref} options={decisionOptions(decision.id, data.allOpenBranches, data.optionLinks)} />
+                    <OptionList modelHref={modelHref} options={decisionOptions(decision.id, data.options)} />
                   </li>
                 ))}
               </ul>
@@ -942,16 +942,16 @@ export function ArchitectHome({ data, modelId, mainCommitIdHint, insights, role,
   );
 }
 
-/** The option changes of one decision, each a link, one level below it. */
-function OptionList({ modelHref, options }: { modelHref: string; options: BranchRow[] }) {
+/** The candidates of one decision, one level below it. A worked option links to its change; a candidate links to the decision. */
+function OptionList({ modelHref, options }: { modelHref: string; options: DecisionOptionRow[] }) {
   if (options.length === 0) return null;
   return (
     <ul className={styles.branchList} aria-label="Options">
-      {options.map((c) => (
-        <li key={c.id}>
-          <Link to={`${modelHref}/changes/${c.id}`}>
+      {options.map((option) => (
+        <li key={option.id}>
+          <Link to={option.branch_id !== null ? `${modelHref}/changes/${option.branch_id}` : `${modelHref}/decisions/${option.decision_id}`}>
             <Text as="span" size="xs">
-              {c.title ?? c.name}
+              {option.title}
             </Text>
           </Link>
         </li>

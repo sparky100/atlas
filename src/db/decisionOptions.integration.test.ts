@@ -4,7 +4,7 @@ import type { Client } from './client';
 import { createServiceRoleClient, createSupabaseClient } from './client';
 import { createChangeBranch, getMainBranch } from './branches';
 import { createDecision, createDecisionLink, listDecisionLinksForDecision } from './decisions';
-import { createDecisionOption, listDecisionOptions, workOnDecisionOption } from './decisionOptions';
+import { createDecisionOption, listDecisionOptions, listDecisionOptionsForModel, workOnDecisionOption } from './decisionOptions';
 import { insertOptionMark } from './decisionOptionMarks';
 import { listDecisionRatingsForDecision, upsertDecisionRating } from './decisionRatings';
 import { listOptionSources } from './productCatalogue';
@@ -67,6 +67,7 @@ describe('D1 candidate options, real database', () => {
     expect(error).toBeNull();
     expect(data).toMatchObject({ decision_id: decisionId, branch_id: branchId, title: 'Use a product', source: 'manual' });
     expect(await listDecisionOptions(owner.client, decisionId)).toEqual([expect.objectContaining({ id: optionId, branch_id: branchId })]);
+    expect(await listDecisionOptionsForModel(owner.client, modelId)).toEqual([expect.objectContaining({ id: optionId, decision_id: decisionId })]);
   });
 
   it('records Designer provenance on the option and back on the mark', async () => {

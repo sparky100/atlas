@@ -11,7 +11,7 @@ import { lifecycleStateOf } from '../../engine/elementRead/fitAndExposure';
 import { projectIsOpen } from './projectModel';
 import { containerParentIds } from '../elements/moduleDisplayName';
 import { listEvidenceForModel } from '../../db/evidence';
-import { listDecisionOptionLinksForProject, type DecisionOptionLink } from '../../db/decisions';
+import { listDecisionOptionsForProject } from '../../db/decisionOptions';
 import {
   getProject,
   listChangesForProject,
@@ -21,7 +21,7 @@ import {
   listProjectLinks,
   type TouchedElement,
 } from '../../db/projects';
-import type { BranchRow, DecisionRow, EvidenceRow, ProjectLinkRow, ProjectRow } from '../../db/types';
+import type { BranchRow, DecisionOptionRow, DecisionRow, EvidenceRow, ProjectLinkRow, ProjectRow } from '../../db/types';
 import { reportError } from '../errors/errorBannerStore';
 import { supabase } from '../supabaseClient';
 
@@ -40,7 +40,8 @@ export interface ProjectData {
   /** Decisions that constrain this project without being part of it. */
   constrainingDecisions: DecisionRow[];
   changes: BranchRow[];
-  optionLinks: DecisionOptionLink[];
+  /** The candidates of the project's decisions, branchless ones included. */
+  options: DecisionOptionRow[];
   links: ProjectLinkRow[];
   evidence: EvidenceRow[];
   /** Every element any of the project's changes touches, with its name where known. */
@@ -87,13 +88,13 @@ export function useProject(modelId: UUID, projectId: UUID): UseProjectResult {
           setState({ status: 'not_found' });
           return;
         }
-        const [decisions, constrainingDecisions, changes, links, main, optionLinks] = await Promise.all([
+        const [decisions, constrainingDecisions, changes, links, main, options] = await Promise.all([
           listDecisionsForProject(supabase, projectId),
           listConstrainingDecisions(supabase, projectId),
           listChangesForProject(supabase, projectId),
           listProjectLinks(supabase, projectId),
           getMainBranch(supabase, modelId),
-          listDecisionOptionLinksForProject(supabase, projectId),
+          listDecisionOptionsForProject(supabase, projectId),
         ]);
         const touchedLists = await Promise.all(changes.map((c) => listElementsTouchedByChange(supabase, modelId, c.id)));
         const touchedById = new Map<UUID, TouchedElement>();
@@ -172,7 +173,7 @@ export function useProject(modelId: UUID, projectId: UUID): UseProjectResult {
           }
         }
         if (isCancelled()) return;
-        setState({ status: 'ready', data: { project, decisions, constrainingDecisions, changes, optionLinks, links, evidence, touched: [...touchedById.values()], reachedIds: [...reachedIds], elementsById, scopeHasCapability, derivedCapabilityCandidates, journeyCapabilities } });
+        setState({ status: 'ready', data: { project, decisions, constrainingDecisions, changes, options, links, evidence, touched: [...touchedById.values()], reachedIds: [...reachedIds], elementsById, scopeHasCapability, derivedCapabilityCandidates, journeyCapabilities } });
       } catch (e) {
         if (isCancelled()) return;
         setState({ status: 'error', message: "Couldn't load this project." });

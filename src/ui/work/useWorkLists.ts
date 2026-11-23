@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react';
 import type { UUID } from '../../contracts/delta';
 import { listChangeBranches } from '../../db/branches';
-import { listDecisionOptionLinksForModel, listDecisionsForModel } from '../../db/decisions';
+import { listDecisionsForModel } from '../../db/decisions';
+import { listDecisionOptionsForModel } from '../../db/decisionOptions';
 import { listProjectsForModel } from '../../db/projects';
 import { reportError } from '../errors/errorBannerStore';
 import { supabase } from '../supabaseClient';
@@ -13,9 +14,9 @@ export function useWorkLists(modelId: UUID | null): WorkLists | null {
   useEffect(() => {
     if (!modelId) return undefined;
     let cancelled = false;
-    Promise.all([listChangeBranches(supabase, modelId), listDecisionsForModel(supabase, modelId), listProjectsForModel(supabase, modelId), listDecisionOptionLinksForModel(supabase, modelId)])
-      .then(([branches, decisions, projects, links]) => {
-        if (!cancelled) setLists(buildWorkLists(branches, decisions, projects, links));
+    Promise.all([listChangeBranches(supabase, modelId), listDecisionsForModel(supabase, modelId), listProjectsForModel(supabase, modelId), listDecisionOptionsForModel(supabase, modelId)])
+      .then(([branches, decisions, projects, options]) => {
+        if (!cancelled) setLists(buildWorkLists(branches, decisions, projects, options));
       })
       .catch((e: unknown) => {
         reportError("Couldn't load the open work.", e);
