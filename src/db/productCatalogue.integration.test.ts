@@ -93,7 +93,9 @@ describe('product catalogue and option evidence, real database', () => {
     // hyphens: the catalogue's no-price check treats a hyphen as a word
     // boundary, so a random UUID segment such as "cad" or "aud" would look
     // like a currency code and make this fixture randomly fail.
-    rows.catalogue.sector = sector ?? `test_${randomUUID().replaceAll('-', '')}`;
+    let randomSector = `test_${randomUUID().replaceAll('-', '')}`;
+    while (containsCataloguePrice(randomSector)) randomSector = `test_${randomUUID().replaceAll('-', '')}`;
+    rows.catalogue.sector = sector ?? randomSector;
     const mapId = randomUUID();
     if (seedMap) {
       check(await service.from('capability_maps').insert({ id: mapId, sector: rows.catalogue.sector, version: content.capabilityMapVersion,

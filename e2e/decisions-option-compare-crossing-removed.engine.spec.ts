@@ -100,6 +100,7 @@ test('an option that removes a boundary crossing shows only that row plus the su
   if (!decisionUrlMatch?.[1]) throw new Error(`could not read the decision id out of ${page.url()}`);
   // The candidate has no branch until Work on this option creates one.
   await page.locator('th', { hasText: 'Option 1' }).getByRole('button', { name: 'Work on this option' }).click();
+  await expect(page).toHaveURL(/\/changes\//);
   const optionBranchIdMatch = /\/changes\/([^/?]+)/.exec(page.url());
   if (!optionBranchIdMatch?.[1]) throw new Error(`could not read the option's branch id out of ${page.url()}`);
   const optionBranchId = optionBranchIdMatch[1];

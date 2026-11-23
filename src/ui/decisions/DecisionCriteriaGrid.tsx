@@ -276,7 +276,7 @@ export function DecisionCriteriaGrid({ decisionId, options, canRate, userId, nee
                     )}
                     {branchId === null && canWorkOnCandidate && (
                       <Text as="p" size="sm" tone="muted">
-                        Work on this option to see what it changes.
+                        Use Work on this option to draft it.
                       </Text>
                     )}
                     <div className={styles.optionHeaderActions}>
@@ -401,7 +401,7 @@ export function DecisionCriteriaGrid({ decisionId, options, canRate, userId, nee
             )}
             {o.provenance != null && <Text as="p" size="sm" tone="muted">{o.provenance}</Text>}
             <Text as="p" size="sm" tone={o.summary === null ? 'muted' : 'default'}>{o.summary ?? 'No changes recorded yet'}</Text>
-            {branchId === null && canWorkOnCandidate && <Text as="p" size="sm" tone="muted">Work on this option to see what it changes.</Text>}
+            {branchId === null && canWorkOnCandidate && <Text as="p" size="sm" tone="muted">Use Work on this option to draft it.</Text>}
             {((o.description?.trim() ?? '') !== '' || (o.sources?.length ?? 0) > 0) && (
               <details className={styles.optionDetails}>
                 <summary>Details and evidence</summary>

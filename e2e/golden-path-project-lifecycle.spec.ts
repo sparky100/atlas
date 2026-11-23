@@ -112,7 +112,9 @@ test('project lifecycle: start from a finding, decide inside it, deliver the cho
   await openProject(page);
   await expect(page.getByText('Option chosen', { exact: true })).toBeVisible();
   await expect(page.getByRole('link', { name: 'Build Repairs Hub' }).first()).toBeVisible();
-  await expect(page.getByText('Other options remain on the decision page; they are not the chosen design.')).toBeVisible();
+  // Candidates that were never worked on are not change branches, so the
+  // project view no longer lists them as alternatives (stage 4 reads options
+  // directly). The chosen design and its comparison are still shown.
   await page.locator('summary', { hasText: 'Review scope against draft changes' }).click();
   await expect(page.getByText('Touched by this project\'s changes, not in scope')).toBeVisible();
   await page.locator('summary', { hasText: 'Compare live model with chosen option' }).click();

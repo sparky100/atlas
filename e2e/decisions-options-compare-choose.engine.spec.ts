@@ -89,6 +89,7 @@ test('add three options to a decision, compare them, choose one; the chosen opti
   // delivery branch, and it is the only option that gets an extra commit.
   const optionBHeaderForWork = page.locator('th', { hasText: 'Option 2' });
   await optionBHeaderForWork.getByRole('button', { name: 'Work on this option' }).click();
+  await expect(page).toHaveURL(/\/changes\//);
   const optionBBranchIdMatch = /\/changes\/([^/?]+)/.exec(page.url());
   if (!optionBBranchIdMatch?.[1]) throw new Error(`could not read option B's branch id out of ${page.url()}`);
   const optionBBranchId = optionBBranchIdMatch[1];

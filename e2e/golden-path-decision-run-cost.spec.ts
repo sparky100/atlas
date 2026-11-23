@@ -9,7 +9,7 @@
  * the 390 run is this spec's own "phone width usable" check.
  */
 import { randomUUID } from 'node:crypto';
-import { compactDecision, changesSurface } from './fixtures/decisionLayout';
+import { compactDecision, changesSurface, optionSurface } from './fixtures/decisionLayout';
 import { expect, test, type Page } from '@playwright/test';
 import { addSystemFromHome, goToModelHome, retireElement, signUpCreateOrgAndModel, clickNavItem } from './fixtures/goldenPath';
 
@@ -45,7 +45,8 @@ test('replacing a costed system with a costed alternative on an option shows the
   await page.getByRole('button', { name: 'Add option' }).click();
   await expect(page.getByText(optionTitle).first()).toBeVisible();
 
-  await page.locator('th', { hasText: optionTitle }).getByRole('button', { name: 'Work on this option' }).click();
+  await optionSurface(page, optionTitle).getByRole('button', { name: 'Work on this option' }).click();
+  await expect(page).toHaveURL(/\/changes\//);
   // An option leads with "Draft this option's changes", which opens the landscape on this option (it becomes the editing ref).
   await page.getByRole('link', { name: "Draft this option's changes" }).click();
   await expect(page).toHaveURL(/landscape/);
