@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import type { AskModelClient, AskModelRequest } from './askLoop';
+import type { AskEvent, AskModelClient, AskModelRequest } from './askLoop';
 import { handleDesign, parseDesignBody } from './designHandler';
-import type { DesignHandlerDeps } from './designHandler';
+import type { DesignHandlerDeps, DesignTiming } from './designHandler';
 import { designerBrief, designerSystemPrompt } from './designPrompt';
 import { estateContext, estateSnapshot, element, uid } from './fixtures/estateSnapshot';
 import type { RunCostSharing, ToolContext } from './types';
@@ -53,6 +53,29 @@ describe('handleDesign', () => {
     expect(d.requests[0]?.system).toContain('You are the Designer');
     expect(d.requests[0]?.system).not.toContain('You are Ask Atlas');
     expect(JSON.stringify(d.requests[0]?.messages)).toContain(ELEMENT);
+  });
+
+  it('reports stage and loop timings without changing the outcome', async () => {
+    const timings: DesignTiming[] = [];
+    const outcome = await handleDesign(deps({ onTiming: (t) => timings.push(t) }), body);
+    expect(outcome.status).toBe('done');
+    expect(timings.map((t) => t.phase)).toEqual(expect.arrayContaining(['load_model', 'role', 'settings', 'share_run_cost', 'main_commit', 'context', 'run_round']));
+    for (const t of timings) expect(t.ms).toBeGreaterThanOrEqual(0);
+  });
+
+  it('streams lookup progress to the caller without changing the draft', async () => {
+    const answer = JSON.stringify({ options: [{ title: 'Replace', summary: 'Buy.' }], gaps: [], stayNote: '' });
+    let round = 0;
+    const events: AskEvent[] = [];
+    const d = deps({ createClient: () => ({ complete: () => {
+      round += 1;
+      return Promise.resolve(round === 1
+        ? { text: '', stopReason: 'tool_use', toolCalls: [{ id: 't1', name: 'search_elements', input: { query: 'Complaints' } }], inputTokens: 1, outputTokens: 1 }
+        : { text: answer, stopReason: 'end_turn', inputTokens: 1, outputTokens: 1 });
+    } }) });
+    const outcome = await handleDesign(d, body, (event) => events.push(event));
+    expect(outcome.status).toBe('done');
+    expect(events).toEqual([{ type: 'tool_call', name: 'search_elements' }, { type: 'tool_done', name: 'search_elements', ok: true }]);
   });
 
   it('refuses before anything is read or sent unless the switches are on and there is a key or trial left, one at a time', async () => {
@@ -248,6 +271,9 @@ describe('the Designer prompt', () => {
     expect(prompt).toContain('Call find_catalogue_products at most twice in a run');
     expect(prompt).not.toContain('you may search the web');
     expect(prompt).not.toContain('webRefs');
+  });
+  it('asks for independent lookups in one round, so a run does not wait through extra rounds', () => {
+    expect(designerSystemPrompt('Estate', '2026-11-19')).toContain('ask for every independent lookup you need in the same round');
   });
   it('puts the element id and the finding in the brief', () => {
     expect(designerBrief({ elementId: ELEMENT, finding: 'Poor fit' })).toContain(ELEMENT);

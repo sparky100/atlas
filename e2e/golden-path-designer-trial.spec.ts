@@ -50,7 +50,16 @@ async function stubDesigner(page: Page, status = 200) {
     const body = status === 200
       ? { status: 'done', stamp: STAMP, design: DESIGN, result: { status: 'answered', answer: '{}', citations: [], citationNames: {}, grounded: false, unverifiedRemoved: 0, toolUses: [], rounds: 2, inputTokens: 10, outputTokens: 5 } }
       : { status: 'not_enabled', message: "The free trial of the Designer is used up. An owner needs to add the organisation's AI key in organisation settings." };
-    await route.fulfill({ status, contentType: 'application/json', body: JSON.stringify(body) });
+    if (status !== 200) {
+      await route.fulfill({ status, contentType: 'application/json', body: JSON.stringify(body) });
+      return;
+    }
+    const lines = [
+      { type: 'event', event: { type: 'tool_call', name: 'search_elements' } },
+      { type: 'event', event: { type: 'tool_done', name: 'search_elements', ok: true } },
+      { type: 'result', ...body },
+    ];
+    await route.fulfill({ status: 200, contentType: 'application/x-ndjson', body: lines.map((line) => `${JSON.stringify(line)}\n`).join('') });
   });
 }
 

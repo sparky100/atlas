@@ -50,6 +50,8 @@ export function createToolContext(supabase: Client, model: { id: UUID; name: str
   let snapshot: Promise<ModelSnapshot> | null = null;
   let reports: ReturnType<typeof listSavedReports> | null = null;
   let facts: ReturnType<typeof listFactsForCommit> | null = null;
+  const factsByElement = new Map<UUID, ReturnType<typeof listFactsForSubject>>();
+  const catalogues = new Map<string, ReturnType<NonNullable<ToolContext['catalogueForCapability']>>>();
   let retired: ReturnType<typeof loadElementsRetiredByOpenChanges> | null = null;
   let staleMonths: Promise<number> | null = null;
   let changes: ReturnType<typeof listChangeBranches> | null = null;
@@ -65,8 +67,13 @@ export function createToolContext(supabase: Client, model: { id: UUID; name: str
     runCost,
     snapshot: () => (snapshot ??= loadSnapshot(supabase, model.id, commitId).then((s) => (exclude ? snapshotWithoutCost(s) : s))),
     factsFor: async (elementId) => {
-      const rows = await listFactsForSubject(supabase, commitId, elementId);
-      return exclude ? factsWithoutCost(rows) : rows;
+      let rows = factsByElement.get(elementId);
+      if (rows === undefined) {
+        rows = listFactsForSubject(supabase, commitId, elementId);
+        factsByElement.set(elementId, rows);
+      }
+      const value = await rows;
+      return exclude ? factsWithoutCost(value) : value;
     },
     savedReports: () => (reports ??= listSavedReports(supabase, model.id)),
     allFacts: () => (facts ??= listFactsForCommit(supabase, commitId).then((rows) => (exclude ? factsWithoutCost(rows) : rows))),
@@ -81,16 +88,26 @@ export function createToolContext(supabase: Client, model: { id: UUID; name: str
     principles: () => (principles ??= listPrinciplesForModel(supabase, model.id)),
     principleLinks: async () => (principleLinks ??= listPrincipleLinksForPrinciples(supabase, (await (principles ??= listPrinciplesForModel(supabase, model.id))).map((p) => p.id))),
     changeImpact: (change) => loadChangeSummary(supabase, model.id, change),
-    catalogueForCapability: async ({ templateRef, code }) => {
-      // A draft starter map can be reloaded and its item ids replaced. The
-      // capability's code and the model's template source are the durable
-      // parts, so fall back to the current published map for that sector.
-      const match = (await capabilityMapMatch(supabase, templateRef))
-        ?? (code === null ? null : await publishedCapabilityMatchForModel(supabase, model.id, code));
-      if (!match) return null;
-      const catalogue = await currentCatalogue(supabase, match.sector);
-      if (!catalogue) return null;
-      return { ...match, catalogueVersion: catalogue.version, entries: await listCurrentCatalogueEntriesForCapability(supabase, match) };
+    catalogueForCapability: ({ templateRef, code }) => {
+      // The pre-validation after a run asks for the same capability the tool
+      // just read; one promise per key means that read is not paid for twice.
+      const key = `${templateRef}\u0000${code ?? ''}`;
+      let lookup = catalogues.get(key);
+      if (lookup === undefined) {
+        lookup = (async () => {
+          // A draft starter map can be reloaded and its item ids replaced. The
+          // capability's code and the model's template source are the durable
+          // parts, so fall back to the current published map for that sector.
+          const match = (await capabilityMapMatch(supabase, templateRef))
+            ?? (code === null ? null : await publishedCapabilityMatchForModel(supabase, model.id, code));
+          if (!match) return null;
+          const catalogue = await currentCatalogue(supabase, match.sector);
+          if (!catalogue) return null;
+          return { ...match, catalogueVersion: catalogue.version, entries: await listCurrentCatalogueEntriesForCapability(supabase, match) };
+        })();
+        catalogues.set(key, lookup);
+      }
+      return lookup;
     },
     now: () => new Date(),
   };

@@ -1,8 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import type { LlmProxyMessage } from '../contracts/llmProxy';
 import { ASK_MAX_HISTORY_TURNS, ASK_MAX_ROUNDS, ASK_MAX_TOKENS_PER_ROUND, runAsk, trimHistory, verifyCitations, wrapToolData } from './askLoop';
-import type { AskEvent, AskModelClient, AskModelRequest, AskModelResponse } from './askLoop';
+import type { AskEvent, AskModelClient, AskModelRequest, AskModelResponse, AskTiming } from './askLoop';
 import { estateContext, uid } from './fixtures/estateSnapshot';
+import type { ToolContext } from './types';
 
 /** A model that plays back a fixed script, and records what it was asked. */
 function scripted(script: (AskModelResponse | ((req: AskModelRequest) => AskModelResponse))[]): { client: AskModelClient; requests: AskModelRequest[] } {
@@ -46,6 +47,16 @@ describe('runAsk', () => {
     expect(JSON.stringify(second[2])).toContain('<tool-data tool=\\"search_elements\\">');
     expect(requests[0]?.maxTokens).toBe(ASK_MAX_TOKENS_PER_ROUND);
     expect(requests[0]?.tools.length).toBeGreaterThan(0);
+  });
+
+  it('reports a round timing for every model call and a timing for each tool', async () => {
+    const { client } = scripted([call('t1', 'search_elements', { query: 'CRM' }), say('Done.')]);
+    const timings: AskTiming[] = [];
+    const result = await runAsk({ client, ctx: estateContext(), history: [], question: 'q', onTiming: (t) => timings.push(t) });
+    expect(result.status).toBe('answered');
+    expect(timings.filter((t) => t.phase === 'round').map((t) => t.round)).toEqual([1, 2]);
+    expect(timings.find((t) => t.phase === 'tool')).toMatchObject({ name: 'search_elements', round: 1 });
+    for (const t of timings) expect(t.ms).toBeGreaterThanOrEqual(0);
   });
 
   it('spends a web-search budget across rounds and accumulates the actual pages', async () => {
@@ -114,6 +125,35 @@ describe('runAsk', () => {
     // Roles alternate all the way through.
     const roles = (last?.messages ?? []).map((m: LlmProxyMessage) => m.role);
     for (const [i, r] of roles.entries()) expect(r).toBe(i % 2 === 0 ? 'user' : 'assistant');
+  });
+
+  it('runs the independent lookups in one round together', async () => {
+    let active = 0;
+    let mostAtOnce = 0;
+    const ctx: ToolContext = {
+      ...estateContext(),
+      projects: async () => {
+        active += 1;
+        mostAtOnce = Math.max(mostAtOnce, active);
+        await new Promise((resolve) => setTimeout(resolve, 20));
+        active -= 1;
+        return [];
+      },
+    };
+    const two: AskModelResponse = {
+      text: '',
+      stopReason: 'tool_use',
+      toolCalls: [
+        { id: 'a', name: 'list_projects', input: {} },
+        { id: 'b', name: 'list_projects', input: {} },
+      ],
+      inputTokens: 1,
+      outputTokens: 1,
+    };
+    const result = await runAsk({ client: scripted([two, say('done')]).client, ctx, history: [], question: 'q' });
+    expect(result.toolUses).toHaveLength(2);
+    expect(result.toolUses.every((u) => u.ok)).toBe(true);
+    expect(mostAtOnce).toBe(2);
   });
 
   it('answers every tool call the model made in a round, even past the per-round cap', async () => {

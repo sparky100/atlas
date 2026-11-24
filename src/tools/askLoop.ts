@@ -7,7 +7,7 @@
 import type { LlmProxyContentBlock, LlmProxyMessage, LlmProxyToolCall, LlmProxyToolDefinition, LlmProxyWebSearch } from '../contracts/llmProxy';
 import { ASK_LIMIT_NOTICE, askSystemPrompt } from './askPrompt';
 import { callTool, MODEL_TOOLS } from './index';
-import type { ToolContext } from './types';
+import type { ToolContext, ToolResult } from './types';
 
 export const ASK_MAX_ROUNDS = 6;
 export const ASK_MAX_TOKENS_PER_ROUND = 2000;
@@ -47,6 +47,20 @@ export interface AskTurn {
 }
 
 export type AskEvent = { type: 'tool_call'; name: string } | { type: 'tool_done'; name: string; ok: boolean };
+
+/**
+ * How long a round or one tool took. For logging and benchmarks only: it is
+ * never shown to the person and never part of an answer. Kept out of
+ * `AskResult` so the answer contract does not grow a field only operators read.
+ */
+export interface AskTiming {
+  phase: 'round' | 'tool';
+  /** The tool's name, for a tool timing. */
+  name?: string;
+  /** 1-based round number. */
+  round: number;
+  ms: number;
+}
 
 export interface AskToolUse {
   name: string;
@@ -161,6 +175,8 @@ export interface RunAskInput {
   /** Replaces Ask Atlas's own instructions (the Designer agent brings its own). Absent: Ask Atlas's. */
   system?: string | undefined;
   onEvent?: ((event: AskEvent) => void) | undefined;
+  /** Optional timings for logs and benchmarks. Never shown to the person. */
+  onTiming?: ((timing: AskTiming) => void) | undefined;
   /** D4: total provider-side web searches this run may use. Omitted means none. */
   webSearch?: { maxUses: number } | undefined;
   /** The per-round output budget. Defaults to `ASK_MAX_TOKENS_PER_ROUND`; the Designer's long structured answer needs more. */
@@ -168,7 +184,7 @@ export interface RunAskInput {
 }
 
 export async function runAsk(input: RunAskInput): Promise<AskResult> {
-  const { client, ctx, onEvent } = input;
+  const { client, ctx, onEvent, onTiming } = input;
   const system = input.system ?? askSystemPrompt(ctx.stamp.modelName, ctx.now().toISOString().slice(0, 10), { runCost: ctx.runCost ?? 'share' });
   const tools = toolDefinitions();
   const question = input.question.trim().slice(0, ASK_MAX_QUESTION_CHARS);
@@ -212,11 +228,13 @@ export async function runAsk(input: RunAskInput): Promise<AskResult> {
   for (;;) {
     const closing = limit !== undefined;
     const searchRemaining = (input.webSearch?.maxUses ?? 0) - webSearchUsed;
+    const roundStartedAt = Date.now();
     const response = await client.complete({
       system, messages, tools, toolChoice: closing ? 'none' : 'auto', maxTokens: input.maxTokensPerRound ?? ASK_MAX_TOKENS_PER_ROUND,
       ...(!closing && searchRemaining > 0 ? { webSearch: { maxUses: searchRemaining } } : {}),
     });
     rounds += 1;
+    onTiming?.({ phase: 'round', round: rounds, ms: Date.now() - roundStartedAt });
     inputTokens += response.inputTokens;
     outputTokens += response.outputTokens;
     if (response.webSearch) {
@@ -239,20 +257,42 @@ export async function runAsk(input: RunAskInput): Promise<AskResult> {
     messages.push({ role: 'assistant', content: assistantBlocks });
 
     const resultBlocks: LlmProxyContentBlock[] = [];
-    for (const [index, call] of calls.entries()) {
-      onEvent?.({ type: 'tool_call', name: call.name });
+    const slots = calls.map((call, index) => {
+      if (index >= ASK_MAX_CALLS_PER_ROUND) {
+        return { call, skip: `Only ${String(ASK_MAX_CALLS_PER_ROUND)} lookups are run per round. Ask again in the next round if still needed.`, result: undefined as ToolResult | undefined };
+      }
+      if (budgetLeft <= 0) {
+        limit = 'budget';
+        return { call, skip: 'The result budget for this question is used up.', result: undefined as ToolResult | undefined };
+      }
+      return { call, skip: undefined, result: undefined as ToolResult | undefined };
+    });
+    // Announce every lookup in the round before starting any, so the page shows the work at once.
+    for (const slot of slots) onEvent?.({ type: 'tool_call', name: slot.call.name });
+    // Independent lookups in one round run together: the round waits on the slowest read, not their sum.
+    // Results are still read and counted below in the model's own order, so the budget stays deterministic.
+    await Promise.all(slots.filter((slot) => slot.skip === undefined).map(async (slot) => {
+      const toolStartedAt = Date.now();
+      try {
+        slot.result = await callTool(ctx, slot.call.name, slot.call.input);
+      } catch (e) {
+        slot.result = { ok: false, error: e instanceof Error ? e.message : 'The lookup failed.' };
+      }
+      onTiming?.({ phase: 'tool', name: slot.call.name, round: rounds, ms: Date.now() - toolStartedAt });
+    }));
+    for (const slot of slots) {
+      const { call } = slot;
       let ok = false;
       let total: number | null = null;
       let truncated = false;
       let error: string | undefined;
       let content: string;
-      if (index >= ASK_MAX_CALLS_PER_ROUND) {
-        content = wrapToolData(call.name, JSON.stringify({ error: `Only ${String(ASK_MAX_CALLS_PER_ROUND)} lookups are run per round. Ask again in the next round if still needed.` }));
-      } else if (budgetLeft <= 0) {
-        limit = 'budget';
-        content = wrapToolData(call.name, JSON.stringify({ error: 'The result budget for this question is used up.' }));
+      if (slot.skip !== undefined) {
+        content = wrapToolData(call.name, JSON.stringify({ error: slot.skip }));
+      } else if (slot.result === undefined) {
+        content = wrapToolData(call.name, JSON.stringify({ error: 'The lookup did not run.' }));
       } else {
-        const result = await callTool(ctx, call.name, call.input);
+        const result = slot.result;
         ok = result.ok;
         if (result.ok) {
           total = result.total;

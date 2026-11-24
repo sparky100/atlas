@@ -2,8 +2,10 @@ import { useEffect, useRef, useState } from 'react';
 import type { UUID } from '../../contracts/delta';
 import { catalogueRefKeyOf, DESIGNER_SUMMARY_MAX, DESIGNER_TITLE_MAX, DESIGNER_WEIGH_MAX, type DesignerCatalogueProduct, type DesignerWebRef } from '../../contracts/designerOptions';
 import { runDesigner, type DesignerDraft } from '../../db/designAgent';
+import type { AskEvent } from '../../tools/askLoop';
 import { DESIGNER_MAX_FINDING_CHARS } from '../../tools/designPrompt';
 import { Button } from '../components/Button/Button';
+import { loadBrowserEnv } from '../env';
 import { useMembership } from '../orgs/useMembership';
 import { useMembers } from '../orgs/useMembers';
 import { ownerNames as namesOfOwners } from '../orgs/ownerNames';
@@ -48,6 +50,27 @@ export interface DesignerSuggestionsProps {
 
 const isEdited = (c: PendingOption) => c.title.trim() !== c.suggestedTitle.trim() || c.summary.trim() !== c.suggestedSummary.trim();
 
+/** The lookup tools, in words a person reading the form already uses. */
+const TOOL_LABELS: Record<string, string> = {
+  search_elements: 'Searching the model',
+  get_element: 'Reading an element',
+  list_relationships: 'Checking what links to it',
+  find_elements: 'Finding related elements',
+  find_catalogue_products: 'Checking reviewed products',
+  list_saved_reports: 'Reading saved reports',
+  run_saved_report: 'Reading a saved report',
+  list_health_findings: 'Reading health findings',
+  portfolio_signals: 'Reading portfolio signals',
+  list_changes: 'Reading changes in flight',
+  change_impact: 'Checking what a change affects',
+  list_decisions: 'Reading decisions',
+  list_projects: 'Reading projects',
+  list_goals: 'Reading goals',
+  list_principles: 'Reading principles',
+};
+
+const toolLabel = (name: string) => TOOL_LABELS[name] ?? name.replaceAll('_', ' ');
+
 function newCards(draft: DesignerDraft, draftedAt: string): SuggestionCard[] {
   return draft.options.map((o) => ({ id: crypto.randomUUID(), title: o.title, summary: o.summary, toWeigh: o.toWeigh, suggestedTitle: o.title, suggestedSummary: o.summary, draftedAt, catalogueRefs: o.catalogueRefs, catalogueProducts: o.catalogueProducts, webRefs: o.webRefs, included: true }));
 }
@@ -88,6 +111,7 @@ export function DesignerSuggestions({ orgId, userId, modelId, elementId, brief, 
   const onTrial = trial !== null && !trial.keySet;
   const heldKey = pendingKey(orgId, userId, `designer-${scope}`);
   const [state, setState] = useState<'idle' | 'running' | 'failed' | 'stopped'>('idle');
+  const [steps, setSteps] = useState<{ name: string; ok: boolean | null }[]>([]);
   const [message, setMessage] = useState('');
   const [cards, setCards] = useState<SuggestionCard[]>([]);
   const [earlier, setEarlier] = useState<SuggestionCard[]>([]);
@@ -133,8 +157,33 @@ export function DesignerSuggestions({ orgId, userId, modelId, elementId, brief, 
     abort.current = controller;
     setState('running');
     setMessage('');
+    setSteps([]);
     try {
-      const draft = await runDesigner(supabase, { modelId, elementId, finding: briefText }, controller.signal);
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) throw new Error('You need to be signed in to ask the Designer for options.');
+      const draft = await runDesigner({
+        functionUrl: `${loadBrowserEnv().VITE_SUPABASE_URL.replace(/\/$/, '')}/functions/v1/design-agent`,
+        accessToken: session.access_token,
+        modelId,
+        elementId,
+        finding: briefText,
+        onEvent: (event: AskEvent) => {
+          if (mine !== runNo.current) return;
+          setSteps((prev) => {
+            const next = prev.slice();
+            if (event.type === 'tool_call') next.push({ name: event.name, ok: null });
+            else {
+              let open = -1;
+              next.forEach((step, i) => {
+                if (step.name === event.name && step.ok === null) open = i;
+              });
+              if (open >= 0) next[open] = { name: event.name, ok: event.ok };
+            }
+            return next;
+          });
+        },
+        signal: controller.signal,
+      });
       if (mine !== runNo.current) return;
       setEarlier((prev) => [...cards, ...prev]);
       setCards(newCards(draft, new Date().toISOString()));
@@ -256,20 +305,42 @@ export function DesignerSuggestions({ orgId, userId, modelId, elementId, brief, 
           </Button>
         )}
       </div>
+      {state === 'running' && (
+        <div role="status" data-testid="designer-progress">
+          {steps.length === 0 ? (
+            <Text as="p" tone="muted" size="sm">Reading what Atlas holds about this. You can keep editing what you have written while it works.</Text>
+          ) : (
+            <>
+              <Text as="p" tone="muted" size="sm">
+                {steps.every((step) => step.ok !== null) ? 'Drafting options from what it found…' : 'Looking things up…'}
+              </Text>
+              <ul className={styles.steps}>
+                {steps.map((step, i) => (
+                  <li key={`${step.name}-${String(i)}`}>
+                    <Text as="span" size="xs" tone="muted">
+                      {toolLabel(step.name)}{step.ok === null ? '…' : step.ok ? ' ✓' : ' — nothing found'}
+                    </Text>
+                  </li>
+                ))}
+              </ul>
+            </>
+          )}
+        </div>
+      )}
       {trialLine !== null && (
         <div role="status" data-testid="designer-trial-line">
           <Text as="p" size="sm">{trialLine}</Text>
         </div>
       )}
-      <Text as="p" tone="muted" size="sm">
-        {state === 'running'
-          ? "Reading what Atlas holds about this. You can keep editing what you have written while it works."
-          : briefText === ''
+      {state !== 'running' && (
+        <Text as="p" tone="muted" size="sm">
+          {briefText === ''
             ? 'Write what the options need to solve above, then ask for suggestions.'
             : tooLong
               ? `Shorten what you have written to ${String(DESIGNER_MAX_FINDING_CHARS)} characters or fewer to ask for suggestions (it is ${String(briefText.length)} now).`
               : 'The Designer reads what you have written above and what Atlas holds, and suggests a short set of options. They are drafts for you to edit. Nothing is saved until you start the decision, and staying as we are is always added for you.'}
-      </Text>
+        </Text>
+      )}
       {state === 'stopped' && <div role="status"><Text as="p" size="sm">Stopped. Nothing was added. The AI service may still finish on its side.</Text></div>}
       {state === 'failed' && (
         <div role="alert">
