@@ -7,7 +7,7 @@
 import type { LlmProxyContentBlock, LlmProxyMessage, LlmProxyToolCall, LlmProxyToolDefinition, LlmProxyWebSearch } from '../contracts/llmProxy';
 import { ASK_LIMIT_NOTICE, askSystemPrompt } from './askPrompt';
 import { callTool, MODEL_TOOLS } from './index';
-import type { ToolContext } from './types';
+import type { ToolContext, ToolResult } from './types';
 
 export const ASK_MAX_ROUNDS = 6;
 export const ASK_MAX_TOKENS_PER_ROUND = 2000;
@@ -257,22 +257,42 @@ export async function runAsk(input: RunAskInput): Promise<AskResult> {
     messages.push({ role: 'assistant', content: assistantBlocks });
 
     const resultBlocks: LlmProxyContentBlock[] = [];
-    for (const [index, call] of calls.entries()) {
-      onEvent?.({ type: 'tool_call', name: call.name });
+    const slots = calls.map((call, index) => {
+      if (index >= ASK_MAX_CALLS_PER_ROUND) {
+        return { call, skip: `Only ${String(ASK_MAX_CALLS_PER_ROUND)} lookups are run per round. Ask again in the next round if still needed.`, result: undefined as ToolResult | undefined };
+      }
+      if (budgetLeft <= 0) {
+        limit = 'budget';
+        return { call, skip: 'The result budget for this question is used up.', result: undefined as ToolResult | undefined };
+      }
+      return { call, skip: undefined, result: undefined as ToolResult | undefined };
+    });
+    // Announce every lookup in the round before starting any, so the page shows the work at once.
+    for (const slot of slots) onEvent?.({ type: 'tool_call', name: slot.call.name });
+    // Independent lookups in one round run together: the round waits on the slowest read, not their sum.
+    // Results are still read and counted below in the model's own order, so the budget stays deterministic.
+    await Promise.all(slots.filter((slot) => slot.skip === undefined).map(async (slot) => {
+      const toolStartedAt = Date.now();
+      try {
+        slot.result = await callTool(ctx, slot.call.name, slot.call.input);
+      } catch (e) {
+        slot.result = { ok: false, error: e instanceof Error ? e.message : 'The lookup failed.' };
+      }
+      onTiming?.({ phase: 'tool', name: slot.call.name, round: rounds, ms: Date.now() - toolStartedAt });
+    }));
+    for (const slot of slots) {
+      const { call } = slot;
       let ok = false;
       let total: number | null = null;
       let truncated = false;
       let error: string | undefined;
       let content: string;
-      if (index >= ASK_MAX_CALLS_PER_ROUND) {
-        content = wrapToolData(call.name, JSON.stringify({ error: `Only ${String(ASK_MAX_CALLS_PER_ROUND)} lookups are run per round. Ask again in the next round if still needed.` }));
-      } else if (budgetLeft <= 0) {
-        limit = 'budget';
-        content = wrapToolData(call.name, JSON.stringify({ error: 'The result budget for this question is used up.' }));
+      if (slot.skip !== undefined) {
+        content = wrapToolData(call.name, JSON.stringify({ error: slot.skip }));
+      } else if (slot.result === undefined) {
+        content = wrapToolData(call.name, JSON.stringify({ error: 'The lookup did not run.' }));
       } else {
-        const toolStartedAt = Date.now();
-        const result = await callTool(ctx, call.name, call.input);
-        onTiming?.({ phase: 'tool', name: call.name, round: rounds, ms: Date.now() - toolStartedAt });
+        const result = slot.result;
         ok = result.ok;
         if (result.ok) {
           total = result.total;
