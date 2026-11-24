@@ -168,6 +168,7 @@ export function DesignerSuggestions({ orgId, userId, modelId, elementId, brief, 
         elementId,
         finding: briefText,
         onEvent: (event: AskEvent) => {
+          if (mine !== runNo.current) return;
           setSteps((prev) => {
             const next = prev.slice();
             if (event.type === 'tool_call') next.push({ name: event.name, ok: null });
