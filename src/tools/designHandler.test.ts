@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { AskModelClient, AskModelRequest } from './askLoop';
 import { handleDesign, parseDesignBody } from './designHandler';
-import type { DesignHandlerDeps } from './designHandler';
+import type { DesignHandlerDeps, DesignTiming } from './designHandler';
 import { designerBrief, designerSystemPrompt } from './designPrompt';
 import { estateContext, estateSnapshot, element, uid } from './fixtures/estateSnapshot';
 import type { RunCostSharing, ToolContext } from './types';
@@ -53,6 +53,14 @@ describe('handleDesign', () => {
     expect(d.requests[0]?.system).toContain('You are the Designer');
     expect(d.requests[0]?.system).not.toContain('You are Ask Atlas');
     expect(JSON.stringify(d.requests[0]?.messages)).toContain(ELEMENT);
+  });
+
+  it('reports stage and loop timings without changing the outcome', async () => {
+    const timings: DesignTiming[] = [];
+    const outcome = await handleDesign(deps({ onTiming: (t) => timings.push(t) }), body);
+    expect(outcome.status).toBe('done');
+    expect(timings.map((t) => t.phase)).toEqual(expect.arrayContaining(['load_model', 'role', 'settings', 'share_run_cost', 'main_commit', 'context', 'run_round']));
+    for (const t of timings) expect(t.ms).toBeGreaterThanOrEqual(0);
   });
 
   it('refuses before anything is read or sent unless the switches are on and there is a key or trial left, one at a time', async () => {

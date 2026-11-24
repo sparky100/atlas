@@ -21,6 +21,7 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.115.0';
 import { corsHeaders } from '../../_shared/cors.ts';
 import { handleDesign } from '../../../../src/tools/designHandler.ts';
+import type { DesignTiming } from '../../../../src/tools/designHandler.ts';
 import { createToolContext } from '../../../../src/tools/loadContext.ts';
 import { summariseTrial, type TrialRow } from '../../../../src/contracts/trialAllowance.ts';
 import { AskProviderError, createProxyAskClient } from '../../../../src/tools/proxyClient.ts';
@@ -50,9 +51,14 @@ Deno.serve(async (req: Request) => {
   // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment -- Deno runtime, no shared type-checking with src/.
   const supabase = createClient(supabaseUrl, supabaseAnonKey, { global: { headers: { Authorization: authHeader } } });
 
+  const startedAt = Date.now();
+  const timings: DesignTiming[] = [];
   try {
     const outcome = await handleDesign(
       {
+        onTiming: (timing) => {
+          timings.push(timing);
+        },
         loadModel: async (modelId) => {
           const { data, error } = await supabase.from('models').select('id, org_id, name').eq('id', modelId).maybeSingle();
           if (error) throw new Error('Could not read the model.');
@@ -94,13 +100,14 @@ Deno.serve(async (req: Request) => {
       },
       body,
     );
+    console.log('design-agent timing', JSON.stringify({ status: outcome.status, totalMs: Date.now() - startedAt, timings }));
     if (outcome.status === 'invalid') return jsonResponse(outcome, 400);
     if (outcome.status === 'forbidden' || outcome.status === 'not_enabled') return jsonResponse(outcome, 403);
     if (outcome.status === 'not_found') return jsonResponse(outcome, 404);
     return jsonResponse(outcome, 200);
   } catch (e) {
     if (e instanceof AskProviderError) return jsonResponse({ status: 'error', message: e.status === 429 ? 'Too many requests for this organisation this hour. Try again later.' : e.status === 403 ? e.message : 'The AI service could not answer. Check the organisation key in settings, then try again.' }, e.status === 429 ? 429 : 502);
-    console.error('design-agent: failed', e instanceof Error ? e.message : 'unknown');
+    console.error('design-agent: failed', e instanceof Error ? e.message : 'unknown', JSON.stringify({ totalMs: Date.now() - startedAt, timings }));
     return jsonResponse({ status: 'error', message: 'Something went wrong drafting the options. Try again.' }, 500);
   }
 });

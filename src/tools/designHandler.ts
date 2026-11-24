@@ -24,6 +24,17 @@ export interface DesignModelInfo {
   name: string;
 }
 
+/**
+ * A stage or lookup that took time. Logged on the server for baselines; never
+ * returned to the person and never part of a draft.
+ */
+export interface DesignTiming {
+  phase: string;
+  ms: number;
+  round?: number;
+  name?: string;
+}
+
 export interface DesignHandlerDeps {
   /** Read with the caller's own session: a model the caller cannot read is `null`. */
   loadModel: (modelId: UUID) => Promise<DesignModelInfo | null>;
@@ -41,6 +52,8 @@ export interface DesignHandlerDeps {
   newRunId: () => string;
   /** A client that uses the organisation's own key when it has one, otherwise the free trial (`useOrgKey` + `runId`), never the platform key outside the trial. */
   createClient: (orgId: UUID, runId: string) => AskModelClient;
+  /** Optional timings for logs and benchmarks. Never shown to the person. */
+  onTiming?: (timing: DesignTiming) => void;
 }
 
 export type DesignOutcome =
@@ -109,27 +122,44 @@ export async function handleDesign(deps: DesignHandlerDeps, body: unknown): Prom
   const parsed = parseDesignBody(body);
   if (typeof parsed === 'string') return { status: 'invalid', message: parsed };
 
-  const model = await deps.loadModel(parsed.modelId);
+  const timing = (phase: string, ms: number, extra: { round?: number; name?: string } = {}) => {
+    deps.onTiming?.({ phase, ms, ...extra });
+  };
+  const timed = async <T>(phase: string, run: () => Promise<T>): Promise<T> => {
+    const startedAt = Date.now();
+    try {
+      return await run();
+    } finally {
+      timing(phase, Date.now() - startedAt);
+    }
+  };
+
+  const model = await timed('load_model', () => deps.loadModel(parsed.modelId));
   if (!model) return { status: 'not_found' };
 
-  const role = await deps.callerRole(model.orgId);
+  const role = await timed('role', () => deps.callerRole(model.orgId));
   // Contributors may run it: they can start decisions, the Designer only drafts text and writes nothing, and the owner still controls it through the organisation's switches and key (journey proposal section 6).
   if (role !== 'owner' && role !== 'architect' && role !== 'contributor') return { status: 'forbidden', message: 'Only an owner, architect or contributor can run the Designer.' };
 
-  const settings = await deps.agentSettings(model.orgId);
+  const settings = await timed('settings', () => deps.agentSettings(model.orgId));
   if (!settings.assistantEnabled || !settings.agentsEnabled) {
     return { status: 'not_enabled', message: 'Agents are not switched on for this organisation. An owner can switch them on in organisation settings.' };
   }
   // No key of its own: the free trial, until it is used up. The proxy checks the same thing and is the real gate.
-  if (!settings.keySet && (await deps.trialRunsLeft(model.orgId)) <= 0) {
-    return { status: 'not_enabled', message: "The free trial of the Designer is used up. An owner needs to add the organisation's AI key in organisation settings." };
+  if (!settings.keySet) {
+    const runsLeft = await timed('trial', () => deps.trialRunsLeft(model.orgId));
+    if (runsLeft <= 0) {
+      return { status: 'not_enabled', message: "The free trial of the Designer is used up. An owner needs to add the organisation's AI key in organisation settings." };
+    }
   }
 
-  const commitId = await deps.mainCommit(model.id);
+  const commitId = await timed('main_commit', () => deps.mainCommit(model.id));
   if (commitId === null) return { status: 'empty_model' };
 
-  const runCost: RunCostSharing = (await deps.shareRunCost(model.orgId)) ? 'share' : 'exclude';
+  const runCost: RunCostSharing = (await timed('share_run_cost', () => deps.shareRunCost(model.orgId))) ? 'share' : 'exclude';
+  const contextStartedAt = Date.now();
   const ctx = deps.createContext(model, commitId, runCost);
+  timing('context', Date.now() - contextStartedAt);
   const result = await runAsk({
     client: deps.createClient(model.orgId, deps.newRunId()),
     ctx,
@@ -137,8 +167,12 @@ export async function handleDesign(deps: DesignHandlerDeps, body: unknown): Prom
     question: designerBrief({ elementId: parsed.elementId, finding: parsed.finding }),
     system: designerSystemPrompt(ctx.stamp.modelName, ctx.now().toISOString().slice(0, 10), { runCost }),
     maxTokensPerRound: DESIGNER_MAX_TOKENS_PER_ROUND,
+    onTiming: (t) => {
+      timing(t.phase === 'round' ? 'run_round' : 'run_tool', t.ms, { round: t.round, ...(t.name !== undefined ? { name: t.name } : {}) });
+    },
   });
   const design = parseDesignerOptions(result.answer);
+  const webRefsStartedAt = Date.now();
   const returnedWebUrls = new Set([...(result.webSearch.results), ...(result.webSearch.citations)].map((source) => source.url));
   let droppedWebRefs = 0;
   for (const option of design.options) {
@@ -146,11 +180,13 @@ export async function handleDesign(deps: DesignHandlerDeps, body: unknown): Prom
     droppedWebRefs += option.webRefs.length - kept.length;
     option.webRefs = kept;
   }
+  timing('web_refs', Date.now() - webRefsStartedAt);
   if (droppedWebRefs > 0) {
     design.problems.push(droppedWebRefs === 1
       ? 'One web page was left out because the search did not return it. Add it by hand only if you have checked it yourself.'
       : `${String(droppedWebRefs)} web pages were left out because the search did not return them. Add one by hand only if you have checked it yourself.`);
   }
+  const catalogueRefsStartedAt = Date.now();
   const returnedProducts = await returnedCatalogueProducts(ctx, result.toolUses);
   let droppedCatalogueRefs = 0;
   for (const option of design.options) {
@@ -162,6 +198,7 @@ export async function handleDesign(deps: DesignHandlerDeps, body: unknown): Prom
       return product === undefined ? [] : [product];
     });
   }
+  timing('catalogue_refs', Date.now() - catalogueRefsStartedAt);
   if (droppedCatalogueRefs > 0) {
     design.problems.push(droppedCatalogueRefs === 1
       ? 'One catalogue product was left out because the Designer did not read it. Add it by hand only if you have checked it yourself.'

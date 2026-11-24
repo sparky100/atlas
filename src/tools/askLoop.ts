@@ -48,6 +48,20 @@ export interface AskTurn {
 
 export type AskEvent = { type: 'tool_call'; name: string } | { type: 'tool_done'; name: string; ok: boolean };
 
+/**
+ * How long a round or one tool took. For logging and benchmarks only: it is
+ * never shown to the person and never part of an answer. Kept out of
+ * `AskResult` so the answer contract does not grow a field only operators read.
+ */
+export interface AskTiming {
+  phase: 'round' | 'tool';
+  /** The tool's name, for a tool timing. */
+  name?: string;
+  /** 1-based round number. */
+  round: number;
+  ms: number;
+}
+
 export interface AskToolUse {
   name: string;
   input: Record<string, unknown>;
@@ -161,6 +175,8 @@ export interface RunAskInput {
   /** Replaces Ask Atlas's own instructions (the Designer agent brings its own). Absent: Ask Atlas's. */
   system?: string | undefined;
   onEvent?: ((event: AskEvent) => void) | undefined;
+  /** Optional timings for logs and benchmarks. Never shown to the person. */
+  onTiming?: ((timing: AskTiming) => void) | undefined;
   /** D4: total provider-side web searches this run may use. Omitted means none. */
   webSearch?: { maxUses: number } | undefined;
   /** The per-round output budget. Defaults to `ASK_MAX_TOKENS_PER_ROUND`; the Designer's long structured answer needs more. */
@@ -168,7 +184,7 @@ export interface RunAskInput {
 }
 
 export async function runAsk(input: RunAskInput): Promise<AskResult> {
-  const { client, ctx, onEvent } = input;
+  const { client, ctx, onEvent, onTiming } = input;
   const system = input.system ?? askSystemPrompt(ctx.stamp.modelName, ctx.now().toISOString().slice(0, 10), { runCost: ctx.runCost ?? 'share' });
   const tools = toolDefinitions();
   const question = input.question.trim().slice(0, ASK_MAX_QUESTION_CHARS);
@@ -212,11 +228,13 @@ export async function runAsk(input: RunAskInput): Promise<AskResult> {
   for (;;) {
     const closing = limit !== undefined;
     const searchRemaining = (input.webSearch?.maxUses ?? 0) - webSearchUsed;
+    const roundStartedAt = Date.now();
     const response = await client.complete({
       system, messages, tools, toolChoice: closing ? 'none' : 'auto', maxTokens: input.maxTokensPerRound ?? ASK_MAX_TOKENS_PER_ROUND,
       ...(!closing && searchRemaining > 0 ? { webSearch: { maxUses: searchRemaining } } : {}),
     });
     rounds += 1;
+    onTiming?.({ phase: 'round', round: rounds, ms: Date.now() - roundStartedAt });
     inputTokens += response.inputTokens;
     outputTokens += response.outputTokens;
     if (response.webSearch) {
@@ -252,7 +270,9 @@ export async function runAsk(input: RunAskInput): Promise<AskResult> {
         limit = 'budget';
         content = wrapToolData(call.name, JSON.stringify({ error: 'The result budget for this question is used up.' }));
       } else {
+        const toolStartedAt = Date.now();
         const result = await callTool(ctx, call.name, call.input);
+        onTiming?.({ phase: 'tool', name: call.name, round: rounds, ms: Date.now() - toolStartedAt });
         ok = result.ok;
         if (result.ok) {
           total = result.total;
