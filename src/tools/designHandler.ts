@@ -94,13 +94,16 @@ export function parseDesignBody(body: unknown): ParsedDesign | string {
 async function returnedCatalogueProducts(ctx: ToolContext, toolUses: readonly { name: string; input: Record<string, unknown>; ok: boolean }[]): Promise<Map<string, DesignerCatalogueProduct>> {
   const ids = [...new Set(toolUses.filter((u) => u.name === 'find_catalogue_products' && u.ok).map((u) => u.input.capability_element_id).filter((v): v is string => typeof v === 'string'))];
   const products = new Map<string, DesignerCatalogueProduct>();
-  if (ids.length === 0 || ctx.catalogueForCapability === undefined) return products;
+  const lookup = ctx.catalogueForCapability;
+  if (ids.length === 0 || lookup === undefined) return products;
   const index = indexSnapshot(await ctx.snapshot());
-  for (const id of ids) {
+  // Independent capabilities are read together rather than one after another.
+  const catalogues = await Promise.all(ids.map((id) => {
     const element = index.byId.get(id);
     const templateRef = capabilityTemplateRef(element?.attributes);
-    if (templateRef === null) continue;
-    const catalogue = await ctx.catalogueForCapability({ templateRef, code: capabilityCode(element?.attributes) });
+    return templateRef === null ? Promise.resolve(null) : lookup({ templateRef, code: capabilityCode(element?.attributes) });
+  }));
+  for (const catalogue of catalogues) {
     if (catalogue === null) continue;
     for (const entry of catalogue.entries) {
       const ref = { sector: catalogue.sector, version: catalogue.catalogueVersion, entryCode: entry.code };
@@ -160,6 +163,11 @@ export async function handleDesign(deps: DesignHandlerDeps, body: unknown, onEve
   const contextStartedAt = Date.now();
   const ctx = deps.createContext(model, commitId, runCost);
   timing('context', Date.now() - contextStartedAt);
+  // Warm the model snapshot and the focal element's facts while the provider
+  // starts, so the first lookup does not pay for those reads. The tools still
+  // return the data, so citations are still checked against what a tool returned.
+  void ctx.snapshot().catch(() => undefined);
+  void ctx.factsFor(parsed.elementId).catch(() => undefined);
   const result = await runAsk({
     client: deps.createClient(model.orgId, deps.newRunId()),
     ctx,

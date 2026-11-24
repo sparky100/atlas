@@ -272,6 +272,9 @@ describe('the Designer prompt', () => {
     expect(prompt).not.toContain('you may search the web');
     expect(prompt).not.toContain('webRefs');
   });
+  it('asks for independent lookups in one round, so a run does not wait through extra rounds', () => {
+    expect(designerSystemPrompt('Estate', '2026-11-19')).toContain('ask for every independent lookup you need in the same round');
+  });
   it('puts the element id and the finding in the brief', () => {
     expect(designerBrief({ elementId: ELEMENT, finding: 'Poor fit' })).toContain(ELEMENT);
   });
