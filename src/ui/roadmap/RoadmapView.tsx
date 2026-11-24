@@ -10,7 +10,7 @@ import type { RoadmapFilters } from './roadmapFilter';
 import type { RoadmapMode } from './roadmapEligibility';
 import type { RoadmapProjectBar, RoadmapUnplacedProject } from './roadmapProjectBars';
 import { roadmapBarCaption, type RoadmapGroup, type RoadmapLifecycleBar } from './roadmapLifecycleRows';
-import { computeRoadmapAxisTicks, isWithinRange, percentAtIso, supportEndPlacement, thinAxisTicksToFit, todayPercent, unsupportedRunPlacement, type RoadmapGranularity, type RoadmapHorizon, type RoadmapTimelineRange } from './roadmapTimelineScale';
+import { computeRoadmapAxisTicks, isWithinRange, lifecycleBarPlacement, percentAtIso, supportEndPlacement, thinAxisTicksToFit, todayPercent, unsupportedRunPlacement, type RoadmapGranularity, type RoadmapHorizon, type RoadmapTimelineRange } from './roadmapTimelineScale';
 import { changeDescription, computeRoadmapVisibleData, eventsForSystem, hiddenNoteFor, recentRoadmapChanges, roadmapRangeFor } from './roadmapVisibleData';
 import styles from './RoadmapView.module.css';
 
@@ -49,11 +49,9 @@ export interface RoadmapViewProps {
  */
 function RoadmapRow({ bar, events, range, todayPct, now, showPast, orgSlug, modelSlug, found }: { found: boolean; showPast: boolean; bar: RoadmapLifecycleBar; events: readonly { event: RoadmapBranchEvents['events'][number]; branch: RoadmapBranchEvents['branch'] }[]; range: RoadmapTimelineRange; todayPct: number | undefined; now: Date; orgSlug: string; modelSlug: string }) {
   const unsupported = unsupportedRunPlacement(bar.supportEndsAt, bar.plannedEnd, range, now);
-  const startPct = percentAtIso(bar.introduced, range);
-  const endPct = percentAtIso(bar.plannedEnd, range);
+  const barPlacement = lifecycleBarPlacement(bar.introduced, bar.plannedEnd, bar.supportEndsAt, range);
   const supportEnd = supportEndPlacement(bar.supportEndsAt, range);
-  const left = startPct ?? 0;
-  const width = (endPct ?? 100) - left;
+  const openEndPct = barPlacement?.openEnded === true && unsupported === undefined ? barPlacement.endPct : undefined;
 
   return (
     <div className={styles.row} data-system-id={bar.systemId} data-found={found ? 'true' : undefined}>
@@ -68,9 +66,15 @@ function RoadmapRow({ bar, events, range, todayPct, now, showPast, orgSlug, mode
       </Link>
       <div className={styles.track}>
         {showPast && todayPct !== undefined && <div className={styles.pastBand} style={{ width: `${String(todayPct)}%` }} aria-hidden="true" />}
-        {/* A bar means "until its planned end". With no end planned there is nothing to draw: a grey bar running to the edge of the window was clutter, saying only that the system continues (Simon, 2026-11-19). The row, its caption, support-end tick and change markers still show. */}
-        {bar.plannedEnd !== undefined && (
-          <div className={styles.lifecycleBar} data-tone={bar.lifecycleStatus === 'retiring' || bar.lifecycleStatus === 'retired' ? 'warn' : 'neutral'} style={{ left: `${String(left)}%`, width: `${String(Math.max(width, 0.5))}%` }} />
+        {/* A planned end is the bar's end. With no planned end, a vendor support end still gives the row a body: a solid bar to that date, then an explicit "No end date planned" run to the edge. That run is never allowed to imply the system stops at the support tick. */}
+        {barPlacement !== undefined && (
+          <div className={styles.lifecycleBar} data-tone={bar.lifecycleStatus === 'retiring' || bar.lifecycleStatus === 'retired' ? 'warn' : 'neutral'} style={{ left: `${String(barPlacement.leftPct)}%`, width: `${String(barPlacement.widthPct)}%` }} />
+        )}
+        {/* Support has not ended yet, but no end is planned: make the open-ended life explicit rather than leaving a gap that reads as an end date. */}
+        {openEndPct !== undefined && (
+          <div className={styles.openEndRun} data-testid="open-end-run" style={{ left: `${String(openEndPct)}%`, width: `${String(100 - openEndPct)}%` }} title="No end date planned">
+            <span className={styles.openEndLabel}>No end date planned</span>
+          </div>
         )}
         {/* Support has ended and no end is planned: still live, without vendor support. A dashed run in the support-end colour from the tick to the edge, with words so it is never colour alone (Simon, 2026-11-19). */}
         {unsupported !== undefined && (

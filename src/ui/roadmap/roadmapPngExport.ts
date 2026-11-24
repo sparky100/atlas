@@ -17,7 +17,7 @@
 import type { RoadmapMode } from './roadmapEligibility';
 import type { RoadmapFilters } from './roadmapFilter';
 import { type RoadmapGroup } from './roadmapLifecycleRows';
-import { computeRoadmapAxisTicks, isWithinRange, percentAtIso, supportEndPlacement, thinAxisTicksToFit, todayPercent, type RoadmapGranularity, type RoadmapTimelineRange } from './roadmapTimelineScale';
+import { computeRoadmapAxisTicks, isWithinRange, lifecycleBarPlacement, percentAtIso, supportEndPlacement, thinAxisTicksToFit, todayPercent, unsupportedRunPlacement, type RoadmapGranularity, type RoadmapTimelineRange } from './roadmapTimelineScale';
 import { computeRoadmapVisibleData, eventsForSystem } from './roadmapVisibleData';
 import type { RoadmapBranchEvents } from '../../db/roadmapChangeEvents';
 
@@ -37,6 +37,7 @@ const PALETTE = {
   surfaceRaised: '#f3f5f7',
   statusOk: '#009e73',
   statusWarn: '#e69f00',
+  statusDanger: '#c0392b',
   statusNeutral: '#8a93a1',
 } as const;
 
@@ -52,6 +53,11 @@ export interface RoadmapPngRow {
   barWidth: number;
   tone: 'warn' | 'neutral';
   supportEndX: number | undefined;
+  /** No planned end, support still to come: a dotted open-ended run from here to the right edge. */
+  openEndX: number | undefined;
+  /** Support has ended with no planned end: a dashed run to the right edge. */
+  unsupportedX: number | undefined;
+  unsupportedLabel: string | undefined;
   markers: RoadmapPngMarker[];
 }
 
@@ -118,18 +124,21 @@ export function computeRoadmapPngPlan(groups: readonly RoadmapGroup[], branchEve
       cursor += GROUP_HEADER_HEIGHT;
       const rows: RoadmapPngRow[] = [];
       for (const bar of group.bars) {
-        const startPct = percentAtIso(bar.introduced, range);
-        const endPct = percentAtIso(bar.plannedEnd, range);
+        const placement = lifecycleBarPlacement(bar.introduced, bar.plannedEnd, bar.supportEndsAt, range);
+        const unsupported = unsupportedRunPlacement(bar.supportEndsAt, bar.plannedEnd, range, now);
         const supportEndPct = supportEndPlacement(bar.supportEndsAt, range)?.pct;
-        const left = startPct ?? 0;
-        const width = Math.max((endPct ?? 100) - left, 0.5);
+        const barX = placement !== undefined ? xAt(placement.leftPct) : xAt(0);
+        const barWidth = placement !== undefined ? xAt(placement.leftPct + placement.widthPct) - xAt(placement.leftPct) : 0;
         rows.push({
           y: cursor,
           name: bar.name,
-          barX: xAt(left),
-          barWidth: xAt(left + width) - xAt(left),
+          barX,
+          barWidth,
           tone: bar.lifecycleStatus === 'retiring' || bar.lifecycleStatus === 'retired' ? 'warn' : 'neutral',
           supportEndX: supportEndPct !== undefined ? xAt(supportEndPct) : undefined,
+          openEndX: placement?.openEnded === true && unsupported === undefined ? xAt(placement.endPct) : undefined,
+          unsupportedX: unsupported !== undefined ? xAt(unsupported.startPct) : undefined,
+          unsupportedLabel: unsupported !== undefined ? `Unsupported since ${bar.supportEndsAt ?? ''}, no end planned` : undefined,
           markers: markersForBar(bar.systemId, branchEvents, mode, range),
         });
         cursor += ROW_HEIGHT;
@@ -189,8 +198,40 @@ export function drawRoadmapPng(ctx: CanvasRenderingContext2D, plan: RoadmapPngPl
       ctx.fillStyle = PALETTE.surfaceRaised;
       ctx.fillRect(TRACK_X0, midY - 6, TRACK_WIDTH, 12);
 
-      ctx.fillStyle = row.tone === 'warn' ? PALETTE.statusWarn : PALETTE.statusNeutral;
-      ctx.fillRect(row.barX, midY - 4, row.barWidth, 8);
+      if (row.barWidth > 0) {
+        ctx.fillStyle = row.tone === 'warn' ? PALETTE.statusWarn : PALETTE.statusNeutral;
+        ctx.fillRect(row.barX, midY - 4, row.barWidth, 8);
+      }
+
+      if (row.openEndX !== undefined) {
+        const width = TRACK_X0 + TRACK_WIDTH - row.openEndX;
+        ctx.save();
+        ctx.strokeStyle = PALETTE.textMuted;
+        ctx.setLineDash([3, 3]);
+        ctx.strokeRect(row.openEndX, midY - 4, width, 8);
+        ctx.restore();
+        if (width > 90) {
+          ctx.fillStyle = PALETTE.textMuted;
+          ctx.font = '10px sans-serif';
+          ctx.fillText('No end date planned', row.openEndX + 4, midY + 3);
+          ctx.font = '12px sans-serif';
+        }
+      }
+
+      if (row.unsupportedX !== undefined) {
+        const width = TRACK_X0 + TRACK_WIDTH - row.unsupportedX;
+        ctx.save();
+        ctx.strokeStyle = PALETTE.statusDanger;
+        ctx.setLineDash([4, 3]);
+        ctx.strokeRect(row.unsupportedX, midY - 4, width, 8);
+        ctx.restore();
+        if (width > 180) {
+          ctx.fillStyle = PALETTE.textMuted;
+          ctx.font = '10px sans-serif';
+          ctx.fillText(row.unsupportedLabel ?? 'Unsupported, no end planned', row.unsupportedX + 4, midY + 3);
+          ctx.font = '12px sans-serif';
+        }
+      }
 
       if (row.supportEndX !== undefined) {
         ctx.fillStyle = PALETTE.statusWarn;

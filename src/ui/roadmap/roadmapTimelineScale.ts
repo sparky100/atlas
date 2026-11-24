@@ -165,6 +165,40 @@ export function unsupportedRunPlacement(supportEndsAt: string | undefined, plann
   return { startPct: date.getTime() < range.start.getTime() ? 0 : percentAt(date, range) };
 }
 
+export interface RoadmapLifecycleBarPlacement {
+  leftPct: number;
+  widthPct: number;
+  endPct: number;
+  /** No planned end: the solid bar stops at vendor support, and an open-ended run says no end is planned. */
+  openEnded: boolean;
+}
+
+/**
+ * The solid part of a lifecycle bar and, when there is no planned end, the
+ * point where an explicit "No end date planned" run takes over. A planned end
+ * still wins; otherwise a vendor support end gives the row a body, so the
+ * support tick is not a mark floating on nothing. An end beyond the window is
+ * clamped to the edge, the same as the support tick itself.
+ */
+export function lifecycleBarPlacement(
+  introduced: string | undefined,
+  plannedEnd: string | undefined,
+  supportEndsAt: string | undefined,
+  range: RoadmapTimelineRange,
+): RoadmapLifecycleBarPlacement | undefined {
+  if (plannedEnd === undefined && supportEndsAt === undefined) return undefined;
+  const leftPct = percentAtIso(introduced, range) ?? 0;
+  const endPct = plannedEnd !== undefined
+    ? (percentAtIso(plannedEnd, range) ?? 100)
+    : (supportEndPlacement(supportEndsAt, range)?.pct ?? 100);
+  return {
+    leftPct,
+    widthPct: Math.max(endPct - leftPct, 0.5),
+    endPct,
+    openEnded: plannedEnd === undefined && supportEndsAt !== undefined && endPct > 0 && endPct < 100,
+  };
+}
+
 export type RoadmapHorizon = '1y' | '3y' | 'all';
 
 /** How many months a fixed horizon covers; `null` for `'all'` (the full date span). */

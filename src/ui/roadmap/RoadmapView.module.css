@@ -121,6 +121,33 @@
   align-items: center;
 }
 
+/* No planned end, support still to come: the solid supported bar stops at the support tick, then this open run says the system continues with no end date. It must never read as an end at the tick. */
+.openEndRun {
+  position: absolute;
+  top: 4px;
+  height: 12px;
+  box-sizing: border-box;
+  border: 1px dotted var(--border-strong);
+  border-left: 0;
+  border-right: 0;
+  border-top-right-radius: 0;
+  border-bottom-right-radius: 0;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+}
+
+.openEndLabel {
+  padding-left: calc(var(--space-1) + 4px);
+  font-size: var(--text-xs-size);
+  line-height: 1;
+  color: var(--text-muted);
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  overflow: hidden;
+  min-width: 0;
+}
+
 /* Clipped with an ellipsis rather than wrapped, so it fits any width and any resize. */
 .unsupportedLabel {
   padding-left: calc(var(--space-1) + 4px);

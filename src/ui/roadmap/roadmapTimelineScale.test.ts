@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { computeRoadmapAxisTicks, computeRoadmapForwardRange, computeRoadmapTimelineRange, isWithinRange, roadmapPastStart, computeRoadmapWindow, defaultRoadmapWindowStart, horizonDurationMonths, percentAt, percentAtIso, shiftRoadmapWindowStart, supportEndPlacement, thinAxisTicksToFit, todayPercent, unsupportedRunPlacement } from './roadmapTimelineScale';
+import { computeRoadmapAxisTicks, computeRoadmapForwardRange, computeRoadmapTimelineRange, isWithinRange, lifecycleBarPlacement, roadmapPastStart, computeRoadmapWindow, defaultRoadmapWindowStart, horizonDurationMonths, percentAt, percentAtIso, shiftRoadmapWindowStart, supportEndPlacement, thinAxisTicksToFit, todayPercent, unsupportedRunPlacement } from './roadmapTimelineScale';
 
 const NOW = new Date('2026-06-15T00:00:00Z');
 
@@ -52,6 +52,44 @@ describe('percentAtIso', () => {
   it('parses a real ISO date string and maps it the same as percentAt', () => {
     const range = { start: new Date('2020-01-01'), end: new Date('2021-01-01') };
     expect(percentAtIso('2020-01-01', range)).toBe(0);
+  });
+});
+
+describe('lifecycleBarPlacement', () => {
+  const range = { start: new Date('2026-01-01'), end: new Date('2031-01-01') };
+
+  it('uses a planned end when there is one and never adds the open-ended run', () => {
+    const placement = lifecycleBarPlacement('2026-01-01', '2028-01-01', undefined, range);
+    expect(placement?.leftPct).toBeCloseTo(0, 0);
+    expect(placement?.endPct).toBeCloseTo(40, 0);
+    expect(placement?.widthPct).toBeCloseTo(40, 0);
+    expect(placement?.openEnded).toBe(false);
+  });
+
+  it('gives a support-end-only row a bar to the support tick and an open-ended run beyond it', () => {
+    const placement = lifecycleBarPlacement('2027-01-01', undefined, '2028-01-01', range);
+    expect(placement?.leftPct).toBeCloseTo(20, 0);
+    expect(placement?.endPct).toBeCloseTo(40, 0);
+    expect(placement?.widthPct).toBeCloseTo(20, 0);
+    expect(placement?.openEnded).toBe(true);
+  });
+
+  it('runs to the window edge when the support end is later, with no open-ended run to draw', () => {
+    const placement = lifecycleBarPlacement('2027-01-01', undefined, '2032-01-01', range);
+    expect(placement?.leftPct).toBeCloseTo(20, 0);
+    expect(placement?.endPct).toBe(100);
+    expect(placement?.openEnded).toBe(false);
+  });
+
+  it('does not add an open-ended run when support has already ended before the window', () => {
+    const placement = lifecycleBarPlacement('2000-01-01', undefined, '2025-01-01', range);
+    expect(placement?.leftPct).toBe(0);
+    expect(placement?.endPct).toBe(0);
+    expect(placement?.openEnded).toBe(false);
+  });
+
+  it('returns nothing when there is no planned or support end to draw', () => {
+    expect(lifecycleBarPlacement('2026-01-01', undefined, undefined, range)).toBeUndefined();
   });
 });
 
