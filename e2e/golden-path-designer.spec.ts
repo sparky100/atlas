@@ -53,7 +53,17 @@ async function stubDesigner(page: Page, reply: (call: number) => { status: numbe
   await page.route('**/functions/v1/design-agent', async (route) => {
     sent.push(route.request().postDataJSON() as { elementId?: string; finding?: string });
     const r = reply(sent.length);
-    await route.fulfill({ status: r.status, contentType: 'application/json', body: JSON.stringify(r.body) });
+    if (r.status !== 200) {
+      await route.fulfill({ status: r.status, contentType: 'application/json', body: JSON.stringify(r.body) });
+      return;
+    }
+    // The function streams progress, then its result, as newline-delimited JSON.
+    const lines = [
+      { type: 'event', event: { type: 'tool_call', name: 'search_elements' } },
+      { type: 'event', event: { type: 'tool_done', name: 'search_elements', ok: true } },
+      { type: 'result', ...(r.body as Record<string, unknown>) },
+    ];
+    await route.fulfill({ status: 200, contentType: 'application/x-ndjson', body: lines.map((line) => `${JSON.stringify(line)}\n`).join('') });
   });
   return sent;
 }

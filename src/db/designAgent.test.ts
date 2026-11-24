@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { citationIds, citationsToNames, DesignerError, interpretDesignerReply } from './designAgent';
+import type { AskEvent } from '../tools/askLoop';
+import { citationIds, citationsToNames, DesignerError, interpretDesignerReply, parseDesignerLine, runDesigner } from './designAgent';
 
 describe('interpretDesignerReply', () => {
   const design = { options: [{ title: 'Configure', summary: 'Use it as is.', toWeigh: 'Fit.' }, { title: 'Replace', summary: 'Buy one.' }], gaps: ['No owner recorded'], stayNote: 'Slow.', problems: [] };
@@ -45,6 +46,80 @@ describe('interpretDesignerReply', () => {
     expect(() => interpretDesignerReply({ status: 'forbidden', message: 'Only an owner, architect or contributor can run the Designer.' })).toThrow('Only an owner, architect or contributor can run the Designer.');
     expect(() => interpretDesignerReply(null)).toThrow(DesignerError);
     expect(() => interpretDesignerReply({ status: 'error' })).toThrow(/could not be reached/);
+  });
+});
+
+describe('parseDesignerLine', () => {
+  it('reads progress, the result and an error, and ignores anything else', () => {
+    expect(parseDesignerLine('{"type":"event","event":{"type":"tool_call","name":"get_element"}}')).toEqual({ type: 'event', event: { type: 'tool_call', name: 'get_element' } });
+    expect(parseDesignerLine('{"type":"result","status":"done"}')).toEqual({ type: 'result', outcome: { status: 'done' } });
+    expect(parseDesignerLine('{"type":"error","code":"rate_limited","message":"Slow down."}')).toEqual({ type: 'error', code: 'rate_limited', message: 'Slow down.' });
+    expect(parseDesignerLine('not json')).toBeNull();
+    expect(parseDesignerLine('')).toBeNull();
+  });
+});
+
+describe('runDesigner', () => {
+  const input = {
+    functionUrl: 'https://x.test/functions/v1/design-agent',
+    accessToken: 't',
+    modelId: '00000000-0000-4000-8000-000000000001',
+    elementId: '00000000-0000-4000-8000-000000000002',
+    finding: 'Quotes take two days.',
+  };
+  const done = {
+    type: 'result',
+    status: 'done',
+    stamp: { modelId: '00000000-0000-4000-8000-000000000001', modelName: 'Estate', ref: 'main', commitId: '00000000-0000-4000-8000-000000000003' },
+    design: { options: [{ title: 'Replace', summary: 'Buy one.' }], gaps: [], stayNote: '', problems: [] },
+    result: { status: 'answered', answer: '{}', citations: [], citationNames: {}, grounded: false, unverifiedRemoved: 0, toolUses: [], rounds: 1, inputTokens: 1, outputTokens: 1 },
+  };
+
+  function streamed(lines: string[]): Response {
+    const encoder = new TextEncoder();
+    const body = new ReadableStream<Uint8Array>({
+      start(controller) {
+        for (const line of lines) controller.enqueue(encoder.encode(line));
+        controller.close();
+      },
+    });
+    return new Response(body, { headers: { 'content-type': 'application/x-ndjson' } });
+  }
+
+  it('streams lookup progress and returns the final draft', async () => {
+    const events: AskEvent[] = [];
+    const draft = await runDesigner({
+      ...input,
+      onEvent: (event) => events.push(event),
+      fetchImpl: () => Promise.resolve(streamed([
+        '{"type":"event","event":{"type":"tool_call","name":"search_elements"}}\n',
+        '{"type":"event","event":{"type":"tool_done","name":"search_elements","ok":true}}\n',
+        `${JSON.stringify(done)}\n`,
+      ])),
+    });
+    expect(events).toEqual([{ type: 'tool_call', name: 'search_elements' }, { type: 'tool_done', name: 'search_elements', ok: true }]);
+    expect(draft.options[0]?.title).toBe('Replace');
+  });
+
+  it("throws the function's plain sentence from an error line", async () => {
+    await expect(runDesigner({ ...input, fetchImpl: () => Promise.resolve(streamed(['{"type":"error","code":"rate_limited","message":"Too many requests right now."}\n'])) }))
+      .rejects.toThrow('Too many requests right now.');
+  });
+
+  it('accepts the single JSON reply of an older function', async () => {
+    const response = new Response(JSON.stringify({ ...done, type: undefined }), { headers: { 'content-type': 'application/json' } });
+    const draft = await runDesigner({ ...input, fetchImpl: () => Promise.resolve(response) });
+    expect(draft.options[0]?.title).toBe('Replace');
+  });
+
+  it("uses the function's sentence for a refusal before the stream starts", async () => {
+    const response = new Response(JSON.stringify({ status: 'not_enabled', message: 'The free trial of the Designer is used up.' }), { status: 403, headers: { 'content-type': 'application/json' } });
+    await expect(runDesigner({ ...input, fetchImpl: () => Promise.resolve(response) })).rejects.toThrow('The free trial of the Designer is used up.');
+  });
+
+  it('says the run stopped when the stream ends without a result', async () => {
+    await expect(runDesigner({ ...input, fetchImpl: () => Promise.resolve(streamed(['{"type":"event","event":{"type":"tool_call","name":"get_element"}}\n'])) }))
+      .rejects.toThrow(/stopped before it finished/);
   });
 });
 

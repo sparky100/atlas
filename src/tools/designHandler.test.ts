@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import type { AskModelClient, AskModelRequest } from './askLoop';
+import type { AskEvent, AskModelClient, AskModelRequest } from './askLoop';
 import { handleDesign, parseDesignBody } from './designHandler';
 import type { DesignHandlerDeps, DesignTiming } from './designHandler';
 import { designerBrief, designerSystemPrompt } from './designPrompt';
@@ -61,6 +61,21 @@ describe('handleDesign', () => {
     expect(outcome.status).toBe('done');
     expect(timings.map((t) => t.phase)).toEqual(expect.arrayContaining(['load_model', 'role', 'settings', 'share_run_cost', 'main_commit', 'context', 'run_round']));
     for (const t of timings) expect(t.ms).toBeGreaterThanOrEqual(0);
+  });
+
+  it('streams lookup progress to the caller without changing the draft', async () => {
+    const answer = JSON.stringify({ options: [{ title: 'Replace', summary: 'Buy.' }], gaps: [], stayNote: '' });
+    let round = 0;
+    const events: AskEvent[] = [];
+    const d = deps({ createClient: () => ({ complete: () => {
+      round += 1;
+      return Promise.resolve(round === 1
+        ? { text: '', stopReason: 'tool_use', toolCalls: [{ id: 't1', name: 'search_elements', input: { query: 'Complaints' } }], inputTokens: 1, outputTokens: 1 }
+        : { text: answer, stopReason: 'end_turn', inputTokens: 1, outputTokens: 1 });
+    } }) });
+    const outcome = await handleDesign(d, body, (event) => events.push(event));
+    expect(outcome.status).toBe('done');
+    expect(events).toEqual([{ type: 'tool_call', name: 'search_elements' }, { type: 'tool_done', name: 'search_elements', ok: true }]);
   });
 
   it('refuses before anything is read or sent unless the switches are on and there is a key or trial left, one at a time', async () => {

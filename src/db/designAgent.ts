@@ -1,7 +1,7 @@
 import type { UUID } from '../contracts/delta';
 import { DESIGNER_CATALOGUE_REFS_MAX, DESIGNER_WEB_REFS_MAX, parseCatalogueProducts, type DesignerOptionDraft, type DesignerWebRef } from '../contracts/designerOptions';
 import { catalogueCitationSchema, type CatalogueCitation } from '../contracts/productCatalogue';
-import type { Client } from './client';
+import type { AskEvent } from '../tools/askLoop';
 
 /**
  * Phase D step 2b: the browser's side of the `design-agent` edge function.
@@ -24,8 +24,13 @@ export interface DesignerDraft {
   usage: { inputTokens: number; outputTokens: number; lookups: number; webSearches: number };
 }
 
+export type DesignerErrorCode = 'rate_limited' | 'provider' | 'failed';
+
 export class DesignerError extends Error {
-  constructor(message: string) {
+  constructor(
+    message: string,
+    readonly code: DesignerErrorCode = 'failed',
+  ) {
     super(message);
     this.name = 'DesignerError';
   }
@@ -118,20 +123,90 @@ export function interpretDesignerReply(body: unknown): DesignerDraft {
   throw new DesignerError(typeof r.message === 'string' && r.message !== '' ? r.message : 'The Designer could not be reached. Check that it has been deployed, then try again.');
 }
 
-export async function runDesigner(supabase: Client, input: { modelId: UUID; elementId: UUID; finding: string }, signal?: AbortSignal): Promise<DesignerDraft> {
-  // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment -- untyped client; see invites.ts.
-  const { data, error } = await supabase.functions.invoke('design-agent', { body: input, ...(signal ? { signal } : {}) });
-  if (error) {
-    // A refusal (403, 429, 502...) carries the function's own sentence in the response body.
-    const context = (error as { context?: unknown }).context;
-    if (context instanceof Response) {
-      try {
-        return interpretDesignerReply(await context.json());
-      } catch (e) {
-        if (e instanceof DesignerError) throw e;
-      }
-    }
-    throw new DesignerError('The Designer could not be reached. Check that it has been deployed, then try again.');
+/**
+ * One newline-delimited line from `design-agent`: a progress event, the final
+ * outcome, or an error. The same shapes `ask-model` streams.
+ */
+export type DesignerLine =
+  | { type: 'event'; event: AskEvent }
+  | { type: 'result'; outcome: unknown }
+  | { type: 'error'; code: DesignerErrorCode; message: string };
+
+/** Pure: an unrecognised or blank line is ignored rather than shown. */
+export function parseDesignerLine(line: string): DesignerLine | null {
+  if (line.trim() === '') return null;
+  let raw: unknown;
+  try {
+    raw = JSON.parse(line);
+  } catch {
+    return null;
   }
-  return interpretDesignerReply(data);
+  if (typeof raw !== 'object' || raw === null) return null;
+  const r = raw as Record<string, unknown>;
+  if (r.type === 'event' && typeof r.event === 'object' && r.event !== null) return { type: 'event', event: r.event as AskEvent };
+  if (r.type === 'error' && typeof r.message === 'string') {
+    const code: DesignerErrorCode = r.code === 'rate_limited' || r.code === 'provider' ? r.code : 'failed';
+    return { type: 'error', code, message: r.message };
+  }
+  if (r.type === 'result' && typeof r.status === 'string') {
+    const outcome = { ...r };
+    delete outcome.type;
+    return { type: 'result', outcome };
+  }
+  return null;
+}
+
+export interface RunDesignerInput {
+  /** Full URL of the function, e.g. `${VITE_SUPABASE_URL}/functions/v1/design-agent`. */
+  functionUrl: string;
+  accessToken: string;
+  modelId: UUID;
+  elementId: UUID;
+  finding: string;
+  /** Progress while the function looks things up. Optional: the draft is the same without it. */
+  onEvent?: (event: AskEvent) => void;
+  signal?: AbortSignal;
+  fetchImpl?: typeof fetch;
+}
+
+/** Resolves with the checked draft; throws `DesignerError` for an error line or a refusal. */
+export async function runDesigner(input: RunDesignerInput): Promise<DesignerDraft> {
+  const doFetch = input.fetchImpl ?? fetch;
+  const response = await doFetch(input.functionUrl, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json', authorization: `Bearer ${input.accessToken}` },
+    body: JSON.stringify({ modelId: input.modelId, elementId: input.elementId, finding: input.finding }),
+    ...(input.signal ? { signal: input.signal } : {}),
+  });
+  // An older function answers one JSON document, and a refusal before the
+  // stream starts does too. Both go through the same reader.
+  if (!response.ok || !(response.headers.get('content-type') ?? '').includes('application/x-ndjson')) {
+    return interpretDesignerReply(await response.json().catch(() => null));
+  }
+  if (!response.body) throw new DesignerError('The Designer could not be reached. Check that it has been deployed, then try again.');
+  const reader = response.body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = '';
+  const final: { outcome: unknown; gotResult: boolean } = { outcome: undefined, gotResult: false };
+  const handle = (line: string) => {
+    const parsed = parseDesignerLine(line);
+    if (!parsed) return;
+    if (parsed.type === 'event') input.onEvent?.(parsed.event);
+    else if (parsed.type === 'error') throw new DesignerError(parsed.message, parsed.code);
+    else {
+      final.outcome = parsed.outcome;
+      final.gotResult = true;
+    }
+  };
+  for (;;) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    buffer += decoder.decode(value, { stream: true });
+    const lines = buffer.split('\n');
+    buffer = lines.pop() ?? '';
+    for (const line of lines) handle(line);
+  }
+  handle(buffer);
+  if (!final.gotResult) throw new DesignerError('The Designer stopped before it finished. Try again.');
+  return interpretDesignerReply(final.outcome);
 }

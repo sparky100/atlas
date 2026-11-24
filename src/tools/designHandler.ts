@@ -12,7 +12,7 @@
 import type { UUID } from '../contracts/delta';
 import { parseDesignerOptions, type DesignerCatalogueProduct, type DesignerOptionsResult } from '../contracts/designerOptions';
 import { runAsk } from './askLoop';
-import type { AskModelClient, AskResult } from './askLoop';
+import type { AskEvent, AskModelClient, AskResult } from './askLoop';
 import { designerBrief, designerSystemPrompt, DESIGNER_MAX_FINDING_CHARS } from './designPrompt';
 import { catalogueRefKey, capabilityCode, capabilityTemplateRef } from './findCatalogueProducts';
 import { indexSnapshot } from './toolKit';
@@ -118,7 +118,7 @@ async function returnedCatalogueProducts(ctx: ToolContext, toolUses: readonly { 
   return products;
 }
 
-export async function handleDesign(deps: DesignHandlerDeps, body: unknown): Promise<DesignOutcome> {
+export async function handleDesign(deps: DesignHandlerDeps, body: unknown, onEvent?: (event: AskEvent) => void): Promise<DesignOutcome> {
   const parsed = parseDesignBody(body);
   if (typeof parsed === 'string') return { status: 'invalid', message: parsed };
 
@@ -167,6 +167,7 @@ export async function handleDesign(deps: DesignHandlerDeps, body: unknown): Prom
     question: designerBrief({ elementId: parsed.elementId, finding: parsed.finding }),
     system: designerSystemPrompt(ctx.stamp.modelName, ctx.now().toISOString().slice(0, 10), { runCost }),
     maxTokensPerRound: DESIGNER_MAX_TOKENS_PER_ROUND,
+    onEvent,
     onTiming: (t) => {
       timing(t.phase === 'round' ? 'run_round' : 'run_tool', t.ms, { round: t.round, ...(t.name !== undefined ? { name: t.name } : {}) });
     },
