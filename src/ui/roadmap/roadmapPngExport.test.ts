@@ -80,6 +80,40 @@ describe('computeRoadmapPngPlan', () => {
     expect(plan.axisY).toBeNull();
   });
 
+  it('gives a support-end-only row a solid bar to the tick and an open-ended run beyond it', () => {
+    const groups: RoadmapGroup[] = [{
+      key: 'cap-1', label: 'Cap 1', href: null,
+      bars: [bar({ introduced: '2025-01-01', plannedEnd: undefined, supportEndsAt: '2026-09-01' })],
+    }];
+    const range = computeRoadmapTimelineRange(['2025-01-01', '2026-09-01'], NOW);
+    const plan = computeRoadmapPngPlan(groups, [], 'toBe', EMPTY_ROADMAP_FILTERS, 'quarters', range, NOW);
+    const row = plan.groups[0]?.rows[0];
+    expect(row?.barWidth).toBeGreaterThan(0);
+    expect(row?.openEndX).toEqual(expect.any(Number));
+    expect(row?.unsupportedX).toBeUndefined();
+  });
+
+  it('turns the open-ended run into the unsupported run once support has ended', () => {
+    const groups: RoadmapGroup[] = [{
+      key: 'cap-1', label: 'Cap 1', href: null,
+      bars: [bar({ introduced: '2025-01-01', plannedEnd: undefined, supportEndsAt: '2026-01-01' })],
+    }];
+    const range = computeRoadmapTimelineRange(['2025-01-01', '2026-09-01'], NOW);
+    const plan = computeRoadmapPngPlan(groups, [], 'toBe', EMPTY_ROADMAP_FILTERS, 'quarters', range, NOW);
+    const row = plan.groups[0]?.rows[0];
+    expect(row?.unsupportedX).toEqual(expect.any(Number));
+    expect(row?.openEndX).toBeUndefined();
+    expect(row?.unsupportedLabel).toContain('Unsupported since');
+  });
+
+  it('does not add an open-ended run when a planned end exists', () => {
+    const groups: RoadmapGroup[] = [{ key: 'cap-1', label: 'Cap 1', href: null, bars: [bar()] }];
+    const range = computeRoadmapTimelineRange(['2025-01-01', '2026-12-01'], NOW);
+    const plan = computeRoadmapPngPlan(groups, [], 'toBe', EMPTY_ROADMAP_FILTERS, 'quarters', range, NOW);
+    expect(plan.groups[0]?.rows[0]?.openEndX).toBeUndefined();
+    expect(plan.groups[0]?.rows[0]?.unsupportedX).toBeUndefined();
+  });
+
   it('places an add marker on the added system\'s own row', () => {
     const groups: RoadmapGroup[] = [{ key: 'cap-1', label: 'Cap 1', href: null, bars: [bar({ systemId: 'sys-2', name: 'New CRM' })] }];
     const branchEvents: RoadmapBranchEvents[] = [{ branch: branch({ target_date: '2026-06-01' }), events: [{ kind: 'add', elementId: 'sys-2', elementName: 'New CRM' }] }];
