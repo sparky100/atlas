@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { allStepsDone, applyDesignerEvent, stepSuffix, type DesignerStep } from './designerProgress';
 import type { UUID } from '../../contracts/delta';
 import { catalogueRefKeyOf, DESIGNER_SUMMARY_MAX, DESIGNER_TITLE_MAX, DESIGNER_WEIGH_MAX, type DesignerCatalogueProduct, type DesignerWebRef } from '../../contracts/designerOptions';
 import { runDesigner, type DesignerDraft } from '../../db/designAgent';
@@ -112,7 +113,7 @@ export function DesignerSuggestions({ orgId, userId, modelId, elementId, brief, 
   const onTrial = trial !== null && !trial.keySet;
   const heldKey = pendingKey(orgId, userId, `designer-${scope}`);
   const [state, setState] = useState<'idle' | 'running' | 'failed' | 'stopped'>('idle');
-  const [steps, setSteps] = useState<{ name: string; ok: boolean | null }[]>([]);
+  const [steps, setSteps] = useState<DesignerStep[]>([]);
   const [message, setMessage] = useState('');
   const [cards, setCards] = useState<SuggestionCard[]>([]);
   const [earlier, setEarlier] = useState<SuggestionCard[]>([]);
@@ -170,18 +171,7 @@ export function DesignerSuggestions({ orgId, userId, modelId, elementId, brief, 
         finding: briefText,
         onEvent: (event: AskEvent) => {
           if (mine !== runNo.current) return;
-          setSteps((prev) => {
-            const next = prev.slice();
-            if (event.type === 'tool_call') next.push({ name: event.name, ok: null });
-            else {
-              let open = -1;
-              next.forEach((step, i) => {
-                if (step.name === event.name && step.ok === null) open = i;
-              });
-              if (open >= 0) next[open] = { name: event.name, ok: event.ok };
-            }
-            return next;
-          });
+          setSteps((prev) => applyDesignerEvent(prev, event));
         },
         signal: controller.signal,
       });
@@ -313,13 +303,13 @@ export function DesignerSuggestions({ orgId, userId, modelId, elementId, brief, 
           ) : (
             <>
               <Text as="p" tone="muted" size="sm">
-                {steps.every((step) => step.ok !== null) ? 'Drafting options from what it found…' : 'Looking things up…'}
+                {allStepsDone(steps) ? 'Drafting options from what it found…' : 'Looking things up…'}
               </Text>
               <ul className={styles.steps}>
-                {steps.map((step, i) => (
-                  <li key={`${step.name}-${String(i)}`}>
+                {steps.map((step) => (
+                  <li key={step.name}>
                     <Text as="span" size="xs" tone="muted">
-                      {toolLabel(step.name)}{step.ok === null ? '…' : step.ok ? ' ✓' : ' — nothing found'}
+                      {toolLabel(step.name)}{stepSuffix(step)}
                     </Text>
                   </li>
                 ))}
