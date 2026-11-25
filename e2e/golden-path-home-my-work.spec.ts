@@ -34,7 +34,7 @@ test('My work lists the project, not the decision options inside it', async ({ p
   await page.getByRole('button', { name: 'My work', exact: true }).click();
   // The project is listed once, under My projects; its decision and option are not listed again on their own.
   const projects = page.getByRole('list', { name: 'My projects' });
-  await expect(projects.getByRole('link', { name: 'Meet Housing Repairs' })).toHaveCount(1);
+  await expect(projects.getByRole('link', { name: 'Meet Housing Repairs', exact: true })).toHaveCount(1);
   // The hierarchy is project, decision, change: the decision sits inside the project and its option inside the decision.
   const inside = projects.getByRole('list', { name: 'Inside this project' });
   await expect(inside.getByRole('link', { name: 'How should we meet Housing Repairs?' })).toHaveCount(1);
@@ -50,14 +50,14 @@ test('My work lists the project, not the decision options inside it', async ({ p
   await clickNavItem(page, 'Work');
   await expect(page.getByRole('heading', { name: 'Work', level: 1 })).toBeVisible();
   const projectsCard = page.getByTestId('work-card-projects');
-  await expect(projectsCard.getByRole('link', { name: 'Meet Housing Repairs' })).toBeVisible();
+  await expect(projectsCard.getByRole('link', { name: 'Meet Housing Repairs', exact: true })).toBeVisible();
   await expect(page.getByTestId('work-card-decisions').getByRole('link', { name: 'How should we meet Housing Repairs?' })).toHaveCount(0);
   await expect(page.getByTestId('work-card-changes').getByRole('link', { name: 'Build Repairs Hub' })).toHaveCount(0);
 
   // The Changes list nests the option under its decision, under the project: nothing stands alone.
   await clickNavItem(page, 'Changes');
   const inProjects = page.getByTestId('changes-in-projects');
-  await expect(inProjects.getByRole('link', { name: 'Meet Housing Repairs' })).toBeVisible();
+  await expect(inProjects.getByRole('link', { name: 'Meet Housing Repairs', exact: true })).toBeVisible();
   await expect(inProjects.getByRole('link', { name: 'How should we meet Housing Repairs?' })).toBeVisible();
   await expect(inProjects.getByText('Build Repairs Hub')).toBeVisible();
   await expect(page.getByRole('button', { name: /^Propose/ })).toHaveCount(0);
