@@ -14,6 +14,7 @@ import { createModel } from './models';
 import { createDecision, createDecisionLink } from './decisions';
 import { createChangeBranch, getMainBranch } from './branches';
 import { markOptionEdited } from './decisionOptionMarks';
+import { addDesignerCandidate, getDecisionOptionForBranch, listDecisionOptions, workOnDecisionOption } from './decisionOptions';
 import { addOptionWithCatalogueSources, catalogueToRows, catalogueSnapshotFromRows, listCatalogueSources, listOptionSources, publishedCapabilityMatchForModel, publishedMapItemForCapability } from './productCatalogue';
 import { listOptionWebSources } from './optionWebSources';
 
@@ -361,6 +362,49 @@ describe('product catalogue and option evidence, real database', () => {
     expect((await anon.from('option_catalogue_sources').select('*')).error).not.toBeNull();
     check(await service.from('decisions').update({ status: 'rejected' }).eq('id', m.decisionId));
     await expect(addOptionWithCatalogueSources(owner.client, m, [s.citation])).rejects.toThrow();
+  });
+
+  // Item 2 of the 25 Nov review: a Designer suggestion is saved as a candidate, with no change branch.
+  function candidateInput(decisionId: string) {
+    return { decisionId, id: randomUUID(), title: 'Buy a quoting product', summary: 'Replace quoting with a product.', toWeigh: 'Time to switch.',
+      approach: 'buy' as const, draftedAt: '2026-11-25T10:00:00Z', editedBy: null, editedAt: null, catalogueRefs: [] as { sector: string; version: number; entryCode: string }[] };
+  }
+
+  it('saves a Designer suggestion as a candidate with its mark and citations, makes no change, and keeps both after Work on this option', async () => {
+    const s = await seed(); check(await publish(s.id));
+    const { decisionId } = await option(contributor);
+    const input = { ...candidateInput(decisionId), editedBy: contributor.id, editedAt: '2026-11-25T10:01:00Z', catalogueRefs: [s.citation] };
+    const saved = await addDesignerCandidate(contributor.client, input);
+    expect(saved).toMatchObject({ id: input.id, branch_id: null, source: 'designer', agent: 'designer', approach: 'buy', to_weigh: 'Time to switch.', edited_by: contributor.id });
+    const sources = await listOptionSources(viewer.client, decisionId);
+    expect(sources).toEqual([expect.objectContaining({ kind: 'catalogue', optionId: input.id, branchId: null, product: 'Quotation Tool' })]);
+    const links = await owner.client.from('decision_links').select('linked_id').eq('decision_id', decisionId).eq('linked_type', 'branch');
+    check(links); expect(links.data).toEqual([]);
+
+    // A retry or double click completes the same option, never a second one, and keeps a later edit.
+    check(await owner.client.from('decision_options').update({ title: 'Move quoting to QuoteCo', updated_by: owner.id }).eq('id', input.id));
+    await Promise.all([addDesignerCandidate(contributor.client, input), addDesignerCandidate(contributor.client, input)]);
+    expect((await listDecisionOptions(owner.client, decisionId)).filter((o) => o.id === input.id)).toEqual([expect.objectContaining({ title: 'Move quoting to QuoteCo' })]);
+    await expect(addDesignerCandidate(contributor.client, { ...input, catalogueRefs: [] })).rejects.toThrow('different provenance');
+
+    const branch = await workOnDecisionOption(contributor.client, input.id);
+    expect(await getDecisionOptionForBranch(owner.client, decisionId, branch.id)).toMatchObject({ id: input.id, source: 'designer', edited_by: contributor.id });
+    expect((await listOptionSources(owner.client, decisionId)).map((x) => x.optionId)).toEqual([input.id]);
+  });
+
+  it('refuses a Designer candidate from a viewer, another organisation, a signed-out caller, a spoofed editor, the baseline type or a closed decision', async () => {
+    const s = await seed(); check(await publish(s.id));
+    const { decisionId } = await option();
+    for (const client of [viewer.client, outsider.client, anon]) await expect(addDesignerCandidate(client, { ...candidateInput(decisionId), catalogueRefs: [s.citation] })).rejects.toThrow();
+    await expect(addDesignerCandidate(owner.client, { ...candidateInput(decisionId), editedBy: outsider.id, editedAt: '2026-11-25T10:02:00Z' })).rejects.toThrow();
+    await expect(addDesignerCandidate(owner.client, { ...candidateInput(decisionId), approach: 'no_change' })).rejects.toThrow();
+    // A bad citation rolls the candidate back too.
+    const bad = candidateInput(decisionId);
+    await expect(addDesignerCandidate(owner.client, { ...bad, catalogueRefs: [{ ...s.citation, entryCode: 'missing-entry' }] })).rejects.toThrow();
+    expect((await listDecisionOptions(owner.client, decisionId)).some((o) => o.id === bad.id)).toBe(false);
+    expect(await listDecisionOptions(outsider.client, decisionId)).toEqual([]);
+    check(await service.from('decisions').update({ status: 'rejected' }).eq('id', decisionId));
+    await expect(addDesignerCandidate(owner.client, candidateInput(decisionId))).rejects.toThrow();
   });
 
   it('keeps snapshots unchanged across replacement/withdrawal and allows withdrawal only once', async () => {

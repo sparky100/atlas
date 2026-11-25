@@ -7,6 +7,12 @@
 import { expect, test, type Page } from '@playwright/test';
 import { signUpCreateOrgAndModel, clickNavItem } from './fixtures/goldenPath';
 
+// A patched route may still be waiting on route.fetch() when the test ends;
+// unroute first so closing the page does not fail it after every check passed.
+test.afterEach(async ({ page }) => {
+  await page.unrouteAll({ behavior: 'ignoreErrors' });
+});
+
 async function createDecisionWithOption(page: Page) {
   await signUpCreateOrgAndModel(page, 'second-opinion');
   await clickNavItem(page, 'Decisions');

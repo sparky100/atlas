@@ -16,7 +16,7 @@ import { Text } from '../components/Text/Text';
 import { useAuth } from '../auth/useAuth';
 import { useMainBranch } from '../branches/useMainBranch';
 import { useSelectedRef } from '../branches/useSelectedRef';
-import type { BranchRow, DecisionLinkRow, DecisionOptionRow, DecisionRow, MemberRole } from '../../db/types';
+import type { DecisionLinkRow, DecisionOptionRow, DecisionRow, MemberRole } from '../../db/types';
 import { intentHeaderLine } from '../changes/branchIntent';
 import { profileLabel } from '../comments/profileLabel';
 import { chooseNote } from './chooseNote';
@@ -96,7 +96,6 @@ export interface DecisionViewProps {
   state: DecisionPageState;
   /** `useDecision.ts`'s own patches — see that file's doc comments. Passed straight through to `useDecisionOptions` so Add-an-option/Choose never trigger this page's own full `reload()`/loading flash any more. */
   applyCreatedOption: (option: DecisionOptionRow) => void;
-  applyNewOption: (link: DecisionLinkRow, branch: BranchRow) => void;
   applyNewConcern: (link: DecisionLinkRow, element: ElementsHeadRow) => void;
   applyDecisionUpdate: (decision: DecisionRow) => void;
   refreshOptionsAndArguments: () => Promise<void>;
@@ -117,14 +116,14 @@ export interface DecisionViewProps {
  * this here" (an element's own linked decisions) are also PR6, but live on
  * `DecisionsView.tsx`/`ElementDecisionsSection.tsx` respectively, not here.
  */
-export function DecisionView({ modelId, decisionId, orgId, orgSlug, modelSlug, role, assistantEnabled, agentsEnabled, keySet, webSearchEnabled, shareCost, state, applyCreatedOption, applyNewOption, applyNewConcern, applyDecisionUpdate, refreshOptionsAndArguments }: DecisionViewProps) {
+export function DecisionView({ modelId, decisionId, orgId, orgSlug, modelSlug, role, assistantEnabled, agentsEnabled, keySet, webSearchEnabled, shareCost, state, applyCreatedOption, applyNewConcern, applyDecisionUpdate, refreshOptionsAndArguments }: DecisionViewProps) {
   const { userId } = useAuth();
   const compact = useCompactDecisionLayout();
   const { branch: main } = useMainBranch(modelId);
   const { members } = useMembers(orgId);
   const optionsState = useDecisionOptions(applyCreatedOption, applyDecisionUpdate, refreshOptionsAndArguments);
   // Options kept from the Designer's suggestions are saved here as the page opens (journey proposal step 2).
-  const pendingOptions = usePendingOptions({ orgId, modelId, decisionId, userId, projectId: state.status === 'ready' ? state.decision.project_id : null, canAdd: state.status === 'ready' && state.decision.status === 'proposed' && canCreateChangeBranch(role), applyNewOption });
+  const pendingOptions = usePendingOptions({ orgId, decisionId, userId, canAdd: state.status === 'ready' && state.decision.status === 'proposed' && canCreateChangeBranch(role), applyCreatedOption });
   const navigate = useNavigate();
   // `?edit=1` (from "Start decision" on a project) opens the decision's own edit form straight away.
   const [searchParams] = useSearchParams();
@@ -1108,16 +1107,8 @@ export function DecisionView({ modelId, decisionId, orgId, orgSlug, modelSlug, r
             const title = researchOptionTitle(candidate);
             const already = (readyState?.options ?? []).find((option) => option.title.trim().toLowerCase() === title.toLowerCase());
             if (already !== undefined) return `An option for this page already exists: ${already.title}.`;
-            const result = await addResearchOption({
-              orgId,
-              modelId,
-              decisionId,
-              userId,
-              projectId: decision.project_id,
-              candidate,
-              optionId,
-            });
-            applyNewOption(result.link, result.branch);
+            const result = await addResearchOption({ decisionId, userId, candidate, optionId });
+            applyCreatedOption(result.option);
             void queryClient.invalidateQueries({ queryKey: ['optionSources', decisionId] });
             return result.sourceError;
           }}

@@ -21,6 +21,12 @@
 import { expect, test, type Page } from '@playwright/test';
 import { addCapability, addSystemFromHome, goToModelHome, signUpCreateOrgAndModel } from './fixtures/goldenPath';
 
+// A patched route may still be waiting on route.fetch() when the test ends;
+// unroute first so closing the page does not fail it after every check passed.
+test.afterEach(async ({ page }) => {
+  await page.unrouteAll({ behavior: 'ignoreErrors' });
+});
+
 function healthPanel(page: Page) {
   return page.getByTestId('health-findings-panel');
 }
@@ -135,10 +141,13 @@ test('from a finding: suggestions become editable options on the decision, and t
   // The decision opens already holding the options: nothing retyped, nothing copied.
   await expect(page.getByRole('heading', { name: 'Keep, link or retire Quote Tool?' })).toBeVisible();
   await expect(page.getByTestId('decision-ai-mark')).toContainText('AI helped with this: Drafted by the Designer on');
-  const options = page.getByRole('link', { name: 'Configure the quoting tool for new homes' });
-  await expect(options.first()).toBeVisible();
-  await expect(page.getByRole('link', { name: 'Replace with a product' }).first()).toBeVisible();
-  await expect(page.getByRole('link', { name: 'Build it ourselves' })).toHaveCount(0);
+  // Saved as candidates: no change is made until someone presses Work on this option.
+  const grid = page.getByTestId('decision-criteria-grid');
+  await expect(grid.getByText('Configure the quoting tool for new homes').first()).toBeVisible();
+  await expect(grid.getByText('Replace with a product').first()).toBeVisible();
+  await expect(grid.getByText('Build it ourselves')).toHaveCount(0);
+  await expect(grid.getByRole('button', { name: 'Work on this option' })).toHaveCount(2);
+  await expect(grid.getByRole('link', { name: 'Configure the quoting tool for new homes' })).toHaveCount(0);
   await expect(page.getByText('Suggested by the Designer, edited by').first()).toBeVisible();
   await noOverflow(page);
 });
@@ -198,7 +207,7 @@ test('from a project: the brief is visible and editable, a failed run keeps it, 
   // Start the decision with what is kept: it opens already holding the options.
   await page.getByTestId('start-project-decision').getByRole('button', { name: /^Start decision with \d+ suggested options?$/ }).click();
   await expect(page.getByTestId('decision-ai-mark')).toContainText('AI helped with this: Drafted by the Designer on');
-  await expect(page.getByRole('link', { name: 'Replace with a repairs product' }).first()).toBeVisible();
+  await expect(page.getByTestId('decision-criteria-grid').getByText('Replace with a repairs product').first()).toBeVisible();
   await expect(page.getByTestId('pending-options')).toHaveCount(0);
   await noOverflow(page);
 });
