@@ -1,28 +1,18 @@
 import { describe, expect, it } from 'vitest';
-import { optionDraftActions, optionDraftLabel, optionKindOf } from './optionDraftActions';
+import { optionDraftActions, optionDraftLabel } from './optionDraftActions';
 
 const sys = (n: number, name: string) => ({ id: `00000000-0000-4000-8000-${String(n).padStart(12, '0')}`, name });
 const labels = (kind: Parameters<typeof optionDraftActions>[0], concerned: ReturnType<typeof sys>[], supporters: ReturnType<typeof sys>[], caps: string[]) => optionDraftActions(kind, concerned, supporters, caps).map(optionDraftLabel);
 
-describe('optionKindOf', () => {
-  it('reads the Designer\'s four options, and nothing else', () => {
-    expect(optionKindOf('Keep and tidy up')).toBe('keep');
-    expect(optionKindOf('Configure what we already run')).toBe('configure');
-    expect(optionKindOf('Replace with a product')).toBe('replace');
-    expect(optionKindOf('Build ourselves')).toBe('build');
-    expect(optionKindOf('Buy a licence from a vendor')).toBeNull();
-  });
-});
-
 describe('optionDraftActions', () => {
   const quote = sys(1, 'Quote Tool');
 
-  it('replace: retire and replace the supporting system, never "extend"', () => {
-    expect(labels('replace', [], [quote], ['Connection Quotations'])).toEqual(['Retire Quote Tool and replace it with a new system']);
+  it('buy: retire and replace the supporting system, never "extend"', () => {
+    expect(labels('buy', [], [quote], ['Connection Quotations'])).toEqual(['Retire Quote Tool and replace it with a new system']);
   });
 
-  it('replace: a system the decision names and the same system as supporter appear once', () => {
-    expect(labels('replace', [quote], [quote, sys(2, 'IS-U')], ['Billing'])).toEqual(['Retire Quote Tool and replace it with a new system', 'Retire IS-U and replace it with a new system']);
+  it('buy: a system the decision names and the same system as supporter appear once', () => {
+    expect(labels('buy', [quote], [quote, sys(2, 'IS-U')], ['Billing'])).toEqual(['Retire Quote Tool and replace it with a new system', 'Retire IS-U and replace it with a new system']);
   });
 
   it('configure: extend the supporting system to cover the capability', () => {
@@ -47,8 +37,8 @@ describe('optionDraftActions', () => {
     expect(labels(null, [quote], [quote], ['C'])).toEqual([]);
   });
 
-  it('caps replace at three', () => {
+  it('caps buy at three', () => {
     const many = [1, 2, 3, 4, 5].map((n) => sys(n, `S${String(n)}`));
-    expect(optionDraftActions('replace', many, [], ['C'])).toHaveLength(3);
+    expect(optionDraftActions('buy', many, [], ['C'])).toHaveLength(3);
   });
 });

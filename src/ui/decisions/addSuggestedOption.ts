@@ -3,6 +3,7 @@ import { optionWasEdited, type DecisionOptionMark } from '../../contracts/decisi
 import { createChangeBranch, getBranch, getMainBranch } from '../../db/branches';
 import { createDecisionLink, listDecisionLinksForDecision } from '../../db/decisions';
 import { insertOptionMark, listOptionMarksForDecision, markOptionEdited } from '../../db/decisionOptionMarks';
+import { getDecisionOptionForBranch, setDecisionOptionApproach } from '../../db/decisionOptions';
 import { addOptionWithCatalogueSources } from '../../db/productCatalogue';
 import type { BranchRow, DecisionLinkRow } from '../../db/types';
 import { supabase } from '../supabaseClient';
@@ -63,6 +64,7 @@ export async function addSuggestedOption(input: AddSuggestedOptionInput): Promis
     await addOptionWithCatalogueSources(supabase, mark, refs);
     const saved = (await listDecisionLinksForDecision(supabase, input.decisionId)).find((l) => l.linked_type === 'branch' && l.linked_id === option.id);
     if (!saved) throw new Error('The option was saved, but its link to the decision could not be read back.');
+    await saveApproach(input);
     return { branch, link: saved };
   }
   const link = links.find((l) => l.linked_type === 'branch' && l.linked_id === option.id) ?? (await createDecisionLink(supabase, { decisionId: input.decisionId, linkedType: 'branch', linkedId: option.id, createdBy: input.userId }));
@@ -73,5 +75,15 @@ export async function addSuggestedOption(input: AddSuggestedOptionInput): Promis
       await markOptionEdited(supabase, { decisionId: input.decisionId, branchId: option.id, editedBy: input.userId, editedAt: new Date().toISOString() });
     }
   }
+  await saveApproach(input);
   return { branch, link };
+}
+
+/** The link's trigger creates the option row; record what kind of option it is, once, without overwriting a person's later choice. */
+async function saveApproach(input: AddSuggestedOptionInput): Promise<void> {
+  const approach = input.option.approach ?? null;
+  if (approach === null) return;
+  const row = await getDecisionOptionForBranch(supabase, input.decisionId, input.option.id);
+  if (row?.approach !== null) return;
+  await setDecisionOptionApproach(supabase, row.id, approach, input.userId);
 }

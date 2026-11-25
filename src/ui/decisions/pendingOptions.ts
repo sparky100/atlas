@@ -1,3 +1,4 @@
+import { approachFromTitle, isOptionApproach, type OptionApproach } from '../../contracts/optionApproach';
 import type { UUID } from '../../contracts/delta';
 import { citationsToNames } from '../../db/designAgent';
 import { parseCatalogueProducts, type DesignerCatalogueProduct } from '../../contracts/designerOptions';
@@ -24,6 +25,8 @@ export interface PendingOption {
   suggestedTitle: string;
   suggestedSummary: string;
   draftedAt: string;
+  /** What kind of option the Designer said this is; saved on the option when it is added. Absent on drafts held before it was stored. */
+  approach?: OptionApproach | null;
   /** Reviewed catalogue products the Designer read for this option. Saved as citations when the option is added. */
   catalogueRefs: CatalogueCitation[];
   /** The same products in display form, so a card can show names, vendors and claims. */
@@ -99,6 +102,7 @@ export function loadPending(storage: StorageLike, key: string, now: number): Pen
         draftedAt: typeof o.draftedAt === 'string' ? o.draftedAt : new Date(now).toISOString(),
         catalogueRefs: refs,
         catalogueProducts: parseCatalogueProducts(o.catalogueProducts),
+        approach: isOptionApproach(o.approach) ? o.approach : approachFromTitle(title),
       }];
     });
   } catch {

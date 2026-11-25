@@ -25,7 +25,8 @@ import { supabase } from '../supabaseClient';
 import { refQueryParam } from '../../db/ref';
 import { ElementNamedText } from './ElementNamedText';
 import { OptionAiMark } from './OptionAiMark';
-import { optionKindOf } from './optionDraftActions';
+import { getOptionApproachForBranch } from '../../db/decisionOptions';
+import { useQuery } from '@tanstack/react-query';
 import { OptionDraftCard } from './OptionDraftCard';
 import { ChangeImpactPreview } from './ChangeImpactPreview';
 import { dateFieldLabelForIntent, intentReviewWeight, isDateRequiredForIntent } from './branchIntent';
@@ -128,6 +129,11 @@ export function ChangeView({ orgId, modelId, branchId, orgSlug, modelSlug, role,
   const [duplicateError, setDuplicateError] = useState<string | null>(null);
   const [pickingReviewers, setPickingReviewers] = useState(false);
   const [visibleSubjectCount, setVisibleSubjectCount] = useState(EDITED_SUBJECTS_PAGE_SIZE);
+  // What kind of option this change belongs to, from the option itself (never its title).
+  const optionApproach = useQuery({
+    queryKey: ['changes', 'optionApproach', branchId],
+    queryFn: () => getOptionApproachForBranch(supabase, branchId),
+  });
 
   if (status === 'loading') return <Loading />;
   if (status === 'not_found' || !branch) return <Text as="p">No change found for this id.</Text>;
@@ -208,7 +214,7 @@ export function ChangeView({ orgId, modelId, branchId, orgSlug, modelSlug, role,
   // and review (submit, the approval track) only appears once it has edits to review.
   const isOption = branch.intent === 'explore';
   // "Keep and tidy up" and "Configure what we already run" often change nothing in the model; say so rather than imply something is missing.
-  const optionKind = isOption ? optionKindOf(branch.title ?? branch.name) : null;
+  const optionKind = optionApproach.data ?? null;
   const noLandscapeChange = optionKind === 'keep' || optionKind === 'configure';
   const showSubmit = canSubmit && (!isOption || hasEdits);
   const submitIsPrimary = canSubmit && hasEdits;

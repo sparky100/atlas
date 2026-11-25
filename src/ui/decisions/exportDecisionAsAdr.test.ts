@@ -153,6 +153,24 @@ describe('exportDecisionAsAdrMarkdown', () => {
     expect(markdown).toContain('Option B is the only one that adds the replacement capacity.');
   });
 
+  it('puts each option\'s approach before its name, and nothing when it is not decided', () => {
+    const markdown = exportDecisionAsAdrMarkdown({
+      decision: makeDecision(),
+      ownerName: 'Alice',
+      concerns: [],
+      options: [
+        { branch: null, title: 'Move quoting to a SaaS tool', approach: 'buy', status: 'candidate', isChosen: false, ratings: [] },
+        { branch: null, title: 'Stay as we are', approach: 'no_change', status: 'candidate', isChosen: false, ratings: [] },
+        { branch: null, title: 'A new idea', approach: null, status: 'candidate', isChosen: false, ratings: [] },
+      ],
+      whatChangesRows: [],
+      reasons: null,
+    });
+    expect(markdown).toContain('- (Buy) Move quoting to a SaaS tool — candidate');
+    expect(markdown).toContain('- (No change) Stay as we are — candidate');
+    expect(markdown).toContain('- A new idea — candidate');
+  });
+
   it('names the accepted decision as decided even with no reasons row yet loaded', () => {
     const chosen = makeBranch({ id: 'branch-b', title: 'Option B', intent: 'propose' });
     const markdown = exportDecisionAsAdrMarkdown({

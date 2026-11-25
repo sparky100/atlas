@@ -8,7 +8,7 @@ describe('interpretDesignerReply', () => {
   it('returns the options, the gaps and the names of what it cites', () => {
     const draft = interpretDesignerReply({ status: 'done', design, result: { answer: '{}', citations: ['a', 'b'], citationNames: { a: 'Quote Tool' }, grounded: true, inputTokens: 1200, outputTokens: 340, toolUses: [{}, {}, {}] } });
     expect(draft).toEqual({
-      options: [{ title: 'Configure', summary: 'Use it as is.', toWeigh: 'Fit.', catalogueRefs: [], catalogueProducts: [], webRefs: [] }, { title: 'Replace', summary: 'Buy one.', toWeigh: '', catalogueRefs: [], catalogueProducts: [], webRefs: [] }],
+      options: [{ title: 'Configure', approach: 'configure', summary: 'Use it as is.', toWeigh: 'Fit.', catalogueRefs: [], catalogueProducts: [], webRefs: [] }, { title: 'Replace', approach: 'buy', summary: 'Buy one.', toWeigh: '', catalogueRefs: [], catalogueProducts: [], webRefs: [] }],
       gaps: ['No owner recorded'],
       stayNote: 'Slow.',
       problems: [],
@@ -139,7 +139,7 @@ describe('citations become names, never ids', () => {
       design: { options: [{ title: 'Keep', summary: `Keep [[element:${A}]].`, toWeigh: `Check [[element:${B}]].` }], gaps: [`No owner for [[element:${A}]]`], stayNote: `[[element:${A}]] stays poor.`, problems: [] },
       result: { answer: 'x', citations: [A, B], citationNames: { [A]: 'Quote Tool', [B]: 'Connection Quotations' }, grounded: true },
     });
-    expect(draft.options[0]).toEqual({ title: 'Keep', summary: 'Keep Quote Tool.', toWeigh: 'Check Connection Quotations.', catalogueRefs: [], catalogueProducts: [], webRefs: [] });
+    expect(draft.options[0]).toEqual({ title: 'Keep', approach: 'keep', summary: 'Keep Quote Tool.', toWeigh: 'Check Connection Quotations.', catalogueRefs: [], catalogueProducts: [], webRefs: [] });
     expect(draft.gaps).toEqual(['No owner for Quote Tool']);
     expect(draft.stayNote).toBe('Quote Tool stays poor.');
   });

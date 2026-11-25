@@ -72,7 +72,7 @@ const TOOL_LABELS: Record<string, string> = {
 const toolLabel = (name: string) => TOOL_LABELS[name] ?? name.replaceAll('_', ' ');
 
 function newCards(draft: DesignerDraft, draftedAt: string): SuggestionCard[] {
-  return draft.options.map((o) => ({ id: crypto.randomUUID(), title: o.title, summary: o.summary, toWeigh: o.toWeigh, suggestedTitle: o.title, suggestedSummary: o.summary, draftedAt, catalogueRefs: o.catalogueRefs, catalogueProducts: o.catalogueProducts, webRefs: o.webRefs, included: true }));
+  return draft.options.map((o) => ({ id: crypto.randomUUID(), title: o.title, approach: o.approach, summary: o.summary, toWeigh: o.toWeigh, suggestedTitle: o.title, suggestedSummary: o.summary, draftedAt, catalogueRefs: o.catalogueRefs, catalogueProducts: o.catalogueProducts, webRefs: o.webRefs, included: true }));
 }
 
 /** The option a person gets when they pick one reviewed product out of a replacement card. */
@@ -82,6 +82,7 @@ function productSuggestion(product: DesignerCatalogueProduct, draftedAt: string)
   return {
     id: crypto.randomUUID(),
     title,
+    approach: 'buy',
     summary,
     toWeigh: '',
     suggestedTitle: title,

@@ -11,7 +11,8 @@ import { LinkButton } from '../components/Button/LinkButton';
 import { Text } from '../components/Text/Text';
 import { reportError } from '../errors/errorBannerStore';
 import { supabase } from '../supabaseClient';
-import { optionDraftActions, optionDraftLabel, optionKindOf, type DraftSystem } from './optionDraftActions';
+import { getOptionApproachForBranch } from '../../db/decisionOptions';
+import { optionDraftActions, optionDraftLabel, type DraftSystem } from './optionDraftActions';
 
 /** At most this many linked elements and supporters are read, so the lookups stay small (CLAUDE.md rule 8). */
 const MAX_IDS = 50;
@@ -24,7 +25,7 @@ const MAX_IDS = 50;
  */
 export function OptionDraftCard({ branch, mainHeadCommitId, orgSlug, modelSlug }: { branch: BranchRow; mainHeadCommitId: UUID | null; orgSlug: string; modelSlug: string }) {
   const { data } = useQuery({
-    queryKey: ['changes', 'optionDraft', branch.id, branch.title, mainHeadCommitId],
+    queryKey: ['changes', 'optionDraft', branch.id, mainHeadCommitId],
     enabled: mainHeadCommitId !== null && branch.intent === 'explore',
     queryFn: async () => {
       try {
@@ -41,7 +42,7 @@ export function OptionDraftCard({ branch, mainHeadCommitId, orgSlug, modelSlug }
         const supporterIds = [...new Set(edges.map((e) => e.from_element_id))].slice(0, MAX_IDS);
         const supporters = supporterIds.length > 0 ? await getElementsByIds(supabase, commitId, supporterIds) : new Map<UUID, ElementsHeadRow>();
         const supporterSystems: DraftSystem[] = [...supporters.values()].filter((e) => lifecycleStateOf(e, supporters, now) === 'active').map((e) => ({ id: e.element_id, name: e.name }));
-        return optionDraftActions(optionKindOf(branch.title ?? branch.name), concernedSystems, supporterSystems, capabilities.map((c) => c.name));
+        return optionDraftActions(await getOptionApproachForBranch(supabase, branch.id), concernedSystems, supporterSystems, capabilities.map((c) => c.name));
       } catch (e) {
         reportError("Couldn't read what this option's decision concerns.", e);
         throw e;

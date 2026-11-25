@@ -1,4 +1,6 @@
 import { useState } from 'react';
+import type { OptionApproach } from '../../contracts/optionApproach';
+import { OptionApproachLabel } from './OptionApproach';
 import { Link } from 'react-router';
 import type { UUID } from '../../contracts/delta';
 import { DECISION_CRITERIA, DECISION_RATING_LEVELS, decisionRatingLevelTone, type DecisionCriterionKey, type DecisionRatingLevel } from '../../contracts/decisionCriteria';
@@ -39,6 +41,8 @@ export interface DecisionCriteriaOption {
   sources?: readonly OptionSource[];
   /** Where the option came from when an agent suggested it, e.g. "Suggested by the Designer, edited by Priya". `null` for an option someone added by hand. */
   provenance?: string | null;
+  /** What kind of option this is (`decision_options.approach`); `null` = not decided yet. */
+  approach: OptionApproach | null;
 }
 
 export interface DecisionCriteriaGridProps {
@@ -68,6 +72,10 @@ export interface DecisionCriteriaGridProps {
   onWorkOnThisChange: (branchId: UUID) => void;
   /** Creates the delivery branch for a candidate that has none yet, then opens it. */
   onWorkOnOption: (optionId: UUID) => void;
+  /** The viewer may change what kind of option each one is (proposed decision, contributor or above). */
+  canSetApproach: boolean;
+  /** Saves a new approach for one option. */
+  onSetApproach: (optionId: UUID, approach: OptionApproach | null) => void;
   /**
    * Lifted from `DecisionView.tsx` (decision-side-completion item 6) rather
    * than this component calling `useDecisionRatings` itself — the ADR
@@ -111,7 +119,7 @@ interface EditingCell {
  * only ever gets the person *into* the change workspace, never repeats
  * that flip.
  */
-export function DecisionCriteriaGrid({ decisionId, options, canRate, userId, neededBy, orgSlug, modelSlug, commitId, onChoose, chooseNote, canWorkOnChange, canWorkOnCandidate, onWorkOnThisChange, onWorkOnOption, canResearch, onResearch, ratingsState }: DecisionCriteriaGridProps) {
+export function DecisionCriteriaGrid({ decisionId, options, canRate, userId, neededBy, orgSlug, modelSlug, commitId, onChoose, chooseNote, canWorkOnChange, canWorkOnCandidate, onWorkOnThisChange, onWorkOnOption, canSetApproach, onSetApproach, canResearch, onResearch, ratingsState }: DecisionCriteriaGridProps) {
   const ratings = ratingsState.ratings;
   const compact = useCompactDecisionLayout();
   const [editing, setEditing] = useState<EditingCell | null>(null);
@@ -238,9 +246,7 @@ export function DecisionCriteriaGrid({ decisionId, options, canRate, userId, nee
                       {o.isChosen && <Chip tone="ok">chosen</Chip>}
                       <Chip tone={optionStatusTone(o)}>{optionStatusLabel(o)}</Chip>
                     </div>
-                    <Text as="span" size="sm" tone="muted">
-                      An option
-                    </Text>
+                    <OptionApproachLabel approach={o.approach} optionTitle={stripIntentPrefix(o.label)} canEdit={canSetApproach} onChange={(approach) => { onSetApproach(o.optionId, approach); }} />
                     {o.branchId !== null ? (
                       <Link to={`/o/${orgSlug}/m/${modelSlug}/changes/${o.branchId}`}>
                         <Text as="span" size="md" className={styles.optionTitle}>
@@ -387,6 +393,7 @@ export function DecisionCriteriaGrid({ decisionId, options, canRate, userId, nee
               <Chip tone={optionStatusTone(o)}>{optionStatusLabel(o)}</Chip>
               <Text as="span" size="sm" tone="muted">{ratedCount(o)}/{DECISION_CRITERIA.length} rated</Text>
             </div>
+            <OptionApproachLabel approach={o.approach} optionTitle={stripIntentPrefix(o.label)} canEdit={canSetApproach} onChange={(approach) => { onSetApproach(o.optionId, approach); }} />
             {branchId !== null ? (
               <Link to={`/o/${orgSlug}/m/${modelSlug}/changes/${branchId}`}>
                 <Text as="span" size="md" className={styles.optionTitle}>{stripIntentPrefix(o.label)}</Text>

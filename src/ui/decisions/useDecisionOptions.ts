@@ -1,7 +1,8 @@
 import { useCallback, useState } from 'react';
 import type { UUID } from '../../contracts/delta';
 import { chooseDecisionOption, updateDecision } from '../../db/decisions';
-import { createDecisionOption, workOnDecisionOption } from '../../db/decisionOptions';
+import type { OptionApproach } from '../../contracts/optionApproach';
+import { createDecisionOption, setDecisionOptionApproach, workOnDecisionOption } from '../../db/decisionOptions';
 import type { BranchRow, DecisionOptionRow, DecisionRow } from '../../db/types';
 import { supabase } from '../supabaseClient';
 import { addBaseline, type AddBaselineInput } from './addBaseline';
@@ -12,6 +13,8 @@ export interface AddOptionInput {
   decisionId: UUID;
   /** What the person typed. No delivery branch is created until someone works on it. */
   title: string;
+  /** What kind of option the person said it is; null = not decided yet. */
+  approach?: OptionApproach | null;
   userId: UUID;
 }
 
@@ -24,6 +27,8 @@ export interface UseDecisionOptionsResult {
    * candidate does not appear in the Changes list or reserve a branch.
    */
   addOption: (input: AddOptionInput) => Promise<boolean>;
+  /** Changes what kind of option this is (Keep, Configure, Buy, Build), keeping everything else. */
+  setOptionApproach: (optionId: UUID, approach: OptionApproach | null, userId: UUID) => Promise<boolean>;
   /** Creates the delivery branch only when this option is actually worked on, then refreshes the page data. */
   workOnOption: (optionId: UUID) => Promise<BranchRow | null>;
   /** Gives a decision that has none its "Stay as we are" baseline option (`addBaseline.ts`). */
@@ -72,7 +77,7 @@ export function useDecisionOptions(
       setError(null);
       setStatus('adding');
       try {
-        const option = await createDecisionOption(supabase, { decisionId: input.decisionId, title: trimmedTitle, createdBy: input.userId });
+        const option = await createDecisionOption(supabase, { decisionId: input.decisionId, title: trimmedTitle, approach: input.approach ?? null, createdBy: input.userId });
         applyCreatedOption(option);
         return true;
       } catch (e) {
@@ -80,6 +85,20 @@ export function useDecisionOptions(
         return false;
       } finally {
         setStatus('idle');
+      }
+    },
+    [applyCreatedOption],
+  );
+
+  const setOptionApproach = useCallback(
+    async (optionId: UUID, approach: OptionApproach | null, userId: UUID): Promise<boolean> => {
+      setError(null);
+      try {
+        applyCreatedOption(await setDecisionOptionApproach(supabase, optionId, approach, userId));
+        return true;
+      } catch (e) {
+        setError(e instanceof Error ? e.message : 'Could not change what kind of option this is.');
+        return false;
       }
     },
     [applyCreatedOption],
@@ -173,5 +192,5 @@ export function useDecisionOptions(
     [applyDecisionUpdate, refreshOptionsAndArguments],
   );
 
-  return { status, error, addOption, workOnOption, addBaselineOption, saveBaselineText, chooseOption };
+  return { status, error, addOption, setOptionApproach, workOnOption, addBaselineOption, saveBaselineText, chooseOption };
 }

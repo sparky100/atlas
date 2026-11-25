@@ -61,6 +61,7 @@ const SCORING_TERMS = ['pricing', 'implementation', 'support', 'integrations', '
 /** The option kinds that say nothing a search could use; the capability and product carry the meaning. */
 const GENERIC_OPTION_LABELS = [
   /^replace with a product$/i,
+  /^buy a product$/i,
   /^build (it )?ourselves$/i,
   /^build (a|the) replacement$/i,
   /^configure what we already run$/i,

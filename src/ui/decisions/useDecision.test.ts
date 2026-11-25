@@ -74,7 +74,7 @@ function makeLink(overrides: Partial<DecisionLinkRow> = {}): DecisionLinkRow {
 function makeOption(overrides: Partial<DecisionOptionRow> = {}): DecisionOptionRow {
   return {
     id: 'option-1', decision_id: DECISION_ID, branch_id: BRANCH_ID, title: 'Option A', summary: '', to_weigh: '',
-    position: 1, source: 'manual', agent: null, drafted_at: null, draft_run_id: null, edited_by: null, edited_at: null,
+    position: 1, approach: null, source: 'manual', agent: null, drafted_at: null, draft_run_id: null, edited_by: null, edited_at: null,
     created_by: 'user-1', created_at: '2026-01-01T00:00:00Z', updated_by: 'user-1', updated_at: '2026-01-01T00:00:00Z',
     ...overrides,
   };

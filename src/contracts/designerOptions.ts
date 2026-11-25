@@ -9,10 +9,11 @@
  * baseline itself, so a card for it would only duplicate it. The Designer's
  * note on it comes back as `stayNote`, shown but not stored as an option.
  */
+import { approachFromTitle, isOptionApproach, type OptionApproach } from './optionApproach';
 import { catalogueCitationSchema, type CatalogueCitation } from './productCatalogue';
 export const DESIGNER_OPTIONS_MIN = 2;
 export const DESIGNER_OPTIONS_MAX = 6;
-/** A "Replace with a product" option may carry at most two reviewed products. */
+/** A "Buy a product" option may carry at most two reviewed products. */
 export const DESIGNER_CATALOGUE_REFS_MAX = 2;
 /** D4: and at most two web pages the search actually returned. */
 export const DESIGNER_WEB_REFS_MAX = 2;
@@ -48,6 +49,8 @@ export interface DesignerCatalogueProduct {
 
 export interface DesignerOptionDraft {
   title: string;
+  /** Keep, Configure, Buy or Build, as the Designer said; read from the title only for an answer that gave none. Never "No change": Atlas adds the baseline itself. */
+  approach: OptionApproach | null;
   /** One or two plain sentences on what the option is. */
   summary: string;
   /** The main thing to weigh. Empty when the Designer gave none. */
@@ -185,6 +188,12 @@ function isPublicHttpsUrl(value: string): boolean {
  * that fails a check is dropped and named in `problems`, and the result is
  * only complete (`problems` empty) when enough valid options came back.
  */
+/** The Designer's own approach for an option, or the title rule when it gave none. "No change" is the baseline's alone. */
+export function designerApproach(value: unknown, title: string): OptionApproach | null {
+  if (isOptionApproach(value) && value !== 'no_change') return value;
+  return approachFromTitle(title);
+}
+
 export function parseDesignerOptions(answer: string): DesignerOptionsResult {
   const empty: DesignerOptionsResult = { options: [], gaps: [], stayNote: '', problems: [] };
   const parsed = extractJson(answer);
@@ -208,7 +217,7 @@ export function parseDesignerOptions(answer: string): DesignerOptionsResult {
       continue;
     }
     seen.add(key);
-    options.push({ title, summary, toWeigh: text(r.toWeigh, DESIGNER_WEIGH_MAX), catalogueRefs: catalogueRefs(r.catalogueRefs), catalogueProducts: [], webRefs: webRefs(r.webRefs) });
+    options.push({ title, approach: designerApproach(r.approach, title), summary, toWeigh: text(r.toWeigh, DESIGNER_WEIGH_MAX), catalogueRefs: catalogueRefs(r.catalogueRefs), catalogueProducts: [], webRefs: webRefs(r.webRefs) });
   }
   if (dropped > 0 && rawOptions.length > 0) problems.push(dropped === 1 ? 'One suggested option was left out because it was incomplete.' : `${String(dropped)} suggested options were left out because they were incomplete.`);
   if (options.length < DESIGNER_OPTIONS_MIN) problems.push(options.length === 0 ? 'The Designer gave no usable options.' : 'The Designer gave fewer options than expected.');
