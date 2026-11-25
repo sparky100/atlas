@@ -8,6 +8,7 @@
 import type { AttributeDefinitionKind } from '../contracts/attributeSchema';
 export type { CaptureJobRowShape as CaptureJobRow, CaptureCandidateRowShape as CaptureCandidateRow } from '../contracts/capture';
 import type { ElementType, Json, UUID } from '../contracts/delta';
+import type { OptionApproach } from '../contracts/optionApproach';
 import type { SourceKind } from '../contracts/sources';
 export type { AnchorType, CommentStatus, NotificationKind } from '../contracts/comments';
 import type { AnchorType, CommentStatus, NotificationKind } from '../contracts/comments';
@@ -550,6 +551,8 @@ export interface DecisionOptionRow {
   summary: string;
   to_weigh: string;
   position: number;
+  /** Keep, Configure, Buy, Build or No change (the baseline); `null` = not decided yet (20261125120000). */
+  approach: OptionApproach | null;
   source: 'manual' | 'designer';
   agent: 'designer' | null;
   drafted_at: string | null;

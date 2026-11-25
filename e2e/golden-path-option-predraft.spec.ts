@@ -21,8 +21,10 @@ async function startDecisionOnQuoteTool(page: Page, handle: string) {
   await expect(page.getByRole('heading', { name: 'Keep, link or retire Quote Tool?' })).toBeVisible();
 }
 
-async function openOptionDraft(page: Page, title: string) {
+async function openOptionDraft(page: Page, title: string, kind: 'Keep and tidy up' | 'Buy a product' | 'Build ourselves') {
   await page.getByRole('button', { name: '+ Add an option' }).click();
+  // The starter actions follow the stored approach, never the title.
+  await page.getByRole('radio', { name: kind, exact: true }).check();
   await page.getByPlaceholder("What's this option? (e.g. Replace with Workday)").fill(title);
   await page.getByRole('button', { name: 'Add option' }).click();
   await expect(page.getByText(title).first()).toBeVisible();
@@ -33,10 +35,10 @@ async function openOptionDraft(page: Page, title: string) {
   if (await draftLink.count() > 0) await draftLink.click();
 }
 
-test('an empty Replace option offers to retire the system the decision concerns', async ({ page }) => {
+test('an empty Buy option offers to retire the system the decision concerns', async ({ page }) => {
   test.slow();
   await startDecisionOnQuoteTool(page, 'optionpredraft');
-  await openOptionDraft(page, 'Replace with a product');
+  await openOptionDraft(page, 'Replace with a product', 'Buy a product');
 
   // The option page leads with what the option is and one way to start; review waits until there are edits.
   await expect(page.getByRole('heading', { name: 'Replace with a product' })).toBeVisible();
@@ -60,7 +62,7 @@ test('an empty Replace option offers to retire the system the decision concerns'
 test('an empty Build option offers to retire the existing system and replace it with a custom-built app', async ({ page }) => {
   test.slow();
   await startDecisionOnQuoteTool(page, 'optionbuild');
-  await openOptionDraft(page, 'Build ourselves');
+  await openOptionDraft(page, 'Build ourselves', 'Build ourselves');
 
   const card = page.getByTestId('option-draft-card');
   const link = card.getByRole('link', { name: 'Retire Quote Tool and replace it with a custom-built app' });
@@ -100,7 +102,7 @@ test('an empty Build option offers to retire the existing system and replace it 
 test('an empty Keep option offers no starter edit', async ({ page }) => {
   test.slow();
   await startDecisionOnQuoteTool(page, 'optionkeep');
-  await openOptionDraft(page, 'Keep and tidy up');
+  await openOptionDraft(page, 'Keep and tidy up', 'Keep and tidy up');
   await expect(page.getByText('No change to the landscape recorded.')).toBeVisible();
   await expect(page.getByTestId('option-draft-card')).toHaveCount(0);
 });

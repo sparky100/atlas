@@ -32,7 +32,8 @@ import { KeptQuestions } from './KeptQuestions';
 import { DecisionGaps } from './DecisionGaps';
 import { recordDecisionGap } from '../../db/decisionGaps';
 import { CapabilityProducts } from '../elements/CapabilityProducts';
-import { optionKindOf } from '../changes/optionDraftActions';
+import type { OptionApproach } from '../../contracts/optionApproach';
+import { OptionApproachPicker } from './OptionApproach';
 import { attributesRecord } from '../elements/attributesRecord';
 import type { AlsoAffectedElement } from './alsoAffected';
 import { DecisionBaselineCard } from './DecisionBaselineCard';
@@ -158,6 +159,7 @@ export function DecisionView({ modelId, decisionId, orgId, orgSlug, modelSlug, r
   const [addingOption, setAddingOption] = useState(false);
   const [researchTarget, setResearchTarget] = useState<{ branchId: UUID; label: string } | null>(null);
   const [optionTitle, setOptionTitle] = useState('');
+  const [optionApproach, setOptionApproach] = useState<OptionApproach | null>(null);
   const [choosing, setChoosing] = useState<{ optionId: UUID | null; branchId: UUID | null } | null>(null);
   const [reasons, setReasons] = useState('');
   const [reconsiderIf, setReconsiderIf] = useState('');
@@ -204,16 +206,7 @@ export function DecisionView({ modelId, decisionId, orgId, orgSlug, modelSlug, r
     return element?.element_type === 'capability' ? [element] : [];
   });
   const readyOptions = readyState?.options ?? [];
-  const hasReplaceOrBuildOption = readyOptions.length > 0
-    ? readyOptions.some((option) => {
-        const kind = optionKindOf(option.title);
-        return kind === 'replace' || kind === 'build';
-      })
-    : branchLinks.some((link) => {
-        const branch = readyState?.linkedBranchesById.get(link.linked_id);
-        const kind = optionKindOf(branch?.title ?? branch?.name ?? '');
-        return kind === 'replace' || kind === 'build';
-      });
+  const hasReplaceOrBuildOption = readyOptions.some((option) => option.approach === 'buy' || option.approach === 'build');
   const concernedCapabilityIds = readyState ? elementLinks.map((l) => l.linked_id).filter((id) => readyState.linkedElementsById.get(id)?.element_type === 'capability') : [];
   // F6.3 (Part B) rule 5: a system/container concern gets its own outcome
   // row (unchanged/retired/replaced by X) alongside a capability concern's
@@ -657,6 +650,7 @@ export function DecisionView({ modelId, decisionId, orgId, orgSlug, modelSlug, r
                   description: o.summary.trim() !== '' ? o.summary : (b?.description ?? null),
                   provenance: optionRowProvenance(o, nameOf) ?? optionProvenance(b ? pendingOptions.marks.get(b.id) : undefined, nameOf),
                   sources: sourcesByOption.get(o.id) ?? (b ? sourcesByBranch.get(b.id) : undefined) ?? [],
+                  approach: o.approach,
                 };
               });
               return (
@@ -682,6 +676,8 @@ export function DecisionView({ modelId, decisionId, orgId, orgSlug, modelSlug, r
                     void navigate(`/o/${orgSlug}/m/${modelSlug}/changes/${branchId}`);
                   }}
                   onWorkOnOption={workOnOption}
+                  canSetApproach={canAddOption}
+                  onSetApproach={(optionId, approach) => { if (userId) void optionsState.setOptionApproach(optionId, approach, userId); }}
                   canResearch={canResearch}
                   onResearch={(branchId, label) => { setResearchTarget({ branchId, label }); }}
                   ratingsState={ratingsState}
@@ -713,6 +709,7 @@ export function DecisionView({ modelId, decisionId, orgId, orgSlug, modelSlug, r
                       onClick={() => {
                         setAddingOption(true);
                         setOptionTitle(suggestion.title);
+                        setOptionApproach(suggestion.approach);
                       }}
                     >
                       {suggestion.title}
@@ -731,6 +728,7 @@ export function DecisionView({ modelId, decisionId, orgId, orgSlug, modelSlug, r
               onClick={() => {
                 setAddingOption(true);
                 setOptionTitle('');
+                setOptionApproach(null);
               }}
             >
               + Add an option
@@ -738,6 +736,7 @@ export function DecisionView({ modelId, decisionId, orgId, orgSlug, modelSlug, r
           )}
           {canAddOption && addingOption && (
             <div className={styles.addOptionForm}>
+              <OptionApproachPicker value={optionApproach} onChange={setOptionApproach} />
               <input
                 className={styles.input}
                 type="text"
@@ -753,7 +752,7 @@ export function DecisionView({ modelId, decisionId, orgId, orgSlug, modelSlug, r
                 disabled={optionsState.status === 'adding' || optionTitle.trim().length === 0}
                 onClick={() => {
                   if (!userId) return;
-                  void optionsState.addOption({ decisionId, title: optionTitle, userId }).then((added) => {
+                  void optionsState.addOption({ decisionId, title: optionTitle, approach: optionApproach, userId }).then((added) => {
                     if (added) setAddingOption(false);
                   });
                 }}

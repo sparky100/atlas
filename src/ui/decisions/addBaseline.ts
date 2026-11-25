@@ -35,6 +35,7 @@ export async function addBaseline(input: AddBaselineInput): Promise<AddedBaselin
   const option = await createDecisionOption(supabase, {
     decisionId: input.decisionId,
     title: BASELINE_TITLE,
+    approach: 'no_change',
     createdBy: input.userId,
   });
   const decision = await updateDecision(supabase, input.decisionId, { baselineOptionId: option.id });

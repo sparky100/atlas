@@ -1,3 +1,5 @@
+import type { OptionApproach } from '../../contracts/optionApproach';
+
 /**
  * Starting points for a decision's options, read from what Atlas already holds
  * (Simon, 2026-11-19). No AI. They only narrow where to start: every one is a
@@ -8,6 +10,8 @@
  */
 export interface OptionSuggestion {
   title: string;
+  /** What kind of option this starting point is, carried into the add-option form. */
+  approach: OptionApproach;
   /** Why this one is suggested, in plain words. */
   reason: string;
 }
@@ -19,10 +23,10 @@ export function suggestOptions(capabilityNames: readonly string[], supporterName
   const out: OptionSuggestion[] = [];
   const unique = [...new Set(supporterNames)].sort((a, b) => a.localeCompare(b));
   for (const name of unique.slice(0, MAX_SYSTEMS)) {
-    out.push({ title: `Extend ${name} to cover this`, reason: `${name} already supports ${subject}.` });
+    out.push({ title: `Extend ${name} to cover this`, approach: 'configure', reason: `${name} already supports ${subject}.` });
   }
-  out.push({ title: 'Buy or adopt a new product', reason: 'A product we do not run yet may meet it.' });
-  out.push({ title: 'Build it ourselves', reason: 'A custom build is always an option to weigh.' });
+  out.push({ title: 'Buy or adopt a new product', approach: 'buy', reason: 'A product we do not run yet may meet it.' });
+  out.push({ title: 'Build it ourselves', approach: 'build', reason: 'A custom build is always an option to weigh.' });
   return out;
 }
 

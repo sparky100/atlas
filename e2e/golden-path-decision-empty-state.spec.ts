@@ -52,7 +52,7 @@ test('two like-for-like options with no commits of their own show the empty-stat
   // Each option says it is an option and offers the way in to edit it.
   const grid = page.getByTestId('decision-criteria-grid');
   if (compactDecision(page)) await expect(grid.getByTestId('decision-option-card')).toHaveCount(2);
-  else await expect(grid.getByText('An option', { exact: true })).toHaveCount(2);
+  else await expect(grid.getByTestId('option-approach')).toHaveCount(2); // each column header says what kind of option it is (Not decided yet here)
   await expect(grid.getByRole('button', { name: 'Work on this option' })).toHaveCount(2);
   if (!compactDecision(page)) await expect(grid.getByText('Use Work on this option to draft it.')).toHaveCount(2);
 

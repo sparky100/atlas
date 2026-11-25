@@ -1,4 +1,5 @@
 import type { UUID } from '../contracts/delta';
+import { isOptionApproach, type OptionApproach } from '../contracts/optionApproach';
 import { assertRealId } from './assertRealId';
 import type { Client } from './client';
 import { listDecisionsForModel } from './decisions';
@@ -58,6 +59,8 @@ export interface CreateDecisionOptionInput {
   decisionId: UUID;
   title: string;
   summary?: string;
+  /** Keep, Configure, Buy, Build, or No change for the baseline; omitted or null = not decided yet. */
+  approach?: OptionApproach | null;
   createdBy: UUID;
 }
 
@@ -78,6 +81,7 @@ export async function createDecisionOption(client: Client, input: CreateDecision
     branch_id: null,
     title,
     summary: input.summary?.trim() ?? '',
+    approach: input.approach ?? null,
     position,
     created_by: input.createdBy,
     updated_by: input.createdBy,
@@ -102,6 +106,27 @@ export async function workOnDecisionOption(client: Client, optionId: UUID): Prom
   return data as BranchRow;
 }
 
+/**
+ * Sets what kind of option this is. Only the approach and the audit columns
+ * change: the title, wording, branch and provenance stay as they are. RLS
+ * allows it while the decision is proposed, for owners, architects and
+ * contributors.
+ */
+export async function setDecisionOptionApproach(client: Client, optionId: UUID, approach: OptionApproach | null, userId: UUID): Promise<DecisionOptionRow> {
+  assertRealId('setDecisionOptionApproach', 'option_id', optionId);
+  assertRealId('setDecisionOptionApproach', 'updated_by', userId);
+  // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment -- untyped client; see branches.ts's module comment.
+  const { data, error } = await client
+    .from('decision_options')
+    .update({ approach, updated_by: userId, updated_at: new Date().toISOString() })
+    .eq('id', optionId)
+    .select('*')
+    .maybeSingle();
+  if (error) throw new Error(`setDecisionOptionApproach: ${error.message}`);
+  if (data === null) throw new Error('setDecisionOptionApproach: this option cannot be changed now (the decision may be closed, or you may not have permission).');
+  return data as DecisionOptionRow;
+}
+
 /** The option a legacy branch belongs to, or null while the compatibility link has not been written. */
 export async function getDecisionOptionForBranch(client: Client, decisionId: UUID, branchId: UUID): Promise<DecisionOptionRow | null> {
   assertRealId('getDecisionOptionForBranch', 'decision_id', decisionId);
@@ -115,4 +140,22 @@ export async function getDecisionOptionForBranch(client: Client, decisionId: UUI
     .maybeSingle();
   if (error) throw new Error(`getDecisionOptionForBranch: ${error.message}`);
   return (data as DecisionOptionRow | null) ?? null;
+}
+
+/**
+ * What kind of option a change belongs to, read from the option that owns the
+ * branch (a branch belongs to at most one option). `null` when the branch is
+ * not an option, or the option's approach is not decided yet.
+ */
+export async function getOptionApproachForBranch(client: Client, branchId: UUID): Promise<OptionApproach | null> {
+  assertRealId('getOptionApproachForBranch', 'branch_id', branchId);
+  const { data, error } = await client
+    .from('decision_options')
+    .select('approach')
+    .eq('branch_id', branchId)
+    .limit(1)
+    .maybeSingle();
+  if (error) throw new Error(`getOptionApproachForBranch: ${error.message}`);
+  const value: unknown = (data as { approach?: unknown } | null)?.approach;
+  return isOptionApproach(value) ? value : null;
 }

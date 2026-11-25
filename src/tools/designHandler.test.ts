@@ -258,7 +258,7 @@ describe('the Designer prompt', () => {
   });
   it('asks Replace and Build to say whether the existing system would be retired, as something to investigate', () => {
     const prompt = designerSystemPrompt('Estate', '2026-11-19');
-    expect(prompt).toMatch(/"Replace with a product" and "Build ourselves", say in the summary whether the existing system would be retired/);
+    expect(prompt).toMatch(/"Buy a product" and "Build ourselves", say in the summary whether the existing system would be retired/);
     expect(prompt).toMatch(/something to investigate and never as the conclusion/);
   });
   it('keeps the catalogue source detail out of the option text', () => {

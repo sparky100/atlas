@@ -18,7 +18,7 @@ import { createChangeBranch, getMainBranch } from './branches';
 import type { Client } from './client';
 import { createServiceRoleClient, createSupabaseClient } from './client';
 import { deleteDecisionGap, listDecisionGaps, recordDecisionGap } from './decisionGaps';
-import { createDecisionOption, listDecisionOptions, workOnDecisionOption } from './decisionOptions';
+import { createDecisionOption, getOptionApproachForBranch, listDecisionOptions, setDecisionOptionApproach, workOnDecisionOption } from './decisionOptions';
 import { createDecision, createDecisionLink } from './decisions';
 import { loadEnv } from './env';
 import { createModel } from './models';
@@ -111,6 +111,43 @@ describe('cross-organisation boundaries for options, gaps and research requests'
       expect(await listDecisionOptions(viewer.client, decisionId)).toHaveLength(2);
       await expect(createDecisionOption(viewer.client, { decisionId, title: 'Viewer option', createdBy: viewer.id })).rejects.toThrow();
       await expect(workOnDecisionOption(viewer.client, candidateId)).rejects.toThrow();
+    });
+  });
+
+  describe('decision_options.approach (Keep, Configure, Buy, Build)', () => {
+    it('round-trips the approach on a new option, and a change can read it back', async () => {
+      const { decisionId } = await seed();
+      const created = await createDecisionOption(owner.client, { decisionId, title: 'Move quoting to a SaaS tool', approach: 'buy', createdBy: owner.id });
+      expect(created.approach).toBe('buy');
+      const branch = await workOnDecisionOption(owner.client, created.id);
+      expect(await getOptionApproachForBranch(owner.client, branch.id)).toBe('buy');
+      const renamed = await owner.client.from('decision_options').update({ title: 'Use QuoteCo', updated_by: owner.id }).eq('id', created.id).select('approach').single();
+      expect(renamed.data?.approach).toBe('buy');
+    });
+
+    it('a person can change it or leave it undecided; nothing else about the option changes', async () => {
+      const { candidateId } = await seed();
+      const built = await setDecisionOptionApproach(owner.client, candidateId, 'build', owner.id);
+      expect(built).toMatchObject({ id: candidateId, approach: 'build', title: 'Buy a quoting product', branch_id: null });
+      const cleared = await setDecisionOptionApproach(owner.client, candidateId, null, owner.id);
+      expect(cleared.approach).toBeNull();
+      const { error } = await owner.client.from('decision_options').update({ approach: 'replace', updated_by: owner.id }).eq('id', candidateId);
+      expect(error).not.toBeNull();
+    });
+
+    it('a viewer and an outsider cannot change it', async () => {
+      const { candidateId } = await seed();
+      await expect(setDecisionOptionApproach(viewer.client, candidateId, 'build', viewer.id)).rejects.toThrow();
+      await expect(setDecisionOptionApproach(outsider.client, candidateId, 'build', outsider.id)).rejects.toThrow();
+      const { data } = await owner.client.from('decision_options').select('approach').eq('id', candidateId).single();
+      expect(data?.approach).toBeNull();
+    });
+
+    it('cannot change once the decision is closed', async () => {
+      const { decisionId, candidateId } = await seed();
+      const { error } = await owner.client.schema('atlas').rpc('cancel_decision', { p_decision_id: decisionId, p_reason: 'Boundary test.' });
+      if (error) throw new Error(`cancelling decision: ${error.message}`);
+      await expect(setDecisionOptionApproach(owner.client, candidateId, 'keep', owner.id)).rejects.toThrow();
     });
   });
 

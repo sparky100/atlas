@@ -1,3 +1,4 @@
+import { OPTION_APPROACH_LABELS, type OptionApproach } from '../../contracts/optionApproach';
 import type { DecisionAgentNote } from '../../contracts/decisionAgentNote';
 import type { OptionSource } from '../../contracts/optionSource';
 import type { UUID } from '../../contracts/delta';
@@ -53,6 +54,8 @@ export interface DecisionAdrExportOption {
   about?: string;
   /** The delivery change, when one exists; null for an untouched candidate. */
   branch: BranchRow | null;
+  /** What kind of option this is (Keep, Configure, Buy, Build, No change); absent or null prints no label, so an older pack reads as it did. */
+  approach?: OptionApproach | null;
   /** Candidate while no delivery change exists; otherwise the branch's own status. */
   status?: BranchRow['status'] | 'candidate';
   isChosen: boolean;
@@ -111,7 +114,8 @@ function optionAboutLines(option: DecisionAdrExportOption): string[] {
 }
 
 function optionLine(option: DecisionAdrExportOption): string {
-  const label = option.branch === null ? (option.title ?? 'Untitled candidate') : intentHeaderLine(option.branch);
+  const name = option.branch === null ? (option.title ?? 'Untitled candidate') : intentHeaderLine(option.branch);
+  const label = option.approach != null ? `(${OPTION_APPROACH_LABELS[option.approach]}) ${name}` : name;
   if (option.isChosen) return `- **${label}** — chosen`;
   if (option.status === 'cancelled' || option.branch?.status === 'cancelled') return `- ${label} — not chosen`;
   if (option.branch === null || option.status === 'candidate') return `- ${label} — candidate`;
