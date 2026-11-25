@@ -91,7 +91,8 @@ test('rate decision options on judgement criteria, leave some unrated, choose on
   await expect(page.getByText('accepted', { exact: true })).toBeVisible();
 
   // The decision shows the chosen option and the rationale recorded at Choose time.
-  await expect(optionAHeader).toContainText('chosen');
+  // Choosing makes no change, so the option says delivery has not started.
+  await expect(optionAHeader).toContainText('Chosen · delivery not started');
   await expect(page.getByText('Option 1 is cheaper and ready sooner.').first()).toBeVisible();
   // And what would make them reconsider, recorded at the same moment.
   await expect(page.getByRole('heading', { name: 'What we chose, why, and what would make us reconsider' })).toBeVisible();
@@ -111,7 +112,7 @@ test('rate decision options on judgement criteria, leave some unrated, choose on
   // The rejected option (Option 2) stays visible in the grid, not removed —
   // its own column, status chip, and previously-recorded rating remain.
   await expect(optionBHeader).toBeVisible();
-  await expect(optionBHeader).toContainText('not chosen');
+  await expect(optionBHeader).toContainText('Not chosen');
   await expect(timingControl).toContainText('After end date');
 
   // A comment write doesn't blank the page either — same marker, still
@@ -122,14 +123,13 @@ test('rate decision options on judgement criteria, leave some unrated, choose on
   await page.getByRole('button', { name: 'Post' }).click();
   await expect(page.getByText('Noting this for the record.')).toBeVisible();
   await expect(criteriaGrid).toHaveAttribute('data-e2e-marker', mountMarker);
-  await expect(optionAHeader).toContainText('chosen');
+  await expect(optionAHeader).toContainText('Chosen · delivery not started');
   await expect(costControl).toContainText('Low');
 
-  // Decision-side-completion item 5: "Work on this option" enters the
-  // change workspace and selects the chosen option as the session's
-  // editing ref, the exact same editing-ref mechanism the change
-  // page itself offers - never a second, invented mechanism.
-  await optionAHeader.getByRole('button', { name: 'Work on this option' }).click();
+  // "Start delivery" makes the chosen option's change, enters the change
+  // workspace and selects it as the session's editing ref, the exact same
+  // editing-ref mechanism the change page itself offers.
+  await optionAHeader.getByRole('button', { name: 'Start delivery' }).click();
   await expect(page).toHaveURL(/\/changes\//);
   await expect(page.getByRole('button', { name: 'Editing in this change' })).toBeVisible();
 });

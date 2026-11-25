@@ -1,5 +1,6 @@
 import type { UUID } from '../../contracts/delta';
 import type { BranchRow, DecisionOptionRow, DecisionRow, ProjectRow } from '../../db/types';
+import { chosenOptionPhrase, decisionOptionState } from '../../engine/decisionOptionState';
 
 /**
  * Home's "My work" card (Simon, 2026-11-19): projects first, then decisions,
@@ -67,8 +68,10 @@ export function myWorkDetail(row: MyWorkRow): string {
 
 export interface DecisionWithOptions {
   decision: DecisionRow;
-  /** The candidates that are this decision's options, branchless ones included. */
+  /** The candidates that are this decision's options, branchless ones included. On a chosen decision, only the chosen option. */
   options: DecisionOptionRow[];
+  /** Set on a chosen decision whose delivery is not finished: the plain phrase for where it has got to ("delivery not started"). */
+  chosenPhrase?: string;
 }
 
 const byOptionTitle = (a: DecisionOptionRow, b: DecisionOptionRow) => a.title.localeCompare(b.title);
@@ -92,11 +95,25 @@ export function projectChildren(
   options: readonly DecisionOptionRow[],
 ): { decisions: DecisionWithOptions[]; changes: BranchRow[] } {
   const optionIds = new Set(options.flatMap((o) => (o.branch_id === null ? [] : [o.branch_id])));
+  const openById = new Map(openBranches.map((b) => [b.id, b]));
+  const inProject = decisions.filter((d) => d.project_id === projectId).sort((a, b) => a.title.localeCompare(b.title));
+  const rows: DecisionWithOptions[] = [];
+  for (const decision of inProject) {
+    if (decision.status === 'proposed') {
+      rows.push({ decision, options: decisionOptions(decision.id, options) });
+      continue;
+    }
+    // A chosen decision stays on Home until its delivery is under way and finished:
+    // chosen with no change yet, or its change still open. Staying as we are has nothing to deliver.
+    if (decision.status !== 'accepted' || decision.chosen_option_id === null || decision.chosen_option_id === decision.baseline_option_id) continue;
+    const chosen = options.find((o) => o.id === decision.chosen_option_id);
+    if (chosen === undefined) continue;
+    const branch = chosen.branch_id === null ? null : (openById.get(chosen.branch_id) ?? undefined);
+    if (branch === undefined) continue;
+    rows.push({ decision, options: [chosen], chosenPhrase: chosenOptionPhrase(decisionOptionState(decision, chosen.id, branch)) });
+  }
   return {
-    decisions: decisions
-      .filter((d) => d.project_id === projectId && d.status === 'proposed')
-      .sort((a, b) => a.title.localeCompare(b.title))
-      .map((decision) => ({ decision, options: decisionOptions(decision.id, options) })),
+    decisions: rows,
     changes: openBranches.filter((b) => b.project_id === projectId && !optionIds.has(b.id)).sort(byBranchTitle),
   };
 }

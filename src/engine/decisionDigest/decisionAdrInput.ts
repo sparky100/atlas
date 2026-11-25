@@ -94,7 +94,7 @@ export function buildDecisionAdrExportInput(source: DecisionAdrSource): Decision
           approach: option.approach,
           branch,
           status: branch?.status ?? ('candidate' as const),
-          isChosen: branch !== null && branch.id === decision.branch_id,
+          isChosen: decision.chosen_option_id != null ? option.id === decision.chosen_option_id : branch !== null && branch.id === decision.branch_id,
           sources,
           ratings: optionRatingsFor(ratings, option.id, option.branch_id),
         };

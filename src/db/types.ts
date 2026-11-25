@@ -469,7 +469,9 @@ export interface DecisionRow {
   baseline_option_id: UUID | null;
   /** Compatibility pointer to the baseline's delivery branch while one exists; stage 4d removes it. */
   baseline_branch_id: UUID | null;
-  /** The chosen option's branch, once accepted (PR5). */
+  /** The option this decision chose; set together with `status: 'accepted'`. */
+  chosen_option_id: UUID | null;
+  /** The chosen option's delivery change. `null` until delivery starts, even on an accepted decision. */
   branch_id: UUID | null;
   superseded_decision_id: UUID | null;
   /** ADR-024: the project this decision is part of (its decision log); `null` is a portfolio-level decision. Moved only through `atlas.set_decision_project`, so option changes follow (P1). */

@@ -10,6 +10,7 @@ import type { BranchRow, DecisionOptionRow, DecisionRow, MemberRole, ProjectRow 
 import { useMainBranch } from '../branches/useMainBranch';
 import { INTENT_LABEL } from '../changes/branchIntent';
 import { branchStatusTone } from '../changes/branchStatus';
+import { decisionOptionState } from '../../engine/decisionOptionState';
 import { profileLabel } from '../comments/profileLabel';
 import { Button } from '../components/Button/Button';
 import { Chip } from '../components/Chip/Chip';
@@ -438,13 +439,16 @@ function ProjectDecision({ decision, options, changes, modelId, projectId, mainH
   capabilities: { id: UUID; name: string }[]; scopeSystemIds: ReadonlySet<UUID>; base: string; overdue: boolean;
 }) {
   const [compareOpen, setCompareOpen] = useState(false);
-  const chosenOption = options.find((option) => option.branch_id !== null && option.branch_id === decision.branch_id);
+  const chosenOption = decision.chosen_option_id !== null
+    ? options.find((option) => option.id === decision.chosen_option_id)
+    : options.find((option) => option.branch_id !== null && option.branch_id === decision.branch_id);
   const chosen = chosenOption?.branch_id != null ? changes.find((branch) => branch.id === chosenOption.branch_id) : undefined;
+  const chosenState = chosenOption !== undefined ? decisionOptionState(decision, chosenOption.id, chosen ?? null) : null;
   const baselineOption = options.find((option) => decision.baseline_option_id !== null
     ? option.id === decision.baseline_option_id
     : option.branch_id !== null && option.branch_id === decision.baseline_branch_id);
   const baselineBranchId = baselineOption?.branch_id ?? decision.baseline_branch_id;
-  const isBaseline = chosenOption?.id === baselineOption?.id || (decision.branch_id !== null && decision.branch_id === baselineBranchId);
+  const isBaseline = (chosenOption !== undefined && chosenOption.id === baselineOption?.id) || (decision.branch_id !== null && decision.branch_id === baselineBranchId);
   const alternatives = options.filter((option) => option.id !== baselineOption?.id && (baselineBranchId === null || option.branch_id !== baselineBranchId));
   const decisionHref = `${base}/decisions/${decision.id}`;
   return <article className={styles.decisionCard}>
@@ -463,8 +467,8 @@ function ProjectDecision({ decision, options, changes, modelId, projectId, mainH
       <div className={styles.chosen}>
         {isBaseline ? <Text as="p" size="sm"><strong>Chosen:</strong> Stay as we are. No model change is planned for this decision.</Text> : (
           <>
-            <Text as="p" size="sm"><strong>Chosen:</strong> {chosenOption ? <Link to={chosenOption.branch_id !== null ? `${base}/changes/${chosenOption.branch_id}` : decisionHref}>{chosenOption.title}</Link> : decision.branch_id ? <Link to={`${base}/changes/${decision.branch_id}`}>Open chosen option</Link> : 'Option not recorded'} {chosen && <Chip tone={branchStatusTone(chosen.status)}>{chosen.status === 'merged' ? 'Merged into live model' : `Model change: ${chosen.status.replace('_', ' ')}`}</Chip>}</Text>
-            {chosen && mainHeadCommitId !== null && chosen.status !== 'merged' && chosen.status !== 'cancelled' && chosen.status !== 'rejected' && chosen.status !== 'archived' && capabilities.length > 0 && (
+            <Text as="p" size="sm"><strong>Chosen:</strong> {chosenOption ? <Link to={chosenOption.branch_id !== null ? `${base}/changes/${chosenOption.branch_id}` : decisionHref}>{chosenOption.title}</Link> : decision.branch_id ? <Link to={`${base}/changes/${decision.branch_id}`}>Open chosen option</Link> : 'Option not recorded'} {chosenState !== null && <span data-testid="project-chosen-state"><Chip tone={chosenState.tone}>{chosenState.label}</Chip></span>}</Text>
+            {chosen && chosenState?.key !== 'chosen' && mainHeadCommitId !== null && chosen.status !== 'merged' && chosen.status !== 'cancelled' && chosen.status !== 'rejected' && chosen.status !== 'archived' && capabilities.length > 0 && (
               <details className={styles.disclosure} onToggle={(event) => { setCompareOpen(event.currentTarget.open); }}><summary>Compare live model with chosen option</summary>
                 {compareOpen && <ProjectBeforeAfter embedded modelId={modelId} comparisonId={projectId} mainHeadCommitId={mainHeadCommitId} changes={[chosen]} capabilities={capabilities} scopeSystemIds={scopeSystemIds} decisions={[decision]} base={base} />}
               </details>

@@ -1,5 +1,6 @@
 import type { UUID } from '../../contracts/delta';
-import type { BranchRow, DecisionRow, ProfileRow, ProjectRow } from '../../db/types';
+import type { BranchRow, DecisionOptionRow, DecisionRow, ProfileRow, ProjectRow } from '../../db/types';
+import { chosenOptionPhrase, decisionOptionState } from '../../engine/decisionOptionState';
 import { isDecisionOverdue, projectProgress, type ProjectProgress } from '../projects/projectModel';
 
 /**
@@ -24,6 +25,31 @@ export interface ProjectSummary {
   overdueDecisions: number;
   /** The earliest needed-by date among this project's own proposed decisions that aren't overdue yet — `null` if none has one. */
   nextDecisionDue: string | null;
+  /** This project's chosen options whose delivery is not finished, each with where it has got to ("delivery not started"). Staying as we are is left out: it has nothing to deliver. */
+  chosenOptions: ChosenOptionLine[];
+}
+
+export interface ChosenOptionLine {
+  decisionId: UUID;
+  optionTitle: string;
+  phrase: string;
+}
+
+/** A chosen option stays on Home until its delivery is finished: no change yet, or its change still open. */
+export function chosenOptionLines(projectDecisions: readonly DecisionRow[], options: readonly DecisionOptionRow[], changeBranches: readonly BranchRow[]): ChosenOptionLine[] {
+  const branchById = new Map(changeBranches.map((b) => [b.id, b]));
+  const lines: ChosenOptionLine[] = [];
+  for (const decision of projectDecisions) {
+    if (decision.status !== 'accepted' || decision.chosen_option_id === null || decision.chosen_option_id === decision.baseline_option_id) continue;
+    const chosen = options.find((o) => o.id === decision.chosen_option_id);
+    if (chosen === undefined) continue;
+    const branch = chosen.branch_id === null ? null : branchById.get(chosen.branch_id);
+    if (branch === undefined) continue;
+    const state = decisionOptionState(decision, chosen.id, branch);
+    if (state.key === 'in_live_model' || state.key === 'delivery_stopped') continue;
+    lines.push({ decisionId: decision.id, optionTitle: chosen.title, phrase: chosenOptionPhrase(state) });
+  }
+  return lines;
 }
 
 export interface OpenDecisionSummary {
@@ -58,6 +84,8 @@ export function buildWhatWeAreDoing(
   profilesById: ReadonlyMap<UUID, ProfileRow>,
   /** ISO `YYYY-MM-DD`. */
   today: string,
+  /** Every candidate of the model's decisions, so a chosen option can say where its delivery has got to. */
+  options: readonly DecisionOptionRow[] = [],
 ): WhatWeAreDoing {
   const projectSummaries = projects
     .filter((p) => IN_HAND_PROJECT_STATUSES.includes(p.status))
@@ -73,6 +101,7 @@ export function buildWhatWeAreDoing(
         progress: projectProgress(projectChanges, projectDecisions),
         overdueDecisions: overdue.length,
         nextDecisionDue: upcoming[0] ?? null,
+        chosenOptions: chosenOptionLines(projectDecisions, options, changeBranches),
       };
     })
     // Proposed first (they are waiting), then active, then on hold; then by target date (none last), then title.

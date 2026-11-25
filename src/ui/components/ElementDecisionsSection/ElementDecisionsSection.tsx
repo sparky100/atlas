@@ -58,9 +58,14 @@ function DecisionEntryRow({ entry, orgSlug, modelSlug }: { entry: ElementPageDec
           Chosen: {optionLabel(chosen, orgSlug, modelSlug)}
         </Text>
       )}
+      {!chosen && entry.chosenWithoutChange != null && (
+        <Text as="p" tone="muted" size="sm">
+          Chosen: {entry.chosenWithoutChange} (delivery not started)
+        </Text>
+      )}
       {others.length > 0 && (
         <Text as="p" tone="faint" size="sm">
-          {chosen ? 'Also considered: ' : 'Options: '}
+          {chosen || entry.chosenWithoutChange != null ? 'Also considered: ' : 'Options: '}
           {others.map((b, i) => (
             <span key={b.id}>
               {i > 0 && ', '}

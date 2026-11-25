@@ -1,5 +1,5 @@
 /** What the decision page tells this person to do next: one sentence and, at most, one action. Driven by the decision's state and the viewer's role (CLAUDE.md UX rules 4 and 7). */
-export type DecisionNextAction = 'add-option' | 'compare' | 'choose' | 'ask-to-choose' | 'open-delivery' | 'none';
+export type DecisionNextAction = 'add-option' | 'compare' | 'choose' | 'ask-to-choose' | 'start-delivery' | 'open-delivery' | 'none';
 
 export interface DecisionNextStepInput {
   status: 'proposed' | 'accepted' | 'rejected' | 'superseded';
@@ -13,6 +13,10 @@ export interface DecisionNextStepInput {
   chosenTitle: string | null;
   /** True when the chosen option is the "stay as we are" baseline, so there is no delivery change to open. */
   chosenIsBaseline?: boolean;
+  /** True once the chosen option has a delivery change. Choosing makes none; "Start delivery" does. */
+  deliveryStarted?: boolean;
+  /** Owners, architects and contributors may start delivery on the chosen option. */
+  canStartDelivery?: boolean;
 }
 
 export interface DecisionNextStep {
@@ -31,11 +35,16 @@ export function decisionNextStep(i: DecisionNextStepInput): DecisionNextStep | n
     if (i.chosenTitle === null) {
       return { title: 'Chosen', body: 'An option was chosen. Its delivery change is no longer linked to this decision.', action: 'none', actionLabel: null };
     }
+    if (i.deliveryStarted !== true) {
+      return i.canStartDelivery === true
+        ? { title: 'Chosen', body: `${i.chosenTitle} was chosen. Nothing in the model has changed yet. Start delivery to draft the change.`, action: 'start-delivery', actionLabel: 'Start delivery' }
+        : { title: 'Chosen', body: `${i.chosenTitle} was chosen. Nothing in the model has changed yet. An owner, architect or contributor starts delivery.`, action: 'none', actionLabel: null };
+    }
     return {
       title: 'Chosen',
-      body: `${i.chosenTitle} was chosen. Open it to draft and submit the delivery.`,
+      body: `${i.chosenTitle} was chosen and delivery has started. Open the change to draft and submit it.`,
       action: 'open-delivery',
-      actionLabel: 'Open the chosen option',
+      actionLabel: 'Open the delivery change',
     };
   }
   if (i.optionCount === 0) {

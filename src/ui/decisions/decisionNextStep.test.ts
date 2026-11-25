@@ -20,10 +20,16 @@ describe('decisionNextStep', () => {
     expect(decisionNextStep({ ...base, canChoose: true, ratedOptionCount: 3 })?.action).toBe('choose');
   });
   it('says what was chosen, offers the delivery, and shows nothing for a cancelled decision', () => {
-    const accepted = decisionNextStep({ ...base, status: 'accepted', chosenTitle: 'Build ourselves' });
-    expect(accepted?.body).toMatch(/Build ourselves was chosen/);
+    // Choosing makes no change: the next step is to start delivery, for someone who may.
+    const chosen = decisionNextStep({ ...base, status: 'accepted', chosenTitle: 'Build ourselves', canStartDelivery: true });
+    expect(chosen?.body).toMatch(/Build ourselves was chosen. Nothing in the model has changed yet/);
+    expect(chosen).toMatchObject({ action: 'start-delivery', actionLabel: 'Start delivery' });
+    expect(decisionNextStep({ ...base, status: 'accepted', chosenTitle: 'Build ourselves' })).toMatchObject({ action: 'none' });
+    expect(decisionNextStep({ ...base, status: 'accepted', chosenTitle: 'Build ourselves' })?.body).toMatch(/contributor starts delivery/);
+    const accepted = decisionNextStep({ ...base, status: 'accepted', chosenTitle: 'Build ourselves', deliveryStarted: true, canStartDelivery: true });
+    expect(accepted?.body).toMatch(/delivery has started/);
     expect(accepted?.action).toBe('open-delivery');
-    expect(accepted?.actionLabel).toBe('Open the chosen option');
+    expect(accepted?.actionLabel).toBe('Open the delivery change');
     expect(decisionNextStep({ ...base, status: 'accepted', chosenTitle: null })?.action).toBe('none');
     expect(decisionNextStep({ ...base, status: 'accepted', chosenTitle: 'Stay as we are', chosenIsBaseline: true })?.action).toBe('none');
     expect(decisionNextStep({ ...base, status: 'rejected' })).toBeNull();

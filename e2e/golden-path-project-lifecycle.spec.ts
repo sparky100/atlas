@@ -88,8 +88,21 @@ test('project lifecycle: start from a finding, decide inside it, deliver the cho
   await page.getByRole('button', { name: 'Confirm choice' }).click();
   await expect(page.getByText('accepted', { exact: true }).first()).toBeVisible();
 
-  // 4. Design the chosen option: work on it as a change and add the system.
-  await hubHeader.getByRole('button', { name: 'Work on this option' }).click();
+  // Choosing records the choice only (item 5): no change exists yet, and every
+  // place that shows the option says so in the same words.
+  await expect(hubHeader).toContainText('Chosen · delivery not started');
+  await expect(page.getByTestId('chosen-option-state')).toHaveText('Chosen · delivery not started');
+  await expect(hubHeader.getByRole('link', { name: 'Build Repairs Hub' })).toHaveCount(0);
+  await openProject(page);
+  await expect(page.getByTestId('project-chosen-state')).toHaveText('Chosen · delivery not started');
+  await goToModelHome(page);
+  await expect(page.getByTestId('home-chosen-option')).toContainText('Option chosen: Build Repairs Hub, delivery not started');
+  await openProject(page);
+  await page.getByRole('link', { name: 'Build Repairs Hub' }).first().click();
+  await expect(page.getByTestId('chosen-option-state')).toHaveText('Chosen · delivery not started');
+
+  // 4. Start delivery on the chosen option: its change is made now, and the system added in it.
+  await optionSurface(page, 'Build Repairs Hub').getByRole('button', { name: 'Start delivery' }).click();
   await expect(page).toHaveURL(/\/changes\//);
   await expect(page.getByRole('button', { name: 'Editing in this change' })).toBeVisible();
   await expect(page.getByRole('link', { name: PROJECT_TITLE }).first()).toBeVisible();
@@ -112,6 +125,7 @@ test('project lifecycle: start from a finding, decide inside it, deliver the cho
   // the other option closed, and what the design touches beyond scope.
   await openProject(page);
   await expect(page.getByText('Option chosen', { exact: true })).toBeVisible();
+  await expect(page.getByTestId('project-chosen-state')).toHaveText('Delivery started');
   await expect(page.getByRole('link', { name: 'Build Repairs Hub' }).first()).toBeVisible();
   await expect(page.getByText('Other options remain on the decision page; they are not the chosen design.')).toBeVisible();
   await page.locator('summary', { hasText: 'Review scope against draft changes' }).click();
@@ -148,7 +162,7 @@ test('project lifecycle: start from a finding, decide inside it, deliver the cho
   // 7. Nothing is open any more: close the project.
   await goToModelHome(page);
   await openProject(page);
-  await expect(page.getByText('Merged into live model')).toBeVisible();
+  await expect(page.getByTestId('project-chosen-state')).toHaveText('In the live model');
   await expect(page.getByRole('link', { name: 'Build Repairs Hub' }).first()).toBeVisible();
   await page.getByRole('button', { name: 'Close project' }).click();
   await expect(page.getByText('Closed', { exact: true }).first()).toBeVisible();

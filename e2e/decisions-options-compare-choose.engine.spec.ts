@@ -143,7 +143,8 @@ test('add three options to a decision, compare them, choose one; the chosen opti
   await page.getByRole('button', { name: 'Confirm choice' }).click();
 
   await expect(page.getByText('accepted', { exact: true })).toBeVisible();
-  await expect(page.getByText('chosen', { exact: true })).toBeVisible();
+  // Option B already had a change with edits, so its delivery has started.
+  await expect(page.getByTestId('chosen-option-state')).toHaveText('Delivery started');
   await expect(page.getByText('Option B is the only one that actually adds the replacement capacity.').first()).toBeVisible();
 
   // The comparison table never blanked or refetched during Choose — same
@@ -159,8 +160,8 @@ test('add three options to a decision, compare them, choose one; the chosen opti
   // table's own headers repeat each option's full, unstripped label too,
   // which would otherwise make this locator ambiguous.
   const criteriaGridTable = page.locator('table').first();
-  await expect(criteriaGridTable.locator('th', { hasText: 'Option 1' })).toContainText('not chosen');
-  await expect(criteriaGridTable.locator('th', { hasText: 'Option 3' })).toContainText('not chosen');
+  await expect(criteriaGridTable.locator('th', { hasText: 'Option 1' })).toContainText('Not chosen');
+  await expect(criteriaGridTable.locator('th', { hasText: 'Option 3' })).toContainText('Not chosen');
 
   await page.goto(`/o/${orgSlug}/m/${modelSlug}/changes/${optionBBranchId}`);
   await expect(page.getByRole('heading', { name: /^Proposing: Option 2/ })).toBeVisible();
