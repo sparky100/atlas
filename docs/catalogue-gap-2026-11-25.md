@@ -99,6 +99,20 @@ These are research shortlists, not catalogue entries. Each needs a date-stamped 
 - **1–8 generic corporate capabilities.** These are shared across sectors and should be a shared catalogue, not 17 sector-specific copies. The `any_organisation` catalogue currently uses a different code set and does not solve this by itself.
 - **5.2 Identity & Account Verification, 5.5 Accessibility & Inclusion.** No sector-specific product found; identity verification may be part of a CRM/CIAM platform, accessibility is a design concern rather than a catalogue product.
 
+## EA Technology apps checked (25 November 2026)
+
+EA Technology's "apps" are four VisNet SaaS app families (Reliability, Capacity, Quality of Supply, Local Integration), plus its separate software line. Five were added to the draft:
+
+| Product | Capabilities | Status |
+|---|---|---|
+| VisNet Connect | 10.2 Connections; 11.4 Connection Quotations; 9.4 Network Planning | Added |
+| VisNet Reliability Apps | 10.1 Outage & Fault Management | Added |
+| VisNet Capacity Apps | 10.4 Distribution System Operation; 9.4 Network Planning | Added |
+| Invest | 9.1 Asset Health Indices; 9.2 Network Investment Planning | Added |
+| Astute HV Monitoring | 9.3 Condition Monitoring; 13.2 Planned Maintenance | Added |
+
+The second wave is VisNet Design (9.4, 10.2), VisNet Forecast (9.4, 9.2), UltraTEV Plus² (9.3, 13.2) and the VisNet Hub/View/Reclose² devices (9.3, 10.1). The Power Quality app has no exact capability code in this map, so it was not forced in.
+
 ## Recommended next wave
 
 Add no more than eight entries in the next review, so each can be checked properly:

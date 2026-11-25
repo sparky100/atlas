@@ -16,14 +16,14 @@ This export is generated from the two draft catalogue files: `content/catalogue/
 
 | Sector | Version | Pinned map | Entries | Capabilities covered | Entries pending review |
 | --- | ---: | ---: | ---: | ---: | ---: |
-| Electricity network | 2 | v4 | 28 | 23 of 84 | 18 |
+| Electricity network | 2 | v4 | 33 | 24 of 84 | 23 |
 | Any organisation | 2 | v2 | 12 | 38 of 70 | 12 |
 
 ## Electricity network
 
-**Version:** 2 · **Pinned map:** v4 · **Entries:** 28 · **Coverage:** 23 of 84 capabilities · **Pending review:** 18 of 28 entries
+**Version:** 2 · **Pinned map:** v4 · **Entries:** 33 · **Coverage:** 24 of 84 capabilities · **Pending review:** 23 of 33 entries
 
-**Description:** Version 2, checked 25 November 2026. It corrects broken and redirected source links, updates products that have been renamed or sold (Octave Attune EAM, formerly HxGN EAM; Siemens Gridscale X Meter Data Management, formerly EnergyIP; Oracle Utilities Customer Service and Billing; Salesforce Field Service and Operations), adds capability links the vendor page already supports, and adds reviewed-candidate products for previously uncovered capabilities. Every new or changed claim is Pending review until a named reviewer signs it; unchanged claims keep their original review. Coverage is deliberately a first slice.
+**Description:** Version 2, checked 25 November 2026. It corrects broken and redirected source links, updates products that have been renamed or sold (Octave Attune EAM, formerly HxGN EAM; Siemens Gridscale X Meter Data Management, formerly EnergyIP; Oracle Utilities Customer Service and Billing; Salesforce Field Service and Operations), adds capability links the vendor page already supports, and adds reviewed-candidate products for previously uncovered capabilities, including EA Technology's VisNet Connect, Reliability Apps, Capacity Apps, Invest and Astute HV Monitoring. Every new or changed claim is Pending review until a named reviewer signs it; unchanged claims keep their original review. Coverage is deliberately a first slice.
 
 ### Coverage
 
@@ -34,21 +34,22 @@ This export is generated from the two draft catalogue files: `content/catalogue/
 | 5.3 | Case & Request Tracking | Salesforce Service Cloud; Microsoft Dynamics 365 Customer Service |
 | 5.4 | Complaints & Feedback | Salesforce Service Cloud; Microsoft Dynamics 365 Customer Service |
 | 9 | Asset Management | Esri ArcGIS Utility Network; GE Vernova Smallworld Geo Network Management |
-| 9.1 | Network Asset Health Indices | IBM Maximo Application Suite; IFS Copperleaf; Cascade |
-| 9.2 | Network Investment Planning | IBM Maximo Application Suite; IFS Copperleaf |
-| 9.3 | Substation & Circuit Condition Monitoring | DynamicMetrix; Cascade |
-| 9.4 | Network Planning & Load Forecasting | Esri ArcGIS Utility Network; GE Vernova Smallworld Geo Network Management; LAEP+ |
+| 9.1 | Network Asset Health Indices | IBM Maximo Application Suite; IFS Copperleaf; Cascade; Invest |
+| 9.2 | Network Investment Planning | IBM Maximo Application Suite; IFS Copperleaf; Invest |
+| 9.3 | Substation & Circuit Condition Monitoring | DynamicMetrix; Cascade; Astute HV Monitoring |
+| 9.4 | Network Planning & Load Forecasting | Esri ArcGIS Utility Network; GE Vernova Smallworld Geo Network Management; LAEP+; VisNet Connect; VisNet Capacity Apps |
 | 9.5 | Asset Inspection & Maintenance | IBM Maximo Application Suite; SAP Asset Management; Octave Attune EAM |
-| 10.1 | Outage & Fault Management | Schneider Electric EcoStruxure ADMS; GE Vernova GridOS for Distribution |
-| 10.2 | Connections | IDNO itc; LAEP+ |
+| 10.1 | Outage & Fault Management | Schneider Electric EcoStruxure ADMS; GE Vernova GridOS for Distribution; VisNet Reliability Apps |
+| 10.2 | Connections | IDNO itc; LAEP+; VisNet Connect |
+| 10.4 | Distribution System Operation | VisNet Capacity Apps |
 | 10.5 | Flexibility Markets | Piclo |
 | 10.6 | Control Room & Real-Time Operations | Schneider Electric EcoStruxure ADMS; GE Vernova GridOS for Distribution |
 | 11.1 | Smart Metering Data | Siemens Gridscale X Meter Data Management; Oracle Utilities Meter Data Management |
-| 11.4 | Connection Quotations | Microsoft Dynamics 365 Customer Service; Salesforce Energy & Utilities Cloud |
+| 11.4 | Connection Quotations | Microsoft Dynamics 365 Customer Service; Salesforce Energy & Utilities Cloud; VisNet Connect |
 | 11.5 | Billing & Settlement | Oracle Utilities Customer Service and Billing |
 | 11.6 | Vulnerable Customer Support | TellJO Customer Wellbeing Checks |
 | 13.1 | Capital Projects & Construction | Oracle Primavera Unifier; Oracle Primavera P6; Microsoft Project |
-| 13.2 | Planned Maintenance & Inspection | IBM Maximo Application Suite; Octave Attune EAM; Cascade; Utility Works Management |
+| 13.2 | Planned Maintenance & Inspection | IBM Maximo Application Suite; Octave Attune EAM; Cascade; Utility Works Management; Astute HV Monitoring |
 | 13.3 | Field Workforce Scheduling & Dispatch | Microsoft Dynamics 365 Field Service; Salesforce Field Service and Operations |
 | 13.6 | Vegetation Management | KaarbonTech Tree SMART |
 | 13.7 | Contractor Management | Utility Works Management |
@@ -525,9 +526,94 @@ Tree stock management software for risk-based surveying, inspection and maintena
   - Source: [https://kaarbontech.co.uk/trees](https://kaarbontech.co.uk/trees) — checked 2026-11-25
   - Reviewer: Pending review — 2026-11-25
 
+#### 29. VisNet Connect — EA Technology
+
+`eatechnology-visnet-connect` · **claims pending review**
+
+Self-service connection software that produces LV and MV connection estimates and quotes using a network digital twin and loadflow engine.
+
+| Code | Capability | How it supports it |
+| --- | --- | --- |
+| 10.2 | Connections | Assesses connection requests against network capacity and constraints. |
+| 11.4 | Connection Quotations | Produces connection estimates and quotes in minutes. |
+| 9.4 | Network Planning & Load Forecasting | Uses a loadflow engine and network digital twin to check capacity and voltage. |
+
+**Claims**
+
+- **functional.** The vendor describes VisNet Connect as a self-service connections tool that generates LV and MV connection estimates and quotes using a network digital twin and loadflow engine.
+  - Source: [https://www.eatechnology.com/solutions/network-planning-and-connections/self-service-connections-software](https://www.eatechnology.com/solutions/network-planning-and-connections/self-service-connections-software) — checked 2026-11-25
+  - Reviewer: Pending review — 2026-11-25
+
+#### 30. VisNet Reliability Apps — EA Technology
+
+`eatechnology-visnet-reliability-apps` · **claims pending review**
+
+SaaS apps that use LV monitoring data to detect and respond to faults and pre-fault conditions.
+
+| Code | Capability | How it supports it |
+| --- | --- | --- |
+| 10.1 | Outage & Fault Management | Reactive Operations detects faults and outages; Proactive Operations identifies pre-fault conditions. |
+
+**Claims**
+
+- **functional.** The vendor describes VisNet Reliability Apps as using LV monitoring data to detect and respond to faults and outages and to identify potential faults before they occur.
+  - Source: [https://www.eatechnology.com/resources/insights/introducing-visnet-hub-apps-for-lv-monitoring](https://www.eatechnology.com/resources/insights/introducing-visnet-hub-apps-for-lv-monitoring) — checked 2026-11-25
+  - Reviewer: Pending review — 2026-11-25
+
+#### 31. VisNet Capacity Apps — EA Technology
+
+`eatechnology-visnet-capacity-apps` · **claims pending review**
+
+SaaS apps that monitor LV feeder and transformer loading to identify headroom and constraint alerts.
+
+| Code | Capability | How it supports it |
+| --- | --- | --- |
+| 10.4 | Distribution System Operation | Provides feeder and phase headroom and constraint alerts for network operation. |
+| 9.4 | Network Planning & Load Forecasting | Uses historic and real-time loading data to identify future constraints. |
+
+**Claims**
+
+- **functional.** The vendor describes VisNet Capacity Apps as monitoring demand across LV feeder circuits and alerting when circuits and transformers approach, reach or exceed their operating limits.
+  - Source: [https://www.eatechnology.com/resources/insights/introducing-visnet-hub-apps-for-lv-monitoring](https://www.eatechnology.com/resources/insights/introducing-visnet-hub-apps-for-lv-monitoring) — checked 2026-11-25
+  - Reviewer: Pending review — 2026-11-25
+
+#### 32. Invest — EA Technology
+
+`eatechnology-invest` · **claims pending review**
+
+Asset investment management software using CNAIM models to prioritise asset health, risk and investment.
+
+| Code | Capability | How it supports it |
+| --- | --- | --- |
+| 9.1 | Network Asset Health Indices | Builds asset-level health and probability-of-failure views using CNAIM v2.1. |
+| 9.2 | Network Investment Planning | Prioritises investment by risk and consequence across the network. |
+
+**Claims**
+
+- **functional.** The vendor describes Invest as asset investment management software that builds asset-level health, risk and investment priority using CNAIM v2.1 models.
+  - Source: [https://www.eatechnology.com/solutions/asset-management-condition/invest](https://www.eatechnology.com/solutions/asset-management-condition/invest) — checked 2026-11-25
+  - Reviewer: Pending review — 2026-11-25
+
+#### 33. Astute HV Monitoring — EA Technology
+
+`eatechnology-astute-hv-monitoring` · **claims pending review**
+
+A permanently installed partial-discharge monitoring service for HV switchgear and cables.
+
+| Code | Capability | How it supports it |
+| --- | --- | --- |
+| 9.3 | Substation & Circuit Condition Monitoring | Continuously monitors partial discharge on switchgear, transformers and cable circuits. |
+| 13.2 | Planned Maintenance & Inspection | Flags developing insulation faults to prioritise maintenance. |
+
+**Claims**
+
+- **functional.** The vendor describes Astute HV Monitoring as a permanently installed partial discharge monitoring system for high-voltage switchgear and cabling that flags developing insulation issues in real time.
+  - Source: [https://www.eatechnology.com/solutions/asset-management-condition/astute](https://www.eatechnology.com/solutions/asset-management-condition/astute) — checked 2026-11-25
+  - Reviewer: Pending review — 2026-11-25
+
 ### Still uncovered
 
-61 of 84 capabilities have no product.
+60 of 84 capabilities have no product.
 
 | Area | Uncovered capabilities |
 | --- | --- |
@@ -539,7 +625,7 @@ Tree stock management software for risk-based surveying, inspection and maintena
 | 6 Estates | 6 Estates; 6.1 Property Portfolio & Strategy; 6.2 Facilities & Building Operations; 6.3 Maintenance & Compliance; 6.4 Space & Workplace; 6.5 Energy & Sustainability |
 | 7 Digital & Technology | 7 Digital & Technology; 7.1 Enterprise Architecture & Standards; 7.2 Application Delivery & Support; 7.3 Infrastructure, Cloud & Networks; 7.4 Cyber Security & Resilience; 7.5 Digital Service Design; 7.6 Technology Service Management |
 | 8 Governance & Assurance | 8 Governance & Assurance; 8.1 Strategy & Performance; 8.2 Risk Management; 8.3 Internal Audit & Assurance; 8.4 Legal & Regulatory Compliance; 8.5 Corporate Governance; 8.6 Business Continuity & Emergency Planning |
-| 10 Network Operations | 10 Network Operations; 10.3 Emergency Response; 10.4 Distribution System Operation |
+| 10 Network Operations | 10 Network Operations; 10.3 Emergency Response |
 | 11 Customer & Metering | 11 Customer & Metering; 11.2 Priority Services Register; 11.3 Guaranteed Standards Payments |
 | 12 Regulatory Compliance & Price-Control Reporting | 12 Regulatory Compliance & Price-Control Reporting; 12.1 Ofgem Regulatory Reporting; 12.2 RIIO Price-Control Business Plan; 12.3 Interruptions Incentive Reporting; 12.4 Network Access & Charging; 12.5 Industry Codes Compliance; 12.6 Health, Safety & Environment |
 | 13 Network Delivery & Maintenance | 13 Network Delivery & Maintenance; 13.4 Streetworks & Permits; 13.5 Land, Wayleaves & Consents |

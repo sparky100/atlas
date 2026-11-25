@@ -4,7 +4,7 @@
   "capabilityMapVersion": 4,
   "status": "draft",
   "title": "Electricity network product catalogue, version 2",
-  "sourceDescription": "Version 2, checked 25 November 2026. It corrects broken and redirected source links, updates products that have been renamed or sold (Octave Attune EAM, formerly HxGN EAM; Siemens Gridscale X Meter Data Management, formerly EnergyIP; Oracle Utilities Customer Service and Billing; Salesforce Field Service and Operations), adds capability links the vendor page already supports, and adds reviewed-candidate products for previously uncovered capabilities. Every new or changed claim is Pending review until a named reviewer signs it; unchanged claims keep their original review. Coverage is deliberately a first slice.",
+  "sourceDescription": "Version 2, checked 25 November 2026. It corrects broken and redirected source links, updates products that have been renamed or sold (Octave Attune EAM, formerly HxGN EAM; Siemens Gridscale X Meter Data Management, formerly EnergyIP; Oracle Utilities Customer Service and Billing; Salesforce Field Service and Operations), adds capability links the vendor page already supports, and adds reviewed-candidate products for previously uncovered capabilities, including EA Technology's VisNet Connect, Reliability Apps, Capacity Apps, Invest and Astute HV Monitoring. Every new or changed claim is Pending review until a named reviewer signs it; unchanged claims keep their original review. Coverage is deliberately a first slice.",
   "licence": "CC-BY-4.0",
   "entries": [
     {
@@ -777,6 +777,151 @@
           "kind": "functional",
           "statement": "The vendor describes its tree software as complete management software for a risk-based approach to tree stock surveying and management.",
           "sourceUrl": "https://kaarbontech.co.uk/trees",
+          "sourceDate": "2026-11-25",
+          "reviewedBy": "Pending review",
+          "reviewedAt": "2026-11-25"
+        }
+      ]
+    },
+    {
+      "code": "eatechnology-visnet-connect",
+      "product": "VisNet Connect",
+      "vendor": "EA Technology",
+      "summary": "Self-service connection software that produces LV and MV connection estimates and quotes using a network digital twin and loadflow engine.",
+      "capabilities": [
+        {
+          "code": "10.2",
+          "name": "Connections",
+          "howItSupports": "Assesses connection requests against network capacity and constraints."
+        },
+        {
+          "code": "11.4",
+          "name": "Connection Quotations",
+          "howItSupports": "Produces connection estimates and quotes in minutes."
+        },
+        {
+          "code": "9.4",
+          "name": "Network Planning & Load Forecasting",
+          "howItSupports": "Uses a loadflow engine and network digital twin to check capacity and voltage."
+        }
+      ],
+      "claims": [
+        {
+          "position": 1,
+          "kind": "functional",
+          "statement": "The vendor describes VisNet Connect as a self-service connections tool that generates LV and MV connection estimates and quotes using a network digital twin and loadflow engine.",
+          "sourceUrl": "https://www.eatechnology.com/solutions/network-planning-and-connections/self-service-connections-software",
+          "sourceDate": "2026-11-25",
+          "reviewedBy": "Pending review",
+          "reviewedAt": "2026-11-25"
+        }
+      ]
+    },
+    {
+      "code": "eatechnology-visnet-reliability-apps",
+      "product": "VisNet Reliability Apps",
+      "vendor": "EA Technology",
+      "summary": "SaaS apps that use LV monitoring data to detect and respond to faults and pre-fault conditions.",
+      "capabilities": [
+        {
+          "code": "10.1",
+          "name": "Outage & Fault Management",
+          "howItSupports": "Reactive Operations detects faults and outages; Proactive Operations identifies pre-fault conditions."
+        }
+      ],
+      "claims": [
+        {
+          "position": 1,
+          "kind": "functional",
+          "statement": "The vendor describes VisNet Reliability Apps as using LV monitoring data to detect and respond to faults and outages and to identify potential faults before they occur.",
+          "sourceUrl": "https://www.eatechnology.com/resources/insights/introducing-visnet-hub-apps-for-lv-monitoring",
+          "sourceDate": "2026-11-25",
+          "reviewedBy": "Pending review",
+          "reviewedAt": "2026-11-25"
+        }
+      ]
+    },
+    {
+      "code": "eatechnology-visnet-capacity-apps",
+      "product": "VisNet Capacity Apps",
+      "vendor": "EA Technology",
+      "summary": "SaaS apps that monitor LV feeder and transformer loading to identify headroom and constraint alerts.",
+      "capabilities": [
+        {
+          "code": "10.4",
+          "name": "Distribution System Operation",
+          "howItSupports": "Provides feeder and phase headroom and constraint alerts for network operation."
+        },
+        {
+          "code": "9.4",
+          "name": "Network Planning & Load Forecasting",
+          "howItSupports": "Uses historic and real-time loading data to identify future constraints."
+        }
+      ],
+      "claims": [
+        {
+          "position": 1,
+          "kind": "functional",
+          "statement": "The vendor describes VisNet Capacity Apps as monitoring demand across LV feeder circuits and alerting when circuits and transformers approach, reach or exceed their operating limits.",
+          "sourceUrl": "https://www.eatechnology.com/resources/insights/introducing-visnet-hub-apps-for-lv-monitoring",
+          "sourceDate": "2026-11-25",
+          "reviewedBy": "Pending review",
+          "reviewedAt": "2026-11-25"
+        }
+      ]
+    },
+    {
+      "code": "eatechnology-invest",
+      "product": "Invest",
+      "vendor": "EA Technology",
+      "summary": "Asset investment management software using CNAIM models to prioritise asset health, risk and investment.",
+      "capabilities": [
+        {
+          "code": "9.1",
+          "name": "Network Asset Health Indices",
+          "howItSupports": "Builds asset-level health and probability-of-failure views using CNAIM v2.1."
+        },
+        {
+          "code": "9.2",
+          "name": "Network Investment Planning",
+          "howItSupports": "Prioritises investment by risk and consequence across the network."
+        }
+      ],
+      "claims": [
+        {
+          "position": 1,
+          "kind": "functional",
+          "statement": "The vendor describes Invest as asset investment management software that builds asset-level health, risk and investment priority using CNAIM v2.1 models.",
+          "sourceUrl": "https://www.eatechnology.com/solutions/asset-management-condition/invest",
+          "sourceDate": "2026-11-25",
+          "reviewedBy": "Pending review",
+          "reviewedAt": "2026-11-25"
+        }
+      ]
+    },
+    {
+      "code": "eatechnology-astute-hv-monitoring",
+      "product": "Astute HV Monitoring",
+      "vendor": "EA Technology",
+      "summary": "A permanently installed partial-discharge monitoring service for HV switchgear and cables.",
+      "capabilities": [
+        {
+          "code": "9.3",
+          "name": "Substation & Circuit Condition Monitoring",
+          "howItSupports": "Continuously monitors partial discharge on switchgear, transformers and cable circuits."
+        },
+        {
+          "code": "13.2",
+          "name": "Planned Maintenance & Inspection",
+          "howItSupports": "Flags developing insulation faults to prioritise maintenance."
+        }
+      ],
+      "claims": [
+        {
+          "position": 1,
+          "kind": "functional",
+          "statement": "The vendor describes Astute HV Monitoring as a permanently installed partial discharge monitoring system for high-voltage switchgear and cabling that flags developing insulation issues in real time.",
+          "sourceUrl": "https://www.eatechnology.com/solutions/asset-management-condition/astute",
           "sourceDate": "2026-11-25",
           "reviewedBy": "Pending review",
           "reviewedAt": "2026-11-25"
