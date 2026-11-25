@@ -280,11 +280,14 @@ export function DecisionView({ modelId, decisionId, orgId, orgSlug, modelSlug, r
   const canResearch = canAddOption && webSearchEnabled && assistantEnabled && agentsEnabled && keySet;
   // Product and vendor names are safe context only when they are already
   // structured sources on the option, never parsed from its free-text summary.
-  const reviewedNamesFor = (targetBranchId: UUID): { productNames: string[]; vendorNames: string[] } => {
+  const reviewedNamesFor = (targetBranchId: UUID): { productNames: string[]; vendorNames: string[]; optionProducts: { product: string; vendor: string }[] } => {
     const sources = (sourcesByBranch.get(targetBranchId) ?? []).filter((source): source is OptionCatalogueSource => source.kind === 'catalogue');
+    const byProduct = new Map<string, { product: string; vendor: string }>();
+    for (const source of sources) byProduct.set(`${source.vendor}\u0000${source.product}`, { product: source.product, vendor: source.vendor });
     return {
       productNames: [...new Set(sources.map((source) => source.product))],
       vendorNames: [...new Set(sources.map((source) => source.vendor))],
+      optionProducts: [...byProduct.values()],
     };
   };
   const canChoose = canChooseDecisionOption(role) && decision.status === 'proposed';
@@ -1079,6 +1082,7 @@ export function DecisionView({ modelId, decisionId, orgId, orgSlug, modelSlug, r
           capabilityNames={concernedCapabilities.map((capability) => capability.name)}
           productNames={reviewedNamesFor(researchTarget.branchId).productNames}
           vendorNames={reviewedNamesFor(researchTarget.branchId).vendorNames}
+          optionProducts={reviewedNamesFor(researchTarget.branchId).optionProducts}
           catalogueProducts={knownCatalogueProducts}
           userId={userId}
           existingUrls={(sourcesByBranch.get(researchTarget.branchId) ?? []).flatMap((source) => (source.kind === 'web' ? [source.url] : []))}
