@@ -1,7 +1,9 @@
 /**
- * `pnpm content:review-catalogue` — D3 PR 2. Checks every
+ * `pnpm content:review-catalogue` — D3 PR 2. Checks
  * `content/catalogue/<sector>/<version>.json` before a person signs or
- * publishes it:
+ * publishes it. By default it checks every file; `--sector` or `--file`
+ * narrows it to one catalogue, so unsigned drafts in other sectors do not
+ * block the gate.
  *
  * - the file matches its own `<sector>/<version>` path;
  * - the pinned `capabilityMapVersion` is a **published** map of that sector;
@@ -11,6 +13,11 @@
  * - the schema's own no-price and HTTPS URL rules hold.
  *
  * It reports every problem and exits 1. Nothing is published or written.
+ *
+ * Usage:
+ *   pnpm content:review-catalogue
+ *   pnpm content:review-catalogue --sector electricity_network
+ *   pnpm content:review-catalogue --file content/catalogue/electricity_network/2.json
  */
 import { readdir, readFile } from 'node:fs/promises';
 import path from 'node:path';
@@ -22,6 +29,65 @@ import { isCliEntrypoint } from './isCliEntrypoint';
 
 const CONTENT_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', 'content', 'catalogue');
 const REVIEWERS_FILE = path.join(CONTENT_ROOT, 'reviewers.json');
+
+const USAGE = [
+  'Usage:',
+  '  pnpm content:review-catalogue',
+  '  pnpm content:review-catalogue --sector electricity_network',
+  '  pnpm content:review-catalogue --file content/catalogue/electricity_network/2.json',
+  '',
+  'With neither option it reviews every catalogue file.',
+].join('\n');
+
+export interface ContentFilter {
+  sector?: string;
+  file?: string;
+}
+
+/** Pure: read `--sector` / `--file`, rejecting ambiguous or malformed input. */
+export function parseArgs(args: readonly string[]): ContentFilter {
+  const known = new Set(['--sector', '--file']);
+  for (const arg of args) {
+    if (arg.startsWith('--') && !known.has(arg)) throw new Error(`Unknown option ${arg}.\n\n${USAGE}`);
+  }
+  const valueOf = (flag: string): string | undefined => {
+    const index = args.indexOf(flag);
+    if (index < 0) return undefined;
+    const value = args[index + 1];
+    if (value === undefined || value.startsWith('--')) throw new Error(`${flag} needs a value.\n\n${USAGE}`);
+    return value;
+  };
+  const sector = valueOf('--sector');
+  const file = valueOf('--file');
+  if (sector !== undefined && file !== undefined) throw new Error(`Use either --sector or --file, not both.\n\n${USAGE}`);
+  if (sector !== undefined && (sector.trim() === '' || sector.includes('/') || sector.includes('\\'))) {
+    throw new Error(`--sector must be a sector folder name.\n\n${USAGE}`);
+  }
+  return { ...(sector !== undefined ? { sector } : {}), ...(file !== undefined ? { file } : {}) };
+}
+
+/**
+ * Pure: narrow the discovered files to one sector or one file. A file may be
+ * given from the repository root or relative to `content/catalogue`; it must
+ * resolve inside the catalogue root.
+ */
+export function selectContentFiles(files: readonly string[], filter: ContentFilter, root: string = CONTENT_ROOT): string[] {
+  if (filter.file !== undefined) {
+    const candidates = [path.resolve(filter.file), path.resolve(root, filter.file)];
+    const target = candidates.find((candidate) => {
+      const relative = path.relative(root, candidate);
+      return relative !== '' && !relative.startsWith('..') && !path.isAbsolute(relative);
+    });
+    if (target === undefined || path.extname(target).toLowerCase() !== '.json') {
+      throw new Error(`--file must be a .json file under ${root}.`);
+    }
+    return files.filter((file) => path.resolve(file) === target);
+  }
+  if (filter.sector !== undefined) {
+    return files.filter((file) => path.basename(path.dirname(path.resolve(file))) === filter.sector);
+  }
+  return [...files];
+}
 
 interface ReviewerFile {
   reviewers?: { name?: unknown }[];
@@ -46,6 +112,11 @@ async function reviewerNames(): Promise<Set<string>> {
 }
 
 async function main(): Promise<void> {
+  if (process.argv.includes('--help') || process.argv.includes('-h')) {
+    console.log(USAGE);
+    return;
+  }
+  const filter = parseArgs(process.argv.slice(2));
   const reviewers = await reviewerNames();
   if (reviewers.size === 0) {
     console.error('reviewers.json lists no reviewers. Add a named person before reviewing content.');
@@ -53,16 +124,19 @@ async function main(): Promise<void> {
     return;
   }
   const supabase = createServiceRoleClient(loadEnv());
-  const files = await contentFiles();
+  const files = selectContentFiles(await contentFiles(), filter);
   if (files.length === 0) {
-    console.error('No catalogue content found under content/catalogue/<sector>/<version>.json.');
+    const target = filter.file ?? (filter.sector !== undefined ? `sector "${filter.sector}"` : 'content/catalogue/<sector>/<version>.json');
+    console.error(`No catalogue content matched ${target}.`);
     process.exitCode = 1;
     return;
   }
+  console.log(`Reviewing ${String(files.length)} catalogue file(s).`);
 
   const today = new Date().toISOString().slice(0, 10);
   let problems = 0;
   for (const file of files) {
+    const before = problems;
     const label = path.relative(CONTENT_ROOT, file);
     const parsed = productCatalogueContentSchema.safeParse(JSON.parse(await readFile(file, 'utf8')) as unknown);
     if (!parsed.success) {
@@ -117,7 +191,7 @@ async function main(): Promise<void> {
         }
       }
     }
-    if (problems === 0) console.log(`${label}: OK (${String(content.entries.length)} entries)`);
+    if (problems === before) console.log(`${label}: OK (${String(content.entries.length)} entries)`);
   }
   if (problems > 0) {
     console.error(`\n${String(problems)} problem(s). Nothing was published.`);
