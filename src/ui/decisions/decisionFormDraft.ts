@@ -10,6 +10,8 @@ import { PENDING_TTL_MS, type StorageLike } from './pendingOptions';
 export interface DecisionFormDraft {
   title: string;
   statement: string;
+  /** The outcome the business wants. Absent in drafts held before outcomes existed. */
+  outcome?: string;
 }
 
 export function decisionFormDraftKey(orgId: UUID, userId: UUID, scope: string): string {
@@ -21,7 +23,7 @@ interface Stored extends DecisionFormDraft {
 }
 
 export function saveDecisionFormDraft(storage: StorageLike, key: string, draft: DecisionFormDraft, now: number): void {
-  if (draft.title.trim() === '' && draft.statement.trim() === '') {
+  if (draft.title.trim() === '' && draft.statement.trim() === '' && (draft.outcome ?? '').trim() === '') {
     storage.removeItem(key);
     return;
   }
@@ -36,8 +38,9 @@ export function loadDecisionFormDraft(storage: StorageLike, key: string, now: nu
   try {
     const stored = JSON.parse(raw) as Partial<Stored>;
     if (typeof stored.savedAt !== 'number' || now - stored.savedAt > PENDING_TTL_MS || typeof stored.title !== 'string' || typeof stored.statement !== 'string') throw new Error('stale');
-    if (stored.title.trim() === '' && stored.statement.trim() === '') throw new Error('empty');
-    return { title: stored.title, statement: stored.statement };
+    const outcome = typeof stored.outcome === 'string' ? stored.outcome : '';
+    if (stored.title.trim() === '' && stored.statement.trim() === '' && outcome.trim() === '') throw new Error('empty');
+    return { title: stored.title, statement: stored.statement, outcome };
   } catch {
     storage.removeItem(key);
     return null;
@@ -50,5 +53,5 @@ export function clearDecisionFormDraft(storage: StorageLike, key: string): void 
 
 /** Whether a held draft is worth offering back: it says something the form does not already say. */
 export function draftDiffers(held: DecisionFormDraft | null, current: DecisionFormDraft): held is DecisionFormDraft {
-  return held !== null && (held.title !== current.title || held.statement !== current.statement);
+  return held !== null && (held.title !== current.title || held.statement !== current.statement || (held.outcome ?? '') !== (current.outcome ?? ''));
 }

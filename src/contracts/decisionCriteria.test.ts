@@ -11,8 +11,8 @@ import {
 } from './decisionCriteria';
 
 describe('DECISION_CRITERIA', () => {
-  it('has exactly the five named criteria, in the brief\'s own order', () => {
-    expect(DECISION_CRITERIA.map((c) => c.key)).toEqual(['cost', 'effort', 'deliveryRisk', 'timing', 'vendorFit']);
+  it('has the outcome first, then the five named criteria, in the brief\'s own order', () => {
+    expect(DECISION_CRITERIA.map((c) => c.key)).toEqual(['outcome', 'cost', 'effort', 'deliveryRisk', 'timing', 'vendorFit']);
   });
 
   it('has no duplicate criterion keys', () => {

@@ -1,5 +1,5 @@
 /** What the decision page tells this person to do next: one sentence and, at most, one action. Driven by the decision's state and the viewer's role (CLAUDE.md UX rules 4 and 7). */
-export type DecisionNextAction = 'add-option' | 'compare' | 'choose' | 'ask-to-choose' | 'start-delivery' | 'open-delivery' | 'none';
+export type DecisionNextAction = 'add-outcome' | 'add-option' | 'compare' | 'choose' | 'ask-to-choose' | 'start-delivery' | 'open-delivery' | 'none';
 
 export interface DecisionNextStepInput {
   status: 'proposed' | 'accepted' | 'rejected' | 'superseded';
@@ -17,6 +17,10 @@ export interface DecisionNextStepInput {
   deliveryStarted?: boolean;
   /** Owners, architects and contributors may start delivery on the chosen option. */
   canStartDelivery?: boolean;
+  /** False while the decision has no outcome written (item 3). Absent is treated as written, for callers that do not show it. */
+  hasOutcome?: boolean;
+  /** Whether this person can edit the decision, and so write its outcome. */
+  canEditOutcome?: boolean;
 }
 
 export interface DecisionNextStep {
@@ -47,6 +51,11 @@ export function decisionNextStep(i: DecisionNextStepInput): DecisionNextStep | n
       actionLabel: 'Open the delivery change',
     };
   }
+  if (i.hasOutcome === false) {
+    return i.canEditOutcome === true
+      ? { title: 'Say what outcome you want', body: 'Say what will be better, for whom, by when, so the options can be judged against it. For example: issue a connection quote in two days, not ten, by March 2027.', action: 'add-outcome', actionLabel: 'Add the outcome' }
+      : { title: 'Waiting for the outcome', body: 'The person who started this decision, or an owner or architect, says what will be better, for whom, by when. You can still read and comment on the options.', action: 'none', actionLabel: null };
+  }
   if (i.optionCount === 0) {
     return i.canAddOption
       ? { title: 'Add the options', body: 'Add an option, or ask the Designer for suggestions. Staying as we are is always one of them.', action: 'add-option', actionLabel: null }
@@ -57,7 +66,7 @@ export function decisionNextStep(i: DecisionNextStepInput): DecisionNextStep | n
     return { title: 'Choose an option', body: `${rated} Compare what each changes, then choose and give your reasons. Rating first is optional but makes the choice easier to explain.`, action: 'choose', actionLabel: 'Review what changes' };
   }
   if (i.ratedOptionCount === 0) {
-    return { title: 'Compare the options', body: 'Rate each option for cost, effort, delivery risk, timing and vendor fit. It is optional, but it makes the choice easier to explain. An owner or architect makes the choice.', action: 'compare', actionLabel: 'Go to the comparison' };
+    return { title: 'Compare the options', body: 'Rate each option on whether it reaches the outcome, and for cost, effort, delivery risk, timing and vendor fit. It is optional, but it makes the choice easier to explain. An owner or architect makes the choice.', action: 'compare', actionLabel: 'Go to the comparison' };
   }
   return { title: 'Ready for a choice?', body: `${rated} When you are done, ask an owner or architect to choose.`, action: 'ask-to-choose', actionLabel: 'Ask an owner or architect to choose' };
 }

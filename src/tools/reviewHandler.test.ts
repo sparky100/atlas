@@ -7,7 +7,7 @@ import { buildReviewerDigest } from './reviewDigest';
 import type { ModelSnapshot, ToolContext } from './types';
 
 const id = (n: number) => `00000000-0000-4000-8000-${String(n).padStart(12, '0')}`;
-const decision = { id: id(1), org_id: id(2), model_id: id(3), status: 'proposed', title: 'How do we quote new connections?', statement: 'Quotes should take two days.', needed_by: '2027-01-01', branch_id: null, reconsider_if: null, review_by: null } as DecisionRow;
+const decision = { id: id(1), org_id: id(2), model_id: id(3), status: 'proposed', title: 'How do we quote new connections?', statement: 'Quotes should take two days.', outcome: 'Issue a connection quote in two days, not ten, by March 2027', needed_by: '2027-01-01', branch_id: null, reconsider_if: null, review_by: null } as DecisionRow;
 const option = { id: id(4), title: 'Replace', name: 'Replace', description: 'Move quotes to a hosted product.', status: 'draft', intent: 'explore', base_commit_id: id(7), head_commit_id: id(9) } as BranchRow;
 const concern = { element_id: id(5), element_type: 'system', name: 'Quote Tool', parent_id: null, attributes: { criticality: 'high', annualRunCost: 'over_5m' }, exists_delta_id: id(6) } as ElementsHeadRow;
 const links = [{ linked_type: 'branch', linked_id: option.id }, { linked_type: 'element', linked_id: concern.element_id }] as DecisionLinkRow[];
@@ -63,6 +63,10 @@ describe('review-agent boundary', () => {
     for (const withheld of ['owner@example.invalid', 'PRIVATE PACK', 'Board Chair', 'PRIVATE COMMENT', 'https://internal.example/hidden', id(91)]) expect(actual).not.toContain(withheld);
     expect(d.requests[0]?.tools).toEqual([]);
     expect(d.choices).toContainEqual({ lens: 'challenge', runId: id(8), shareCost: false });
+    // The outcome we want leads the digest, and the Challenger is asked to test each option against it (item 3).
+    expect(actual).toContain('Outcome we want');
+    expect(actual).toContain('Issue a connection quote in two days, not ten, by March 2027');
+    expect(JSON.stringify(d.requests[0]?.system)).toContain('likely to reach it');
   });
 
   it('blocks viewers, disabled agents, a missing own key and cross-org model without calling the provider', async () => {
@@ -88,6 +92,12 @@ describe('review-agent boundary', () => {
     expect((await handleReview(shared.deps, body)).status).toBe('done');
     expect(JSON.stringify(shared.requests[0])).toContain('Cost secret');
     expect(shared.choices[0]?.shareCost).toBe(true);
+  });
+
+  it('blocks money in the outcome the same way', async () => {
+    const blocked = deps({ loadDecision: () => Promise.resolve({ ...decision, outcome: 'Save £40,000 a year by March 2027' }) });
+    expect((await handleReview(blocked.deps, body)).status).toBe('cost_blocked');
+    expect(blocked.requests).toHaveLength(0);
   });
 
   it('keeps only grounded questions and never turns a reviewer into a clearance', async () => {

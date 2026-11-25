@@ -17,6 +17,8 @@ export interface CreateDecisionInput {
   title: string;
   /** F3's own "context" — written before any option exists. */
   statement: string;
+  /** The outcome the business wants; empty when not written yet. */
+  outcome?: string;
   ownerId: UUID;
   /** ISO `date` string (`YYYY-MM-DD`), or `''` for none. */
   neededBy: string;
@@ -94,6 +96,7 @@ export function useDecisions(modelId: UUID, orgId: UUID, userId: UUID | null): U
           modelId,
           title: trimmedTitle,
           statement: input.statement.trim(),
+          outcome: (input.outcome ?? '').trim(),
           ownerId: input.ownerId,
           ...(input.neededBy.trim().length > 0 ? { neededBy: input.neededBy.trim() } : {}),
           ...(input.sourceFindingKey ? { sourceFindingKey: input.sourceFindingKey } : {}),

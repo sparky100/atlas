@@ -179,6 +179,14 @@ describe('decision_option_ratings against a real local Supabase', () => {
     await expect(upsertDecisionRating(alice.client, { decisionId, branchId: unlinkedBranch.id, criterion: 'cost', level: 'favourable', note: null, ratedBy: alice.id })).rejects.toThrow();
   });
 
+  it('accepts the "Reaches the outcome" rating (item 3) and refuses an unknown criterion', async () => {
+    const { decisionId, optionBranchId } = await seedDecisionWithOption('Outcome rating');
+    const row = await upsertDecisionRating(alice.client, { decisionId, branchId: optionBranchId, criterion: 'outcome', level: 'acceptable', note: 'Four days, not two', ratedBy: alice.id });
+    expect(row).toMatchObject({ criterion: 'outcome', level: 'acceptable', note: 'Four days, not two' });
+    const unknown = { decisionId, branchId: optionBranchId, criterion: 'happiness', level: 'favourable', note: null, ratedBy: alice.id } as unknown as Parameters<typeof upsertDecisionRating>[1];
+    await expect(upsertDecisionRating(alice.client, unknown)).rejects.toThrow();
+  });
+
   it('rejects a note over the 200-character cap at the database level', async () => {
     const { decisionId, optionBranchId } = await seedDecisionWithOption('Note length guard');
     const tooLong = 'x'.repeat(201);

@@ -16,6 +16,8 @@ import styles from './DecisionPacks.module.css';
 export interface DecisionPacksProps {
   decisionId: UUID;
   canFreeze: boolean;
+  /** Why a pack can't be frozen yet (an open decision with no outcome), or null when it can. */
+  freezeBlocked?: string | null;
   /** Owner or architect: may approve or decline the latest pack. */
   canSign: boolean;
   userId: UUID | null;
@@ -32,7 +34,7 @@ export interface DecisionPacksProps {
  * is on a fixed record. A later edit never changes a pack; a material change
  * is frozen as the next version. Insert-only (`atlas.freeze_decision_pack`).
  */
-export function DecisionPacks({ decisionId, canFreeze, canSign, userId, nameOfUser, commitId, buildMarkdown }: DecisionPacksProps) {
+export function DecisionPacks({ decisionId, canFreeze, freezeBlocked = null, canSign, userId, nameOfUser, commitId, buildMarkdown }: DecisionPacksProps) {
   const queryClient = useQueryClient();
   const [busy, setBusy] = useState(false);
   const [lens, setLens] = useState<DecisionApprovalLens | ''>('');
@@ -80,9 +82,16 @@ export function DecisionPacks({ decisionId, canFreeze, canSign, userId, nameOfUs
         A pack is this write-up exactly as it reads now, kept as a fixed record for sign-off. Owners and architects can approve or decline the latest version, as a capacity they state (a label, not a checked role). You can't sign a pack you froze yourself. Editing the decision later never changes a pack: a material change is frozen as a new version and needs fresh sign-off.
       </Text>
       {canFreeze && (
-        <Button variant="secondary" disabled={busy} onClick={() => void freeze()}>
+        <Button variant="secondary" disabled={busy || freezeBlocked !== null} onClick={() => void freeze()}>
           {packs.length === 0 ? 'Freeze a pack' : `Freeze as version ${String((packs[0]?.version ?? 0) + 1)}`}
         </Button>
+      )}
+      {canFreeze && freezeBlocked !== null && (
+        <div data-testid="pack-freeze-blocked">
+          <Text as="p" tone="muted" size="sm">
+            {freezeBlocked}
+          </Text>
+        </div>
       )}
       {packs.length > 0 && (
         <ul className={styles.list}>

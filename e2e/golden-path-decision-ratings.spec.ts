@@ -61,8 +61,8 @@ test('rate decision options on judgement criteria, leave some unrated, choose on
   await rateCell('Delivery risk', 'Option 1', 'Medium', 'Some integration risk.');
   await rateCell('Timing', 'Option 2', 'After end date', 'Vendor cannot commit to a date.');
 
-  await expect(optionAHeader).toContainText('2/5');
-  await expect(optionBHeader).toContainText('1/5');
+  await expect(optionAHeader).toContainText('2/6');
+  await expect(optionBHeader).toContainText('1/6');
   const effortControl = await ratingControl(page, 'Option 1', 'Effort');
   const costControl = await ratingControl(page, 'Option 1', 'Cost');
   const timingControl = await ratingControl(page, 'Option 2', 'Timing');
@@ -104,7 +104,7 @@ test('rate decision options on judgement criteria, leave some unrated, choose on
 
   // The ratings recorded before choosing are still shown afterwards...
   await expect(costControl).toContainText('Low');
-  await expect(optionAHeader).toContainText('2/5');
+  await expect(optionAHeader).toContainText('2/6');
 
   // ...and are now read-only: the cell is no longer a live tap target.
   await expect(costControl).toBeDisabled();

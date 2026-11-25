@@ -16,6 +16,7 @@ import type { AskEvent, AskModelClient, AskResult } from './askLoop';
 import { designerBrief, designerSystemPrompt, DESIGNER_MAX_FINDING_CHARS } from './designPrompt';
 import { catalogueRefKey, capabilityCode, capabilityTemplateRef } from './findCatalogueProducts';
 import { indexSnapshot } from './toolKit';
+import { MONEY } from './reviewDigest';
 import type { RunCostSharing, ToolContext, ToolStamp } from './types';
 
 export interface DesignModelInfo {
@@ -160,6 +161,10 @@ export async function handleDesign(deps: DesignHandlerDeps, body: unknown, onEve
   if (commitId === null) return { status: 'empty_model' };
 
   const runCost: RunCostSharing = (await timed('share_run_cost', () => deps.shareRunCost(model.orgId))) ? 'share' : 'exclude';
+  // The brief now carries the outcome too (item 3), which may name an amount. Money is withheld from the AI unless the owner shares cost, so nothing is sent.
+  if (runCost === 'exclude' && MONEY.test(parsed.finding)) {
+    return { status: 'invalid', message: 'Your brief or outcome mentions an amount of money, and this organisation does not share cost with AI. Remove the amount before asking for suggestions, or ask an owner to allow cost sharing.' };
+  }
   const contextStartedAt = Date.now();
   const ctx = deps.createContext(model, commitId, runCost);
   timing('context', Date.now() - contextStartedAt);

@@ -25,6 +25,8 @@ export interface CreateDecisionInput {
   title: string;
   /** F3's own "context" — written at creation, before any option exists. */
   statement: string;
+  /** The outcome the business wants; empty when not written yet. */
+  outcome?: string;
   ownerId: UUID;
   neededBy?: string;
   sourceFindingKey?: string;
@@ -43,6 +45,7 @@ export async function createDecision(supabase: Client, input: CreateDecisionInpu
     model_id: input.modelId,
     title: input.title,
     statement: input.statement,
+    outcome: input.outcome ?? '',
     owner_id: input.ownerId,
     needed_by: input.neededBy ?? null,
     source_finding_key: input.sourceFindingKey ?? null,
@@ -276,6 +279,8 @@ export interface UpdateDecisionInput {
   title?: string;
   /** The decision's context. */
   statement?: string;
+  /** The outcome the business wants; editable while the decision is open. */
+  outcome?: string;
   ownerId?: UUID;
   neededBy?: string | null;
   lensMapUrl?: string | null;
@@ -301,6 +306,7 @@ export async function updateDecision(supabase: Client, decisionId: UUID, input: 
   const patch: Record<string, unknown> = {};
   if (input.title !== undefined) patch.title = input.title;
   if (input.statement !== undefined) patch.statement = input.statement;
+  if (input.outcome !== undefined) patch.outcome = input.outcome;
   if (input.ownerId !== undefined) patch.owner_id = input.ownerId;
   if (input.neededBy !== undefined) patch.needed_by = input.neededBy;
   if (input.lensMapUrl !== undefined) patch.lens_map_url = input.lensMapUrl;

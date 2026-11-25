@@ -1,6 +1,7 @@
 import { Loading } from '../components/Loading/Loading';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useEffect, useState } from 'react';
+import { OutcomeField } from './OutcomeField';
 import { Link, useNavigate, useSearchParams } from 'react-router';
 import { suggestOptions } from './optionSuggestions';
 import { findingLabel } from './findingLabels';
@@ -129,6 +130,8 @@ export function DecisionView({ modelId, decisionId, orgId, orgSlug, modelSlug, r
   // `?edit=1` (from "Start decision" on a project) opens the decision's own edit form straight away.
   const [searchParams] = useSearchParams();
   const startEditing = searchParams.get('edit') === '1';
+  // "Add the outcome" on the next-step card opens the edit form at the outcome.
+  const [editRequest, setEditRequest] = useState(0);
   const { setRef } = useSelectedRef();
   // Lifted up from `DecisionCriteriaGrid.tsx` (decision-side-completion
   // item 6) — the ADR export below needs every option's own ratings too,
@@ -316,10 +319,16 @@ export function DecisionView({ modelId, decisionId, orgId, orgSlug, modelSlug, r
     chosenIsBaseline: chosenOption?.id === baselineOption?.id || (decision.branch_id !== null && decision.branch_id === baselineBranchId),
     deliveryStarted: chosenBranch !== undefined,
     canStartDelivery: canCreateChangeBranch(role),
+    hasOutcome: decision.outcome.trim() !== '',
+    canEditOutcome: canEditDecision(role, decision, userId),
   });
 
   function onNextStepAction() {
     if (!nextStep) return;
+    if (nextStep.action === 'add-outcome') {
+      setEditRequest((n) => n + 1);
+      return;
+    }
     if (nextStep.action === 'start-delivery') {
       if (chosenOption !== undefined) workOnOption(chosenOption.id);
       return;
@@ -451,6 +460,7 @@ export function DecisionView({ modelId, decisionId, orgId, orgSlug, modelSlug, r
           members={members.map((m) => ({ id: m.member.user_id, label: profileLabel(m.profile) }))}
           onSaved={applyDecisionUpdate}
           startOpen={startEditing}
+          openRequest={editRequest}
         />
       )}
       <DecisionCancel
@@ -463,6 +473,12 @@ export function DecisionView({ modelId, decisionId, orgId, orgSlug, modelSlug, r
           await refreshOptionsAndArguments();
         }}
       />
+      <section className={styles.context} aria-label="Outcome we want" data-testid="decision-outcome">
+        <Text as="h2" size="lg">Outcome we want</Text>
+        <Text as="p" tone={decision.outcome.trim() !== '' ? 'default' : 'muted'}>
+          {decision.outcome.trim() !== '' ? decision.outcome : decision.status === 'proposed' ? 'No outcome recorded yet. Say what will be better, for whom, by when, so the options can be judged against it.' : 'No outcome was recorded for this decision.'}
+        </Text>
+      </section>
       <section className={styles.context} aria-label="Decision details">
         <Text as="h2" size="lg">Decision details</Text>
         <div className={styles.field}>
@@ -1075,7 +1091,7 @@ export function DecisionView({ modelId, decisionId, orgId, orgSlug, modelSlug, r
         </Panel>
       )}
 
-      <DecisionPacks decisionId={decision.id} canFreeze={canChooseDecisionOption(role)} canSign={canChooseDecisionOption(role)} userId={userId} nameOfUser={(id) => { const m = members.find((x) => x.member.user_id === id); return m ? profileLabel(m.profile) : 'a former member'; }} commitId={main?.head_commit_id ?? null} buildMarkdown={buildAdrMarkdown} />
+      <DecisionPacks decisionId={decision.id} canFreeze={canChooseDecisionOption(role)} freezeBlocked={decision.status === 'proposed' && decision.outcome.trim() === '' ? 'Say what outcome we want before freezing a pack: the pack leads with it. Use Edit decision above.' : null} canSign={canChooseDecisionOption(role)} userId={userId} nameOfUser={(id) => { const m = members.find((x) => x.member.user_id === id); return m ? profileLabel(m.profile) : 'a former member'; }} commitId={main?.head_commit_id ?? null} buildMarkdown={buildAdrMarkdown} />
 
       <Panel>
         <Text as="h2" size="lg">
@@ -1289,10 +1305,11 @@ function DecisionCancel({
  * creator or an org owner/architect, while proposed; closed once decided or
  * cancelled, like everything else on the decision.
  */
-function DecisionEdit({ decision, members, onSaved, startOpen }: { decision: DecisionRow; members: { id: UUID; label: string }[]; onSaved: (updated: DecisionRow) => void; startOpen: boolean }) {
+function DecisionEdit({ decision, members, onSaved, startOpen, openRequest }: { decision: DecisionRow; members: { id: UUID; label: string }[]; onSaved: (updated: DecisionRow) => void; startOpen: boolean; openRequest: number }) {
   const [open, setOpen] = useState(startOpen);
   const [title, setTitle] = useState(decision.title);
   const [statement, setStatement] = useState(decision.statement);
+  const [outcome, setOutcome] = useState(decision.outcome);
   const [ownerId, setOwnerId] = useState(decision.owner_id);
   const [neededBy, setNeededBy] = useState(decision.needed_by ?? '');
   const [lensMapUrl, setLensMapUrl] = useState(decision.lens_map_url ?? '');
@@ -1301,10 +1318,26 @@ function DecisionEdit({ decision, members, onSaved, startOpen }: { decision: Dec
   function start() {
     setTitle(decision.title);
     setStatement(decision.statement);
+    setOutcome(decision.outcome);
     setOwnerId(decision.owner_id);
     setNeededBy(decision.needed_by ?? '');
     setLensMapUrl(decision.lens_map_url ?? '');
     setOpen(true);
+  }
+
+  // The next-step card's "Add the outcome": open the form with the cursor in the outcome (state adjusted while rendering, not in an effect).
+  const [seenRequest, setSeenRequest] = useState(openRequest);
+  const [focusOutcome, setFocusOutcome] = useState(false);
+  if (openRequest !== seenRequest) {
+    setSeenRequest(openRequest);
+    setTitle(decision.title);
+    setStatement(decision.statement);
+    setOutcome(decision.outcome);
+    setOwnerId(decision.owner_id);
+    setNeededBy(decision.needed_by ?? '');
+    setLensMapUrl(decision.lens_map_url ?? '');
+    setOpen(true);
+    setFocusOutcome(true);
   }
 
   if (!open) {
@@ -1327,6 +1360,7 @@ function DecisionEdit({ decision, members, onSaved, startOpen }: { decision: Dec
           void updateDecision(supabase, decision.id, {
             title: title.trim(),
             statement: statement.trim(),
+            outcome: outcome.trim(),
             ...(decision.ai_draft_agent !== null && statement.trim() !== decision.statement.trim() ? { aiDraftEdited: true } : {}),
             ownerId,
             neededBy: neededBy === '' ? null : neededBy,
@@ -1368,6 +1402,9 @@ function DecisionEdit({ decision, members, onSaved, startOpen }: { decision: Dec
             }}
           />
         </label>
+        <div data-testid="decision-edit-outcome">
+          <OutcomeField className={styles.textarea} value={outcome} onChange={setOutcome} focusOnOpen={focusOutcome} />
+        </div>
         <label>
           <Text as="span" size="sm" tone="muted">
             Owner

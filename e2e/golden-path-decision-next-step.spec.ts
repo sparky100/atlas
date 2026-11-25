@@ -19,9 +19,20 @@ test('a decision tells the owner what to do next, and Home says it is open', asy
   await page.getByRole('button', { name: 'Start decision' }).click();
   await expect(page.getByRole('heading', { name: decisionTitle })).toBeVisible();
 
+  // Item 3: the outcome comes first. The decision says none is recorded, and the card asks for it.
   const card = page.getByTestId('decision-next-step');
   await expect(card).toContainText('What to do next');
+  await expect(page.getByTestId('decision-outcome')).toContainText('No outcome recorded yet');
+  await expect(card).toContainText('Say what outcome you want');
+  await expect(page.getByTestId('decision-packs').getByTestId('pack-freeze-blocked')).toContainText('Say what outcome we want before freezing a pack');
+  await card.getByRole('button', { name: 'Add the outcome' }).click();
+  const outcomeBox = page.getByTestId('decision-edit-outcome').getByLabel('Outcome: what will be better, for whom, by when');
+  await expect(outcomeBox).toBeFocused();
+  await outcomeBox.fill('Issue a quote in two days, not ten, by March 2027');
+  await page.getByRole('button', { name: 'Save', exact: true }).click();
+  await expect(page.getByTestId('decision-outcome')).toContainText('Issue a quote in two days, not ten, by March 2027');
   await expect(card).toContainText('Add the options');
+  await expect(page.getByTestId('decision-packs').getByTestId('pack-freeze-blocked')).toHaveCount(0);
 
   for (const title of ['Option 1', 'Option 2']) {
     await page.getByRole('button', { name: '+ Add an option' }).click();
@@ -32,6 +43,8 @@ test('a decision tells the owner what to do next, and Home says it is open', asy
   await expect(card).toContainText('Choose an option');
   await expect(card).toContainText('0 of 2 options rated');
   await expect(card.getByRole('button', { name: 'Review what changes' })).toBeVisible();
+  // The comparison leads with whether each option reaches the outcome.
+  await expect(page.locator('#decision-compare').getByText('Reaches the outcome').first()).toBeVisible();
   // Read the option, then its effect, then the optional AI questions.
   const inReadingOrder = await page.evaluate(() => {
     const option = document.getElementById('decision-compare');

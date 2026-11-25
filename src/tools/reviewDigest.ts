@@ -30,7 +30,8 @@ export interface ReviewDigest {
   containsMoneyText: boolean;
 }
 
-const MONEY = /(?:[$£€]\s*\d|\b\d+(?:[.,]\d+)?\s*(?:GBP|USD|EUR|pounds?|dollars?|euros?)\b)/i;
+/** An amount of money in saved text. Shared with the Designer's brief check. */
+export const MONEY = /(?:[$£€]\s*\d|\b\d+(?:[.,]\d+)?\s*(?:GBP|USD|EUR|pounds?|dollars?|euros?)\b)/i;
 
 function elementLine(element: ElementsHeadRow): string {
   const attrs = (element.attributes && typeof element.attributes === 'object' && !Array.isArray(element.attributes) ? element.attributes : {}) as Record<string, unknown>;
@@ -54,7 +55,7 @@ export function buildReviewerDigest(input: ReviewDigestInput): ReviewDigest {
   // Build an explicit copy: a future field on DecisionRow/BranchRow does not
   // leave Atlas simply because the human pack starts rendering it.
   const safeDecision = {
-    title: decision.title, statement: decision.statement, status: decision.status,
+    title: decision.title, statement: decision.statement, outcome: decision.outcome, status: decision.status,
     needed_by: decision.needed_by, branch_id: decision.branch_id,
     reconsider_if: decision.reconsider_if, review_by: decision.review_by,
     stay_risk: '', stay_reason: '', lens_map_url: null,
