@@ -57,6 +57,8 @@ export async function listDecisionOptionsForProject(client: Client, projectId: U
 
 export interface CreateDecisionOptionInput {
   decisionId: UUID;
+  /** A caller-chosen id, so a retry finishes the same option; omitted = the database chooses. */
+  id?: UUID;
   title: string;
   summary?: string;
   /** Keep, Configure, Buy, Build, or No change for the baseline; omitted or null = not decided yet. */
@@ -76,7 +78,9 @@ export async function createDecisionOption(client: Client, input: CreateDecision
   if (title.length === 0) throw new Error('createDecisionOption: a title is required');
   const existing = await listDecisionOptions(client, input.decisionId);
   const position = existing.reduce((max, option) => Math.max(max, option.position), 0) + 1;
+  if (input.id !== undefined) assertRealId('createDecisionOption', 'id', input.id);
   const row = {
+    ...(input.id !== undefined ? { id: input.id } : {}),
     decision_id: input.decisionId,
     branch_id: null,
     title,
@@ -158,4 +162,51 @@ export async function getOptionApproachForBranch(client: Client, branchId: UUID)
   if (error) throw new Error(`getOptionApproachForBranch: ${error.message}`);
   const value: unknown = (data as { approach?: unknown } | null)?.approach;
   return isOptionApproach(value) ? value : null;
+}
+
+export interface AddDesignerCandidateInput {
+  decisionId: UUID;
+  /** The suggestion card's own id, so a retry completes the option instead of duplicating it. */
+  id: UUID;
+  title: string;
+  summary: string;
+  toWeigh: string;
+  approach: OptionApproach | null;
+  draftedAt: string;
+  /** Set only when the person changed the suggestion before adding it; must be the caller. */
+  editedBy: UUID | null;
+  editedAt: string | null;
+  catalogueRefs: readonly { sector: string; version: number; entryCode: string }[];
+}
+
+/**
+ * Saves a Designer suggestion as a candidate option, with no change branch,
+ * its "Suggested by the Designer" provenance and any reviewed catalogue
+ * citations, in one transaction (`20261125140000_add_designer_candidate.sql`).
+ */
+export async function addDesignerCandidate(client: Client, input: AddDesignerCandidateInput): Promise<DecisionOptionRow> {
+  assertRealId('addDesignerCandidate', 'decision_id', input.decisionId);
+  assertRealId('addDesignerCandidate', 'id', input.id);
+  const title = input.title.trim();
+  if (title.length === 0) throw new Error('addDesignerCandidate: a title is required');
+  // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment -- untyped client; see branches.ts's module comment.
+  const { data, error } = await client.rpc('add_designer_candidate', {
+    p_decision: input.decisionId,
+    p_option: {
+      id: input.id, title, summary: input.summary, toWeigh: input.toWeigh, approach: input.approach,
+      draftedAt: input.draftedAt, draftRunId: null, editedBy: input.editedBy, editedAt: input.editedAt,
+    },
+    p_sources: input.catalogueRefs,
+  });
+  if (error) throw new Error(`addDesignerCandidate: ${error.message}`);
+  return data as DecisionOptionRow;
+}
+
+/** One option by id, or `null` when it does not exist or RLS hides it. */
+export async function getDecisionOption(client: Client, optionId: UUID): Promise<DecisionOptionRow | null> {
+  assertRealId('getDecisionOption', 'id', optionId);
+  // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment -- untyped client; see branches.ts's module comment.
+  const { data, error } = await client.from('decision_options').select('*').eq('id', optionId).maybeSingle();
+  if (error) throw new Error(`getDecisionOption: ${error.message}`);
+  return (data as DecisionOptionRow | null) ?? null;
 }

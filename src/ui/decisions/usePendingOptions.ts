@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import type { DecisionOptionMark } from '../../contracts/decisionOptionMark';
 import type { UUID } from '../../contracts/delta';
 import { listOptionMarksForDecision } from '../../db/decisionOptionMarks';
-import type { BranchRow, DecisionLinkRow } from '../../db/types';
+import type { DecisionOptionRow } from '../../db/types';
 import { supabase } from '../supabaseClient';
 import { addSuggestedOption } from './addSuggestedOption';
 import { clockNow, loadPending, pendingKey, removePending, savePending } from './pendingOptions';
@@ -30,15 +30,14 @@ export interface PendingOptionsState {
  */
 export function usePendingOptions(args: {
   orgId: UUID;
-  modelId: UUID;
   decisionId: UUID;
   userId: UUID | null;
-  projectId: UUID | null;
   /** The page has loaded and this person may add options. */
   canAdd: boolean;
-  applyNewOption: (link: DecisionLinkRow, branch: BranchRow) => void;
+  /** Each saved suggestion is a candidate with no change yet. */
+  applyCreatedOption: (option: DecisionOptionRow) => void;
 }): PendingOptionsState {
-  const { orgId, modelId, decisionId, userId, projectId, canAdd, applyNewOption } = args;
+  const { orgId, decisionId, userId, canAdd, applyCreatedOption } = args;
   const [status, setStatus] = useState<'idle' | 'adding' | 'failed'>('idle');
   const [error, setError] = useState<string | null>(null);
   const [waiting, setWaiting] = useState(0);
@@ -73,8 +72,8 @@ export function usePendingOptions(args: {
     void (async () => {
       for (const option of queue) {
         try {
-          const added = await addSuggestedOption({ orgId, modelId, decisionId, userId, projectId, option });
-          applyNewOption(added.link, added.branch);
+          const added = await addSuggestedOption({ decisionId, userId, option });
+          applyCreatedOption(added);
           removePending(localStorage, key, option.id, clockNow());
           setWaiting((w) => Math.max(0, w - 1));
         } catch (e) {
@@ -89,7 +88,7 @@ export function usePendingOptions(args: {
       running.current = false;
       await refreshMarks();
     })();
-  }, [key, userId, canAdd, orgId, modelId, decisionId, projectId, applyNewOption, attempt, refreshMarks]);
+  }, [key, userId, canAdd, decisionId, applyCreatedOption, attempt, refreshMarks]);
 
   const retry = useCallback(() => {
     setAttempt((n) => n + 1);
