@@ -444,6 +444,8 @@ export interface DecisionRow {
   title: string;
   /** F3's own "context" — ADR-013 named this `statement`; F3 reuses the column rather than adding a second near-duplicate text field. */
   statement: string;
+  /** The outcome the business wants, in one plain sentence: what will be better, for whom, by when. Empty until written; locked once an option is chosen. */
+  outcome: string;
   status: DecisionStatus;
   /** F3's own "owner" — distinct from `decided_by` (who actually closed it). Required at creation. */
   owner_id: UUID;
@@ -610,7 +612,7 @@ export interface DecisionLinkRow {
 }
 
 /** `DecisionCriterionKey` (`src/contracts/decisionCriteria.ts`) as it's stored — verbatim, no translation layer. */
-export type DecisionRatingCriterion = 'cost' | 'effort' | 'deliveryRisk' | 'timing' | 'vendorFit';
+export type DecisionRatingCriterion = 'outcome' | 'cost' | 'effort' | 'deliveryRisk' | 'timing' | 'vendorFit';
 /** `DecisionRatingLevel` (`src/contracts/decisionCriteria.ts`) as it's stored — verbatim. */
 export type DecisionRatingLevelValue = 'favourable' | 'acceptable' | 'unfavourable';
 

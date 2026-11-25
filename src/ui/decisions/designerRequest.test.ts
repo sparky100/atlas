@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { DESIGNER_MAX_FINDING_CHARS } from '../../tools/designPrompt';
 import { prefillFromSystemWithoutCapability } from './decisionPrefill';
-import { canOfferDesigner, designerCostLine, designerTrialLine, designerInputFromPrefill, designerUnavailableReason } from './designerRequest';
+import { canOfferDesigner, designerBriefText, designerCostLine, designerTrialLine, designerInputFromPrefill, designerUnavailableReason } from './designerRequest';
 
 const ID = '00000000-0000-4000-8000-000000000001';
 
@@ -108,5 +108,13 @@ describe('the free trial', () => {
   });
   it('says a trial run used the free trial, not the organisation key', () => {
     expect(designerCostLine({ inputTokens: 1, outputTokens: 1, lookups: 1, trial: true })).toContain("Atlas's free trial");
+  });
+});
+
+describe('designerBriefText', () => {
+  it('sends the need, then the outcome, and falls back to the title', () => {
+    expect(designerBriefText('Quotes are slow.', 'Quotes in two days by March 2027', 'Title')).toBe('Quotes are slow.\nOutcome we want: Quotes in two days by March 2027');
+    expect(designerBriefText('  ', '', 'Which quote tool?')).toBe('Which quote tool?');
+    expect(designerBriefText('Quotes are slow.', '   ', 'Title')).toBe('Quotes are slow.');
   });
 });

@@ -18,6 +18,7 @@ test('the person who froze a pack cannot sign it; only the latest version is ope
   const decisionTitle = `Sign off the new ledger? ${randomUUID().slice(0, 8)}`;
   await page.getByPlaceholder('Title (e.g. What replaces SAP PM?)').fill(decisionTitle);
   await page.getByPlaceholder('Context — why this decision needs making').fill('We need a recorded sign-off before going ahead.');
+  await page.getByLabel('Outcome: what will be better, for whom, by when').fill('A recorded sign-off before go-ahead, this quarter');
   await page.getByRole('combobox').selectOption({ index: 1 });
   await page.getByRole('button', { name: 'Start decision' }).click();
   await expect(page.getByRole('heading', { name: decisionTitle })).toBeVisible();

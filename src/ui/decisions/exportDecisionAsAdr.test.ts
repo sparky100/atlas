@@ -21,7 +21,7 @@ function makeDecision(overrides: Partial<DecisionRow> = {}): DecisionRow {
     decided_by: null,
     decided_at: null,
     cancel_reason: null,
-    reconsider_if: null, review_by: null, stay_risk: '', stay_reason: '', baseline_option_id: null, baseline_branch_id: null, chosen_option_id: null, branch_id: null,
+    reconsider_if: null, review_by: null, stay_risk: '', stay_reason: '', baseline_option_id: null, baseline_branch_id: null, chosen_option_id: null, branch_id: null, outcome: '',
     superseded_decision_id: null,
     project_id: null,
     created_by: 'user-1',
@@ -67,7 +67,7 @@ describe('exportDecisionAsAdrMarkdown', () => {
       whatChangesRows: [{ id: 'ledger:outcome', groupLabel: 'Ledger', rowLabel: 'Outcome', main: { display: 'unchanged', changed: false }, options: new Map([[branch.id, { display: 'retired', changed: true }]]), anyChanged: true }],
       reasons: null,
     });
-    expect(markdown).toBe('# ADR: Replace Ledger Service?\n\n**Status:** Proposed\n**Outcome:** Not yet decided\n**Owner:** Alice\n\n## Context\n\nLedger Service needs a real replacement plan.\n\n## Concerns\n\n- Ledger (system)\n\n## Options considered\n\n- Exploring: Option A — draft\n  - About: A replacement.\n  - Effort: Acceptable\n\n## What changes (evidence)\n\n- **Ledger — Outcome** — Current (main): unchanged; Exploring: Option A: retired\n\n## Decision\n\nNot yet decided.\n');
+    expect(markdown).toBe('# ADR: Replace Ledger Service?\n\n**Status:** Proposed\n**Result:** Not yet decided\n**Owner:** Alice\n\n## Outcome we want\n\nNo outcome recorded yet.\n\n## Context\n\nLedger Service needs a real replacement plan.\n\n## Concerns\n\n- Ledger (system)\n\n## Options considered\n\n- Exploring: Option A — draft\n  - About: A replacement.\n  - Effort: Acceptable\n\n## What changes (evidence)\n\n- **Ledger — Outcome** — Current (main): unchanged; Exploring: Option A: retired\n\n## Decision\n\nNot yet decided.\n');
   });
   it('records the stay-as-we-are baseline only when something was written', () => {
     const base = { ownerName: 'Alice', concerns: [], options: [], whatChangesRows: [], reasons: null };

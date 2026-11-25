@@ -62,6 +62,7 @@ test('a draft can be discarded, and a frozen pack reads as a document with the o
   const title = `Move quoting to the new tool ${randomUUID().slice(0, 8)}`;
   await page.getByPlaceholder(TITLE_PLACEHOLDER).fill(title);
   await page.getByPlaceholder(CONTEXT_PLACEHOLDER).fill('Quotes are slow and done by hand.');
+  await page.getByLabel('Outcome: what will be better, for whom, by when').fill('Issue a connection quote in two days, not ten, by March 2027');
   await page.getByRole('combobox').selectOption({ index: 1 });
   await page.getByRole('button', { name: 'Start decision' }).click();
   await expect(page.getByRole('heading', { name: title })).toBeVisible();
@@ -71,8 +72,10 @@ test('a draft can be discarded, and a frozen pack reads as a document with the o
   await packs.getByText(/Version 1 — frozen/).click();
   const doc = packs.getByTestId('pack-document');
   await expect(doc.getByRole('heading', { name: title })).toBeVisible();
-  await expect(doc.locator('dt', { hasText: 'Outcome' })).toBeVisible();
+  await expect(doc.locator('dt', { hasText: 'Result' })).toBeVisible();
   await expect(doc.locator('dd', { hasText: 'Not yet decided' })).toBeVisible();
+  await expect(doc.getByRole('heading', { name: 'Outcome we want' })).toBeVisible();
+  await expect(doc.locator('p', { hasText: 'Issue a connection quote in two days, not ten, by March 2027' })).toBeVisible();
   await expect(doc.getByRole('heading', { name: 'Context' })).toBeVisible();
   await expect(doc.locator('p', { hasText: 'Quotes are slow and done by hand.' })).toBeVisible();
   // The exact frozen record is still there, one click away.

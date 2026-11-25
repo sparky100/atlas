@@ -163,6 +163,16 @@ describe('handleDesign', () => {
     expect(withheld.requests[0]?.system).not.toMatch(/annualRunCost|£/);
   });
 
+  it('sends nothing when the brief or outcome names an amount of money and cost is not shared', async () => {
+    const withMoney = { ...body, finding: 'Quotes are slow.\nOutcome we want: save £40,000 a year by March 2027' };
+    const withheld = deps();
+    const refused = await handleDesign(withheld, withMoney);
+    expect(refused).toMatchObject({ status: 'invalid' });
+    expect(withheld.calls).not.toContain('client');
+    const shared = deps({ shareRunCost: () => Promise.resolve(true) });
+    expect((await handleDesign(shared, withMoney)).status).toBe('done');
+  });
+
   it('treats a model the caller cannot read as not found, before asking about roles or switches', async () => {
     const d = deps({ loadModel: () => Promise.resolve(null), callerRole: () => Promise.reject(new Error('must not be asked')) });
     expect((await handleDesign(d, body)).status).toBe('not_found');

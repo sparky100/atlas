@@ -662,9 +662,28 @@ describe('decisions/decision_links/decision_arguments/assumptions/evidence again
       expect(await listDecisionsLinkingElements(alice.client, [])).toEqual([]);
     });
   });
+  describe('the outcome we want (item 3)', () => {
+    it('round-trips, can be edited while open, and is locked once an option is chosen', async () => {
+      const decision = await createDecision(alice.client, { id: randomUUID(), orgId, modelId, title: 'Outcome round trip', statement: 'Quotes are slow.', outcome: 'Issue a connection quote in two days, not ten, by March 2027', ownerId: alice.id, createdBy: alice.id });
+      expect(decision.outcome).toBe('Issue a connection quote in two days, not ten, by March 2027');
+      expect((await getDecision(alice.client, decision.id))?.outcome).toBe('Issue a connection quote in two days, not ten, by March 2027');
+      const edited = await updateDecision(alice.client, decision.id, { outcome: 'Quotes in two days for small domestic connections' });
+      expect(edited.outcome).toBe('Quotes in two days for small domestic connections');
+      const blank = await createDecision(alice.client, { id: randomUUID(), orgId, modelId, title: 'No outcome yet', statement: '', ownerId: alice.id, createdBy: alice.id });
+      expect(blank.outcome).toBe('');
+
+      const option = await createDecisionOption(alice.client, { decisionId: decision.id, title: 'Configure the CRM', createdBy: alice.id });
+      await chooseDecisionOption(alice.client, decision.id, option.id, 'Fastest route to two-day quotes.');
+      await expect(updateDecision(alice.client, decision.id, { outcome: 'Something else' })).rejects.toThrow();
+      expect((await getDecision(alice.client, decision.id))?.outcome).toBe('Quotes in two days for small domestic connections');
+    });
+  });
   describe('frozen decision packs (Phase B3)', () => {
     it('freezes numbered versions that round-trip, are never changeable, and are closed to other organisations', async () => {
       const decision = await createDecision(alice.client, { id: randomUUID(), orgId, modelId, title: 'Pack me', statement: 'context', ownerId: alice.id, createdBy: alice.id });
+      // An open decision's pack leads with the outcome, so the database refuses one without it (item 3).
+      await expect(freezeDecisionPack(alice.client, decision.id, '# ADR: Pack me\n\nNo outcome.', null)).rejects.toThrow(/outcome/);
+      await updateDecision(alice.client, decision.id, { outcome: 'Quotes in two days, not ten' });
       const first = await freezeDecisionPack(alice.client, decision.id, '# ADR: Pack me\n\nFirst.', null);
       const second = await freezeDecisionPack(alice.client, decision.id, '# ADR: Pack me\n\nSecond.', null);
       expect([first.version, second.version]).toEqual([1, 2]);
@@ -696,7 +715,7 @@ describe('decisions/decision_links/decision_arguments/assumptions/evidence again
   });
   describe('sign-off on a frozen pack (Phase C2)', () => {
     it('binds a named person and lens to the exact latest version, with the database refusing everything else', async () => {
-      const decision = await createDecision(alice.client, { id: randomUUID(), orgId, modelId, title: 'Sign me', statement: 'context', ownerId: alice.id, createdBy: alice.id });
+      const decision = await createDecision(alice.client, { id: randomUUID(), orgId, modelId, title: 'Sign me', statement: 'context', outcome: 'Sign-off recorded before go-ahead', ownerId: alice.id, createdBy: alice.id });
       const first = await freezeDecisionPack(alice.client, decision.id, '# ADR: Sign me\n\nFirst.', null);
 
       // The person who froze the pack cannot sign it (this org is not a personal one).

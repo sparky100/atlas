@@ -46,6 +46,8 @@ import { suggestDecisionTitle } from '../decisions/optionSuggestions';
 import { ProjectBeforeAfter } from './ProjectBeforeAfter';
 import { DesignerSuggestions, type SuggestionSelection } from '../decisions/DesignerSuggestions';
 import { DecisionDraftBanner } from '../decisions/DecisionDraftBanner';
+import { designerBriefText } from '../decisions/designerRequest';
+import { OutcomeField } from '../decisions/OutcomeField';
 import { useDecisionFormDraft } from '../decisions/useDecisionFormDraft';
 import { clockNow, pendingKey, savePending } from '../decisions/pendingOptions';
 import { ProjectStep } from './ProjectStep';
@@ -462,6 +464,11 @@ function ProjectDecision({ decision, options, changes, modelId, projectId, mainH
       </div>
       <Link to={decisionHref}>{decision.status === 'proposed' ? 'Explore and choose options →' : 'Open decision →'}</Link>
     </div>
+    <span data-testid="project-decision-outcome">
+      <Text as="p" size="sm" tone={decision.outcome.trim() !== '' ? 'default' : 'muted'}>
+        <strong>Outcome we want:</strong> {decision.outcome.trim() !== '' ? decision.outcome.trim() : decision.status === 'proposed' ? 'not recorded yet.' : 'none was recorded.'}
+      </Text>
+    </span>
     {decision.status === 'proposed' && <Text as="p" size="sm" tone="muted">{alternatives.length} {alternatives.length === 1 ? 'draft option' : 'draft options'} to consider. None is chosen yet.</Text>}
     {decision.status === 'accepted' && (
       <div className={styles.chosen}>
@@ -511,10 +518,11 @@ function NewDecisionForm({
   const [title, setTitle] = useState(suggestedTitle);
   // The Designer drafts options from what the project is about, the same panel the Decisions page offers (Simon, 2026-11-19: it must appear here too). Its draft is added to the context and the decision records that an agent helped.
   const [statement, setStatement] = useState(project.purpose.trim());
+  const [outcome, setOutcome] = useState('');
   const [suggested, setSuggested] = useState<SuggestionSelection>({ options: [], draftedAt: null, anyEdited: false });
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const draft = useDecisionFormDraft(project.org_id, userId, `project-${project.id}`, { title, statement });
+  const draft = useDecisionFormDraft(project.org_id, userId, `project-${project.id}`, { title, statement, outcome });
   const firstScope = scopeIds[0];
   // The Designer is sent what is written in the box below, so correcting it changes the brief.
   const aiDraft = suggested.draftedAt !== null ? { draftedAt: suggested.draftedAt, edited: suggested.anyEdited } : null;
@@ -526,7 +534,7 @@ function NewDecisionForm({
         if (title.trim().length === 0) return;
         setBusy(true);
         setError(null);
-        void createDecision(supabase, { id: crypto.randomUUID(), orgId: project.org_id, modelId: project.model_id, title: title.trim(), statement, ownerId: userId, ...(aiDraft !== null ? { aiDraft: { agent: 'designer' as const, draftedAt: aiDraft.draftedAt, edited: aiDraft.edited } } : {}), ...(project.source_finding_key !== null ? { sourceFindingKey: project.source_finding_key } : {}), createdBy: userId, projectId: project.id })
+        void createDecision(supabase, { id: crypto.randomUUID(), orgId: project.org_id, modelId: project.model_id, title: title.trim(), statement, outcome: outcome.trim(), ownerId: userId, ...(aiDraft !== null ? { aiDraft: { agent: 'designer' as const, draftedAt: aiDraft.draftedAt, edited: aiDraft.edited } } : {}), ...(project.source_finding_key !== null ? { sourceFindingKey: project.source_finding_key } : {}), createdBy: userId, projectId: project.id })
           .then(async (d) => {
             // Every decision starts with its "Stay as we are" baseline; if this fails the decision page offers "Add the baseline".
             await addBaseline({ orgId: project.org_id, modelId: project.model_id, decisionId: d.id, userId, projectId: project.id }).catch((err: unknown) => {
@@ -558,6 +566,7 @@ function NewDecisionForm({
           onRestore={(d) => {
             setTitle(d.title);
             setStatement(d.statement);
+            setOutcome(d.outcome ?? '');
             draft.accept();
           }}
           onDiscard={draft.discard}
@@ -571,7 +580,7 @@ function NewDecisionForm({
         value={title}
         onChange={(e) => {
           setTitle(e.target.value);
-          draft.remember({ title: e.target.value, statement });
+          draft.remember({ title: e.target.value, statement, outcome });
         }}
       />
       <label>
@@ -584,12 +593,20 @@ function NewDecisionForm({
           value={statement}
           onChange={(e) => {
             setStatement(e.target.value);
-            draft.remember({ title, statement: e.target.value });
+            draft.remember({ title, statement: e.target.value, outcome });
           }}
         />
       </label>
+      <OutcomeField
+        className={styles.input}
+        value={outcome}
+        onChange={(v) => {
+          setOutcome(v);
+          draft.remember({ title, statement, outcome: v });
+        }}
+      />
       {designerAvailable && firstScope !== undefined && (
-        <DesignerSuggestions orgId={project.org_id} userId={userId} modelId={project.model_id} elementId={firstScope} brief={statement.trim() !== '' ? statement : project.title} scope={`project-${project.id}`} onChange={setSuggested} />
+        <DesignerSuggestions orgId={project.org_id} userId={userId} modelId={project.model_id} elementId={firstScope} brief={designerBriefText(statement, outcome, project.title)} scope={`project-${project.id}`} onChange={setSuggested} />
       )}
       {!designerAvailable && designerUnavailable !== null && firstScope !== undefined && (
         <div data-testid="designer-unavailable">

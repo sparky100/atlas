@@ -12,7 +12,7 @@ describe('decision form draft', () => {
   it('keeps what was typed and gives it back', () => {
     const s = memory();
     saveDecisionFormDraft(s, KEY, { title: 'Quotes', statement: 'Same-day quotes' }, 1000);
-    expect(loadDecisionFormDraft(s, KEY, 2000)).toEqual({ title: 'Quotes', statement: 'Same-day quotes' });
+    expect(loadDecisionFormDraft(s, KEY, 2000)).toEqual({ title: 'Quotes', statement: 'Same-day quotes', outcome: '' });
   });
   it('is per organisation, person and place', () => {
     expect(decisionFormDraftKey('o', 'u', 'a')).not.toBe(decisionFormDraftKey('o', 'v', 'a'));

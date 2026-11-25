@@ -19,7 +19,8 @@ import { DecisionDraftBanner } from './DecisionDraftBanner';
 import { useDecisionFormDraft } from './useDecisionFormDraft';
 import { DesignerSuggestions, type SuggestionSelection } from './DesignerSuggestions';
 import { clockNow, pendingKey, savePending } from './pendingOptions';
-import { designerInputFromPrefill } from './designerRequest';
+import { designerBriefText, designerInputFromPrefill } from './designerRequest';
+import { OutcomeField } from './OutcomeField';
 import { groupDecisionsList } from './decisionsListGroups';
 import { decisionStatusLabel, decisionStatusTone } from './decisionStatus';
 import { useDecisions } from './useDecisions';
@@ -60,6 +61,7 @@ export function DecisionsView({ modelId, orgId, userId, orgSlug, modelSlug, canC
   // title/statement/link the person already touched.
   const [title, setTitle] = useState(() => prefill?.title ?? '');
   const [statement, setStatement] = useState(() => prefill?.statement ?? '');
+  const [outcome, setOutcome] = useState('');
   // Set when the Designer's draft is put into the context, so the decision says an agent helped (Simon, 2026-11-19). Editing the context afterwards marks it edited.
   const [suggested, setSuggested] = useState<SuggestionSelection>({ options: [], draftedAt: null, anyEdited: false });
   const aiDraft = suggested.draftedAt !== null ? { draftedAt: suggested.draftedAt, edited: suggested.anyEdited } : null;
@@ -72,12 +74,13 @@ export function DecisionsView({ modelId, orgId, userId, orgSlug, modelSlug, canC
   // The Designer is pointed at the first thing the decision is about: the finding behind the form, or whatever the person has linked.
   const designerElementId = designerInputFromPrefill(prefill)?.elementId ?? links[0]?.elementId;
 
-  const draft = useDecisionFormDraft(orgId, userId, `decisions-${modelId}`, { title, statement });
+  const draft = useDecisionFormDraft(orgId, userId, `decisions-${modelId}`, { title, statement, outcome });
 
   const resetForm = () => {
     draft.clear();
     setTitle('');
     setStatement('');
+    setOutcome('');
     setSuggested({ options: [], draftedAt: null, anyEdited: false });
     setOwnerId(userId ?? '');
     setNeededBy('');
@@ -99,6 +102,7 @@ export function DecisionsView({ modelId, orgId, userId, orgSlug, modelSlug, canC
               void createDecisionWithLinks({
                 title,
                 statement,
+                outcome,
                 ownerId,
                 neededBy,
                 // An empty key is the element page's own "Start a decision…" (no finding behind it).
@@ -121,6 +125,7 @@ export function DecisionsView({ modelId, orgId, userId, orgSlug, modelSlug, canC
                 onRestore={(d) => {
                   setTitle(d.title);
                   setStatement(d.statement);
+                  setOutcome(d.outcome ?? '');
                   draft.accept();
                 }}
                 onDiscard={draft.discard}
@@ -133,7 +138,7 @@ export function DecisionsView({ modelId, orgId, userId, orgSlug, modelSlug, canC
               value={title}
               onChange={(e) => {
                 setTitle(e.target.value);
-                draft.remember({ title: e.target.value, statement });
+                draft.remember({ title: e.target.value, statement, outcome });
               }}
             />
             <label>
@@ -146,10 +151,18 @@ export function DecisionsView({ modelId, orgId, userId, orgSlug, modelSlug, canC
                 value={statement}
                 onChange={(e) => {
                   setStatement(e.target.value);
-                  draft.remember({ title, statement: e.target.value });
+                  draft.remember({ title, statement: e.target.value, outcome });
                 }}
               />
             </label>
+            <OutcomeField
+              className={styles.textarea}
+              value={outcome}
+              onChange={(v) => {
+                setOutcome(v);
+                draft.remember({ title, statement, outcome: v });
+              }}
+            />
             {!designerAvailable && designerUnavailable !== null && (
               <div data-testid="designer-unavailable">
                 <Text as="p" tone="muted" size="sm">
@@ -159,7 +172,7 @@ export function DecisionsView({ modelId, orgId, userId, orgSlug, modelSlug, canC
               </div>
             )}
             {designerAvailable && userId && designerElementId !== undefined && (
-              <DesignerSuggestions orgId={orgId} userId={userId} modelId={modelId} elementId={designerElementId} brief={statement.trim() !== '' ? statement : title} scope={`decisions-${modelId}`} onChange={setSuggested} />
+              <DesignerSuggestions orgId={orgId} userId={userId} modelId={modelId} elementId={designerElementId} brief={designerBriefText(statement, outcome, title)} scope={`decisions-${modelId}`} onChange={setSuggested} />
             )}
             {designerAvailable && designerElementId === undefined && (
               <div data-testid="designer-needs-link">

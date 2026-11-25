@@ -4,7 +4,7 @@ import { inlineParts, parsePackDocument } from './packDocument';
 const SAMPLE = `# ADR: Same-day quotes
 
 **Status:** Accepted — decided 2026-11-20
-**Outcome:** Chose Configure the tool
+**Result:** Chose Configure the tool
 
 ## Context
 
@@ -33,7 +33,7 @@ describe('parsePackDocument', () => {
   it('reads status and outcome as facts', () => {
     const facts = blocks[1];
     expect(facts?.kind).toBe('facts');
-    expect(facts?.kind === 'facts' && facts.facts.map((f) => f.label)).toEqual(['Status', 'Outcome']);
+    expect(facts?.kind === 'facts' && facts.facts.map((f) => f.label)).toEqual(['Status', 'Result']);
   });
   it('joins wrapped lines into one paragraph and keeps the AI line as italics', () => {
     const paragraph = blocks.find((b) => b.kind === 'paragraph');

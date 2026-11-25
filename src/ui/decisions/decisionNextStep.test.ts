@@ -40,3 +40,19 @@ describe('askToChooseComment', () => {
     expect(askToChooseComment(['sam', 'lee'], 'Quote tool')).toBe('@sam @lee The options for "Quote tool" are ready. Please compare them and choose one.');
   });
 });
+
+describe('decisionNextStep: the outcome comes first (item 3)', () => {
+  it('asks someone who can edit the decision to add the outcome before anything else', () => {
+    expect(decisionNextStep({ ...base, hasOutcome: false, canEditOutcome: true })).toMatchObject({ title: 'Say what outcome you want', action: 'add-outcome', actionLabel: 'Add the outcome' });
+    expect(decisionNextStep({ ...base, optionCount: 0, hasOutcome: false, canEditOutcome: true })?.action).toBe('add-outcome');
+  });
+
+  it('tells everyone else who adds it, with no action', () => {
+    expect(decisionNextStep({ ...base, hasOutcome: false, canEditOutcome: false })).toMatchObject({ title: 'Waiting for the outcome', action: 'none', actionLabel: null });
+  });
+
+  it('carries on as before once the outcome is written, and never asks on a chosen decision', () => {
+    expect(decisionNextStep({ ...base, hasOutcome: true, canEditOutcome: true })?.action).toBe('compare');
+    expect(decisionNextStep({ ...base, status: 'accepted', chosenTitle: 'Configure the CRM', hasOutcome: false, canEditOutcome: true })?.action).not.toBe('add-outcome');
+  });
+});

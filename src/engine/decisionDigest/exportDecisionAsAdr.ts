@@ -174,10 +174,15 @@ export function exportDecisionAsAdrMarkdown(input: DecisionAdrExportInput): stri
   lines.push(`# ADR: ${decision.title}`);
   lines.push('');
   lines.push(`**Status:** ${statusLine(decision)}`);
-  lines.push(`**Outcome:** ${outcomeLine(decision, options)}`);
+  lines.push(`**Result:** ${outcomeLine(decision, options)}`);
   if (!input.omitOwner) lines.push(`**Owner:** ${ownerName}`);
   if (decision.needed_by) lines.push(`**Needed by:** ${decision.needed_by}`);
   if (decision.lens_map_url) lines.push(`**Lens map:** ${decision.lens_map_url}`);
+  lines.push('');
+  // The pack leads with the outcome the business wants (item 3).
+  lines.push('## Outcome we want');
+  lines.push('');
+  lines.push(decision.outcome.trim().length > 0 ? decision.outcome.trim() : decision.status === 'proposed' ? 'No outcome recorded yet.' : 'No outcome was recorded for this decision.');
   lines.push('');
   lines.push('## Context');
   lines.push('');

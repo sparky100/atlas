@@ -53,7 +53,7 @@ export function decisionRatingLevelTone(level: DecisionRatingLevel): DecisionRat
  * `key` field, so there is no separate camelCase↔snake_case translation
  * layer anywhere between the contract and the database.
  */
-export type DecisionCriterionKey = 'cost' | 'effort' | 'deliveryRisk' | 'timing' | 'vendorFit';
+export type DecisionCriterionKey = 'outcome' | 'cost' | 'effort' | 'deliveryRisk' | 'timing' | 'vendorFit';
 
 export interface DecisionCriterionDefinition {
   key: DecisionCriterionKey;
@@ -69,6 +69,8 @@ export interface DecisionCriterionDefinition {
  * own `decisionCriteriaTests.test.ts` "ordering" case).
  */
 export const DECISION_CRITERIA: readonly DecisionCriterionDefinition[] = [
+  // First: does the option reach the outcome the business wants (item 3, PROPOSAL-outcome-on-the-need.md).
+  { key: 'outcome', label: 'Reaches the outcome', levelLabels: { favourable: 'Likely', acceptable: 'Partly', unfavourable: 'Unlikely' } },
   { key: 'cost', label: 'Cost', levelLabels: { favourable: 'Low', acceptable: 'Medium', unfavourable: 'High' } },
   { key: 'effort', label: 'Effort', levelLabels: { favourable: 'Low', acceptable: 'Medium', unfavourable: 'High' } },
   { key: 'deliveryRisk', label: 'Delivery risk', levelLabels: { favourable: 'Low', acceptable: 'Medium', unfavourable: 'High' } },
