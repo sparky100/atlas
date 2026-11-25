@@ -47,11 +47,14 @@ test('project lifecycle: start from a finding, decide inside it, deliver the cho
   await expect(page.getByRole('heading', { name: 'Decisions', exact: true })).toBeVisible();
   await expect(nextStep.getByLabel('New decision title')).toHaveValue('How should we meet Housing Repairs?');
   await nextStep.getByLabel('New decision title').fill('Which system supports repairs?');
+  // Item 3: the outcome the business wants goes with the need.
+  await nextStep.getByLabel('Outcome: what will be better, for whom, by when').fill('Tenants book a repair in one call, by June 2027');
   await page.getByRole('button', { name: 'Start decision' }).click();
   await expect(page.getByRole('heading', { name: 'Which system supports repairs?' })).toBeVisible();
   await expect(page.getByRole('link', { name: PROJECT_TITLE }).first()).toBeVisible();
   await expect(page.getByRole('link', { name: PROJECT_TITLE, exact: true })).toHaveCount(1);
   await expect(page.getByTestId('decision-source-finding')).toContainText('Started from a health finding: a capability nothing supports.');
+  await expect(page.getByTestId('decision-outcome')).toContainText('Tenants book a repair in one call, by June 2027');
   // It starts from where the person came from: the project's purpose is the context, the project's capability is what it concerns, and the edit form is already open.
   await expect(page.getByPlaceholder('What needs deciding, and why now')).not.toHaveValue('');
   await expect(page.getByRole('link', { name: 'Housing Repairs' }).first()).toBeVisible();
@@ -164,6 +167,20 @@ test('project lifecycle: start from a finding, decide inside it, deliver the cho
   await openProject(page);
   await expect(page.getByTestId('project-chosen-state')).toHaveText('In the live model');
   await expect(page.getByRole('link', { name: 'Build Repairs Hub' }).first()).toBeVisible();
+  await expect(page.getByTestId('project-decision-outcome')).toContainText('Tenants book a repair in one call, by June 2027');
+
+  // Item 3, part 2: once it is in the live model, record whether the outcome came.
+  await page.getByRole('link', { name: 'Which system supports repairs?' }).first().click();
+  const benefit = page.getByTestId('decision-benefit');
+  await expect(benefit).toContainText('Did we get the outcome?');
+  await expect(benefit).toContainText('We wanted: Tenants book a repair in one call, by June 2027');
+  await expect(benefit).toContainText('Not recorded yet.');
+  await benefit.getByLabel('Partly').check();
+  await benefit.getByLabel('What happened (optional)').fill('Most repairs are booked in one call.');
+  await benefit.getByRole('button', { name: 'Record the answer' }).click();
+  await expect(benefit.getByTestId('decision-benefit-latest')).toContainText(/Benefit confirmed by .+ on \d{4}-\d{2}-\d{2}: Partly\. Most repairs are booked in one call\./);
+  await expect(benefit.getByRole('button', { name: 'Record the answer' })).toHaveCount(0);
+  await openProject(page);
   await page.getByRole('button', { name: 'Close project' }).click();
   await expect(page.getByText('Closed', { exact: true }).first()).toBeVisible();
   await expect(page.getByRole('button', { name: '✎ Edit project' })).toHaveCount(0);
