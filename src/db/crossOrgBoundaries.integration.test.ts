@@ -6,6 +6,8 @@
  *    (20261123090000_decision_options.sql, 20261123120000_work_on_decision_option.sql)
  *  - `decision_gaps` (20261123150000_decision_gaps.sql)
  *  - `web_research_requests` (20261122080000_web_research_guarded.sql)
+ *  - research and saved pages on a candidate with no change
+ *    (20261125130000_option_keyed_research.sql)
  *
  * Each block is run as a signed-in owner of a DIFFERENT organisation, and as a
  * viewer of the same organisation where the role gate matters, against a real
@@ -18,6 +20,8 @@ import { createChangeBranch, getMainBranch } from './branches';
 import type { Client } from './client';
 import { createServiceRoleClient, createSupabaseClient } from './client';
 import { deleteDecisionGap, listDecisionGaps, recordDecisionGap } from './decisionGaps';
+import { listOptionWebSources } from './optionWebSources';
+import { saveCheckedWebSource } from './webResearch';
 import { createDecisionOption, getOptionApproachForBranch, listDecisionOptions, setDecisionOptionApproach, workOnDecisionOption } from './decisionOptions';
 import { createDecision, createDecisionLink } from './decisions';
 import { loadEnv } from './env';
@@ -219,6 +223,68 @@ describe('cross-organisation boundaries for options, gaps and research requests'
         query: 'viewer query', status: 'ok', result_count: 0, urls: [],
       });
       expect(error).not.toBeNull();
+    });
+  });
+  describe('research on a candidate with no change (option-keyed)', () => {
+    const candidate = { url: 'https://quoteco.example/connections', title: 'QuoteCo for networks', publisher: 'quoteco.example', excerpt: 'Quotes a connection in a day.', retrievedAt: '2026-11-25T10:00:00Z' };
+
+    it('round-trips a search record, a checked page and a gap on a branchless candidate, and keeps them after Work on this option', async () => {
+      const { decisionId, candidateId } = await seed();
+      const { error: recordError } = await owner.client.from('web_research_requests').insert({
+        org_id: orgId, decision_id: decisionId, option_id: candidateId, requested_by: owner.id,
+        query: 'connection quote software UK DNO', status: 'ok', result_count: 1, urls: [candidate.url],
+      });
+      expect(recordError).toBeNull();
+      await saveCheckedWebSource(owner.client, { decisionId, optionId: candidateId, branchId: null, userId: owner.id, candidate, assertion: 'Quotes a connection within a day.' });
+      await recordDecisionGap(owner.client, { decisionId, branchId: null, optionId: candidateId, userId: owner.id, body: 'No UK price list found.', origin: 'research' });
+
+      const saved = await listOptionWebSources(owner.client, decisionId);
+      expect(saved).toEqual([expect.objectContaining({ optionId: candidateId, branchId: null, url: candidate.url, assertion: 'Quotes a connection within a day.', checkedBy: owner.id })]);
+      const gaps = await listDecisionGaps(owner.client, decisionId);
+      expect(gaps).toEqual([expect.objectContaining({ optionId: candidateId, branchId: null })]);
+
+      await workOnDecisionOption(owner.client, candidateId);
+      const after = await listOptionWebSources(owner.client, decisionId);
+      expect(after.map((source) => source.optionId)).toEqual([candidateId]);
+    });
+
+    it('refuses a page whose branch is not the option\'s own, or an option from another decision', async () => {
+      const first = await seed();
+      const second = await seed();
+      const base = { decision_id: first.decisionId, url: candidate.url, title: candidate.title, publisher: null, excerpt: null, retrieved_at: candidate.retrievedAt, cited_by: owner.id };
+      expect((await owner.client.from('option_web_sources').insert({ ...base, option_id: first.candidateId, branch_id: first.branchId })).error).not.toBeNull();
+      expect((await owner.client.from('option_web_sources').insert({ ...base, option_id: second.candidateId })).error).not.toBeNull();
+      expect((await owner.client.from('web_research_requests').insert({
+        org_id: orgId, decision_id: first.decisionId, option_id: second.candidateId, requested_by: owner.id,
+        query: 'cross-decision query', status: 'ok', result_count: 0, urls: [],
+      })).error).not.toBeNull();
+    });
+
+    it('an outsider and a viewer can neither save a page nor record a search against the candidate', async () => {
+      const { decisionId, candidateId } = await seed();
+      for (const user of [outsider, viewer]) {
+        await expect(saveCheckedWebSource(user.client, { decisionId, optionId: candidateId, branchId: null, userId: user.id, candidate, assertion: 'Injected.' })).rejects.toThrow();
+        for (const claimedOrg of [orgId, otherOrgId]) {
+          const { error } = await user.client.from('web_research_requests').insert({
+            org_id: claimedOrg, decision_id: decisionId, option_id: candidateId, requested_by: user.id,
+            query: 'injected query', status: 'ok', result_count: 0, urls: [],
+          });
+          expect(error).not.toBeNull();
+        }
+      }
+      expect(await listOptionWebSources(outsider.client, decisionId)).toEqual([]);
+      expect(await listOptionWebSources(owner.client, decisionId)).toEqual([]);
+    });
+
+    it('a search sent with only a branch still records its option (compatibility until the function is redeployed)', async () => {
+      const { decisionId, branchId } = await seed();
+      const { data, error } = await owner.client.from('web_research_requests').insert({
+        org_id: orgId, decision_id: decisionId, branch_id: branchId, requested_by: owner.id,
+        query: 'branch only query', status: 'ok', result_count: 0, urls: [],
+      }).select('option_id').single();
+      expect(error).toBeNull();
+      const options = await listDecisionOptions(owner.client, decisionId);
+      expect(data?.option_id).toBe(options.find((o) => o.branch_id === branchId)?.id);
     });
   });
 });

@@ -51,7 +51,6 @@ async function decisionAdr(modelId: UUID, mainHeadCommitId: UUID | null, decisio
   const comparison = mainHeadCommitId && options.length > 0 ? await compareDecisionOptions(supabase, { modelId, mainHeadCommitId, capabilityIds, otherConcernElementIds: otherElementIds, options }) : null;
   const sourcesByOption = new Map<UUID, typeof sources>();
   for (const source of sources) {
-    if (source.optionId == null) continue;
     const list = sourcesByOption.get(source.optionId) ?? [];
     list.push(source);
     sourcesByOption.set(source.optionId, list);

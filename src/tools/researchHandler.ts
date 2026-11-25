@@ -7,7 +7,8 @@
  *   2. the caller is an owner, architect or contributor;
  *   3. the organisation has switched web research on, has agents on and has its
  *      own AI key (the platform trial never pays for a public search);
- *   4. the decision is still proposed and the option is linked to it;
+ *   4. the decision is still proposed and the option is one of its options
+ *      (a candidate with or without a change);
  *   5. only then is the person's exact query sent, through the proxy, to the
  *      provider. Nothing from the estate model is added.
  *
@@ -22,8 +23,10 @@ import type { WebResearchCandidate } from '../contracts/webResearch';
 export interface ResearchDecision {
   orgId: UUID;
   status: string;
-  /** True when the branch is a `branch`-typed link on this decision. */
-  branchLinked: boolean;
+  /** True when the option is a `decision_options` row on this decision. */
+  optionOnDecision: boolean;
+  /** The option's change, when it has one; recorded with the search, never required. */
+  branchId: UUID | null;
 }
 
 export interface ResearchOrgSettings {
@@ -43,7 +46,8 @@ export interface ResearchSearchResult {
 export interface ResearchRecordInput {
   orgId: UUID;
   decisionId: UUID;
-  branchId: UUID;
+  optionId: UUID;
+  branchId: UUID | null;
   query: string;
   status: 'ok' | 'error';
   resultCount: number;
@@ -53,7 +57,7 @@ export interface ResearchRecordInput {
 
 export interface ResearchHandlerDeps {
   /** Read with the caller's own session: a decision they cannot read is `null`. */
-  loadDecision: (decisionId: UUID, branchId: UUID) => Promise<ResearchDecision | null>;
+  loadDecision: (decisionId: UUID, optionId: UUID) => Promise<ResearchDecision | null>;
   /** The caller's role in the organisation, or `null`. */
   callerRole: (orgId: UUID) => Promise<string | null>;
   /** The organisation's switches and key flag, read with the caller's session. */
@@ -86,7 +90,7 @@ const PUBLISHER_MAX = 200;
 
 export interface ParsedResearch {
   decisionId: UUID;
-  branchId: UUID;
+  optionId: UUID;
   query: string;
 }
 
@@ -99,7 +103,7 @@ export function parseResearchBody(body: unknown): ParsedResearch | string {
   if (typeof body !== 'object' || body === null) return 'A request body is required.';
   const r = body as Record<string, unknown>;
   if (typeof r.decisionId !== 'string' || !UUID_SHAPE.test(r.decisionId)) return 'decisionId must be a decision id.';
-  if (typeof r.branchId !== 'string' || !UUID_SHAPE.test(r.branchId)) return 'branchId must be a branch id.';
+  if (typeof r.optionId !== 'string' || !UUID_SHAPE.test(r.optionId)) return 'optionId must be an option id.';
   if (typeof r.query !== 'string') return 'query is required.';
   const query = r.query.trim();
   if (query.length < RESEARCH_QUERY_MIN_CHARS) return `query must be at least ${String(RESEARCH_QUERY_MIN_CHARS)} characters.`;
@@ -108,7 +112,7 @@ export function parseResearchBody(body: unknown): ParsedResearch | string {
     const code = character.codePointAt(0) ?? 0;
     if (code < 32 || code === 127) return 'query must be a single line of text.';
   }
-  return { decisionId: r.decisionId, branchId: r.branchId, query };
+  return { decisionId: r.decisionId, optionId: r.optionId, query };
 }
 
 function isPublicHttpsUrl(value: string): boolean {
@@ -178,7 +182,7 @@ export async function handleResearch(deps: ResearchHandlerDeps, body: unknown): 
   const parsed = parseResearchBody(body);
   if (typeof parsed === 'string') return { status: 'invalid', message: parsed };
 
-  const decision = await deps.loadDecision(parsed.decisionId, parsed.branchId);
+  const decision = await deps.loadDecision(parsed.decisionId, parsed.optionId);
   if (!decision) return { status: 'not_found', message: 'That decision could not be found.' };
 
   const role = await deps.callerRole(decision.orgId);
@@ -200,8 +204,8 @@ export async function handleResearch(deps: ResearchHandlerDeps, body: unknown): 
   if (decision.status !== 'proposed') {
     return { status: 'forbidden', message: 'Web research is only available while the decision is proposed.' };
   }
-  if (!decision.branchLinked) {
-    return { status: 'forbidden', message: 'That option is not linked to this decision.' };
+  if (!decision.optionOnDecision) {
+    return { status: 'forbidden', message: 'That option is not one of this decision\'s options.' };
   }
 
   try {
@@ -210,7 +214,8 @@ export async function handleResearch(deps: ResearchHandlerDeps, body: unknown): 
       await deps.record({
         orgId: decision.orgId,
         decisionId: parsed.decisionId,
-        branchId: parsed.branchId,
+        optionId: parsed.optionId,
+        branchId: decision.branchId,
         query: parsed.query,
         status: 'ok',
         resultCount: result.candidates.length,
@@ -233,7 +238,8 @@ export async function handleResearch(deps: ResearchHandlerDeps, body: unknown): 
       await deps.record({
         orgId: decision.orgId,
         decisionId: parsed.decisionId,
-        branchId: parsed.branchId,
+        optionId: parsed.optionId,
+        branchId: decision.branchId,
         query: parsed.query,
         status: 'error',
         resultCount: 0,

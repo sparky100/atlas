@@ -24,6 +24,8 @@ export interface DecisionGap {
 export interface RecordDecisionGapInput {
   decisionId: string;
   branchId: string | null;
+  /** The candidate option the gap is about; when given, a branchless candidate can hold a gap. */
+  optionId?: string | null;
   userId: string;
   body: string;
   origin: DecisionGapOrigin;

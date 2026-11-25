@@ -15,7 +15,10 @@ import styles from './WebResearchDialog.module.css';
 
 export interface WebResearchDialogProps {
   decisionId: UUID;
-  branchId: UUID;
+  /** The candidate option being researched; it need not have a change. */
+  optionId: UUID;
+  /** The option's change, when it has one. */
+  branchId: UUID | null;
   optionLabel: string;
   /** The decision's own title, used only to suggest a query, never sent automatically. */
   decisionTitle: string;
@@ -55,6 +58,7 @@ export interface WebResearchDialogProps {
  */
 export function WebResearchDialog({
   decisionId,
+  optionId: researchedOptionId,
   branchId,
   optionLabel,
   decisionTitle,
@@ -202,7 +206,7 @@ export function WebResearchDialog({
     setError(null);
     setNotice(null);
     try {
-      const response = await requestWebResearch(supabase, { decisionId, branchId, query: exact });
+      const response = await requestWebResearch(supabase, { decisionId, optionId: researchedOptionId, query: exact });
       setSearchedQuery(exact);
       setSearchedAt(response.searchedAt);
       setResults(response.candidates);
@@ -227,7 +231,7 @@ export function WebResearchDialog({
     setSaving(true);
     setError(null);
     try {
-      await saveCheckedWebSource(supabase, { decisionId, branchId, userId, candidate: selected, assertion });
+      await saveCheckedWebSource(supabase, { decisionId, optionId: researchedOptionId, branchId, userId, candidate: selected, assertion });
       onSaved();
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Could not save this page. Try again.');

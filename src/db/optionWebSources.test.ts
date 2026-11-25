@@ -6,6 +6,7 @@ import { insertOptionWebSource, optionWebSourcesFromRows } from './optionWebSour
 const row: OptionWebSourceRow = {
   decision_id: 'decision-1',
   branch_id: 'branch-1',
+  option_id: 'option-1',
   url: 'https://vendor.example/evidence',
   title: 'Product evidence',
   publisher: 'Vendor Ltd',
@@ -21,7 +22,7 @@ const row: OptionWebSourceRow = {
 describe('optionWebSourcesFromRows', () => {
   it('maps the saved page to a web source and keeps the URL as its identity', () => {
     expect(optionWebSourcesFromRows([row])[0]).toEqual({
-      kind: 'web', id: 'branch-1\u0000https://vendor.example/evidence', branchId: 'branch-1', optionId: null,
+      kind: 'web', id: 'option-1\u0000https://vendor.example/evidence', branchId: 'branch-1', optionId: 'option-1',
       url: 'https://vendor.example/evidence', title: 'Product evidence', publisher: 'Vendor Ltd',
       excerpt: 'The page says it records complaints.', retrievedAt: '2026-11-21T10:00:00Z',
       citedBy: 'user-1', citedAt: '2026-11-21T10:05:00Z',
@@ -53,9 +54,9 @@ describe('insertOptionWebSource', () => {
 
   it('saves the page without claiming anyone checked it', async () => {
     const { client, inserted } = capture();
-    await insertOptionWebSource(client, { decisionId: 'decision-1', branchId: 'branch-1', candidate, citedBy: 'user-1' });
+    await insertOptionWebSource(client, { decisionId: 'decision-1', optionId: 'option-1', branchId: null, candidate, citedBy: 'user-1' });
     expect(inserted()).toMatchObject({
-      decision_id: 'decision-1', branch_id: 'branch-1', url: candidate.url, title: 'A page',
+      decision_id: 'decision-1', option_id: 'option-1', branch_id: null, url: candidate.url, title: 'A page',
       publisher: null, excerpt: null, retrieved_at: candidate.retrievedAt, cited_by: 'user-1',
       assertion: null, checked_by: null, checked_at: null,
     });
@@ -63,7 +64,7 @@ describe('insertOptionWebSource', () => {
 
   it('explains a page already saved with the option', async () => {
     const { client } = capture({ code: '23505', message: 'duplicate key' });
-    await expect(insertOptionWebSource(client, { decisionId: 'decision-1', branchId: 'branch-1', candidate, citedBy: 'user-1' }))
+    await expect(insertOptionWebSource(client, { decisionId: 'decision-1', optionId: 'option-1', branchId: null, candidate, citedBy: 'user-1' }))
       .rejects.toThrow('already saved with this option');
   });
 });
