@@ -2,6 +2,7 @@ import { Loading } from '../components/Loading/Loading';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useEffect, useState } from 'react';
 import { OutcomeField } from './OutcomeField';
+import { DecisionBenefit } from './DecisionBenefit';
 import { Link, useNavigate, useSearchParams } from 'react-router';
 import { suggestOptions } from './optionSuggestions';
 import { findingLabel } from './findingLabels';
@@ -543,6 +544,22 @@ export function DecisionView({ modelId, decisionId, orgId, orgSlug, modelSlug, r
             )}
           </div>
         </Panel>
+      )}
+
+      {decision.status === 'accepted' && (
+        <DecisionBenefit
+          decisionId={decision.id}
+          outcome={decision.outcome}
+          chosenIsBaseline={chosenOption !== undefined && chosenOption.id === baselineOption?.id}
+          inLiveModel={chosenState?.key === 'in_live_model'}
+          canRecord={canChooseDecisionOption(role)}
+          members={members.map((m) => ({ id: m.member.user_id, label: profileLabel(m.profile) }))}
+          defaultConfirmer={decision.owner_id}
+          nameOf={(id) => {
+            const m = members.find((x) => x.member.user_id === id);
+            return m ? profileLabel(m.profile) : 'a former member';
+          }}
+        />
       )}
 
       <Panel>

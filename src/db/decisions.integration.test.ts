@@ -25,6 +25,7 @@ import { createChangeBranch, getBranch, getMainBranch } from './branches';
 import type { Client } from './client';
 import { createServiceRoleClient, createSupabaseClient } from './client';
 import { createDecisionOption, getDecisionOptionForBranch, workOnDecisionOption } from './decisionOptions';
+import { listDecisionBenefitChecks, recordDecisionBenefit } from './decisionBenefit';
 import { commitToBranch } from './commits';
 import { createComment, listCommentsForAnchor } from './comments';
 import {
@@ -528,6 +529,62 @@ describe('decisions/decision_links/decision_arguments/assumptions/evidence again
       expect(after).toMatchObject({ branch_id: null });
       await service.auth.admin.deleteUser(outsider.id);
       await service.auth.admin.deleteUser(viewer.id);
+    });
+  });
+
+  describe('did we get the outcome? (item 3, part 2)', () => {
+    it('is recorded only once the chosen option is in the live model, by an owner or architect, naming a member; never changed; closed to other organisations', async () => {
+      const decision = await createDecision(alice.client, { id: randomUUID(), orgId, modelId, title: 'Benefit check', statement: 'Quotes are slow.', outcome: 'Quotes in two days, not ten', ownerId: alice.id, createdBy: alice.id });
+      const chosen = await createDecisionOption(alice.client, { decisionId: decision.id, title: 'Configure the CRM', createdBy: alice.id });
+      await expect(recordDecisionBenefit(alice.client, { decisionId: decision.id, result: 'yes', note: '', confirmedBy: alice.id })).rejects.toThrow(/no chosen option/);
+      await chooseDecisionOption(alice.client, decision.id, chosen.id, 'Fastest.');
+      const branch = await workOnDecisionOption(alice.client, chosen.id);
+      await expect(recordDecisionBenefit(alice.client, { decisionId: decision.id, result: 'yes', note: '', confirmedBy: alice.id })).rejects.toThrow(/not in the live model/);
+
+      // Merging is the review queue's job; the status is set directly here as test setup only.
+      const { error: mergeError } = await service.from('branches').update({ status: 'merged' }).eq('id', branch.id);
+      if (mergeError) throw new Error(`mark merged: ${mergeError.message}`);
+
+      const outsider = await createSignedInUser('benefit-outsider');
+      const viewer = await createSignedInUser('benefit-viewer');
+      try {
+        const { error: inviteError } = await alice.client.from('members').insert({ org_id: orgId, user_id: viewer.id, role: 'viewer', invited_by: alice.id });
+        if (inviteError) throw new Error(`inviting viewer: ${inviteError.message}`);
+
+        // The person named must be a member of this organisation.
+        await expect(recordDecisionBenefit(alice.client, { decisionId: decision.id, result: 'yes', note: '', confirmedBy: outsider.id })).rejects.toThrow(/member/);
+
+        const first = await recordDecisionBenefit(alice.client, { decisionId: decision.id, result: 'not_yet', note: 'Still at eight days.', confirmedBy: viewer.id });
+        expect(first).toMatchObject({ decision_id: decision.id, org_id: orgId, result: 'not_yet', note: 'Still at eight days.', confirmed_by: viewer.id, recorded_by: alice.id });
+        const second = await recordDecisionBenefit(alice.client, { decisionId: decision.id, result: 'partly', note: 'Four days now.', confirmedBy: viewer.id });
+        const checks = await listDecisionBenefitChecks(alice.client, decision.id);
+        expect(checks.map((c) => c.id)).toEqual([second.id, first.id]);
+
+        // A viewer can read the answers but not record one; nobody can change or remove one.
+        expect((await listDecisionBenefitChecks(viewer.client, decision.id)).length).toBe(2);
+        await expect(recordDecisionBenefit(viewer.client, { decisionId: decision.id, result: 'yes', note: '', confirmedBy: viewer.id })).rejects.toThrow();
+        const edited = await alice.client.from('decision_benefit_checks').update({ result: 'yes' }).eq('id', first.id).select('id');
+        expect(edited.error !== null || edited.data.length === 0).toBe(true);
+        const removed = await alice.client.from('decision_benefit_checks').delete().eq('id', first.id).select('id');
+        expect(removed.error !== null || removed.data.length === 0).toBe(true);
+
+        // A signed-in user from a different organisation can neither record nor read.
+        const otherOrg = randomUUID();
+        await createOrganisation(outsider.client, { id: otherOrg, name: 'Other Org', slug: `benefit-other-${otherOrg.slice(0, 8)}`, createdBy: outsider.id });
+        await expect(recordDecisionBenefit(outsider.client, { decisionId: decision.id, result: 'yes', note: '', confirmedBy: outsider.id })).rejects.toThrow();
+        expect(await listDecisionBenefitChecks(outsider.client, decision.id)).toEqual([]);
+      } finally {
+        await service.auth.admin.deleteUser(outsider.id);
+        await service.auth.admin.deleteUser(viewer.id);
+      }
+    });
+
+    it('has nothing to confirm when staying as we are was chosen', async () => {
+      const decision = await createDecision(alice.client, { id: randomUUID(), orgId, modelId, title: 'Benefit on baseline', statement: '', outcome: 'Keep quoting steady', ownerId: alice.id, createdBy: alice.id });
+      const baseline = await createDecisionOption(alice.client, { decisionId: decision.id, title: 'Stay as we are', createdBy: alice.id });
+      await updateDecision(alice.client, decision.id, { baselineOptionId: baseline.id });
+      await chooseDecisionOption(alice.client, decision.id, baseline.id, 'Not worth changing yet.');
+      await expect(recordDecisionBenefit(alice.client, { decisionId: decision.id, result: 'yes', note: '', confirmedBy: alice.id })).rejects.toThrow(/nothing to deliver/);
     });
   });
 

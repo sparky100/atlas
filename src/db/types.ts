@@ -499,6 +499,23 @@ export interface DecisionGapRow {
   created_at: string;
 }
 
+/** Whether a decision's outcome came (item 3): the three answers a person can give. */
+export type DecisionBenefitResult = 'yes' | 'partly' | 'not_yet';
+
+/** The literal shape of a row in `decision_benefit_checks` (`20261126100000_decision_benefit_checks.sql`). Insert-only; the latest row for a decision is its answer. */
+export interface DecisionBenefitCheckRow {
+  decision_id: UUID;
+  id: UUID;
+  org_id: UUID;
+  result: DecisionBenefitResult;
+  note: string;
+  /** The member who confirmed it, normally the business owner. */
+  confirmed_by: UUID;
+  /** Who recorded it (an owner or architect). */
+  recorded_by: UUID;
+  recorded_at: string;
+}
+
 /** A frozen, versioned copy of a decision write-up (Phase B3). Insert-only; written only by `atlas.freeze_decision_pack`. */
 export interface DecisionPackRow {
   id: UUID;
