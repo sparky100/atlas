@@ -17,6 +17,12 @@
 import { expect, test, type Page } from '@playwright/test';
 import { addCapability, addSystemFromHome, goToModelHome, signUpCreateOrgAndModel } from './fixtures/goldenPath';
 
+// A patched route may still be waiting on route.fetch() when the test ends;
+// unroute first so closing the page does not fail it after every check passed.
+test.afterEach(async ({ page }) => {
+  await page.unrouteAll({ behavior: 'ignoreErrors' });
+});
+
 const STAMP = { modelId: '00000000-0000-4000-8000-000000000001', modelName: 'Estate', ref: 'main', commitId: '00000000-0000-4000-8000-000000000002' };
 const DESIGN = {
   options: [

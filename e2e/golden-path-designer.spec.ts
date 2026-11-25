@@ -21,6 +21,12 @@
 import { expect, test, type Page } from '@playwright/test';
 import { addCapability, addSystemFromHome, goToModelHome, signUpCreateOrgAndModel } from './fixtures/goldenPath';
 
+// A patched route may still be waiting on route.fetch() when the test ends;
+// unroute first so closing the page does not fail it after every check passed.
+test.afterEach(async ({ page }) => {
+  await page.unrouteAll({ behavior: 'ignoreErrors' });
+});
+
 function healthPanel(page: Page) {
   return page.getByTestId('health-findings-panel');
 }
