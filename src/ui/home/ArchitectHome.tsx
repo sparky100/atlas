@@ -23,6 +23,7 @@ import {
   prefillFromSystemWithoutCapability,
   prefillFromCriticalSupportEndFinding,
   prefillFromOutgoingDisposition,
+  projectPrefillFromDecisionPrefill,
   type DecisionPrefill,
 } from '../decisions/decisionPrefill';
 import { canStartDecision } from '../orgs/useMembership';
@@ -241,8 +242,8 @@ export function ArchitectHome({ data, modelId, mainCommitIdHint, insights, role,
     href: `/o/${orgSlug}/m/${modelSlug}/decisions?${decisionPrefillToSearchParams(prefill).toString()}`,
     label: 'Start a decision →',
     // F10 step 7 (ADR-024 §6.4): the same finding can start a project
-    // instead — same prefill params, the project form reads them too.
-    ...(canStartProject(role) ? { also: { href: `/o/${orgSlug}/m/${modelSlug}/projects?${decisionPrefillToSearchParams(prefill).toString()}`, label: 'Start a project →' } } : {}),
+    // instead — the project gets its own voice, not "a decision is needed".
+    ...(canStartProject(role) ? { also: { href: `/o/${orgSlug}/m/${modelSlug}/projects?${decisionPrefillToSearchParams(projectPrefillFromDecisionPrefill(prefill)).toString()}`, label: 'Start a project →' } } : {}),
   });
   // F4 (ADR-019 "Amended (F4, ...)"): the architect door's own link into the
   // standing duplicates report.
@@ -428,7 +429,7 @@ export function ArchitectHome({ data, modelId, mainCommitIdHint, insights, role,
         const disposition = element ? attributesRecord(element.attributes).disposition : undefined;
         const prefill = prefillFromOutgoingDisposition({ id: item.id, name: element?.name ?? item.label }, disposition === 'eliminate' ? 'eliminate' : 'migrate');
         return canStartProject(role)
-          ? { href: `/o/${orgSlug}/m/${modelSlug}/projects?${decisionPrefillToSearchParams(prefill).toString()}`, label: 'Start a project →' }
+          ? { href: `/o/${orgSlug}/m/${modelSlug}/projects?${decisionPrefillToSearchParams(projectPrefillFromDecisionPrefill(prefill)).toString()}`, label: 'Start a project →' }
           : { href: `/o/${orgSlug}/m/${modelSlug}/e/${item.id}`, label: 'View →' };
       },
     },

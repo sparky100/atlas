@@ -72,7 +72,7 @@ import { interfaceTypeLabelOf, isIntegrationInterface, isIntegrationPlatform, is
 import { useRouteTiming } from '../perf/useRouteTiming';
 import { useValueStreamImpact } from '../valueStreams/useValueStreamImpact';
 import { CompletenessChip } from '../gaps/CompletenessChip';
-import { bandAction, capabilityProblems, purposeFromProblems } from '../elements/capabilityProblems';
+import { bandAction, bandFindingKey, capabilityProblems, purposeFromProblems } from '../elements/capabilityProblems';
 import { CapabilityProblemsBand } from '../elements/CapabilityProblemsBand';
 import { completenessOf, firstWalkableKind, missingFactsText, sumCompleteness } from '../gaps/gaps';
 import { usePortfolio } from '../portfolio/usePortfolio';
@@ -364,7 +364,15 @@ export function ElementPage() {
         }),
         missingFactsText: supporters.length > 0 ? missingFactsText(rolled) : '',
       });
-      const projectHref = canStartProject(role) ? startProjectFromElementHref(`/o/${orgSlug ?? ''}/m/${model.slug}/projects`, { id: data.element.element_id, name: data.element.name, type: 'capability' }, purposeFromProblems(problems)) : null;
+      const projectHref = canStartProject(role) ? startProjectFromElementHref(
+        `/o/${orgSlug ?? ''}/m/${model.slug}/projects`,
+        { id: data.element.element_id, name: data.element.name, type: 'capability' },
+        {
+          title: problems.some((problem) => problem.kind === 'no-supporter') ? `Meet ${data.element.name}` : `Improve ${data.element.name}`,
+          purpose: purposeFromProblems(problems, data.element.name),
+          findingKey: bandFindingKey(problems),
+        },
+      ) : null;
       const fillKind = firstWalkableKind(rolled);
       problemsNode = (
         <CapabilityProblemsBand

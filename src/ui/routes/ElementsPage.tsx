@@ -37,7 +37,7 @@ import { canEditBranch, canStartProject } from '../orgs/roleGates';
 import { attributeDefinitionToFieldSchema } from '../../contracts/attributeSchema';
 import { useBulkEdit } from '../elements/useBulkEdit';
 import { useAttestation } from '../elements/useAttestation';
-import { decisionPrefillToSearchParams, prefillFromCapabilityNoSupportersFinding, prefillFromCriticalExposedFinding, prefillFromCriticalSupportEndFinding, prefillFromOutgoingDisposition } from '../decisions/decisionPrefill';
+import { decisionPrefillToSearchParams, prefillFromCapabilityNoSupportersFinding, prefillFromCriticalExposedFinding, prefillFromCriticalSupportEndFinding, prefillFromOutgoingDisposition, projectPrefillFromDecisionPrefill } from '../decisions/decisionPrefill';
 import { StartDecisionLink } from '../decisions/StartDecisionLink';
 import { useRouteTiming } from '../perf/useRouteTiming';
 import { SavedReportBar } from '../reports/SavedReportBar';
@@ -249,10 +249,11 @@ export function ElementsPage() {
                 ? prefillFromCriticalExposedFinding(element)
                 : prefillFromCapabilityNoSupportersFinding(element);
           const params = decisionPrefillToSearchParams(prefill).toString();
+          const projectParams = decisionPrefillToSearchParams(projectPrefillFromDecisionPrefill(prefill)).toString();
           return (
             <span className={styles.rowActions}>
               <StartDecisionLink href={`/o/${orgSlug ?? ''}/m/${model.slug}/decisions?${params}`} />
-              {canStartProject(role) && <StartProjectLink href={`/o/${orgSlug ?? ''}/m/${model.slug}/projects?${params}`} />}
+              {canStartProject(role) && <StartProjectLink href={`/o/${orgSlug ?? ''}/m/${model.slug}/projects?${projectParams}`} />}
             </span>
           );
         }
@@ -288,7 +289,7 @@ export function ElementsPage() {
               { id: row.element.element_id, name: row.element.name },
               row.disposition === 'eliminate' ? 'eliminate' : 'migrate',
             );
-            const params = decisionPrefillToSearchParams(prefill).toString();
+            const params = decisionPrefillToSearchParams(projectPrefillFromDecisionPrefill(prefill)).toString();
             return (
               <span className={styles.rowActions}>
                 <StartProjectLink href={`/o/${orgSlug ?? ''}/m/${model.slug}/projects?${params}`} />

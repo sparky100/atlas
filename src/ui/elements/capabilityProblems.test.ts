@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { bandAction, capabilityProblems, purposeFromProblems, type CapabilitySupporter } from './capabilityProblems';
+import { bandAction, bandFindingKey, capabilityProblems, purposeFromProblems, type CapabilitySupporter } from './capabilityProblems';
 
 const sys = (over: Partial<CapabilitySupporter> = {}): CapabilitySupporter => ({ systemId: 's1', name: 'Quote Tool', fit: 'good', note: '', ...over });
 
@@ -51,5 +51,17 @@ describe('purposeFromProblems', () => {
   });
   it('is empty when nobody wrote a reason', () => {
     expect(purposeFromProblems(capabilityProblems({ supporters: [{ systemId: 'a', name: 'Quote Tool', fit: 'poor', note: '' }], missingFactsText: '' }))).toBe('');
+  });
+
+  it('gives a capability with no supporter a project-shaped default naming it', () => {
+    const problems = capabilityProblems({ supporters: [], missingFactsText: '' });
+    expect(purposeFromProblems(problems, 'Network Planning & Load Forecasting')).toBe(
+      'No system is recorded as supporting Network Planning & Load Forecasting. Work out what it needs, who relies on it, and which option to investigate — extend, buy or build.',
+    );
+    expect(bandFindingKey(problems)).toBe('capability-no-supporters');
+  });
+
+  it('has no finding key when the band is only about fit', () => {
+    expect(bandFindingKey(capabilityProblems({ supporters: [sys({ fit: 'poor', note: 'Slow.' })], missingFactsText: '' }))).toBe('');
   });
 });

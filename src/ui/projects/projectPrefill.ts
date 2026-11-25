@@ -10,12 +10,39 @@ export interface ProjectFormPrefill {
   scope: ProjectScopeItem[];
 }
 
-/** F10 step 7: the element page's "Start a project…" — that element as the declared scope, its name as a starting title, no finding key. The element's type rides along so the form (plan A1) knows whether a capability is already named. */
-export function startProjectFromElementHref(projectsHref: string, element: { id: UUID; name: string; type?: ElementType }, purpose = ''): string {
+export interface ProjectStart {
+  /** Overrides the element-type default title. */
+  title?: string;
+  /** Overrides the element-type default purpose. */
+  purpose?: string;
+  /** A stable health-finding key, when a finding is behind this start. */
+  findingKey?: string;
+}
+
+/** The project voice for a generic element start (the element page's ⋯ menu). */
+export function projectStartForElement(element: { name: string; type?: ElementType }): { title: string; purpose: string } {
+  if (element.type === 'capability') {
+    return {
+      title: `Meet ${element.name}`,
+      purpose: `Work out what ${element.name} needs, who relies on it, and which option to investigate — extend, buy or build.`,
+    };
+  }
+  if (element.type === 'system' || element.type === 'container') {
+    return {
+      title: `Decide the future of ${element.name}`,
+      purpose: `Work out whether to keep, extend, replace or retire ${element.name}, and what evidence is needed.`,
+    };
+  }
+  return { title: element.name, purpose: '' };
+}
+
+/** F10 step 7: the element page's "Start a project…" — that element as the declared scope, with a project-shaped title and purpose. The element's type rides along so the form (plan A1) knows whether a capability is already named. */
+export function startProjectFromElementHref(projectsHref: string, element: { id: UUID; name: string; type?: ElementType }, start: ProjectStart = {}): string {
+  const defaults = projectStartForElement(element);
   const params = new URLSearchParams();
-  params.set('startTitle', element.name);
-  params.set('startStatement', purpose);
-  params.set('startFindingKey', '');
+  params.set('startTitle', start.title ?? defaults.title);
+  params.set('startStatement', start.purpose ?? defaults.purpose);
+  params.set('startFindingKey', start.findingKey ?? '');
   params.append('startElementId', element.id);
   params.append('startElementName', element.name);
   params.append('startElementType', element.type ?? '');
@@ -31,8 +58,8 @@ export function startProjectFromElementHref(projectsHref: string, element: { id:
  */
 export function projectFormFromPrefill(prefill: DecisionPrefill): ProjectFormPrefill {
   return {
-    title: prefill.title.replace(/\?\s*$/, ''),
-    purpose: prefill.statement,
+    title: prefill.projectTitle ?? prefill.title.replace(/\?\s*$/, ''),
+    purpose: prefill.projectStatement ?? prefill.statement,
     sourceFindingKey: prefill.sourceFindingKey === '' ? null : prefill.sourceFindingKey,
     scope: prefill.linkedElements.map((e) => (e.type ? { elementId: e.id, name: e.name, elementType: e.type } : { elementId: e.id, name: e.name })),
   };

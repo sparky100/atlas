@@ -87,10 +87,10 @@ test("a weak tile says what's in hand: nothing at first, then the project starte
 
   // Start a project from the tile itself — its scope is already the capability.
   await tileCard.getByRole('link', { name: 'Start a project →' }).click();
-  await expect(page.getByLabel('Project title')).toHaveValue('Who supports Housing Repairs');
+  await expect(page.getByLabel('Project title')).toHaveValue('Meet Housing Repairs');
   await page.getByLabel('Architect').selectOption({ index: 1 });
   await page.getByRole('button', { name: 'Start project' }).click();
-  await expect(page.getByRole('heading', { name: 'Who supports Housing Repairs', level: 1 })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Meet Housing Repairs', level: 1 })).toBeVisible();
 
   // Back on Overview: the tile names the project and offers nothing to start.
   await showOverview(page);
@@ -101,8 +101,8 @@ test("a weak tile says what's in hand: nothing at first, then the project starte
   await expect(card.getByRole('link', { name: 'Start a decision →' })).toHaveCount(0);
 
   // The project link opens the project.
-  await card.getByRole('link', { name: 'Project: Who supports Housing Repairs' }).click();
-  await expect(page.getByRole('heading', { name: 'Who supports Housing Repairs', level: 1 })).toBeVisible();
+  await card.getByRole('link', { name: 'Project: Meet Housing Repairs' }).click();
+  await expect(page.getByRole('heading', { name: 'Meet Housing Repairs', level: 1 })).toBeVisible();
 });
 
 test("What's recent lists a project closed since the last version, and it leaves What we're doing", async ({ page }) => {
