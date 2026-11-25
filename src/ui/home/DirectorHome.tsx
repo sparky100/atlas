@@ -13,7 +13,7 @@ import type { MemberRole } from '../../db/types';
 import { formatDate } from '../time';
 import { CapabilityMapImportPanel } from '../capabilityMap/CapabilityMapImportPanel';
 import { attributesRecord } from '../elements/attributesRecord';
-import { decisionPrefillToSearchParams, prefillFromCapabilityNoSupportersFinding, prefillFromWeakFitCapabilities, prefillFromSystemAtEndOfLife } from '../decisions/decisionPrefill';
+import { decisionPrefillToSearchParams, prefillFromCapabilityNoSupportersFinding, prefillFromWeakFitCapabilities, prefillFromSystemAtEndOfLife, projectPrefillFromDecisionPrefill } from '../decisions/decisionPrefill';
 import { StartDecisionLink } from '../decisions/StartDecisionLink';
 import { GoalsWithoutCapabilityNote } from '../goals/GoalsWithoutCapabilityNote';
 import { PrincipleDeparturesNote } from '../principles/PrincipleDeparturesNote';
@@ -465,8 +465,11 @@ function CapabilityTile({ tile, orgSlug, modelSlug, emphasised, role, inHand }: 
   const tileCapability = { id: tile.capability.element_id, name: tile.capability.name };
   const canAct = tile.tone !== 'ok' && canStartDecision(role);
   const decisionsBase = `/o/${orgSlug}/m/${modelSlug}/decisions?`;
+  const projectsBase = `/o/${orgSlug}/m/${modelSlug}/projects?`;
   // A "no system recorded" tile is the capability-no-supporters finding, whose one home is this grid since 2026-10-03 (UI-principles §3) — its row keeps that finding's own prefill ("Who supports X?").
-  const noSystemHref = tile.tone === 'neutral' && canAct ? `${decisionsBase}${decisionPrefillToSearchParams(prefillFromCapabilityNoSupportersFinding(tileCapability)).toString()}` : null;
+  const noSystemPrefill = tile.tone === 'neutral' && canAct ? prefillFromCapabilityNoSupportersFinding(tileCapability) : null;
+  const noSystemHref = noSystemPrefill ? `${decisionsBase}${decisionPrefillToSearchParams(noSystemPrefill).toString()}` : null;
+  const noSystemProjectHref = noSystemPrefill && canStartProject(role) ? `${projectsBase}${decisionPrefillToSearchParams(projectPrefillFromDecisionPrefill(noSystemPrefill)).toString()}` : null;
   // F6.1: a second, independent "Start a decision" for the fit reason —
   // concerns are the individual poor-fit capabilities under this tile
   // (`prefillFromWeakFitCapabilities`), never the level-1 tile itself.
@@ -474,15 +477,19 @@ function CapabilityTile({ tile, orgSlug, modelSlug, emphasised, role, inHand }: 
   // replacement recorded (`weakFitAllReplacementPlanned`) — the fit pill
   // reads "replacement planned" instead in that case, nothing left to
   // start a decision about.
-  const startFitDecisionHref =
+  const fitPrefill =
     tile.weakFitCapabilities.length > 0 && !tile.weakFitAllReplacementPlanned && canStartDecision(role)
-      ? `/o/${orgSlug}/m/${modelSlug}/decisions?${decisionPrefillToSearchParams(prefillFromWeakFitCapabilities(tile.capability.name, tile.weakFitCapabilities.map((c) => ({ id: c.element_id, name: c.name })))).toString()}`
+      ? prefillFromWeakFitCapabilities(tile.capability.name, tile.weakFitCapabilities.map((c) => ({ id: c.element_id, name: c.name })))
       : null;
+  const startFitDecisionHref = fitPrefill ? `${decisionsBase}${decisionPrefillToSearchParams(fitPrefill).toString()}` : null;
   // UI-principles §3 (2026-10-04): once a project or decision is already
   // addressing this tile, it says so instead of offering to start another.
   const nothingInHand = isNothingInHand(inHand);
   const fitActionHref = nothingInHand ? startFitDecisionHref : null;
-  const rowActions = (href: string | null) => (nothingInHand && href !== null ? { decision: href, project: canStartProject(role) ? href.replace('/decisions?', '/projects?') : null } : null);
+  const fitActionProjectHref = fitActionHref !== null && fitPrefill !== null && canStartProject(role)
+    ? `${projectsBase}${decisionPrefillToSearchParams(projectPrefillFromDecisionPrefill(fitPrefill)).toString()}`
+    : null;
+  const rowActions = (decisionHref: string | null, projectHref: string | null) => (nothingInHand && decisionHref !== null ? { decision: decisionHref, project: canStartProject(role) ? projectHref : null } : null);
   const content = (
     <>
       <span className={styles.statusBar} data-tone={severity.tone} aria-hidden="true" />
@@ -540,17 +547,19 @@ function CapabilityTile({ tile, orgSlug, modelSlug, emphasised, role, inHand }: 
           {tile.exposedSystems.map((system) => {
             const lifecycleStatus = attributesRecord(system.attributes).lifecycleStatus;
             const replacementPlanned = tile.tone === 'info';
-            const href = canAct ? `${decisionsBase}${decisionPrefillToSearchParams(prefillFromSystemAtEndOfLife({ id: system.element_id, name: system.name }, tileCapability, replacementPlanned)).toString()}` : null;
+            const prefill = canAct ? prefillFromSystemAtEndOfLife({ id: system.element_id, name: system.name }, tileCapability, replacementPlanned) : null;
+            const href = prefill ? `${decisionsBase}${decisionPrefillToSearchParams(prefill).toString()}` : null;
+            const projectHref = prefill && canStartProject(role) ? `${projectsBase}${decisionPrefillToSearchParams(projectPrefillFromDecisionPrefill(prefill)).toString()}` : null;
             return (
               <IssueRow
                 key={system.element_id}
                 item={{ name: system.name, to: `/o/${orgSlug}/m/${modelSlug}/e/${system.element_id}` }}
                 problem={`${typeof lifecycleStatus === 'string' && lifecycleStatus !== '' ? lifecycleStatus : 'at end of life'}, ${replacementPlanned ? 'replacement planned' : 'no replacement'}`}
-                actions={rowActions(href)}
+                actions={rowActions(href, projectHref)}
               />
             );
           })}
-          {tile.tone === 'neutral' && <IssueRow item={{ name: tile.capability.name, to: href }} problem="has no system supporting it" actions={rowActions(noSystemHref)} />}
+          {tile.tone === 'neutral' && <IssueRow item={{ name: tile.capability.name, to: href }} problem="has no system supporting it" actions={rowActions(noSystemHref, noSystemProjectHref)} />}
         </ul>
       )}
       {emphasised && !tile.isOwned && (
@@ -575,6 +584,7 @@ function CapabilityTile({ tile, orgSlug, modelSlug, emphasised, role, inHand }: 
       {fitActionHref !== null && (
         <div className={styles.tileActions}>
           <StartDecisionLink href={fitActionHref} />
+          {fitActionProjectHref !== null && <StartProjectLink href={fitActionProjectHref} />}
         </div>
       )}
     </>

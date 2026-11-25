@@ -35,6 +35,17 @@ export interface DecisionPrefillLinkedElement {
 export interface DecisionPrefill {
   title: string;
   statement: string;
+  /**
+   * Project-facing title, when a project should be named for the work rather
+   * than for the decision question. `projectPrefillFromDecisionPrefill` falls
+   * back to `title` with a trailing question mark removed.
+   */
+  projectTitle?: string;
+  /**
+   * Project-facing purpose, when a project should say what work will be done
+   * rather than "a decision is needed". Falls back to `statement`.
+   */
+  projectStatement?: string;
   sourceFindingKey: string;
   /**
    * F6.1 ("make capability fit-for-purpose visible to directors"):
@@ -51,11 +62,27 @@ export interface DecisionPrefill {
   linkedElements: readonly DecisionPrefillLinkedElement[];
 }
 
+/**
+ * The same finding, written for a project rather than a decision. The project
+ * form reads this, so it never opens with "a decision is needed" when the
+ * person chose to start the work first.
+ */
+export function projectPrefillFromDecisionPrefill(prefill: DecisionPrefill): DecisionPrefill {
+  return {
+    title: prefill.projectTitle ?? prefill.title.replace(/\?\s*$/, ''),
+    statement: prefill.projectStatement ?? prefill.statement,
+    sourceFindingKey: prefill.sourceFindingKey,
+    linkedElements: prefill.linkedElements,
+  };
+}
+
 /** `findCriticalSystemsPastOrNearSupportEnd`'s own finding (`ArchitectHome.tsx`'s `critical-support-end` check) — F3's own named "SAP PM" golden path. */
 export function prefillFromCriticalSupportEndFinding(system: { id: UUID; name: string }): DecisionPrefill {
   return {
     title: `Replace ${system.name}?`,
     statement: `${system.name} is critical and past or near its vendor support end — a decision is needed on what replaces it.`,
+    projectTitle: `Replace ${system.name}`,
+    projectStatement: `${system.name} is critical and past or near its vendor support end. Work out the replacement options and when the switch must happen.`,
     sourceFindingKey: 'critical-support-end',
     linkedElements: [{ id: system.id, name: system.name, type: 'system' }],
   };
@@ -66,6 +93,8 @@ export function prefillFromWeakCapability(capability: { id: UUID; name: string }
   return {
     title: `What improves ${capability.name}?`,
     statement: `${capability.name} shows ${toneLabel} — a decision is needed on how to strengthen it.`,
+    projectTitle: `Strengthen ${capability.name}`,
+    projectStatement: `${capability.name} shows ${toneLabel}. Work out what would improve it and which option to investigate.`,
     sourceFindingKey: 'weak-capability',
     linkedElements: [{ id: capability.id, name: capability.name, type: 'capability' }],
   };
@@ -78,6 +107,10 @@ export function prefillFromSystemAtEndOfLife(system: { id: UUID; name: string },
     statement: replacementPlanned
       ? `${system.name} is at end of life and supports ${capability.name}; a replacement is planned — a decision is needed to confirm it.`
       : `${system.name} is at end of life and supports ${capability.name}, with no replacement recorded — a decision is needed on what replaces it.`,
+    projectTitle: `Replace ${system.name}`,
+    projectStatement: replacementPlanned
+      ? `${system.name} is at end of life and supports ${capability.name}; a replacement is planned. Work out whether to confirm it and when to switch.`
+      : `${system.name} is at end of life and supports ${capability.name}, with no replacement recorded. Work out the replacement options and when to switch.`,
     sourceFindingKey: 'weak-capability',
     linkedElements: [
       { id: system.id, name: system.name, type: 'system' },
@@ -106,6 +139,8 @@ export function prefillFromWeakFitCapabilities(tileCapabilityName: string, capab
   return {
     title: `What improves fit under ${tileCapabilityName}?`,
     statement: `${isPlural ? `${String(capabilities.length)} capabilities under ${tileCapabilityName}` : `${names}, under ${tileCapabilityName},`} rated a poor or adequate fit${isPlural ? ` (${names})` : ''} — a decision is needed on how to improve ${isPlural ? 'them' : 'it'}.`,
+    projectTitle: `Improve fit under ${tileCapabilityName}`,
+    projectStatement: `${isPlural ? `${String(capabilities.length)} capabilities under ${tileCapabilityName}` : `${names}, under ${tileCapabilityName},`} rated a poor or adequate fit${isPlural ? ` (${names})` : ''}. Work out what would improve fit and which option to investigate.`,
     sourceFindingKey: 'poor-fit-director',
     linkedElements: capabilities.map((c) => ({ id: c.id, name: c.name, type: 'capability' as const })),
   };
@@ -116,6 +151,8 @@ export function prefillFromCriticalExposedFinding(system: { id: UUID; name: stri
   return {
     title: `Replace ${system.name}?`,
     statement: `${system.name} is critical and exposed with no planned replacement — a decision is needed on what replaces it.`,
+    projectTitle: `Replace ${system.name}`,
+    projectStatement: `${system.name} is critical with no planned replacement. Work out what should replace it and how exposure is reduced.`,
     sourceFindingKey: 'critical-exposed',
     linkedElements: [{ id: system.id, name: system.name, type: 'system' }],
   };
@@ -126,6 +163,8 @@ export function prefillFromCapabilityNoSupportersFinding(capability: { id: UUID;
   return {
     title: `Who supports ${capability.name}?`,
     statement: `${capability.name} has no known supporting system — a decision is needed on how it should be supported.`,
+    projectTitle: `Meet ${capability.name}`,
+    projectStatement: `No system is recorded as supporting ${capability.name}. Work out what the capability needs, who relies on it, and which option to investigate — extend, buy or build.`,
     sourceFindingKey: 'capability-no-supporters',
     linkedElements: [{ id: capability.id, name: capability.name, type: 'capability' }],
   };
@@ -136,6 +175,8 @@ export function prefillFromWeakStage(stage: { id: UUID; name: string }, toneLabe
   return {
     title: `What improves ${stage.name}?`,
     statement: `${stage.name} shows ${toneLabel} — a decision is needed on how to strengthen the capabilities that enable it.`,
+    projectTitle: `Strengthen ${stage.name}`,
+    projectStatement: `${stage.name} shows ${toneLabel}. Work out what would strengthen the capabilities that enable it.`,
     sourceFindingKey: 'weak-stage',
     linkedElements: [{ id: stage.id, name: stage.name, type: 'value_stream' }],
   };
@@ -156,6 +197,8 @@ export function prefillFromSystemWithoutCapability(system: { id: UUID; name: str
   return {
     title: `Keep, link or retire ${system.name}?`,
     statement: `${system.name} has no capability link recorded. A decision is needed on whether it supports a capability that should be linked, or whether retiring it should be investigated. No business use has been ruled in or out.`,
+    projectTitle: `Decide the future of ${system.name}`,
+    projectStatement: `${system.name} has no capability link recorded. Work out whether it supports a capability, and whether to link, retire or leave it. No business use has been ruled in or out.`,
     sourceFindingKey: 'unlinked-systems',
     linkedElements: [{ id: system.id, name: system.name, type: 'system' }],
   };
@@ -165,6 +208,8 @@ export function prefillFromOutgoingDisposition(element: { id: UUID; name: string
   return {
     title: disposition === 'migrate' ? `Move ${element.name} to another system` : `Switch off ${element.name}`,
     statement: `${element.name} is planned to ${disposition === 'migrate' ? 'move to another system' : 'be switched off'}, with no open change retiring it yet.`,
+    projectTitle: disposition === 'migrate' ? `Move ${element.name} to another system` : `Switch off ${element.name}`,
+    projectStatement: `${element.name} is planned to ${disposition === 'migrate' ? 'move to another system' : 'be switched off'}, with no open change retiring it yet. Work out the steps and when the switch happens.`,
     sourceFindingKey: 'outgoing-no-retiring-change',
     linkedElements: [{ id: element.id, name: element.name }],
   };

@@ -8,7 +8,7 @@ import { compactDecision, optionSurface, ratingControl } from './fixtures/decisi
 import { expect, test, type Page } from '@playwright/test';
 import { addCapability, addSystemFromHome, clickNavItem, expectNavCurrent, goToModelHome, signUpCreateOrgAndModel } from './fixtures/goldenPath';
 
-const PROJECT_TITLE = 'Who supports Housing Repairs';
+const PROJECT_TITLE = 'Meet Housing Repairs';
 
 async function openProject(page: Page): Promise<void> {
   await clickNavItem(page, 'Projects');

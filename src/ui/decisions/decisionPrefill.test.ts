@@ -9,6 +9,7 @@ import { startDecisionFromElementHref,
   prefillFromSystemAtEndOfLife,
   prefillFromSystemWithoutCapability,
   prefillFromWeakCapability,
+  projectPrefillFromDecisionPrefill,
 } from './decisionPrefill';
 
 describe('decisionPrefill', () => {
@@ -17,6 +18,8 @@ describe('decisionPrefill', () => {
     expect(prefill.title).toContain('SAP PM');
     expect(prefill.statement).toContain('SAP PM');
     expect(prefill.sourceFindingKey).toBe('critical-support-end');
+    expect(prefill.projectTitle).toBe('Replace SAP PM');
+    expect(prefill.projectStatement).toContain('Work out the replacement options');
     expect(prefill.linkedElements).toEqual([{ id: 'sys-1', name: 'SAP PM', type: 'system' }]);
   });
 
@@ -42,7 +45,19 @@ describe('decisionPrefill', () => {
     expect(prefill.statement).toContain('Adult Social Care');
     expect(prefill.statement).toContain('no known supporting system');
     expect(prefill.sourceFindingKey).toBe('capability-no-supporters');
+    expect(prefill.projectTitle).toBe('Meet Adult Social Care');
+    expect(prefill.projectStatement).toContain('No system is recorded as supporting Adult Social Care');
     expect(prefill.linkedElements).toEqual([{ id: 'cap-2', name: 'Adult Social Care', type: 'capability' }]);
+  });
+
+  it('turns a finding prefill into a project voice without changing its finding or scope', () => {
+    const decision = prefillFromCapabilityNoSupportersFinding({ id: 'cap-2', name: 'Adult Social Care' });
+    const project = projectPrefillFromDecisionPrefill(decision);
+    expect(project.title).toBe('Meet Adult Social Care');
+    expect(project.statement).toBe(decision.projectStatement);
+    expect(project.sourceFindingKey).toBe('capability-no-supporters');
+    expect(project.linkedElements).toEqual(decision.linkedElements);
+    expect(decision.title).toBe('Who supports Adult Social Care?');
   });
 
   describe('prefillFromWeakFitCapabilities (F6.1: fit visible to directors)', () => {
@@ -72,7 +87,8 @@ describe('decisionPrefill', () => {
     const prefill = prefillFromCriticalSupportEndFinding({ id: 'sys-1', name: 'SAP PM' });
     const params = decisionPrefillToSearchParams(prefill);
     const parsed = parseDecisionPrefillFromSearchParams(params);
-    expect(parsed).toEqual(prefill);
+    // The project-only fields are deliberately not carried in a decision link.
+    expect(parsed).toEqual({ title: prefill.title, statement: prefill.statement, sourceFindingKey: prefill.sourceFindingKey, linkedElements: prefill.linkedElements });
   });
 
   it('round-trips a multi-element prefill (order preserved) through URLSearchParams', () => {
@@ -82,14 +98,14 @@ describe('decisionPrefill', () => {
     ]);
     const params = decisionPrefillToSearchParams(prefill);
     const parsed = parseDecisionPrefillFromSearchParams(params);
-    expect(parsed).toEqual(prefill);
+    expect(parsed).toEqual({ title: prefill.title, statement: prefill.statement, sourceFindingKey: prefill.sourceFindingKey, linkedElements: prefill.linkedElements });
   });
 
   it('round-trips a title/statement containing "&" and other URL-hostile characters', () => {
     const prefill = prefillFromWeakCapability({ id: 'cap-1', name: 'Risk & Compliance' }, 'no known supporters');
     const params = decisionPrefillToSearchParams(prefill);
     const parsed = parseDecisionPrefillFromSearchParams(new URLSearchParams(params.toString()));
-    expect(parsed).toEqual(prefill);
+    expect(parsed).toEqual({ title: prefill.title, statement: prefill.statement, sourceFindingKey: prefill.sourceFindingKey, linkedElements: prefill.linkedElements });
   });
 
   it('returns null when any expected param is missing (a bare /decisions link, or a stripped param)', () => {

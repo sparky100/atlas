@@ -60,12 +60,23 @@ export function bandAction(problems: readonly CapabilityProblem[]): 'project' | 
 }
 
 /**
- * The project purpose to start from: each poor-fit reason someone already wrote on the capability, one line per system,
- * with where it came from, so nothing is retyped and it can be corrected at the source. Empty when nobody wrote a reason.
+ * The project purpose to start from. Each poor-fit reason someone already wrote is kept, one line per system, with
+ * where it came from, so nothing is retyped and it can be corrected at the source. A capability with no supporter gets
+ * the finding's own project-shaped default instead of an empty box. Empty only when there is nothing project-shaped.
  */
-export function purposeFromProblems(problems: readonly CapabilityProblem[]): string {
+export function purposeFromProblems(problems: readonly CapabilityProblem[], capabilityName = ''): string {
+  const noSupporter = problems.some((p) => p.kind === 'no-supporter');
+  if (noSupporter) {
+    const subject = capabilityName.trim() === '' ? 'this capability' : capabilityName.trim();
+    return `No system is recorded as supporting ${subject}. Work out what it needs, who relies on it, and which option to investigate — extend, buy or build.`;
+  }
   return problems
     .filter((p) => p.kind === 'poor-fit' && p.reason !== null && p.systemName !== null)
     .map((p) => `${p.systemName ?? ''}: ${p.reason ?? ''} (From the fit note on ${p.systemName ?? ''}.)`)
     .join('\n');
+}
+
+/** The stable health-finding key behind the band's project action, when there is one. */
+export function bandFindingKey(problems: readonly CapabilityProblem[]): string {
+  return problems.some((p) => p.kind === 'no-supporter') ? 'capability-no-supporters' : '';
 }
