@@ -89,7 +89,7 @@ test('project pack: decide and design inside a project, attach evidence, downloa
 
   // The pack, as Markdown: every section, with real content.
   const md = await download(page, 'Download project pack as Markdown');
-  expect(md.name).toMatch(/-who-supports-housing-repairs-pack-\d{4}-\d{2}-\d{2}\.md$/);
+  expect(md.name).toMatch(/-meet-housing-repairs-pack-\d{4}-\d{2}-\d{2}\.md$/);
   const text = md.bytes.toString('utf8');
   expect(text).toContain(`# Project pack: ${PROJECT_TITLE}`);
   expect(text).toContain('## Purpose');
@@ -103,7 +103,7 @@ test('project pack: decide and design inside a project, attach evidence, downloa
 
   // And as PDF.
   const pdf = await download(page, 'Download project pack as PDF');
-  expect(pdf.name).toMatch(/-who-supports-housing-repairs-pack-\d{4}-\d{2}-\d{2}\.pdf$/);
+  expect(pdf.name).toMatch(/-meet-housing-repairs-pack-\d{4}-\d{2}-\d{2}\.pdf$/);
   expect(pdf.bytes.subarray(0, 5).toString('latin1')).toBe('%PDF-');
 
   const overflow = await page.evaluate(() => document.documentElement.scrollWidth > document.documentElement.clientWidth + 1);
