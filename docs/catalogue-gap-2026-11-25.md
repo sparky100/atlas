@@ -113,6 +113,20 @@ EA Technology's "apps" are four VisNet SaaS app families (Reliability, Capacity,
 
 The second wave is VisNet Design (9.4, 10.2), VisNet Forecast (9.4, 9.2), UltraTEV Plus² (9.3, 13.2) and the VisNet Hub/View/Reclose² devices (9.3, 10.1). The Power Quality app has no exact capability code in this map, so it was not forced in.
 
+## Vendor batch 2 checked (25 November 2026)
+
+| Product | Capabilities | Status |
+|---|---|---|
+| Depotnet | 13.4 Streetworks & Permits | Added |
+| Siemens Spectrum Power ADMS | 10.1 Outage & Fault; 10.6 Control Room | Added |
+| Hitachi Energy Network Manager ADMS | 10.1; 10.6; 10.4 DSO | Added |
+| SurvalentONE ADMS | 10.1; 10.6 | Added |
+| DIgSILENT PowerFactory | 9.4 Network Planning; 10.2 Connections | Added |
+| CGI OpenGrid EAM | 9.5 Asset Inspection; 13.2 Planned Maintenance | Added |
+| CGI OpenGrid DERMS | 10.4 DSO; 10.5 Flexibility Markets | Added |
+
+**Still open:** 13.5 Land, Wayleaves & Consents. Wayl-Ease is a UK Power Networks innovation beta, not a commercial product page; Trimble and Esri land-management products remain candidates. 10.3 Emergency Response, 11.2 PSR, 11.3 Guaranteed Standards, 12.x regulatory reporting and 13.7 Contractor Management still have no product.
+
 ## Recommended next wave
 
 Add no more than eight entries in the next review, so each can be checked properly:

@@ -4,7 +4,7 @@
   "capabilityMapVersion": 4,
   "status": "draft",
   "title": "Electricity network product catalogue, version 2",
-  "sourceDescription": "Version 2, checked 25 November 2026. It corrects broken and redirected source links, updates products that have been renamed or sold (Octave Attune EAM, formerly HxGN EAM; Siemens Gridscale X Meter Data Management, formerly EnergyIP; Oracle Utilities Customer Service and Billing; Salesforce Field Service and Operations), adds capability links the vendor page already supports, and adds reviewed-candidate products for previously uncovered capabilities, including EA Technology's VisNet Connect, Reliability Apps, Capacity Apps, Invest and Astute HV Monitoring. Every new or changed claim is Pending review until a named reviewer signs it; unchanged claims keep their original review. Coverage is deliberately a first slice.",
+  "sourceDescription": "Version 2, checked 25 November 2026. It corrects broken and redirected links, updates products that were renamed or sold, extends existing entries where the vendor page supports more capabilities, and adds reviewed-candidate products including EA Technology's VisNet apps and the Siemens, Hitachi Energy, Survalent, DIgSILENT, CGI and Depotnet products below. Every new or changed claim is Pending review until a named reviewer signs it; unchanged claims keep their original review. Coverage is deliberately a first slice.",
   "licence": "CC-BY-4.0",
   "entries": [
     {
@@ -922,6 +922,209 @@
           "kind": "functional",
           "statement": "The vendor describes Astute HV Monitoring as a permanently installed partial discharge monitoring system for high-voltage switchgear and cabling that flags developing insulation issues in real time.",
           "sourceUrl": "https://www.eatechnology.com/solutions/asset-management-condition/astute",
+          "sourceDate": "2026-11-25",
+          "reviewedBy": "Pending review",
+          "reviewedAt": "2026-11-25"
+        }
+      ]
+    },
+    {
+      "code": "depotnet",
+      "product": "Depotnet",
+      "vendor": "Depotnet",
+      "summary": "Job management software for utilities that manages permits, street works and safe digging, with DfT Street Manager integration.",
+      "capabilities": [
+        {
+          "code": "13.4",
+          "name": "Streetworks & Permits",
+          "howItSupports": "Manages permits, street works and safe digging, with DfT Street Manager integration."
+        }
+      ],
+      "claims": [
+        {
+          "position": 1,
+          "kind": "functional",
+          "statement": "The vendor describes Depotnet as job management software for utilities that manages permits, street works and safe digging, with direct DfT Street Manager integration.",
+          "sourceUrl": "https://www.depotnet.co.uk/",
+          "sourceDate": "2026-11-25",
+          "reviewedBy": "Pending review",
+          "reviewedAt": "2026-11-25"
+        }
+      ]
+    },
+    {
+      "code": "siemens-spectrum-power-adms",
+      "product": "Spectrum Power ADMS",
+      "vendor": "Siemens",
+      "summary": "An integrated distribution management system that unifies SCADA and outage management for distribution grids.",
+      "capabilities": [
+        {
+          "code": "10.1",
+          "name": "Outage & Fault Management",
+          "howItSupports": "Unifies SCADA and outage management with an automated outage workflow."
+        },
+        {
+          "code": "10.6",
+          "name": "Control Room & Real-Time Operations",
+          "howItSupports": "Provides SCADA monitoring, alarming and control with a control-centre visual cockpit."
+        }
+      ],
+      "claims": [
+        {
+          "position": 1,
+          "kind": "functional",
+          "statement": "Siemens describes Spectrum Power ADMS as an integrated software system that unifies SCADA functionality and outage management to manage, orchestrate and optimize distribution grids.",
+          "sourceUrl": "https://www.siemens.com/en-us/products/spectrum-power/advanced-distribution-management/",
+          "sourceDate": "2026-11-25",
+          "reviewedBy": "Pending review",
+          "reviewedAt": "2026-11-25"
+        }
+      ]
+    },
+    {
+      "code": "hitachi-energy-network-manager-adms",
+      "product": "Network Manager ADMS",
+      "vendor": "Hitachi Energy",
+      "summary": "An integrated distribution management system with SCADA, outage management, network analysis and DERMS.",
+      "capabilities": [
+        {
+          "code": "10.1",
+          "name": "Outage & Fault Management",
+          "howItSupports": "Outage management includes outage prediction, FLISR and crew management."
+        },
+        {
+          "code": "10.6",
+          "name": "Control Room & Real-Time Operations",
+          "howItSupports": "Provides SCADA monitoring and control with a unified operator interface."
+        },
+        {
+          "code": "10.4",
+          "name": "Distribution System Operation",
+          "howItSupports": "Includes grid-aware DERMS and network optimization."
+        }
+      ],
+      "claims": [
+        {
+          "position": 1,
+          "kind": "functional",
+          "statement": "Hitachi Energy describes Network Manager ADMS as an integrated solution for distribution management with real-time monitoring and control, network analysis, network optimization and outage management.",
+          "sourceUrl": "https://hitachienergy.com/products-and-solutions/scada/network-management/network-manager-adms",
+          "sourceDate": "2026-11-25",
+          "reviewedBy": "Pending review",
+          "reviewedAt": "2026-11-25"
+        }
+      ]
+    },
+    {
+      "code": "survalentone-adms",
+      "product": "SurvalentONE ADMS",
+      "vendor": "Survalent",
+      "summary": "A fully integrated SCADA, OMS and DMS platform for distribution operations.",
+      "capabilities": [
+        {
+          "code": "10.1",
+          "name": "Outage & Fault Management",
+          "howItSupports": "Integrates OMS with FLISR and fault location."
+        },
+        {
+          "code": "10.6",
+          "name": "Control Room & Real-Time Operations",
+          "howItSupports": "Provides a unified SCADA, OMS and DMS operator interface."
+        }
+      ],
+      "claims": [
+        {
+          "position": 1,
+          "kind": "functional",
+          "statement": "Survalent describes SurvalentONE ADMS as a fully integrated SCADA, OMS and DMS solution that delivers real-time operational intelligence.",
+          "sourceUrl": "https://www.survalent.com/products/survalentone-adms/",
+          "sourceDate": "2026-11-25",
+          "reviewedBy": "Pending review",
+          "reviewedAt": "2026-11-25"
+        }
+      ]
+    },
+    {
+      "code": "digsilent-powerfactory",
+      "product": "PowerFactory",
+      "vendor": "DIgSILENT",
+      "summary": "Power system analysis software for generation, transmission, distribution and industrial networks.",
+      "capabilities": [
+        {
+          "code": "9.4",
+          "name": "Network Planning & Load Forecasting",
+          "howItSupports": "Provides load-flow, distribution network analysis and connection request assessment."
+        },
+        {
+          "code": "10.2",
+          "name": "Connections",
+          "howItSupports": "Assesses connection requests against network capacity and constraints."
+        }
+      ],
+      "claims": [
+        {
+          "position": 1,
+          "kind": "functional",
+          "statement": "DIgSILENT describes PowerFactory as power system analysis software for generation, transmission, distribution and industrial systems, including load-flow and distribution network analysis.",
+          "sourceUrl": "https://www.digsilent.de/en/powerfactory.html",
+          "sourceDate": "2026-11-25",
+          "reviewedBy": "Pending review",
+          "reviewedAt": "2026-11-25"
+        }
+      ]
+    },
+    {
+      "code": "cgi-opengrid-eam",
+      "product": "CGI OpenGrid EAM",
+      "vendor": "CGI",
+      "summary": "Enterprise asset management for utility transmission and distribution, combining work management, asset health and field mobility.",
+      "capabilities": [
+        {
+          "code": "9.5",
+          "name": "Asset Inspection & Maintenance",
+          "howItSupports": "Combines asset health, work management and field mobility for T&D assets."
+        },
+        {
+          "code": "13.2",
+          "name": "Planned Maintenance & Inspection",
+          "howItSupports": "Plans and executes corrective, preventive and capital work orders."
+        }
+      ],
+      "claims": [
+        {
+          "position": 1,
+          "kind": "functional",
+          "statement": "CGI describes its OpenGrid EAM as combining work management, asset health, workforce scheduling, field mobility and analytics for utility asset management.",
+          "sourceUrl": "https://www.cgi.com/us/en-us/utilities/enterprise-asset-management",
+          "sourceDate": "2026-11-25",
+          "reviewedBy": "Pending review",
+          "reviewedAt": "2026-11-25"
+        }
+      ]
+    },
+    {
+      "code": "cgi-opengrid-derms",
+      "product": "CGI OpenGrid DERMS",
+      "vendor": "CGI",
+      "summary": "A network-model-based DER management system for visibility, orchestration and optimization of distributed energy resources.",
+      "capabilities": [
+        {
+          "code": "10.4",
+          "name": "Distribution System Operation",
+          "howItSupports": "Regulates and optimizes DERs within network operations."
+        },
+        {
+          "code": "10.5",
+          "name": "Flexibility Markets",
+          "howItSupports": "Schedules and dispatches DERs in response to market and grid signals."
+        }
+      ],
+      "claims": [
+        {
+          "position": 1,
+          "kind": "functional",
+          "statement": "CGI describes OpenGrid DERMS as a network-model-based system that provides visibility and real-time orchestration and optimization of distributed energy resources.",
+          "sourceUrl": "https://cgi.com/en/utilities/cgi-opengrid-derms",
           "sourceDate": "2026-11-25",
           "reviewedBy": "Pending review",
           "reviewedAt": "2026-11-25"

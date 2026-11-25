@@ -16,14 +16,14 @@ This export is generated from the two draft catalogue files: `content/catalogue/
 
 | Sector | Version | Pinned map | Entries | Capabilities covered | Entries pending review |
 | --- | ---: | ---: | ---: | ---: | ---: |
-| Electricity network | 2 | v4 | 33 | 24 of 84 | 23 |
-| Any organisation | 2 | v2 | 12 | 38 of 70 | 12 |
+| Electricity network | 2 | v4 | 40 | 25 of 84 | 30 |
+| Any organisation | 2 | v2 | 16 | 47 of 70 | 16 |
 
 ## Electricity network
 
-**Version:** 2 · **Pinned map:** v4 · **Entries:** 33 · **Coverage:** 24 of 84 capabilities · **Pending review:** 23 of 33 entries
+**Version:** 2 · **Pinned map:** v4 · **Entries:** 40 · **Coverage:** 25 of 84 capabilities · **Pending review:** 30 of 40 entries
 
-**Description:** Version 2, checked 25 November 2026. It corrects broken and redirected source links, updates products that have been renamed or sold (Octave Attune EAM, formerly HxGN EAM; Siemens Gridscale X Meter Data Management, formerly EnergyIP; Oracle Utilities Customer Service and Billing; Salesforce Field Service and Operations), adds capability links the vendor page already supports, and adds reviewed-candidate products for previously uncovered capabilities, including EA Technology's VisNet Connect, Reliability Apps, Capacity Apps, Invest and Astute HV Monitoring. Every new or changed claim is Pending review until a named reviewer signs it; unchanged claims keep their original review. Coverage is deliberately a first slice.
+**Description:** Version 2, checked 25 November 2026. It corrects broken and redirected links, updates products that were renamed or sold, extends existing entries where the vendor page supports more capabilities, and adds reviewed-candidate products including EA Technology's VisNet apps and the Siemens, Hitachi Energy, Survalent, DIgSILENT, CGI and Depotnet products below. Every new or changed claim is Pending review until a named reviewer signs it; unchanged claims keep their original review. Coverage is deliberately a first slice.
 
 ### Coverage
 
@@ -37,20 +37,21 @@ This export is generated from the two draft catalogue files: `content/catalogue/
 | 9.1 | Network Asset Health Indices | IBM Maximo Application Suite; IFS Copperleaf; Cascade; Invest |
 | 9.2 | Network Investment Planning | IBM Maximo Application Suite; IFS Copperleaf; Invest |
 | 9.3 | Substation & Circuit Condition Monitoring | DynamicMetrix; Cascade; Astute HV Monitoring |
-| 9.4 | Network Planning & Load Forecasting | Esri ArcGIS Utility Network; GE Vernova Smallworld Geo Network Management; LAEP+; VisNet Connect; VisNet Capacity Apps |
-| 9.5 | Asset Inspection & Maintenance | IBM Maximo Application Suite; SAP Asset Management; Octave Attune EAM |
-| 10.1 | Outage & Fault Management | Schneider Electric EcoStruxure ADMS; GE Vernova GridOS for Distribution; VisNet Reliability Apps |
-| 10.2 | Connections | IDNO itc; LAEP+; VisNet Connect |
-| 10.4 | Distribution System Operation | VisNet Capacity Apps |
-| 10.5 | Flexibility Markets | Piclo |
-| 10.6 | Control Room & Real-Time Operations | Schneider Electric EcoStruxure ADMS; GE Vernova GridOS for Distribution |
+| 9.4 | Network Planning & Load Forecasting | Esri ArcGIS Utility Network; GE Vernova Smallworld Geo Network Management; LAEP+; VisNet Connect; VisNet Capacity Apps; PowerFactory |
+| 9.5 | Asset Inspection & Maintenance | IBM Maximo Application Suite; SAP Asset Management; Octave Attune EAM; CGI OpenGrid EAM |
+| 10.1 | Outage & Fault Management | Schneider Electric EcoStruxure ADMS; GE Vernova GridOS for Distribution; VisNet Reliability Apps; Spectrum Power ADMS; Network Manager ADMS; SurvalentONE ADMS |
+| 10.2 | Connections | IDNO itc; LAEP+; VisNet Connect; PowerFactory |
+| 10.4 | Distribution System Operation | VisNet Capacity Apps; Network Manager ADMS; CGI OpenGrid DERMS |
+| 10.5 | Flexibility Markets | Piclo; CGI OpenGrid DERMS |
+| 10.6 | Control Room & Real-Time Operations | Schneider Electric EcoStruxure ADMS; GE Vernova GridOS for Distribution; Spectrum Power ADMS; Network Manager ADMS; SurvalentONE ADMS |
 | 11.1 | Smart Metering Data | Siemens Gridscale X Meter Data Management; Oracle Utilities Meter Data Management |
 | 11.4 | Connection Quotations | Microsoft Dynamics 365 Customer Service; Salesforce Energy & Utilities Cloud; VisNet Connect |
 | 11.5 | Billing & Settlement | Oracle Utilities Customer Service and Billing |
 | 11.6 | Vulnerable Customer Support | TellJO Customer Wellbeing Checks |
 | 13.1 | Capital Projects & Construction | Oracle Primavera Unifier; Oracle Primavera P6; Microsoft Project |
-| 13.2 | Planned Maintenance & Inspection | IBM Maximo Application Suite; Octave Attune EAM; Cascade; Utility Works Management; Astute HV Monitoring |
+| 13.2 | Planned Maintenance & Inspection | IBM Maximo Application Suite; Octave Attune EAM; Cascade; Utility Works Management; Astute HV Monitoring; CGI OpenGrid EAM |
 | 13.3 | Field Workforce Scheduling & Dispatch | Microsoft Dynamics 365 Field Service; Salesforce Field Service and Operations |
+| 13.4 | Streetworks & Permits | Depotnet |
 | 13.6 | Vegetation Management | KaarbonTech Tree SMART |
 | 13.7 | Contractor Management | Utility Works Management |
 
@@ -611,9 +612,128 @@ A permanently installed partial-discharge monitoring service for HV switchgear a
   - Source: [https://www.eatechnology.com/solutions/asset-management-condition/astute](https://www.eatechnology.com/solutions/asset-management-condition/astute) — checked 2026-11-25
   - Reviewer: Pending review — 2026-11-25
 
+#### 34. Depotnet — Depotnet
+
+`depotnet` · **claims pending review**
+
+Job management software for utilities that manages permits, street works and safe digging, with DfT Street Manager integration.
+
+| Code | Capability | How it supports it |
+| --- | --- | --- |
+| 13.4 | Streetworks & Permits | Manages permits, street works and safe digging, with DfT Street Manager integration. |
+
+**Claims**
+
+- **functional.** The vendor describes Depotnet as job management software for utilities that manages permits, street works and safe digging, with direct DfT Street Manager integration.
+  - Source: [https://www.depotnet.co.uk/](https://www.depotnet.co.uk/) — checked 2026-11-25
+  - Reviewer: Pending review — 2026-11-25
+
+#### 35. Spectrum Power ADMS — Siemens
+
+`siemens-spectrum-power-adms` · **claims pending review**
+
+An integrated distribution management system that unifies SCADA and outage management for distribution grids.
+
+| Code | Capability | How it supports it |
+| --- | --- | --- |
+| 10.1 | Outage & Fault Management | Unifies SCADA and outage management with an automated outage workflow. |
+| 10.6 | Control Room & Real-Time Operations | Provides SCADA monitoring, alarming and control with a control-centre visual cockpit. |
+
+**Claims**
+
+- **functional.** Siemens describes Spectrum Power ADMS as an integrated software system that unifies SCADA functionality and outage management to manage, orchestrate and optimize distribution grids.
+  - Source: [https://www.siemens.com/en-us/products/spectrum-power/advanced-distribution-management/](https://www.siemens.com/en-us/products/spectrum-power/advanced-distribution-management/) — checked 2026-11-25
+  - Reviewer: Pending review — 2026-11-25
+
+#### 36. Network Manager ADMS — Hitachi Energy
+
+`hitachi-energy-network-manager-adms` · **claims pending review**
+
+An integrated distribution management system with SCADA, outage management, network analysis and DERMS.
+
+| Code | Capability | How it supports it |
+| --- | --- | --- |
+| 10.1 | Outage & Fault Management | Outage management includes outage prediction, FLISR and crew management. |
+| 10.6 | Control Room & Real-Time Operations | Provides SCADA monitoring and control with a unified operator interface. |
+| 10.4 | Distribution System Operation | Includes grid-aware DERMS and network optimization. |
+
+**Claims**
+
+- **functional.** Hitachi Energy describes Network Manager ADMS as an integrated solution for distribution management with real-time monitoring and control, network analysis, network optimization and outage management.
+  - Source: [https://hitachienergy.com/products-and-solutions/scada/network-management/network-manager-adms](https://hitachienergy.com/products-and-solutions/scada/network-management/network-manager-adms) — checked 2026-11-25
+  - Reviewer: Pending review — 2026-11-25
+
+#### 37. SurvalentONE ADMS — Survalent
+
+`survalentone-adms` · **claims pending review**
+
+A fully integrated SCADA, OMS and DMS platform for distribution operations.
+
+| Code | Capability | How it supports it |
+| --- | --- | --- |
+| 10.1 | Outage & Fault Management | Integrates OMS with FLISR and fault location. |
+| 10.6 | Control Room & Real-Time Operations | Provides a unified SCADA, OMS and DMS operator interface. |
+
+**Claims**
+
+- **functional.** Survalent describes SurvalentONE ADMS as a fully integrated SCADA, OMS and DMS solution that delivers real-time operational intelligence.
+  - Source: [https://www.survalent.com/products/survalentone-adms/](https://www.survalent.com/products/survalentone-adms/) — checked 2026-11-25
+  - Reviewer: Pending review — 2026-11-25
+
+#### 38. PowerFactory — DIgSILENT
+
+`digsilent-powerfactory` · **claims pending review**
+
+Power system analysis software for generation, transmission, distribution and industrial networks.
+
+| Code | Capability | How it supports it |
+| --- | --- | --- |
+| 9.4 | Network Planning & Load Forecasting | Provides load-flow, distribution network analysis and connection request assessment. |
+| 10.2 | Connections | Assesses connection requests against network capacity and constraints. |
+
+**Claims**
+
+- **functional.** DIgSILENT describes PowerFactory as power system analysis software for generation, transmission, distribution and industrial systems, including load-flow and distribution network analysis.
+  - Source: [https://www.digsilent.de/en/powerfactory.html](https://www.digsilent.de/en/powerfactory.html) — checked 2026-11-25
+  - Reviewer: Pending review — 2026-11-25
+
+#### 39. CGI OpenGrid EAM — CGI
+
+`cgi-opengrid-eam` · **claims pending review**
+
+Enterprise asset management for utility transmission and distribution, combining work management, asset health and field mobility.
+
+| Code | Capability | How it supports it |
+| --- | --- | --- |
+| 9.5 | Asset Inspection & Maintenance | Combines asset health, work management and field mobility for T&D assets. |
+| 13.2 | Planned Maintenance & Inspection | Plans and executes corrective, preventive and capital work orders. |
+
+**Claims**
+
+- **functional.** CGI describes its OpenGrid EAM as combining work management, asset health, workforce scheduling, field mobility and analytics for utility asset management.
+  - Source: [https://www.cgi.com/us/en-us/utilities/enterprise-asset-management](https://www.cgi.com/us/en-us/utilities/enterprise-asset-management) — checked 2026-11-25
+  - Reviewer: Pending review — 2026-11-25
+
+#### 40. CGI OpenGrid DERMS — CGI
+
+`cgi-opengrid-derms` · **claims pending review**
+
+A network-model-based DER management system for visibility, orchestration and optimization of distributed energy resources.
+
+| Code | Capability | How it supports it |
+| --- | --- | --- |
+| 10.4 | Distribution System Operation | Regulates and optimizes DERs within network operations. |
+| 10.5 | Flexibility Markets | Schedules and dispatches DERs in response to market and grid signals. |
+
+**Claims**
+
+- **functional.** CGI describes OpenGrid DERMS as a network-model-based system that provides visibility and real-time orchestration and optimization of distributed energy resources.
+  - Source: [https://cgi.com/en/utilities/cgi-opengrid-derms](https://cgi.com/en/utilities/cgi-opengrid-derms) — checked 2026-11-25
+  - Reviewer: Pending review — 2026-11-25
+
 ### Still uncovered
 
-60 of 84 capabilities have no product.
+59 of 84 capabilities have no product.
 
 | Area | Uncovered capabilities |
 | --- | --- |
@@ -628,34 +748,39 @@ A permanently installed partial-discharge monitoring service for HV switchgear a
 | 10 Network Operations | 10 Network Operations; 10.3 Emergency Response |
 | 11 Customer & Metering | 11 Customer & Metering; 11.2 Priority Services Register; 11.3 Guaranteed Standards Payments |
 | 12 Regulatory Compliance & Price-Control Reporting | 12 Regulatory Compliance & Price-Control Reporting; 12.1 Ofgem Regulatory Reporting; 12.2 RIIO Price-Control Business Plan; 12.3 Interruptions Incentive Reporting; 12.4 Network Access & Charging; 12.5 Industry Codes Compliance; 12.6 Health, Safety & Environment |
-| 13 Network Delivery & Maintenance | 13 Network Delivery & Maintenance; 13.4 Streetworks & Permits; 13.5 Land, Wayleaves & Consents |
+| 13 Network Delivery & Maintenance | 13 Network Delivery & Maintenance; 13.5 Land, Wayleaves & Consents |
 
 ## Any organisation
 
-**Version:** 2 · **Pinned map:** v2 · **Entries:** 12 · **Coverage:** 38 of 70 capabilities · **Pending review:** 12 of 12 entries
+**Version:** 2 · **Pinned map:** v2 · **Entries:** 16 · **Coverage:** 47 of 70 capabilities · **Pending review:** 16 of 16 entries
 
-**Description:** Version 2, checked 25 November 2026. It corrects the Workday mapping from Digital & Technology to the HR capabilities it actually serves, adds customer-contact and case-tracking links to the CRM entries, adds strategy and risk links to Planview, corrects the Miro claim and mapping, and adds reviewed-candidate products for the main corporate gaps. Every new or changed claim is Pending review until a named reviewer signs it. Coverage is a first slice, not an exhaustive market survey.
+**Description:** Version 2, checked 25 November 2026. It corrects the Workday mapping, adds customer-contact and case-tracking links to the CRM entries, adds strategy and risk links to Planview, corrects the Miro claim and mapping, and adds reviewed-candidate products including Ivalua, Diligent, Workday Financial Management and Qlik. Every new or changed claim is Pending review until a named reviewer signs it. Coverage is a first slice, not an exhaustive market survey.
 
 ### Coverage
 
 | Code | Capability | Products |
 | --- | --- | --- |
-| 1 | Finance | Oracle Fusion Cloud Financial Management |
-| 1.1 | Financial Planning & Budgeting | Oracle Fusion Cloud Financial Management |
-| 1.2 | Financial Accounting & Reporting | Oracle Fusion Cloud Financial Management |
-| 1.4 | Payments & Receivables | Oracle Fusion Cloud Financial Management |
-| 1.5 | Financial Control & Audit Support | Oracle Fusion Cloud Financial Management |
+| 1 | Finance | Oracle Fusion Cloud Financial Management; Workday Financial Management |
+| 1.1 | Financial Planning & Budgeting | Oracle Fusion Cloud Financial Management; Workday Financial Management |
+| 1.2 | Financial Accounting & Reporting | Oracle Fusion Cloud Financial Management; Workday Financial Management |
+| 1.4 | Payments & Receivables | Oracle Fusion Cloud Financial Management; Workday Financial Management |
+| 1.5 | Financial Control & Audit Support | Oracle Fusion Cloud Financial Management; Workday Financial Management |
 | 2 | Human Resources | Workday Human Capital Management |
 | 2.1 | Workforce Planning | Workday Human Capital Management |
 | 2.2 | Recruitment & Onboarding | Workday Human Capital Management |
 | 2.3 | Learning & Development | Workday Human Capital Management |
 | 2.4 | Pay, Reward & Pensions | Workday Human Capital Management |
 | 2.5 | Employee Relations & Wellbeing | Workday Human Capital Management |
+| 3 | Procurement | Ivalua |
+| 3.1 | Category & Sourcing Strategy | Ivalua |
+| 3.2 | Tendering & Contract Award | Ivalua |
+| 3.3 | Contract & Supplier Management | Ivalua |
+| 3.4 | Spend Control & Compliance | Ivalua |
 | 4.1 | Records Management | Microsoft Purview |
 | 4.2 | Data Governance & Quality | Microsoft Purview |
 | 4.3 | Information Rights & Access | Microsoft Purview |
 | 4.4 | Data Protection & Privacy | Microsoft Purview |
-| 4.5 | Analytics & Business Intelligence | Power BI |
+| 4.5 | Analytics & Business Intelligence | Power BI; Qlik Cloud Analytics |
 | 5 | Customer Contact | ServiceNow Customer Service Management; Microsoft Dynamics 365 Customer Service |
 | 5.3 | Case & Request Tracking | ServiceNow Customer Service Management; Microsoft Dynamics 365 Customer Service |
 | 5.4 | Complaints & Feedback | ServiceNow Customer Service Management; Microsoft Dynamics 365 Customer Service |
@@ -667,8 +792,12 @@ A permanently installed partial-discharge monitoring service for HV switchgear a
 | 6.5 | Energy & Sustainability | Planon Integrated Workplace Management Solution |
 | 7.2 | Application Delivery & Support | Jira Service Management |
 | 7.6 | Technology Service Management | Jira Service Management |
+| 8 | Governance & Assurance | Diligent One Platform |
 | 8.1 | Strategy & Performance | Planview AdaptiveWork |
-| 8.2 | Risk Management | Planview AdaptiveWork |
+| 8.2 | Risk Management | Planview AdaptiveWork; Diligent One Platform |
+| 8.3 | Internal Audit & Assurance | Diligent One Platform |
+| 8.4 | Legal & Regulatory Compliance | Diligent One Platform |
+| 8.5 | Corporate Governance | Diligent One Platform |
 | 9.1 | Understanding Needs | Qualtrics XM |
 | 9.2 | Engagement & Communications | Qualtrics XM |
 | 9.3 | Relationship Management | ServiceNow Customer Service Management; Microsoft Dynamics 365 Customer Service |
@@ -903,18 +1032,93 @@ An AI-powered service management platform for IT, HR, facilities and other teams
   - Source: [https://www.atlassian.com/software/jira/service-management](https://www.atlassian.com/software/jira/service-management) — checked 2026-11-25
   - Reviewer: Pending review — 2026-11-25
 
+#### 13. Ivalua — Ivalua
+
+`ivalua` · **claims pending review**
+
+An enterprise procurement platform covering sourcing, contract management, supplier management and spend analysis.
+
+| Code | Capability | How it supports it |
+| --- | --- | --- |
+| 3 | Procurement | Runs source-to-pay procurement processes. |
+| 3.1 | Category & Sourcing Strategy | Supports strategic sourcing and category management. |
+| 3.2 | Tendering & Contract Award | Supports sourcing events and contract award. |
+| 3.3 | Contract & Supplier Management | Manages contracts and supplier relationships. |
+| 3.4 | Spend Control & Compliance | Provides spend analysis and procurement controls. |
+
+**Claims**
+
+- **functional.** The vendor describes Ivalua as an enterprise procurement platform covering sourcing, contract management, supplier management and spend analysis.
+  - Source: [https://www.ivalua.com/](https://www.ivalua.com/) — checked 2026-11-25
+  - Reviewer: Pending review — 2026-11-25
+
+#### 14. Diligent One Platform — Diligent
+
+`diligent` · **claims pending review**
+
+Governance, risk and compliance software for enterprise risk, internal audit, compliance and board governance.
+
+| Code | Capability | How it supports it |
+| --- | --- | --- |
+| 8 | Governance & Assurance | Runs governance, risk and compliance activities in one platform. |
+| 8.2 | Risk Management | Identifies, assesses and mitigates enterprise risks. |
+| 8.3 | Internal Audit & Assurance | Manages audit plans, requests and assurance work. |
+| 8.4 | Legal & Regulatory Compliance | Tracks regulatory obligations and compliance. |
+| 8.5 | Corporate Governance | Supports board management and corporate governance. |
+
+**Claims**
+
+- **functional.** The vendor describes Diligent as governance, risk and compliance software for enterprise risk, internal audit, compliance and board governance.
+  - Source: [https://www.diligent.com/](https://www.diligent.com/) — checked 2026-11-25
+  - Reviewer: Pending review — 2026-11-25
+
+#### 15. Workday Financial Management — Workday
+
+`workday-financial-management` · **claims pending review**
+
+Cloud financial management software for accounting, planning, revenue and financial controls.
+
+| Code | Capability | How it supports it |
+| --- | --- | --- |
+| 1 | Finance | Runs core financial management processes. |
+| 1.1 | Financial Planning & Budgeting | Supports financial planning and budgeting. |
+| 1.2 | Financial Accounting & Reporting | Supports accounting and financial reporting. |
+| 1.4 | Payments & Receivables | Supports revenue lifecycles and receivables. |
+| 1.5 | Financial Control & Audit Support | Provides continuous controls and audit support. |
+
+**Claims**
+
+- **functional.** The vendor describes Workday Financial Management as cloud financial management software for accounting, planning and financial processes.
+  - Source: [https://www.workday.com/en-gb/products/financial-management.html](https://www.workday.com/en-gb/products/financial-management.html) — checked 2026-11-25
+  - Reviewer: Pending review — 2026-11-25
+
+#### 16. Qlik Cloud Analytics — Qlik
+
+`qlik` · **claims pending review**
+
+Data integration, AI and analytics software for dashboards, visualizations and business insight.
+
+| Code | Capability | How it supports it |
+| --- | --- | --- |
+| 4.5 | Analytics & Business Intelligence | Creates dashboards and visualizations for business intelligence. |
+
+**Claims**
+
+- **functional.** The vendor describes Qlik as data integration, AI and analytics software for dashboards, visualizations and insight.
+  - Source: [https://www.qlik.com/](https://www.qlik.com/) — checked 2026-11-25
+  - Reviewer: Pending review — 2026-11-25
+
 ### Still uncovered
 
-32 of 70 capabilities have no product.
+23 of 70 capabilities have no product.
 
 | Area | Uncovered capabilities |
 | --- | --- |
 | 1 Finance | 1.3 Treasury & Cash Management |
-| 3 Procurement | 3 Procurement; 3.1 Category & Sourcing Strategy; 3.2 Tendering & Contract Award; 3.3 Contract & Supplier Management; 3.4 Spend Control & Compliance |
 | 4 Information Management | 4 Information Management |
 | 5 Customer Contact | 5.1 Contact Channels; 5.2 Identity & Account Verification; 5.5 Accessibility & Inclusion |
 | 7 Digital & Technology | 7 Digital & Technology; 7.1 Enterprise Architecture & Standards; 7.3 Infrastructure, Cloud & Networks; 7.4 Cyber Security & Resilience; 7.5 Digital Service Design |
-| 8 Governance & Assurance | 8 Governance & Assurance; 8.3 Internal Audit & Assurance; 8.4 Legal & Regulatory Compliance; 8.5 Corporate Governance; 8.6 Business Continuity & Emergency Planning |
+| 8 Governance & Assurance | 8.6 Business Continuity & Emergency Planning |
 | 9 Customers & Stakeholders | 9 Customers & Stakeholders |
 | 10 Products & Services | 10 Products & Services; 10.2 Service Portfolio Management; 10.3 Pricing & Funding Models; 10.4 Quality Standards & Specifications |
 | 11 Delivery & Operations | 11 Delivery & Operations; 11.3 Supply & Partner Coordination; 11.4 Performance & Quality Monitoring |

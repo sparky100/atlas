@@ -68,6 +68,19 @@ Shortlist only. Each needs a date-stamped vendor statement and a named reviewer 
 | 12.3–12.5 Change & Improvement | Planview AdaptiveWork | https://www.planview.com/products-solutions/products/adaptivework/ | 200 |
 | 5.2 Identity & Account Verification | Microsoft Entra / Okta | (needs a specific product page) | not checked |
 
+## Vendor batch 2 checked (25 November 2026)
+
+| Product | Capabilities | Status |
+|---|---|---|
+| Ivalua | 3 Procurement; 3.1–3.4 | Added |
+| Diligent One Platform | 8 Governance; 8.2–8.5 | Added |
+| Workday Financial Management | 1 Finance; 1.1, 1.2, 1.4, 1.5 | Added |
+| Qlik Cloud Analytics | 4.5 Analytics & BI | Added |
+
+Coupa, SAP Ariba and ServiceNow GRC block scripted requests; Ivalua and Diligent stand in for procurement and GRC. ServiceNow ITSM is also blocked, but Jira Service Management already covers 7.2 and 7.6.
+
+**Still open:** 5.1 Contact Channels, 5.2 Identity & Verification, 5.5 Accessibility; 7.1 Enterprise Architecture, 7.3 Infrastructure, 7.4 Cyber Security, 7.5 Digital Service Design; 8.6 Business Continuity; 9 Customers & Stakeholders; 10 Products & Services; 11 Delivery & Operations; 12 Change & Improvement.
+
 ## Recommended next wave
 
 Add no more than eight entries, one per major gap:
