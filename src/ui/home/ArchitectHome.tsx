@@ -966,7 +966,7 @@ function ProjectChildren({ modelHref, children }: { modelHref: string; children:
   if (children.decisions.length === 0 && children.changes.length === 0) return null;
   return (
     <ul className={styles.branchList} aria-label="Inside this project">
-      {children.decisions.map(({ decision, options }) => (
+      {children.decisions.map(({ decision, options, chosenPhrase }) => (
         <li key={decision.id}>
           <Text as="span" size="xs" tone="muted">
             Decision:{' '}
@@ -976,7 +976,15 @@ function ProjectChildren({ modelHref, children }: { modelHref: string; children:
               {decision.title}
             </Text>
           </Link>
-          <OptionList modelHref={modelHref} options={options} />
+          {chosenPhrase !== undefined && options[0] !== undefined ? (
+            <span data-testid="home-chosen-option">
+              <Text as="p" size="xs" tone="muted">
+                Option chosen: {options[0].title}, {chosenPhrase}
+              </Text>
+            </span>
+          ) : (
+            <OptionList modelHref={modelHref} options={options} />
+          )}
         </li>
       ))}
       {children.changes.map((c) => (

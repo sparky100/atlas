@@ -74,7 +74,8 @@ test('start a decision from a critical-support-end health finding, choose the on
   await page.getByPlaceholder('The reasons this option was chosen over the others').fill('Workday is the only realistic replacement in budget.');
   await page.getByRole('button', { name: 'Confirm choice' }).click();
   await expect(page.getByText('accepted', { exact: true })).toBeVisible();
-  await expect(page.getByText('chosen', { exact: true })).toBeVisible();
+  // Choosing records the choice only: the candidate has no change yet.
+  await expect(page.getByTestId('chosen-option-state')).toHaveText('Chosen · delivery not started');
 
   // 4. "Export as ADR markdown" — clipboard copy, ElementHeader's own
   // "Copy element ID" pattern, not a download (nothing in this app offers one).

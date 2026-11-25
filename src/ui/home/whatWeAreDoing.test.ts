@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import type { BranchRow, DecisionRow, ProfileRow, ProjectRow } from '../../db/types';
-import { buildMyOwnedWork, buildRecentRecords, buildWhatWeAreDoing, displayNameOf } from './whatWeAreDoing';
+import type { BranchRow, DecisionOptionRow, DecisionRow, ProfileRow, ProjectRow } from '../../db/types';
+import { buildMyOwnedWork, buildRecentRecords, buildWhatWeAreDoing, chosenOptionLines, displayNameOf } from './whatWeAreDoing';
 
 function branch(overrides: Partial<BranchRow>): BranchRow {
   return {
@@ -47,7 +47,7 @@ function decision(overrides: Partial<DecisionRow>): DecisionRow {
     decided_by: null,
     decided_at: null,
     cancel_reason: null,
-    reconsider_if: null, review_by: null, stay_risk: '', stay_reason: '', baseline_option_id: null, baseline_branch_id: null, branch_id: null,
+    reconsider_if: null, review_by: null, stay_risk: '', stay_reason: '', baseline_option_id: null, baseline_branch_id: null, chosen_option_id: null, branch_id: null,
     superseded_decision_id: null,
     project_id: 'p',
     created_by: 'u',
@@ -227,5 +227,30 @@ describe('buildRecentRecords', () => {
     const decisions = [decision({ id: 'd-old', status: 'accepted', decided_at: '2025-01-01T00:00:00Z' })];
     const projects = [project({ id: 'p-old', status: 'closed', closed_at: '2025-02-01T00:00:00Z' })];
     expect(buildRecentRecords(decisions, projects, null).map((r) => r.id)).toEqual(['p-old', 'd-old']);
+  });
+});
+
+describe('chosenOptionLines', () => {
+  const D = '00000000-0000-4000-8000-0000000000d1';
+  const O = '00000000-0000-4000-8000-0000000000a1';
+  const B = '00000000-0000-4000-8000-0000000000b1';
+  const BASE = '00000000-0000-4000-8000-0000000000a0';
+  const accepted = { id: D, status: 'accepted', chosen_option_id: O, baseline_option_id: BASE, project_id: 'p1' } as unknown as DecisionRow;
+  const opt = (branchId: string | null) => ({ id: O, decision_id: D, title: 'Build Repairs Hub', branch_id: branchId }) as unknown as DecisionOptionRow;
+  const br = (status: BranchRow['status']) => ({ id: B, status, base_commit_id: 'c1', head_commit_id: 'c2' }) as unknown as BranchRow;
+
+  it('says a chosen option has not started delivery yet', () => {
+    expect(chosenOptionLines([accepted], [opt(null)], [])).toEqual([{ decisionId: D, optionTitle: 'Build Repairs Hub', phrase: 'delivery not started' }]);
+  });
+
+  it('follows the delivery change, and drops it once it is in the live model or stopped', () => {
+    expect(chosenOptionLines([accepted], [opt(B)], [br('in_review')])[0]?.phrase).toBe('delivery started, in review');
+    expect(chosenOptionLines([accepted], [opt(B)], [br('merged')])).toEqual([]);
+    expect(chosenOptionLines([accepted], [opt(B)], [br('cancelled')])).toEqual([]);
+  });
+
+  it('leaves out staying as we are, and open decisions', () => {
+    expect(chosenOptionLines([{ ...accepted, chosen_option_id: BASE }], [{ ...opt(null), id: BASE }], [])).toEqual([]);
+    expect(chosenOptionLines([{ ...accepted, status: 'proposed', chosen_option_id: null }], [opt(null)], [])).toEqual([]);
   });
 });

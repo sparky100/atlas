@@ -316,7 +316,7 @@ function plural(count: number, one: string, many: string): string {
 
 /** One project in hand: title (to its page), status when not simply active, owner, target date, progress counts, and its decisions' timing — overdue ones flagged in words, never colour alone. */
 function ProjectWorkRow({ summary, modelHref }: { summary: ProjectSummary; modelHref: string }) {
-  const { project, ownerDisplay, progress, overdueDecisions, nextDecisionDue } = summary;
+  const { project, ownerDisplay, progress, overdueDecisions, nextDecisionDue, chosenOptions } = summary;
   return (
     <li className={styles.workRow}>
       <div className={styles.workRowTitle}>
@@ -340,6 +340,13 @@ function ProjectWorkRow({ summary, modelHref }: { summary: ProjectSummary; model
       <Text as="p" tone="faint" size="xs">
         {formatProjectProgress(progress)}
       </Text>
+      {chosenOptions.map((line) => (
+        <span key={line.decisionId} data-testid="home-chosen-option">
+          <Text as="p" tone="muted" size="sm">
+            <Link to={`${modelHref}/decisions/${line.decisionId}`}>Option chosen: {line.optionTitle}</Link>, {line.phrase}
+          </Text>
+        </span>
+      ))}
     </li>
   );
 }

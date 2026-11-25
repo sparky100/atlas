@@ -193,7 +193,7 @@ describe('decision_option_ratings against a real local Supabase', () => {
     const { decisionId, optionBranchId } = await seedDecisionWithOption('Read-only once chosen');
     await upsertDecisionRating(alice.client, { decisionId, branchId: optionBranchId, criterion: 'cost', level: 'favourable', note: 'before choosing', ratedBy: alice.id });
 
-    const { error: forceError } = await service.from('decisions').update({ status: 'accepted', decided_by: alice.id, decided_at: new Date().toISOString(), branch_id: optionBranchId }).eq('id', decisionId);
+    const { error: forceError } = await service.from('decisions').update({ status: 'accepted', decided_by: alice.id, decided_at: new Date().toISOString(), chosen_option_id: ((await service.from('decision_options').select('id').eq('decision_id', decisionId).eq('branch_id', optionBranchId).single()).data)?.id ?? null, branch_id: optionBranchId }).eq('id', decisionId);
     if (forceError) throw new Error(`force-accepting decision: ${forceError.message}`);
 
     await expect(upsertDecisionRating(alice.client, { decisionId, branchId: optionBranchId, criterion: 'cost', level: 'unfavourable', note: 'trying to edit after choosing', ratedBy: alice.id })).rejects.toThrow();

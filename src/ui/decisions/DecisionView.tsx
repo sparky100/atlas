@@ -9,6 +9,7 @@ import { useEstateSuggestions } from './useEstateSuggestions';
 import type { UUID } from '../../contracts/delta';
 import { Button } from '../components/Button/Button';
 import { Chip } from '../components/Chip/Chip';
+import { decisionOptionState } from '../../engine/decisionOptionState';
 import { CommentsSection } from '../components/CommentsSection/CommentsSection';
 import { ElementTypeGlyph } from '../components/ElementTypeGlyph/ElementTypeGlyph';
 import { Panel } from '../components/Panel/Panel';
@@ -284,8 +285,11 @@ export function DecisionView({ modelId, decisionId, orgId, orgSlug, modelSlug, r
   };
   const canChoose = canChooseDecisionOption(role) && decision.status === 'proposed';
   const canRate = canRateDecisionOption(role, decision);
-  const chosenBranch = decision.branch_id !== null ? linkedBranchesById.get(decision.branch_id) : undefined;
-  const chosenOption = decision.branch_id !== null ? optionByBranchId.get(decision.branch_id) : undefined;
+  // The decision names its chosen option; that option's change (if delivery has started) is the delivery change.
+  const chosenOption = decision.chosen_option_id !== null ? options.find((o) => o.id === decision.chosen_option_id) : (decision.branch_id !== null ? optionByBranchId.get(decision.branch_id) : undefined);
+  const chosenBranchId = chosenOption?.branch_id ?? decision.branch_id;
+  const chosenBranch = chosenBranchId !== null ? linkedBranchesById.get(chosenBranchId) : undefined;
+  const chosenState = chosenOption !== undefined ? decisionOptionState(decision, chosenOption.id, chosenBranch ?? null) : null;
   // A candidate with no branch is still an option; only the baseline is
   // excluded from the comparison columns (the Current column covers it).
   const scoredOptions = options.filter((o) => o.id !== baselineOption?.id && (baselineBranchId === null || o.branch_id !== baselineBranchId));
@@ -310,12 +314,18 @@ export function DecisionView({ modelId, decisionId, orgId, orgSlug, modelSlug, r
     canChoose,
     chosenTitle: chosenOption?.title ?? (chosenBranch ? (chosenBranch.title ?? chosenBranch.name) : null),
     chosenIsBaseline: chosenOption?.id === baselineOption?.id || (decision.branch_id !== null && decision.branch_id === baselineBranchId),
+    deliveryStarted: chosenBranch !== undefined,
+    canStartDelivery: canCreateChangeBranch(role),
   });
 
   function onNextStepAction() {
     if (!nextStep) return;
+    if (nextStep.action === 'start-delivery') {
+      if (chosenOption !== undefined) workOnOption(chosenOption.id);
+      return;
+    }
     if (nextStep.action === 'open-delivery') {
-      if (decision.branch_id !== null) void navigate(`/o/${orgSlug}/m/${modelSlug}/changes/${decision.branch_id}`);
+      if (chosenBranchId !== null) void navigate(`/o/${orgSlug}/m/${modelSlug}/changes/${chosenBranchId}`);
       return;
     }
     if (nextStep.action === 'compare' || nextStep.action === 'choose') {
@@ -488,8 +498,11 @@ export function DecisionView({ modelId, decisionId, orgId, orgSlug, modelSlug, r
             <Text as="p">{chosenOption?.title ?? (chosenBranch !== undefined ? (chosenBranch.title ?? chosenBranch.name) : 'An option that is no longer linked to this decision.')}</Text>
             {decision.decided_at !== null && (
               <Text as="p" size="sm" tone="muted">
-                Decided {decision.decided_at.slice(0, 10)}
+                Chosen by {decision.decided_by !== null ? profileLabel(members.find((m) => m.member.user_id === decision.decided_by)?.profile) : 'a former member'} on {decision.decided_at.slice(0, 10)}
               </Text>
+            )}
+            {chosenState !== null && (
+              <span data-testid="chosen-option-state"><Chip tone={chosenState.tone}>{chosenState.label}</Chip></span>
             )}
           </div>
           <div className={styles.field}>
@@ -642,8 +655,8 @@ export function DecisionView({ modelId, decisionId, orgId, orgSlug, modelSlug, r
                   branchId: b?.id ?? null,
                   label: o.title,
                   status: b?.status ?? 'draft',
-                  statusLabel: o.branch_id === null ? (decision.status === 'proposed' ? 'candidate' : 'not chosen') : undefined,
-                  isChosen: b?.id === decision.branch_id,
+                  state: decisionOptionState(decision, o.id, b ?? null),
+                  isChosen: o.id === chosenOption?.id,
                   summary: b !== undefined && comparison.status === 'ready' ? (comparison.optionSummaries.get(b.id) ?? null) : null,
                   canChoose: canChoose && (b === undefined || b.status === 'draft'),
                   description: o.summary.trim() !== '' ? o.summary : (b?.description ?? null),
@@ -1005,7 +1018,7 @@ export function DecisionView({ modelId, decisionId, orgId, orgSlug, modelSlug, r
                   variant="primary"
                   disabled={optionsState.status === 'choosing' || reasons.trim().length === 0}
                   onClick={() => {
-                    void optionsState.chooseOption(decisionId, choosing.optionId, choosing.branchId, reasons, { reconsiderIf, reviewBy }).then((chosen) => {
+                    void optionsState.chooseOption(decisionId, choosing.optionId, reasons, { reconsiderIf, reviewBy }).then((chosen) => {
                       if (chosen) {
                         setChoosing(null);
                         setReconsiderIf('');

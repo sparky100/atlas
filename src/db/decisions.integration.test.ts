@@ -24,7 +24,7 @@ import type { CommitEnvelope, Delta } from '../contracts/delta';
 import { createChangeBranch, getBranch, getMainBranch } from './branches';
 import type { Client } from './client';
 import { createServiceRoleClient, createSupabaseClient } from './client';
-import { createDecisionOption } from './decisionOptions';
+import { createDecisionOption, getDecisionOptionForBranch, workOnDecisionOption } from './decisionOptions';
 import { commitToBranch } from './commits';
 import { createComment, listCommentsForAnchor } from './comments';
 import {
@@ -74,6 +74,14 @@ async function createSignedInUser(label: string): Promise<TestUser> {
 
 function makeCreateDelta(id: string, elementId: string, name: string, sourceId: string): Delta {
   return { kind: 'element.create', id, elementId, elementType: 'system', name, parentId: null, attributes: { lifecycleStatus: 'active', isExternal: false }, sourceId, confidence: 1 };
+}
+
+
+/** The candidate row the decision_links trigger made for a linked branch option. */
+async function optionFor(client: Client, decisionId: string, branchId: string): Promise<string> {
+  const option = await getDecisionOptionForBranch(client, decisionId, branchId);
+  if (option === null) throw new Error('optionFor: no candidate row for this branch');
+  return option.id;
 }
 
 describe('decisions/decision_links/decision_arguments/assumptions/evidence against a real local Supabase', () => {
@@ -252,9 +260,10 @@ describe('decisions/decision_links/decision_arguments/assumptions/evidence again
     // this state before that RPC exists; the point of this test is what
     // happens to a plain update *after* that state is reached, not how it
     // got there.
+    const forcedOption = await createDecisionOption(alice.client, { decisionId: decision.id, title: 'Forced choice', createdBy: alice.id });
     const { error: forceError } = await service
       .from('decisions')
-      .update({ status: 'accepted', decided_by: alice.id, decided_at: new Date().toISOString(), branch_id: otherBranch.id })
+      .update({ status: 'accepted', decided_by: alice.id, decided_at: new Date().toISOString(), chosen_option_id: forcedOption.id, branch_id: otherBranch.id })
       .eq('id', decision.id);
     if (forceError) throw new Error(`force-accepting decision: ${forceError.message}`);
 
@@ -342,8 +351,8 @@ describe('decisions/decision_links/decision_arguments/assumptions/evidence again
       if (!chosen) throw new Error('expected three options');
       const notChosen = options.filter((o) => o.id !== chosen.id);
 
-      const accepted = await chooseDecisionOption(alice.client, decision.id, chosen.id, 'Option B has the lowest boundary-crossing count and no criticality regressions.');
-      expect(accepted).toMatchObject({ status: 'accepted', branch_id: chosen.id, decided_by: alice.id });
+      const accepted = await chooseDecisionOption(alice.client, decision.id, await optionFor(alice.client, decision.id, chosen.id), 'Option B has the lowest boundary-crossing count and no criticality regressions.');
+      expect(accepted).toMatchObject({ status: 'accepted', branch_id: chosen.id, chosen_option_id: await optionFor(alice.client, decision.id, chosen.id), decided_by: alice.id });
       expect(accepted.decided_at).not.toBeNull();
 
       const chosenBranchAfter = await getBranch(alice.client, chosen.id);
@@ -373,10 +382,10 @@ describe('decisions/decision_links/decision_arguments/assumptions/evidence again
       expect(decision.reconsider_if).toBeNull();
       expect(decision.review_by).toBeNull();
 
-      await expect(chooseDecisionOption(alice.client, decision.id, option.id, 'Cheapest.', { reconsiderIf: 'Price rises', reviewBy: '2020-01-01' })).rejects.toThrow(/past/);
+      await expect(chooseDecisionOption(alice.client, decision.id, await optionFor(alice.client, decision.id, option.id), 'Cheapest.', { reconsiderIf: 'Price rises', reviewBy: '2020-01-01' })).rejects.toThrow(/past/);
 
       const reviewBy = new Date(Date.now() + 90 * 86_400_000).toISOString().slice(0, 10);
-      const accepted = await chooseDecisionOption(alice.client, decision.id, option.id, 'Cheapest.', { reconsiderIf: '  Vendor price rises or support is extended  ', reviewBy });
+      const accepted = await chooseDecisionOption(alice.client, decision.id, await optionFor(alice.client, decision.id, option.id), 'Cheapest.', { reconsiderIf: '  Vendor price rises or support is extended  ', reviewBy });
       expect(accepted).toMatchObject({ status: 'accepted', reconsider_if: 'Vendor price rises or support is extended', review_by: reviewBy });
 
       // Not in the column update grant: even the owner cannot rewrite them directly.
@@ -400,7 +409,7 @@ describe('decisions/decision_links/decision_arguments/assumptions/evidence again
       expect(described).toMatchObject({ stay_risk: 'Vendor support ends in March', stay_reason: 'No budget this year', baseline_branch_id: baseline.id });
 
       // The baseline is an ordinary option: it can be chosen.
-      const accepted = await chooseDecisionOption(alice.client, decision.id, baseline.id, 'We cannot deliver a change this year.');
+      const accepted = await chooseDecisionOption(alice.client, decision.id, await optionFor(alice.client, decision.id, baseline.id), 'We cannot deliver a change this year.');
       expect(accepted).toMatchObject({ status: 'accepted', branch_id: baseline.id, baseline_branch_id: baseline.id });
 
       // Closed with the decision: no further edits.
@@ -430,24 +439,26 @@ describe('decisions/decision_links/decision_arguments/assumptions/evidence again
       const option = await createChangeBranch(alice.client, { id: randomUUID(), orgId, modelId, name: `xorg-option-${randomUUID().slice(0, 8)}`, createdBy: alice.id, intent: 'explore', mainHeadCommitId: main.head_commit_id });
       await createDecisionLink(alice.client, { decisionId: decision.id, linkedType: 'branch', linkedId: option.id, createdBy: alice.id });
       const outsider = await createSignedInUser('decisions-outsider');
-      await expect(chooseDecisionOption(outsider.client, decision.id, option.id, 'I am not a member', { reconsiderIf: 'x' })).rejects.toThrow();
+      await expect(chooseDecisionOption(outsider.client, decision.id, await optionFor(alice.client, decision.id, option.id), 'I am not a member', { reconsiderIf: 'x' })).rejects.toThrow();
       await service.auth.admin.deleteUser(outsider.id);
     });
 
-    it('refuses a non-owner/architect caller, a branch not linked to the decision, and a branch that is not a draft explore-intent option', async () => {
+    it('refuses a non-owner/architect caller, an option of another decision, and an option whose change is not a draft explore-intent change', async () => {
       const main = await getMainBranch(alice.client, modelId);
       if (!main?.head_commit_id) throw new Error('main branch not found');
       const decision = await createDecision(alice.client, { id: randomUUID(), orgId, modelId, title: 'Refusal checks', statement: 'context', ownerId: alice.id, createdBy: alice.id });
       const option = await createChangeBranch(alice.client, { id: randomUUID(), orgId, modelId, name: `refusal-option-${randomUUID().slice(0, 8)}`, createdBy: alice.id, intent: 'explore', mainHeadCommitId: main.head_commit_id });
       await createDecisionLink(alice.client, { decisionId: decision.id, linkedType: 'branch', linkedId: option.id, createdBy: alice.id });
 
-      const unlinkedBranch = await createChangeBranch(alice.client, { id: randomUUID(), orgId, modelId, name: `unlinked-${randomUUID().slice(0, 8)}`, createdBy: alice.id, intent: 'explore', mainHeadCommitId: main.head_commit_id });
-      await expect(chooseDecisionOption(alice.client, decision.id, unlinkedBranch.id, 'not a linked option')).rejects.toThrow();
+      // An option of another decision is not one of this decision's options.
+      const elsewhere = await createDecision(alice.client, { id: randomUUID(), orgId, modelId, title: 'Elsewhere', statement: 'context', ownerId: alice.id, createdBy: alice.id });
+      const elsewhereOption = await createDecisionOption(alice.client, { decisionId: elsewhere.id, title: 'Not on this decision', createdBy: alice.id });
+      await expect(chooseDecisionOption(alice.client, decision.id, elsewhereOption.id, 'not one of its options')).rejects.toThrow(/not one of decision/);
 
       const bob = await createSignedInUser('decisions-bob-contributor');
       const { error: inviteError } = await alice.client.from('members').insert({ org_id: orgId, user_id: bob.id, role: 'contributor', invited_by: alice.id });
       if (inviteError) throw new Error(`inviting bob as contributor: ${inviteError.message}`);
-      await expect(chooseDecisionOption(bob.client, decision.id, option.id, 'a contributor should not be able to choose')).rejects.toThrow();
+      await expect(chooseDecisionOption(bob.client, decision.id, await optionFor(alice.client, decision.id, option.id), 'a contributor should not be able to choose')).rejects.toThrow();
       await service.auth.admin.deleteUser(bob.id);
 
       // F3a's own architect floor (`atlas.submit_merge_request`'s own
@@ -461,7 +472,62 @@ describe('decisions/decision_links/decision_arguments/assumptions/evidence again
       // Submit the option for review — it leaves 'draft', so it's no longer a legal choice even though it's still linked.
       const { error: submitError } = await alice.client.schema('atlas').rpc('submit_merge_request', { p_id: randomUUID(), p_branch_id: option.id, p_classification: {}, p_reviewers: [{ user_id: architect.id, required: true }] });
       if (submitError) throw new Error(`submit_merge_request: ${submitError.message}`);
-      await expect(chooseDecisionOption(alice.client, decision.id, option.id, 'no longer a draft')).rejects.toThrow();
+      await expect(chooseDecisionOption(alice.client, decision.id, await optionFor(alice.client, decision.id, option.id), 'no longer a draft')).rejects.toThrow();
+    });
+
+    it('choosing a candidate with no change records the choice only; Start delivery then makes the delivery change (item 5, option A)', async () => {
+      const decision = await createDecision(alice.client, { id: randomUUID(), orgId, modelId, title: 'Choose a candidate', statement: 'context', ownerId: alice.id, createdBy: alice.id });
+      const chosen = await createDecisionOption(alice.client, { decisionId: decision.id, title: 'Buy a quoting product', createdBy: alice.id });
+      const other = await createDecisionOption(alice.client, { decisionId: decision.id, title: 'Configure the CRM', createdBy: alice.id });
+      const baseline = await createDecisionOption(alice.client, { decisionId: decision.id, title: 'Stay as we are', createdBy: alice.id });
+      await updateDecision(alice.client, decision.id, { baselineOptionId: baseline.id });
+      const { count: branchesBefore } = await alice.client.from('branches').select('id', { count: 'exact', head: true }).eq('model_id', modelId);
+
+      const accepted = await chooseDecisionOption(alice.client, decision.id, chosen.id, 'Quotes in two days.');
+      expect(accepted).toMatchObject({ status: 'accepted', chosen_option_id: chosen.id, branch_id: null, decided_by: alice.id });
+      const { count: branchesAfter } = await alice.client.from('branches').select('id', { count: 'exact', head: true }).eq('model_id', modelId);
+      expect(branchesAfter).toBe(branchesBefore);
+
+      // Only the chosen option can start delivery, and staying as we are has nothing to deliver.
+      await expect(workOnDecisionOption(alice.client, other.id)).rejects.toThrow(/not its chosen option/);
+      await expect(workOnDecisionOption(alice.client, baseline.id)).rejects.toThrow(/not its chosen option/);
+
+      const delivery = await workOnDecisionOption(alice.client, chosen.id);
+      expect(delivery).toMatchObject({ kind: 'change', status: 'draft', intent: 'propose', title: 'Buy a quoting product' });
+      const { data: after } = await alice.client.from('decisions').select('*').eq('id', decision.id).single();
+      expect(after).toMatchObject({ status: 'accepted', chosen_option_id: chosen.id, branch_id: delivery.id });
+      // A second press opens the same change.
+      expect((await workOnDecisionOption(alice.client, chosen.id)).id).toBe(delivery.id);
+
+      // The decision itself is still closed: starting delivery opened no other field.
+      const { error: editError } = await alice.client.from('decisions').update({ title: 'Edited after delivery started' }).eq('id', decision.id);
+      expect(editError).not.toBeNull();
+    });
+
+    it('choosing "Stay as we are" never starts delivery', async () => {
+      const decision = await createDecision(alice.client, { id: randomUUID(), orgId, modelId, title: 'Stay chosen', statement: 'context', ownerId: alice.id, createdBy: alice.id });
+      const baseline = await createDecisionOption(alice.client, { decisionId: decision.id, title: 'Stay as we are', createdBy: alice.id });
+      await updateDecision(alice.client, decision.id, { baselineOptionId: baseline.id });
+      await chooseDecisionOption(alice.client, decision.id, baseline.id, 'No budget this year.');
+      await expect(workOnDecisionOption(alice.client, baseline.id)).rejects.toThrow(/nothing to deliver/);
+    });
+
+    it('a viewer, and a signed-in user from a different organisation, cannot start delivery on a chosen option', async () => {
+      const decision = await createDecision(alice.client, { id: randomUUID(), orgId, modelId, title: 'Delivery boundary', statement: 'context', ownerId: alice.id, createdBy: alice.id });
+      const chosen = await createDecisionOption(alice.client, { decisionId: decision.id, title: 'Build it', createdBy: alice.id });
+      await chooseDecisionOption(alice.client, decision.id, chosen.id, 'Only option.');
+
+      const outsider = await createSignedInUser('delivery-outsider');
+      await expect(workOnDecisionOption(outsider.client, chosen.id)).rejects.toThrow();
+      const viewer = await createSignedInUser('delivery-viewer');
+      const { error: inviteError } = await alice.client.from('members').insert({ org_id: orgId, user_id: viewer.id, role: 'viewer', invited_by: alice.id });
+      if (inviteError) throw new Error(`inviting viewer: ${inviteError.message}`);
+      await expect(workOnDecisionOption(viewer.client, chosen.id)).rejects.toThrow();
+
+      const { data: after } = await alice.client.from('decisions').select('branch_id').eq('id', decision.id).single();
+      expect(after).toMatchObject({ branch_id: null });
+      await service.auth.admin.deleteUser(outsider.id);
+      await service.auth.admin.deleteUser(viewer.id);
     });
   });
 
@@ -563,7 +629,7 @@ describe('decisions/decision_links/decision_arguments/assumptions/evidence again
       const decision = await createDecision(alice.client, { id: randomUUID(), orgId, modelId, title: 'Already chosen', statement: '', ownerId: alice.id, createdBy: alice.id });
       const option = await createChangeBranch(alice.client, { id: randomUUID(), orgId, modelId, name: `chosen-${randomUUID().slice(0, 8)}`, createdBy: alice.id, intent: 'explore', mainHeadCommitId: main.head_commit_id });
       await createDecisionLink(alice.client, { decisionId: decision.id, linkedType: 'branch', linkedId: option.id, createdBy: alice.id });
-      await chooseDecisionOption(alice.client, decision.id, option.id, 'The only option.');
+      await chooseDecisionOption(alice.client, decision.id, await optionFor(alice.client, decision.id, option.id), 'The only option.');
       await expect(cancelDecision(alice.client, decision.id, 'too late')).rejects.toThrow(/only a proposed decision/);
     });
   });

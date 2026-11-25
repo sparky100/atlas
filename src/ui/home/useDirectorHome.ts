@@ -17,6 +17,7 @@ import {
   type ModelCounts,
 } from '../../db/modelHome';
 import { listDecisionsForModel, listOpenDecisionElementLinksForModel } from '../../db/decisions';
+import { listDecisionOptionsForModel } from '../../db/decisionOptions';
 import { listOrgMemberProfiles, listProfilesByIds } from '../../db/profiles';
 import { listProjectsForModel } from '../../db/projects';
 import { listTagsForModel } from '../../db/tags';
@@ -127,7 +128,7 @@ export function useDirectorHome(
         return listProfilesByIds(supabase, missing);
       });
 
-      const [elementHeads, supportsEdges, changeBranches, tags, plannedReplacements, ownsEdges, projects, decisions, memberProfiles, projectScope, decisionElementLinks, depths, authorProfiles] = await Promise.all([
+      const [elementHeads, supportsEdges, changeBranches, tags, plannedReplacements, ownsEdges, projects, decisions, memberProfiles, projectScope, decisionElementLinks, depths, authorProfiles, decisionOptions] = await Promise.all([
         listDirectorElementHeads(supabase, commitId),
         listAllSupportsEdges(supabase, commitId),
         changeBranchesRequest,
@@ -142,6 +143,8 @@ export function useDirectorHome(
         listOpenDecisionElementLinksForModel(supabase, modelId),
         depthsRequest,
         authorProfilesRequest,
+        // So a chosen option on "Projects in hand" can say where its delivery has got to.
+        listDecisionOptionsForModel(supabase, modelId),
       ]);
       const { capabilities, systems, containers } = elementHeads;
       const counts = deriveModelCounts(capabilities, systems, changeBranches);
@@ -171,7 +174,7 @@ export function useDirectorHome(
       const unrecordedCount = tiles.filter((t) => t.tone === 'neutral').length;
 
       const today = new Date().toISOString().slice(0, 10);
-      const whatWeAreDoing = buildWhatWeAreDoing(projects, decisions, changeBranches, new Map(memberProfiles.map((p) => [p.user_id, p])), today);
+      const whatWeAreDoing = buildWhatWeAreDoing(projects, decisions, changeBranches, new Map(memberProfiles.map((p) => [p.user_id, p])), today, decisionOptions);
       const inHandByTile = computeTileInHand(tiles, capabilities, projectScope, decisionElementLinks, decisions);
 
       const allSortedTags = sortedTagsOf(tags);

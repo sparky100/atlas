@@ -20,6 +20,7 @@ import {
 import { listBranchesByIds } from '../../db/branches';
 import { listProjectsForModel } from '../../db/projects';
 import { listDecisionLinksForDecision, listDecisionsLinkingElements } from '../../db/decisions';
+import { getDecisionOption } from '../../db/decisionOptions';
 import { buildRelationshipParticipantsById } from '../components/HistoryTimeline/historyTimelineSummary';
 import {
   projectionChildrenOf,
@@ -110,6 +111,8 @@ export interface ElementPageData {
 export interface ElementPageDecisionEntry {
   decision: DecisionRow;
   options: BranchRow[];
+  /** The chosen option's title when it has no change yet (choosing makes none); `null` otherwise. */
+  chosenWithoutChange?: string | null;
 }
 
 export type ElementPageState =
@@ -298,7 +301,8 @@ export function useElementPage(
               const allLinks = await listDecisionLinksForDecision(supabase, decision.id);
               const branchIds = allLinks.filter((l) => l.linked_type === 'branch').map((l) => l.linked_id);
               const options = branchIds.length > 0 ? await listBranchesByIds(supabase, branchIds) : [];
-              return { decision, options };
+              const chosen = decision.chosen_option_id !== null ? await getDecisionOption(supabase, decision.chosen_option_id) : null;
+              return { decision, options, chosenWithoutChange: chosen !== null && chosen.branch_id === null ? chosen.title : null };
             }),
         );
       };

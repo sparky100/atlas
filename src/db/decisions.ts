@@ -241,18 +241,19 @@ export async function listDecisionsLinkingElements(supabase: Client, elementIds:
 }
 
 /**
- * F3 PR5's "Choose": `atlas.choose_decision_option`
- * (`20260913120000_choose_decision_option.sql`) — the only writer
+ * "Choose": `atlas.choose_decision_option`
+ * (`20261125150000_decision_chosen_option.sql`), the only writer
  * `decision_arguments` has. Atomically accepts the decision, records
- * `reasons` as the one `decision_arguments` row, flips `chosenBranchId`'s
- * own `intent` to `propose`, and cancels every other `branch`-linked
- * option still in draft. `chosenBranchId` must already be a `branch`-typed
- * link on this decision, `explore`-intent, `draft` — the RPC validates all
- * three itself, this is not re-checked client-side.
+ * `chosenOptionId` on it and `reasons` as the one `decision_arguments` row,
+ * and cancels every other option's change still in draft. It makes no change
+ * of its own: a candidate with no change stays one until someone starts
+ * delivery (`workOnDecisionOption`). An option that already has a change keeps
+ * it as the delivery change (its intent becomes `propose`). The RPC checks the
+ * role, that the option is on this decision and that any change is a draft.
  */
-export async function chooseDecisionOption(supabase: Client, decisionId: UUID, chosenBranchId: UUID, reasons: string, reconsider?: { reconsiderIf?: string; reviewBy?: string }): Promise<DecisionRow> {
+export async function chooseDecisionOption(supabase: Client, decisionId: UUID, chosenOptionId: UUID, reasons: string, reconsider?: { reconsiderIf?: string; reviewBy?: string }): Promise<DecisionRow> {
   // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment -- untyped client; see branches.ts's module comment.
-  const { data, error } = await supabase.schema('atlas').rpc('choose_decision_option', { p_decision_id: decisionId, p_chosen_branch_id: chosenBranchId, p_reasons: reasons, p_reconsider_if: reconsider?.reconsiderIf ?? null, p_review_by: reconsider?.reviewBy ?? null });
+  const { data, error } = await supabase.schema('atlas').rpc('choose_decision_option', { p_decision_id: decisionId, p_option_id: chosenOptionId, p_reasons: reasons, p_reconsider_if: reconsider?.reconsiderIf ?? null, p_review_by: reconsider?.reviewBy ?? null });
   if (error) throw new Error(`chooseDecisionOption: ${error.message}`);
   return data as DecisionRow;
 }

@@ -36,7 +36,7 @@ export interface UseDecisionOptionsResult {
   /** Saves the baseline's two plain-text answers (operational risk of staying, what speaks for staying, or holds us back from changing). */
   saveBaselineText: (decisionId: UUID, stayRisk: string, stayReason: string) => Promise<boolean>;
   /** F3's own "Choose" — `atlas.choose_decision_option` in one call (`src/db/decisions.ts`'s `chooseDecisionOption`). Optionally records what would make the choice be reconsidered, and a review date. */
-  chooseOption: (decisionId: UUID, optionId: UUID | null, branchId: UUID | null, reasons: string, reconsider?: { reconsiderIf: string; reviewBy: string }) => Promise<boolean>;
+  chooseOption: (decisionId: UUID, optionId: UUID | null, reasons: string, reconsider?: { reconsiderIf: string; reviewBy: string }) => Promise<boolean>;
 }
 
 /**
@@ -159,7 +159,7 @@ export function useDecisionOptions(
   );
 
   const chooseOption = useCallback(
-    async (decisionId: UUID, optionId: UUID | null, branchId: UUID | null, reasons: string, reconsider?: { reconsiderIf: string; reviewBy: string }): Promise<boolean> => {
+    async (decisionId: UUID, optionId: UUID | null, reasons: string, reconsider?: { reconsiderIf: string; reviewBy: string }): Promise<boolean> => {
       if (reasons.trim().length === 0) {
         setError('Reasons are required.');
         return false;
@@ -167,15 +167,11 @@ export function useDecisionOptions(
       setError(null);
       setStatus('choosing');
       try {
-        let chosenBranchId = branchId;
-        if (chosenBranchId === null) {
-          if (optionId === null) {
-            setError('This option has no change to choose yet.');
-            return false;
-          }
-          chosenBranchId = (await workOnDecisionOption(supabase, optionId)).id;
+        if (optionId === null) {
+          setError('This option cannot be chosen.');
+          return false;
         }
-        const decision = await chooseDecisionOption(supabase, decisionId, chosenBranchId, reasons.trim(), {
+        const decision = await chooseDecisionOption(supabase, decisionId, optionId, reasons.trim(), {
           ...(reconsider !== undefined && reconsider.reconsiderIf.trim().length > 0 ? { reconsiderIf: reconsider.reconsiderIf.trim() } : {}),
           ...(reconsider !== undefined && reconsider.reviewBy.length > 0 ? { reviewBy: reconsider.reviewBy } : {}),
         });

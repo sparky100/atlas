@@ -136,7 +136,7 @@ describe('decision_agent_notes against a real local Supabase', () => {
 
   it('is closed once the decision is no longer proposed', async () => {
     const { decisionId, branchId } = await seed();
-    const { error } = await service.from('decisions').update({ status: 'accepted', decided_by: alice.id, decided_at: new Date().toISOString(), branch_id: branchId }).eq('id', decisionId);
+    const { error } = await service.from('decisions').update({ status: 'accepted', decided_by: alice.id, decided_at: new Date().toISOString(), chosen_option_id: ((await service.from('decision_options').select('id').eq('decision_id', decisionId).eq('branch_id', branchId).single()).data)?.id ?? null, branch_id: branchId }).eq('id', decisionId);
     if (error) throw new Error(`force-accepting decision: ${error.message}`);
     await expect(keepDecisionAgentNote(alice.client, note(decisionId, branchId, alice.id))).rejects.toThrow();
   });
