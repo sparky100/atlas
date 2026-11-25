@@ -137,3 +137,13 @@
 .chip:hover {
   border-color: var(--accent);
 }
+
+.select {
+  width: 100%;
+  padding: var(--space-2);
+  border-radius: var(--radius-sm);
+  border: var(--border-width) solid var(--border-strong);
+  background: var(--surface);
+  color: var(--text);
+  font: inherit;
+}

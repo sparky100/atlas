@@ -9,7 +9,7 @@ import { supabase } from '../supabaseClient';
 import { researchOptionTitle } from './researchOptionText';
 import { ResearchResultCard, type ResearchCardAction } from './ResearchResultCard';
 import { catalogueMatchFor, type KnownCatalogueProduct } from './researchCatalogueMatches';
-import { buildResearchQuery, suggestResearchQuery } from './researchQuerySuggestion';
+import { buildResearchQuery, suggestResearchQuery, type ResearchProduct } from './researchQuerySuggestion';
 import { researchQueryProblem, WEB_RESEARCH_QUERY_MAX } from './webResearchQuery';
 import styles from './WebResearchDialog.module.css';
 
@@ -24,6 +24,8 @@ export interface WebResearchDialogProps {
   /** Products and vendors already saved with this option as reviewed catalogue sources. */
   productNames?: readonly string[];
   vendorNames?: readonly string[];
+  /** The same products with their vendors, so a chosen product is scored with its own vendor. */
+  optionProducts?: readonly ResearchProduct[];
   /** Reviewed catalogue products, so a web page can be marked as "looks like the same product". */
   catalogueProducts?: readonly KnownCatalogueProduct[];
   userId: UUID;
@@ -59,6 +61,7 @@ export function WebResearchDialog({
   capabilityNames,
   productNames = [],
   vendorNames = [],
+  optionProducts = [],
   catalogueProducts = [],
   userId,
   existingUrls,
@@ -73,6 +76,8 @@ export function WebResearchDialog({
   const queryRef = useRef<HTMLTextAreaElement>(null);
   const headingId = useId();
   const queryId = useId();
+  const productSelectId = useId();
+  const [selectedProduct, setSelectedProduct] = useState<string | null>(null);
 
   // Stable keys keep the suggestion memo from rebuilding on every render while
   // still reacting when a late capability read arrives.
@@ -87,8 +92,10 @@ export function WebResearchDialog({
       capabilityNames: split(capabilityKey),
       productNames: split(productKey),
       vendorNames: split(vendorKey),
+      optionProducts,
+      selectedProductName: selectedProduct ?? undefined,
     });
-  }, [optionLabel, decisionTitle, capabilityKey, productKey, vendorKey]);
+  }, [optionLabel, decisionTitle, capabilityKey, productKey, vendorKey, optionProducts, selectedProduct]);
 
   // The suggestion is the default; state holds only what the person changes.
   // A late capability read therefore improves an untouched suggestion without
@@ -121,6 +128,7 @@ export function WebResearchDialog({
   const chips = chipsState ?? suggestion.chips;
   const query = queryState ?? suggestion.query;
   const approved = approvedQuery === query && query.trim() !== '';
+  const capabilityLabel = capabilityNames.length > 0 ? capabilityNames.join(', ') : 'this capability';
   const busy = searching || saving || addingUrl !== null || gapSaving;
   const existing = new Set(existingUrls);
   const citedElsewhere = new Set(citedElsewhereUrls);
@@ -157,9 +165,17 @@ export function WebResearchDialog({
 
   function removeChip(chip: string): void {
     const remaining = chips.filter((value) => value !== chip);
-    const queryStillMatchesChips = query === buildResearchQuery(chips);
+    const queryStillMatchesChips = query === buildResearchQuery(chips, suggestion.intent);
     setChipsState(remaining);
-    if (queryStillMatchesChips) setQueryState(buildResearchQuery(remaining));
+    if (queryStillMatchesChips) setQueryState(buildResearchQuery(remaining, suggestion.intent));
+    setApprovedQuery(null);
+    setError(null);
+  }
+
+  function chooseProduct(value: string): void {
+    setSelectedProduct(value);
+    setChipsState(null);
+    setQueryState(null);
     setApprovedQuery(null);
     setError(null);
   }
@@ -419,25 +435,54 @@ export function WebResearchDialog({
             <Text as="p" size="sm" tone="muted">
               The exact text below is sent to Anthropic&apos;s web search and recorded with the decision. Do not include private model, customer or organisation detail.
             </Text>
-            {chips.length > 0 && (
+            {(chips.length > 0 || suggestion.intent === 'find-products') && (
               <div className={styles.suggestions} data-testid="research-suggestions">
                 <Text as="p" size="sm" tone="muted">
-                  Suggested from this option. Remove any part you do not want to search for.
+                  {suggestion.intent === 'find-products'
+                    ? `No product is named yet. This starts as a market scan for products that support ${capabilityLabel}.`
+                    : `This starts from ${suggestion.productName ?? 'the named product'}. The search gathers evidence to score it against cost, effort, delivery risk, timing and vendor fit.`}
                 </Text>
-                <div className={styles.chips}>
-                  {chips.map((chip) => (
-                    <button
-                      key={chip}
-                      type="button"
-                      className={styles.chip}
+                {suggestion.productOptions.length > 1 && (
+                  <>
+                    <label htmlFor={productSelectId}>
+                      <Text as="span" size="sm">
+                        Which product?
+                      </Text>
+                    </label>
+                    <select
+                      id={productSelectId}
+                      className={styles.select}
+                      value={selectedProduct ?? suggestion.productName ?? ''}
                       disabled={searching}
-                      onClick={() => { removeChip(chip); }}
-                      aria-label={`Remove ${chip} from the suggested query`}
+                      onChange={(event) => { chooseProduct(event.target.value); }}
                     >
-                      {chip} <span aria-hidden="true">×</span>
-                    </button>
-                  ))}
-                </div>
+                      {suggestion.productOptions.map((product) => (
+                        <option key={product} value={product}>{product}</option>
+                      ))}
+                    </select>
+                  </>
+                )}
+                {chips.length > 0 && (
+                  <>
+                    <Text as="p" size="xs" tone="muted">
+                      Remove any part you do not want to search for.
+                    </Text>
+                    <div className={styles.chips}>
+                      {chips.map((chip) => (
+                        <button
+                          key={chip}
+                          type="button"
+                          className={styles.chip}
+                          disabled={searching}
+                          onClick={() => { removeChip(chip); }}
+                          aria-label={`Remove ${chip} from the suggested query`}
+                        >
+                          {chip} <span aria-hidden="true">×</span>
+                        </button>
+                      ))}
+                    </div>
+                  </>
+                )}
               </div>
             )}
             <label htmlFor={queryId}>
