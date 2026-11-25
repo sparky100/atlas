@@ -57,7 +57,7 @@ export async function addOptionWithCatalogueSources(client: Client, mark: Decisi
 /** Decision-scoped read, not an unbounded list of branch IDs. Rendering arrives with the source contract. */
 export async function listCatalogueSources(client: Client, decisionId: string): Promise<OptionCatalogueSourceRow[]> {
   const { data, error } = await client.from('option_catalogue_sources').select('*').eq('decision_id', decisionId)
-    .order('branch_id').order('catalogue_sector').order('catalogue_version').order('entry_code');
+    .order('option_id').order('catalogue_sector').order('catalogue_version').order('entry_code');
   if (error) throw new Error(`listCatalogueSources: ${error.message}`);
   return data as OptionCatalogueSourceRow[];
 }
@@ -152,9 +152,9 @@ export async function catalogueStandingByCitation(client: Client, citations: rea
 export function optionSourcesFromRows(rows: readonly OptionCatalogueSourceRow[], standingByCitation: ReadonlyMap<string, CatalogueStanding>): OptionSource[] {
   return rows.map((row) => ({
     kind: 'catalogue' as const,
-    id: `${row.branch_id}\u0000${row.catalogue_sector}\u0000${String(row.catalogue_version)}\u0000${row.entry_code}`,
+    id: `${row.option_id}\u0000${row.catalogue_sector}\u0000${String(row.catalogue_version)}\u0000${row.entry_code}`,
+    optionId: row.option_id,
     branchId: row.branch_id,
-    optionId: row.option_id ?? null,
     sector: row.catalogue_sector,
     version: row.catalogue_version,
     entryCode: row.entry_code,

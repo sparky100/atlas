@@ -267,7 +267,7 @@ describe('exportDecisionAsAdrMarkdown', () => {
   it('lists saved catalogue evidence under its option, with the claim, source and reviewer, and keeps standing live', () => {
     const branch = makeBranch();
     const source: OptionSource = {
-      kind: 'catalogue', id: 'branch-1:sector:1:crm-x', branchId: branch.id, sector: 'electricity_network', version: 1,
+      kind: 'catalogue', id: 'branch-1:sector:1:crm-x', optionId: 'option-1', branchId: branch.id, sector: 'electricity_network', version: 1,
       entryCode: 'crm-x', product: 'CRM X', vendor: 'Vendor Ltd', summary: 'A CRM.', licence: 'CC-BY-4.0',
       standing: 'replaced', citedBy: 'user-1', citedAt: '2026-11-21T09:00:00Z',
       claims: [{ position: 1, kind: 'functional', statement: 'Records complaints.', sourceUrl: 'https://vendor.example/crm', sourceDate: '2026-01-01', reviewedBy: 'Simon Parkinson', reviewedAt: '2026-01-02' }],
@@ -285,7 +285,7 @@ describe('exportDecisionAsAdrMarkdown', () => {
   it('lists a saved web page as unreviewed evidence under its option', () => {
     const branch = makeBranch();
     const source: OptionSource = {
-      kind: 'web', id: 'branch-1\u0000https://example.com/evidence', branchId: branch.id,
+      kind: 'web', id: 'branch-1\u0000https://example.com/evidence', optionId: 'option-1', branchId: branch.id,
       url: 'https://example.com/evidence', title: 'Product evidence', publisher: 'Example', excerpt: 'The page says it records complaints.',
       retrievedAt: '2026-11-21T10:00:00Z', citedBy: 'user-1', citedAt: '2026-11-21T10:05:00Z',
       assertion: 'It records complaints.', checkedBy: 'user-1', checkedAt: '2026-11-21T10:06:00Z',

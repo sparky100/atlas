@@ -67,7 +67,8 @@ export interface DecisionCriteriaGridProps {
   /** The organisations's guarded web research is on, the decision is proposed and the caller may contribute. */
   canResearch: boolean;
   /** Opens the Researcher for this option; the label is the person-facing option name shown in the dialog. */
-  onResearch: (branchId: UUID, label: string) => void;
+  /** Research any candidate, whether or not it has a change yet. */
+  onResearch: (optionId: UUID, branchId: UUID | null, label: string) => void;
   /** Selects this branch as the session's editing ref and navigates to its change page - the exact "Edit in this change" mechanism `ChangePage.tsx` already offers, reused rather than reinvented (item 5: "using the existing 'Work in this change' flow"). */
   onWorkOnThisChange: (branchId: UUID) => void;
   /** Creates the delivery branch for a candidate that has none yet, then opens it. */
@@ -281,8 +282,8 @@ export function DecisionCriteriaGrid({ decisionId, options, canRate, userId, nee
                       </Text>
                     )}
                     <div className={styles.optionHeaderActions}>
-                      {canResearch && branchId !== null && (
-                        <Button variant="secondary" onClick={() => { onResearch(branchId, stripIntentPrefix(o.label)); }}>
+                      {canResearch && (
+                        <Button variant="secondary" onClick={() => { onResearch(o.optionId, branchId, stripIntentPrefix(o.label)); }}>
                           Research the web
                         </Button>
                       )}
@@ -427,7 +428,7 @@ export function DecisionCriteriaGrid({ decisionId, options, canRate, userId, nee
               })}
             </div>
             <div className={styles.optionHeaderActions}>
-              {canResearch && branchId !== null && <Button variant="secondary" onClick={() => { onResearch(branchId, stripIntentPrefix(o.label)); }}>Research the web</Button>}
+              {canResearch && <Button variant="secondary" onClick={() => { onResearch(o.optionId, branchId, stripIntentPrefix(o.label)); }}>Research the web</Button>}
               {branchId !== null && <Link to={`/o/${orgSlug}/m/${modelSlug}/decisions/${decisionId}/options/${branchId}/landscape`}>Preview impact →</Link>}
               {branchId === null && canWorkOnCandidate && <Button variant="secondary" onClick={() => { onWorkOnOption(o.optionId); }}>Work on this option</Button>}
               {canEditOption(o) && branchId !== null && <Button variant="secondary" onClick={() => { onWorkOnThisChange(branchId); }}>Work on this option</Button>}

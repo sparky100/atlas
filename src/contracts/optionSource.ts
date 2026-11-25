@@ -1,11 +1,12 @@
 import type { CatalogueClaim, CatalogueStanding } from './productCatalogue';
 
 interface OptionSourceCommon {
-  /** Stable within a decision: the option (or, before the backfill, its branch) plus the source's own identity. */
+  /** Stable within a decision: the option plus the source's own identity. */
   id: string;
-  branchId: string;
-  /** D1 stage 1: the stable candidate identity. Absent only for a row created before the compatibility trigger existed. */
-  optionId?: string | null;
+  /** The candidate option the source belongs to (20261125130000_option_keyed_research.sql). */
+  optionId: string;
+  /** The option's change, when it had one at the time the source was saved. Never the key. */
+  branchId: string | null;
   citedBy: string;
   citedAt: string;
 }
@@ -58,8 +59,8 @@ export type OptionSource = OptionCatalogueSource | OptionWebSource;
 /** One saved web source row, before mapping to the view shape. */
 export interface OptionWebSourceRow {
   decision_id: string;
-  branch_id: string;
-  option_id?: string | null;
+  branch_id: string | null;
+  option_id: string;
   url: string;
   title: string;
   publisher: string | null;

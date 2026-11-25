@@ -31,10 +31,12 @@ export async function listDecisionGaps(client: Client, decisionId: string): Prom
 export async function recordDecisionGap(client: Client, input: RecordDecisionGapInput): Promise<DecisionGap> {
   assertRealId('recordDecisionGap', 'decision_id', input.decisionId);
   if (input.branchId !== null) assertRealId('recordDecisionGap', 'branch_id', input.branchId);
+  if (input.optionId != null) assertRealId('recordDecisionGap', 'option_id', input.optionId);
   const row = {
     id: crypto.randomUUID(),
     decision_id: input.decisionId,
     branch_id: input.branchId,
+    ...(input.optionId != null ? { option_id: input.optionId } : {}),
     origin: input.origin,
     body: input.body.trim(),
     created_by: input.userId,

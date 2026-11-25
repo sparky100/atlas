@@ -71,20 +71,21 @@ Deno.serve(async (req: Request) => {
 
     const outcome = await handleResearch(
       {
-        loadDecision: async (decisionId, branchId) => {
+        loadDecision: async (decisionId, optionId) => {
           const { data, error } = await supabase.from('decisions').select('org_id, status').eq('id', decisionId).maybeSingle();
           if (error) throw new Error('Could not read the decision.');
           const row = data as { org_id: string; status: string } | null;
           if (!row) return null;
-          const { data: link, error: linkError } = await supabase
-            .from('decision_links')
-            .select('decision_id')
+          // A candidate option, with or without a change: the option row is the authority.
+          const { data: option, error: optionError } = await supabase
+            .from('decision_options')
+            .select('id, branch_id')
+            .eq('id', optionId)
             .eq('decision_id', decisionId)
-            .eq('linked_type', 'branch')
-            .eq('linked_id', branchId)
             .maybeSingle();
-          if (linkError) throw new Error('Could not read the option link.');
-          return { orgId: row.org_id, status: row.status, branchLinked: link !== null };
+          if (optionError) throw new Error('Could not read the option.');
+          const found = option as { id: string; branch_id: string | null } | null;
+          return { orgId: row.org_id, status: row.status, optionOnDecision: found !== null, branchId: found?.branch_id ?? null };
         },
         callerRole: async (orgId) => {
           const { data, error } = await supabase.from('members').select('role').eq('org_id', orgId).eq('user_id', userId).maybeSingle();
@@ -156,6 +157,7 @@ Deno.serve(async (req: Request) => {
           const { error } = await supabase.from('web_research_requests').insert({
             org_id: input.orgId,
             decision_id: input.decisionId,
+            option_id: input.optionId,
             branch_id: input.branchId,
             requested_by: userId,
             query: input.query,

@@ -2,6 +2,7 @@ import type { UUID } from '../../contracts/delta';
 import type { WebResearchCandidate } from '../../contracts/webResearch';
 import { createChangeBranch, getBranch, getMainBranch } from '../../db/branches';
 import { createDecisionLink, listDecisionLinksForDecision } from '../../db/decisions';
+import { getDecisionOptionForBranch } from '../../db/decisionOptions';
 import { insertOptionWebSource } from '../../db/optionWebSources';
 import type { BranchRow, DecisionLinkRow } from '../../db/types';
 import { supabase } from '../supabaseClient';
@@ -60,8 +61,12 @@ export async function addResearchOption(input: AddResearchOptionInput): Promise<
 
   let sourceError: string | null = null;
   try {
+    // The link's trigger created the candidate row; the page belongs to it.
+    const option = await getDecisionOptionForBranch(supabase, input.decisionId, branch.id);
+    if (option === null) throw new Error('The option was saved, but it could not be read back to attach the page.');
     await insertOptionWebSource(supabase, {
       decisionId: input.decisionId,
+      optionId: option.id,
       branchId: branch.id,
       candidate: input.candidate,
       citedBy: input.userId,

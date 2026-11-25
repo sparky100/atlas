@@ -9,7 +9,8 @@ import {
 import type { ResearchHandlerDeps } from './researchHandler';
 
 const DECISION = '11111111-1111-4111-8111-111111111111';
-const BRANCH = '22222222-2222-4222-8222-222222222222';
+const OPTION = '22222222-2222-4222-8222-222222222222';
+const BRANCH = '44444444-4444-4444-8444-444444444444';
 const ORG = '33333333-3333-4333-8333-333333333333';
 const NOW = new Date('2026-11-22T09:00:00.000Z');
 const QUERY = 'Oracle customer service utility billing';
@@ -28,7 +29,7 @@ function deps(over: Partial<ResearchHandlerDeps> = {}): ResearchHandlerDeps & { 
   return {
     searches,
     records,
-    loadDecision: () => Promise.resolve({ orgId: ORG, status: 'proposed', branchLinked: true }),
+    loadDecision: () => Promise.resolve({ orgId: ORG, status: 'proposed', optionOnDecision: true, branchId: null }),
     callerRole: () => Promise.resolve('contributor'),
     orgSettings: () => Promise.resolve({ webSearchEnabled: true, assistantEnabled: true, agentsEnabled: true, keySet: true }),
     search: (orgId, query) => {
@@ -44,17 +45,17 @@ function deps(over: Partial<ResearchHandlerDeps> = {}): ResearchHandlerDeps & { 
   };
 }
 
-const body = { decisionId: DECISION, branchId: BRANCH, query: QUERY };
+const body = { decisionId: DECISION, optionId: OPTION, query: QUERY };
 
 describe('parseResearchBody', () => {
   it('keeps the query text and trims only the edges', () => {
-    expect(parseResearchBody({ ...body, query: `  ${QUERY}  ` })).toEqual({ decisionId: DECISION, branchId: BRANCH, query: QUERY });
+    expect(parseResearchBody({ ...body, query: `  ${QUERY}  ` })).toEqual({ decisionId: DECISION, optionId: OPTION, query: QUERY });
   });
 
   it('refuses a missing body, bad ids and an empty or overlong query', () => {
     expect(parseResearchBody(null)).toContain('body');
     expect(parseResearchBody({ ...body, decisionId: 'nope' })).toContain('decisionId');
-    expect(parseResearchBody({ ...body, branchId: 'nope' })).toContain('branchId');
+    expect(parseResearchBody({ ...body, optionId: 'nope' })).toContain('optionId');
     expect(parseResearchBody({ ...body, query: '  ' })).toContain('at least');
     expect(parseResearchBody({ ...body, query: 'x'.repeat(RESEARCH_QUERY_MAX_CHARS + 1) })).toContain('at most');
   });
@@ -72,7 +73,7 @@ describe('handleResearch', () => {
     expect(outcome).toMatchObject({ status: 'done', query: QUERY, candidates: [CANDIDATE], searchedAt: NOW.toISOString(), requests: 1 });
     expect(d.searches).toEqual([[ORG, QUERY]]);
     expect(d.records).toEqual([
-      { orgId: ORG, decisionId: DECISION, branchId: BRANCH, query: QUERY, status: 'ok', resultCount: 1, urls: [CANDIDATE.url] },
+      { orgId: ORG, decisionId: DECISION, optionId: OPTION, branchId: null, query: QUERY, status: 'ok', resultCount: 1, urls: [CANDIDATE.url] },
     ]);
   });
 
@@ -103,8 +104,17 @@ describe('handleResearch', () => {
   });
 
   it('refuses an accepted decision or an option that is not linked', async () => {
-    expect((await handleResearch(deps({ loadDecision: () => Promise.resolve({ orgId: ORG, status: 'accepted', branchLinked: true }) }), body)).status).toBe('forbidden');
-    expect((await handleResearch(deps({ loadDecision: () => Promise.resolve({ orgId: ORG, status: 'proposed', branchLinked: false }) }), body)).status).toBe('forbidden');
+    expect((await handleResearch(deps({ loadDecision: () => Promise.resolve({ orgId: ORG, status: 'accepted', optionOnDecision: true, branchId: null }) }), body)).status).toBe('forbidden');
+    expect((await handleResearch(deps({ loadDecision: () => Promise.resolve({ orgId: ORG, status: 'proposed', optionOnDecision: false, branchId: null }) }), body)).status).toBe('forbidden');
+  });
+
+  it('records the option, and its change only when it already has one', async () => {
+    const records: unknown[] = [];
+    await handleResearch(deps({
+      loadDecision: () => Promise.resolve({ orgId: ORG, status: 'proposed', optionOnDecision: true, branchId: BRANCH }),
+      record: (input) => { records.push(input); return Promise.resolve(); },
+    }), body);
+    expect(records).toEqual([expect.objectContaining({ optionId: OPTION, branchId: BRANCH })]);
   });
 
   it('records a failed search and returns the provider message', async () => {

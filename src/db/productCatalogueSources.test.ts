@@ -5,6 +5,7 @@ import { optionSourcesFromRows } from './productCatalogue';
 const row: OptionCatalogueSourceRow = {
   decision_id: 'decision-1',
   branch_id: 'branch-1',
+  option_id: 'option-1',
   catalogue_sector: 'electricity_network',
   catalogue_version: 1,
   entry_code: 'crm-x',
@@ -23,8 +24,8 @@ describe('optionSourcesFromRows', () => {
     const sources = optionSourcesFromRows([row], new Map([['electricity_network\u00001', 'replaced']]));
     expect(sources).toHaveLength(1);
     expect(sources[0]).toMatchObject({
-      kind: 'catalogue', branchId: 'branch-1', product: 'CRM X', vendor: 'Vendor Ltd', standing: 'replaced',
-      id: 'branch-1\u0000electricity_network\u00001\u0000crm-x',
+      kind: 'catalogue', optionId: 'option-1', branchId: 'branch-1', product: 'CRM X', vendor: 'Vendor Ltd', standing: 'replaced',
+      id: 'option-1\u0000electricity_network\u00001\u0000crm-x',
     });
     const first = sources[0];
     if (first?.kind !== 'catalogue') throw new Error('Expected a catalogue source');

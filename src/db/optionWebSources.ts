@@ -6,9 +6,9 @@ import type { Client } from './client';
 export function optionWebSourcesFromRows(rows: readonly OptionWebSourceRow[]): OptionWebSource[] {
   return rows.map((row) => ({
     kind: 'web' as const,
-    id: `${row.branch_id}\u0000${row.url}`,
+    id: `${row.option_id}\u0000${row.url}`,
+    optionId: row.option_id,
     branchId: row.branch_id,
-    optionId: row.option_id ?? null,
     url: row.url,
     title: row.title,
     publisher: row.publisher,
@@ -24,7 +24,8 @@ export function optionWebSourcesFromRows(rows: readonly OptionWebSourceRow[]): O
 
 export interface InsertOptionWebSourceInput {
   decisionId: string;
-  branchId: string;
+  optionId: string;
+  branchId: string | null;
   candidate: Pick<WebResearchCandidate, 'url' | 'title' | 'publisher' | 'excerpt' | 'retrievedAt'>;
   citedBy: string;
 }
@@ -37,6 +38,7 @@ export interface InsertOptionWebSourceInput {
 export async function insertOptionWebSource(client: Client, input: InsertOptionWebSourceInput): Promise<void> {
   const { error } = await client.from('option_web_sources').insert({
     decision_id: input.decisionId,
+    option_id: input.optionId,
     branch_id: input.branchId,
     url: input.candidate.url,
     title: input.candidate.title,
@@ -60,7 +62,7 @@ export async function listOptionWebSources(client: Client, decisionId: string): 
     .from('option_web_sources')
     .select('*')
     .eq('decision_id', decisionId)
-    .order('branch_id')
+    .order('option_id')
     .order('cited_at');
   if (error) throw new Error(`listOptionWebSources: ${error.message}`);
   return optionWebSourcesFromRows((data as OptionWebSourceRow[] | null) ?? []);

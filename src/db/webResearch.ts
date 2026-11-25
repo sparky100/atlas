@@ -21,7 +21,7 @@ async function errorMessage(error: unknown): Promise<string | null> {
  */
 export async function requestWebResearch(
   supabase: Client,
-  input: { decisionId: UUID; branchId: UUID; query: string },
+  input: { decisionId: UUID; optionId: UUID; query: string },
 ): Promise<{ candidates: WebResearchCandidate[]; searchedAt: string }> {
   // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment -- untyped Supabase function response
   const { data, error } = await supabase.functions.invoke('research-agent', { body: input });
@@ -57,7 +57,10 @@ export async function listEarlierResearchUrls(client: Client, decisionId: UUID):
 
 export interface SaveCheckedWebSourceInput {
   decisionId: UUID;
-  branchId: UUID;
+  /** The candidate option the page is evidence for. */
+  optionId: UUID;
+  /** The option's change, when it has one; never required. */
+  branchId: UUID | null;
   userId: UUID;
   candidate: WebResearchCandidate;
   /** The person's own sentence about what the page supports. */
@@ -66,7 +69,7 @@ export interface SaveCheckedWebSourceInput {
 
 /**
  * Saves the page and the person's check together. RLS requires the caller to be
- * a contributor or above on a proposed decision and the option to be linked;
+ * a contributor or above on a proposed decision and the option to be one of its options;
  * `checked_by` must be the caller. The database sets another check time, but a
  * value is sent so the all-or-none check is satisfied before any trigger runs.
  */
@@ -76,6 +79,7 @@ export async function saveCheckedWebSource(supabase: Client, input: SaveCheckedW
   if (assertion.length > 500) throw new Error('Keep the statement to 500 characters or fewer.');
   const { error } = await supabase.from('option_web_sources').insert({
     decision_id: input.decisionId,
+    option_id: input.optionId,
     branch_id: input.branchId,
     url: input.candidate.url,
     title: input.candidate.title,

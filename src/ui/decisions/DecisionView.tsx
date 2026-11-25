@@ -146,18 +146,18 @@ export function DecisionView({ modelId, decisionId, orgId, orgSlug, modelSlug, r
   const sourcesByBranch = new Map<string, OptionSource[]>();
   const sourcesByOption = new Map<string, OptionSource[]>();
   for (const source of optionSources.data ?? []) {
-    const branchList = sourcesByBranch.get(source.branchId) ?? [];
-    branchList.push(source);
-    sourcesByBranch.set(source.branchId, branchList);
-    if (source.optionId != null) {
-      const optionList = sourcesByOption.get(source.optionId) ?? [];
-      optionList.push(source);
-      sourcesByOption.set(source.optionId, optionList);
+    if (source.branchId !== null) {
+      const branchList = sourcesByBranch.get(source.branchId) ?? [];
+      branchList.push(source);
+      sourcesByBranch.set(source.branchId, branchList);
     }
+    const optionList = sourcesByOption.get(source.optionId) ?? [];
+    optionList.push(source);
+    sourcesByOption.set(source.optionId, optionList);
   }
 
   const [addingOption, setAddingOption] = useState(false);
-  const [researchTarget, setResearchTarget] = useState<{ branchId: UUID; label: string } | null>(null);
+  const [researchTarget, setResearchTarget] = useState<{ optionId: UUID; branchId: UUID | null; label: string } | null>(null);
   const [optionTitle, setOptionTitle] = useState('');
   const [optionApproach, setOptionApproach] = useState<OptionApproach | null>(null);
   const [choosing, setChoosing] = useState<{ optionId: UUID | null; branchId: UUID | null } | null>(null);
@@ -273,8 +273,8 @@ export function DecisionView({ modelId, decisionId, orgId, orgSlug, modelSlug, r
   const canResearch = canAddOption && webSearchEnabled && assistantEnabled && agentsEnabled && keySet;
   // Product and vendor names are safe context only when they are already
   // structured sources on the option, never parsed from its free-text summary.
-  const reviewedNamesFor = (targetBranchId: UUID): { productNames: string[]; vendorNames: string[]; optionProducts: { product: string; vendor: string }[] } => {
-    const sources = (sourcesByBranch.get(targetBranchId) ?? []).filter((source): source is OptionCatalogueSource => source.kind === 'catalogue');
+  const reviewedNamesFor = (targetOptionId: UUID): { productNames: string[]; vendorNames: string[]; optionProducts: { product: string; vendor: string }[] } => {
+    const sources = (sourcesByOption.get(targetOptionId) ?? []).filter((source): source is OptionCatalogueSource => source.kind === 'catalogue');
     const byProduct = new Map<string, { product: string; vendor: string }>();
     for (const source of sources) byProduct.set(`${source.vendor}\u0000${source.product}`, { product: source.product, vendor: source.vendor });
     return {
@@ -679,7 +679,7 @@ export function DecisionView({ modelId, decisionId, orgId, orgSlug, modelSlug, r
                   canSetApproach={canAddOption}
                   onSetApproach={(optionId, approach) => { if (userId) void optionsState.setOptionApproach(optionId, approach, userId); }}
                   canResearch={canResearch}
-                  onResearch={(branchId, label) => { setResearchTarget({ branchId, label }); }}
+                  onResearch={(optionId, branchId, label) => { setResearchTarget({ optionId, branchId, label }); }}
                   ratingsState={ratingsState}
                 />
                 </div>
@@ -1075,17 +1075,18 @@ export function DecisionView({ modelId, decisionId, orgId, orgSlug, modelSlug, r
       {researchTarget !== null && userId !== null && (
         <WebResearchDialog
           decisionId={decisionId}
+          optionId={researchTarget.optionId}
           branchId={researchTarget.branchId}
           optionLabel={researchTarget.label}
           decisionTitle={decision.title}
           capabilityNames={concernedCapabilities.map((capability) => capability.name)}
-          productNames={reviewedNamesFor(researchTarget.branchId).productNames}
-          vendorNames={reviewedNamesFor(researchTarget.branchId).vendorNames}
-          optionProducts={reviewedNamesFor(researchTarget.branchId).optionProducts}
+          productNames={reviewedNamesFor(researchTarget.optionId).productNames}
+          vendorNames={reviewedNamesFor(researchTarget.optionId).vendorNames}
+          optionProducts={reviewedNamesFor(researchTarget.optionId).optionProducts}
           catalogueProducts={knownCatalogueProducts}
           userId={userId}
-          existingUrls={(sourcesByBranch.get(researchTarget.branchId) ?? []).flatMap((source) => (source.kind === 'web' ? [source.url] : []))}
-          citedElsewhereUrls={(optionSources.data ?? []).flatMap((source) => (source.kind === 'web' && source.branchId !== researchTarget.branchId ? [source.url] : []))}
+          existingUrls={(sourcesByOption.get(researchTarget.optionId) ?? []).flatMap((source) => (source.kind === 'web' ? [source.url] : []))}
+          citedElsewhereUrls={(optionSources.data ?? []).flatMap((source) => (source.kind === 'web' && source.optionId !== researchTarget.optionId ? [source.url] : []))}
           earlierSearchUrls={earlierResearchUrls}
           onClose={() => { setResearchTarget(null); }}
           onSaved={() => {
@@ -1096,6 +1097,7 @@ export function DecisionView({ modelId, decisionId, orgId, orgSlug, modelSlug, r
             await recordDecisionGap(supabase, {
               decisionId,
               branchId: researchTarget.branchId,
+              optionId: researchTarget.optionId,
               userId,
               body,
               origin: 'research',
