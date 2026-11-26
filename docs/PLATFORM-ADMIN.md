@@ -51,6 +51,15 @@ else in this product checks platform-admin status.
    drafted and who reviewed each claim, with dates, and who published a
    catalogue version, and a product cannot be published while any of its claims
    is waiting for review.
+   The same screen has a **Source links** section: **Check source links**
+   requests each distinct claim source link once (public https pages only, no
+   AI) and saves the result, with the date and your name, as **Works**,
+   **Moved**, **Gone** or **Could not check**. Links that are not working are
+   listed with the product and claim that cite them, and the product editor says
+   what was found for each claim's link. A check only records what was found: it
+   never edits a claim or unpublishes a product. It needs the
+   `catalogue-link-check` function deployed (`pnpm functions:deploy:catalogue-link-check`);
+   until then the screen says the checker is not available.
 4. **Withdraw or reinstate a published sample model** at
    `/platform-admin/sample-models`, with each sample's own page at
    `/platform-admin/sample-models/:slug`. A sample is withdrawn

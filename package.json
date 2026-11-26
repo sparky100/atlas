@@ -55,6 +55,8 @@
     "functions:deploy:org-ai-key": "pnpm functions:bundle:org-ai-key && supabase functions deploy org-ai-key",
     "functions:bundle:design-agent": "tsx scripts/bundleDesignAgentFunction.ts",
     "functions:bundle:research-agent": "tsx scripts/bundleResearchAgentFunction.ts",
+    "functions:bundle:catalogue-link-check": "tsx scripts/bundleCatalogueLinkCheckFunction.ts",
+    "functions:deploy:catalogue-link-check": "pnpm functions:bundle:catalogue-link-check && supabase functions deploy catalogue-link-check --use-api",
     "functions:bundle:review-agent": "tsx scripts/bundleReviewAgentFunction.ts",
     "functions:deploy:review-agent": "pnpm functions:bundle:review-agent && supabase functions deploy review-agent --use-api",
     "functions:deploy:design-agent": "pnpm functions:bundle:design-agent && supabase functions deploy design-agent",

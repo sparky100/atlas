@@ -5,11 +5,13 @@ import type {
   CapabilitySetOption,
   CatalogueProductContent,
   GeneralCapabilityOption,
+  SourceCheckRow,
 } from '../../contracts/catalogueAdmin';
 import {
   listCapabilitySetItems,
   listCapabilitySets,
   listGeneralCapabilities,
+  listSourceChecks,
   publishCatalogueProduct,
   withdrawCatalogueProduct,
   readCatalogueProduct,
@@ -21,7 +23,7 @@ import { Loading } from '../components/Loading/Loading';
 import { Text } from '../components/Text/Text';
 import { useUnsavedChanges } from '../routes/platformAdmin/unsavedChanges';
 import { supabase } from '../supabaseClient';
-import { claimStatusText, emptyProduct, isGeneralCapabilityCode, publicationStatusText, sameClaimText, sectorLabel, setLabel } from './catalogueShared';
+import { claimStatusText, emptyProduct, isGeneralCapabilityCode, publicationStatusText, sameClaimText, sectorLabel, setLabel, sourceCheckSentence } from './catalogueShared';
 import styles from './CatalogueAdmin.module.css';
 
 const BASE = '/platform-admin/catalogue';
@@ -50,6 +52,8 @@ export function CatalogueProductAdmin({ productId }: { productId: string | null 
   const [issues, setIssues] = useState<string[] | null>(null);
   const [notice, setNotice] = useState('');
   const [loadError, setLoadError] = useState('');
+  /** Latest check of each source link, by address; `null` when they could not be read (then no claim says anything about its link). */
+  const [sourceChecks, setSourceChecks] = useState<Map<string, SourceCheckRow> | null>(null);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
@@ -66,6 +70,8 @@ export function CatalogueProductAdmin({ productId }: { productId: string | null 
         setGeneral(nextGeneral);
         setDetail(nextDetail);
         setContent(nextDetail === null ? emptyProduct() : nextDetail.content);
+        // The link checks are extra information: if they cannot be read the editor still works and says nothing about links.
+        setSourceChecks(await listSourceChecks(supabase).then((rows) => new Map(rows.map((row) => [row.url, row])), () => null));
       } catch (cause) {
         setLoadError(cause instanceof Error ? cause.message : String(cause));
       } finally {
@@ -352,6 +358,11 @@ export function CatalogueProductAdmin({ productId }: { productId: string | null 
               <p role="status" data-testid="claim-status">
                 {record === undefined ? notSavedText : claimStatusText(record)}
               </p>
+              {sourceChecks !== null && claim.sourceUrl.trim() !== '' && (
+                <p data-testid="claim-link-check">
+                  {(() => { const check = sourceChecks.get(claim.sourceUrl.trim()); return check === undefined ? 'Link not checked yet.' : `Link: ${sourceCheckSentence(check)}`; })()}
+                </p>
+              )}
               <div className={styles.claimGrid}>
                 <label>Position <input type="number" min={1} value={claim.position} onChange={(event) => { updateClaim(index, { position: Number(event.target.value) }); }} /></label>
                 <label>Kind <select value={claim.kind} onChange={(event) => { updateClaim(index, { kind: event.target.value as typeof claim.kind }); }}>{CLAIM_KINDS.map((kind) => <option key={kind} value={kind}>{kind.replaceAll('_', ' ')}</option>)}</select></label>

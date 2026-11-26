@@ -165,3 +165,48 @@ test('the sector catalogue is read-only history and withdrawing it is blocked un
   await expect(page.getByTestId('catalogue-version-admin')).toBeVisible();
   expect(await page.evaluate(() => document.documentElement.scrollWidth > document.documentElement.clientWidth + 1)).toBe(false);
 });
+
+/** Step 5a: a link the last check found gone is listed with the product and claim that cite it, and the product editor says so. */
+for (const viewport of [{ width: 1280, height: 800 }, { width: 390, height: 844 }]) {
+  test(`source links that are not working are listed with their product at ${String(viewport.width)}`, async ({ page }) => {
+    await page.setViewportSize(viewport);
+    const service = createServiceRoleClient(loadEnv());
+    const suffix = randomUUID().slice(0, 8);
+    const productName = `Link check product ${suffix}`;
+    const goneUrl = `https://example.test/gone-${suffix}`;
+    const worksUrl = `https://example.test/works-${suffix}`;
+    const zero = '00000000-0000-0000-0000-000000000000';
+    const productResult: { data: { id: string } | null; error: { message: string } | null } = await service.from('catalogue_products').insert({
+      code: `link-check-${suffix}`, product: productName, vendor: `Vendor ${suffix}`, summary: 'Used to check source links.', created_by: zero, updated_by: zero,
+    }).select('id').single();
+    if (productResult.error || !productResult.data) throw new Error(`link-check seed: ${productResult.error?.message ?? 'no row'}`);
+    const productId = productResult.data.id;
+    const checked = (result: { error: { message: string } | null }) => { if (result.error) throw new Error(`link-check seed: ${result.error.message}`); };
+    checked(await service.from('catalogue_product_claims').insert([
+      { product_id: productId, position: 1, kind: 'functional', statement: 'The vendor describes a page that has gone.', source_url: goneUrl, source_date: '2026-11-01' },
+      { product_id: productId, position: 2, kind: 'deployment', statement: 'The vendor describes a page that works.', source_url: worksUrl, source_date: '2026-11-01' },
+    ]));
+    checked(await service.from('catalogue_source_checks').insert([
+      { url: goneUrl, result: 'gone', http_status: 404, checked_by: zero },
+      { url: worksUrl, result: 'works', http_status: 200, checked_by: zero },
+    ]));
+
+    await signUpAdmin(page);
+    await page.goto('/platform-admin/catalogue/review');
+    await expect(page.getByTestId('source-links-summary')).toContainText('links checked');
+    await expect(page.getByRole('button', { name: 'Check source links' })).toBeEnabled();
+    const flagged = page.getByTestId('source-links-flagged');
+    await expect(flagged).toContainText(goneUrl);
+    await expect(flagged).toContainText('Gone (404)');
+    await expect(flagged).toContainText('The vendor describes a page that has gone.');
+    await expect(flagged).not.toContainText(worksUrl);
+    expect(await page.evaluate(() => document.documentElement.scrollWidth > document.documentElement.clientWidth + 1)).toBe(false);
+
+    // The product editor says what was found for each claim's link.
+    await flagged.getByRole('link', { name: productName }).first().click();
+    await expect(page.getByLabel('Product', { exact: true })).toHaveValue(productName);
+    await page.locator('details').first().locator('summary').click();
+    await expect(page.getByTestId('claim-link-check').first()).toContainText('Link: Gone (404)');
+    await page.screenshot({ path: `test-results/catalogue-source-links-${String(viewport.width)}.png`, fullPage: true });
+  });
+}
