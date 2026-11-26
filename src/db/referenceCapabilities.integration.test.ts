@@ -93,7 +93,9 @@ describe('reference capability identity, real database', () => {
 
   it('keeps draft identities invisible to an owner in another organisation and denies client writes', async () => {
     for (const table of ['reference_capabilities', 'reference_capability_revisions', 'reference_map_item_links']) {
-      const outside = await otherOrgOwner.client.from(table).select('*');
+      // Alignments of PUBLISHED maps are readable by every signed-in user (20261126230000); these maps are drafts.
+      const outsideQuery = otherOrgOwner.client.from(table).select('*');
+      const outside = await (table === 'reference_map_item_links' ? outsideQuery.in('map_item_id', itemIds) : outsideQuery);
       check(outside);
       expect(outside.data).toEqual([]);
       expect((await anon.from(table).select('*')).error).not.toBeNull();

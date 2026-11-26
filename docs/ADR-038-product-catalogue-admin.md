@@ -175,3 +175,25 @@ Step 4 of `proposals/PROPOSAL-catalogue-maintenance.md`, first half. Migration
   existing `save_catalogue_product`, so the advisor count is unchanged.
 - **Users see no change in 4a.** Readers, option citations, Designer and packs
   still use sector catalogues. Step 4b switches them, with its own walkthrough.
+
+## Amendment, 26 November 2026: users can read published products (step 4b-1)
+
+Step 4b of `proposals/WALKTHROUGH-catalogue-step-4b-reader-switch.md`, first PR.
+Migration `20261126230000_catalogue_published_products_readable.sql`.
+
+- **Who can see what changes.** Any signed-in user can read a product's newest,
+  not-withdrawn revision with its claims and links. Withdrawn revisions and
+  revisions a newer one replaced stay admin-only. Any signed-in user can read
+  which general capability a published map item is aligned to, with the written
+  basis and who aligned it; alignments of unpublished maps stay admin-only. User
+  ids of publishers and reviewers on product revisions are not readable by
+  browsers; the names are.
+- **Replaced is recorded once** on the older revision (`superseded_at`, set by a
+  trigger when a newer revision is inserted), so the read policy does not read
+  its own table.
+- **One policy per table and action**, replacing the admin-only ones, so the
+  advisor's multiple-permissive-policy count does not grow. No new callable
+  function.
+- **One reader**, `listPublishedProductsForCapability` (`src/db/publishedProducts.ts`),
+  matches a capability's shared identity or its sector code. No screen uses it
+  yet (step 4b-2).

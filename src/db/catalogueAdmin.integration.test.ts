@@ -13,6 +13,7 @@ import {
   validateCatalogueDraft,
   withdrawCatalogueProduct,
 } from './catalogueAdmin';
+import { listPublishedProductsForCapability } from './publishedProducts';
 import type { CatalogueDraftContent, CatalogueProductContent } from '../contracts/catalogueAdmin';
 
 const env = loadEnv();
@@ -364,6 +365,57 @@ describe('platform product catalogue, real database', () => {
         product_id: pid, revision: 9, product_edit_revision: 1, code: 'x', product: 'x', vendor: 'x', summary: 'x', published_by: outside.id,
       });
       expect(write.error).not.toBeNull();
+    });
+  });
+  describe('reading published products as another signed-in user', () => {
+    let pid: string;
+    let sharedCapabilityId: string;
+    const content = (): CatalogueProductContent => ({
+      code: `test-read-${suffix}`, product: `Read product ${suffix}`, vendor: 'Test vendor',
+      summary: 'First summary.', capabilities: [],
+      generalCapabilities: [{ capabilityId: sharedCapabilityId, howItSupports: 'Runs the shared capability' }],
+      claims: [{ ...claim, review: true }],
+    });
+    const names = async (sector: string): Promise<string[]> =>
+      (await listPublishedProductsForCapability(outside.client, { sector, capabilityCode: '1' })).map((p) => p.product);
+
+    it('shows nothing before the product is published', async () => {
+      const link = await service.from('reference_map_item_links').select('capability_id').eq('map_item_id', itemIds.get(retailMapId)).single();
+      check(link);
+      sharedCapabilityId = (link.data as { capability_id: string }).capability_id;
+      pid = (await saveCatalogueProduct(admin.client, null, 0, content())).productId;
+      expect(await names('utility')).not.toContain(`Read product ${suffix}`);
+    });
+
+    it('shows a published product in every sector that aligns to its shared capability, with its claims', async () => {
+      await publishCatalogueProduct(admin.client, pid);
+      for (const sector of ['utility', 'retail_ecommerce']) expect(await names(sector)).toContain(`Read product ${suffix}`);
+      const found = (await listPublishedProductsForCapability(outside.client, { sector: 'utility', capabilityCode: '1' })).find((p) => p.productId === pid);
+      expect(found).toEqual(expect.objectContaining({ revision: 1, vendor: 'Test vendor', howItSupports: 'Runs the shared capability' }));
+      expect(found?.approvedByName).toBeTruthy();
+      expect(found?.claims).toEqual([expect.objectContaining({ statement: claim.statement, origin: 'person' })]);
+    });
+
+    it('keeps showing the published revision while the product has unpublished changes, then the newest revision once', async () => {
+      const current = await readCatalogueProduct(admin.client, pid);
+      await saveCatalogueProduct(admin.client, pid, current.product.edit_revision, { ...current.content, summary: 'Edited, not published.' });
+      const before = (await listPublishedProductsForCapability(outside.client, { sector: 'utility', capabilityCode: '1' })).filter((p) => p.productId === pid);
+      expect(before).toEqual([expect.objectContaining({ revision: 1, summary: 'First summary.' })]);
+      await publishCatalogueProduct(admin.client, pid);
+      const after = (await listPublishedProductsForCapability(outside.client, { sector: 'utility', capabilityCode: '1' })).filter((p) => p.productId === pid);
+      expect(after).toEqual([expect.objectContaining({ revision: 2, summary: 'Edited, not published.' })]);
+    });
+
+    it('does not expose who published a product, only the name', async () => {
+      const who = await outside.client.from('catalogue_product_revisions').select('published_by').eq('product_id', pid);
+      expect(who.error).not.toBeNull();
+    });
+
+    it('stops showing a withdrawn product', async () => {
+      await withdrawCatalogueProduct(admin.client, pid, 'The vendor sold the product.');
+      expect(await names('utility')).not.toContain(`Read product ${suffix}`);
+      const hidden = await outside.client.from('catalogue_product_revisions').select('id').eq('product_id', pid);
+      expect(hidden.data).toEqual([]);
     });
   });
 });
