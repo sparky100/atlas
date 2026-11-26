@@ -267,3 +267,29 @@ Migration `20261126250000_catalogue_source_checks.sql`; edge function
   rules are in `src/tools/catalogueLinkCheck.ts` and tested.
 - **Not here.** The AI claim check, turning failures into review items and the
   monthly schedule are step 5b.
+
+## Amendment, 26 November 2026: AI claim check (step 5b-1)
+
+Migration `20261126260000_catalogue_claim_checks.sql`; edge function
+`catalogue-claim-check`; walkthrough `proposals/WALKTHROUGH-catalogue-step-5b-claim-check.md`.
+
+- **Table keyed by product, link and statement.** `catalogue_claim_checks`
+  holds the latest AI verdict (supported, changed, can't tell) with the quote,
+  a short note, the model, token counts, and who/when. A "supported" verdict
+  must carry a quote (check constraint). It is a record only: it never edits a
+  claim or unpublishes a product.
+- **Server-stamped people and dates.** A trigger stamps who and when. A
+  dismissal ("I looked: it still stands") changes only the dismissal columns
+  and cannot alter the AI's verdict; a new check clears the dismissal.
+  Platform admins only, one policy per action; the trigger function is not
+  executable through the API, so no new advisor finding.
+- **Quote or "can't tell".** The page text is untrusted data. The AI must
+  quote a sentence; the quote is verified against the page (case, spacing and
+  quote marks flattened, at least 15 characters) or the verdict is downgraded.
+- **Key and limit.** The function confirms the caller is a platform admin,
+  reads the platform AI key through a service-role-only RPC, and stops at a
+  daily token total of 1,000,000 counted from saved results (re-checks that
+  overwrite a result are undercounted). It writes no catalogue data; the
+  browser saves results under admin RLS.
+- **Not here.** The monthly schedule and run record (5b-2) and finding new
+  products (step 6).

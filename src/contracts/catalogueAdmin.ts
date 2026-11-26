@@ -279,3 +279,45 @@ export function sourceCheckLabel(result: SourceCheckResult): string {
     case 'could_not_check': return 'Could not check';
   }
 }
+
+/** Step 5b-1: what the platform's AI found when it read the page a claim cites. */
+export const CLAIM_CHECK_VERDICTS = ['supported', 'changed', 'cant_tell'] as const;
+export const claimCheckVerdictSchema = z.enum(CLAIM_CHECK_VERDICTS);
+export type ClaimCheckVerdict = z.infer<typeof claimCheckVerdictSchema>;
+
+/** A claim as the claim checker needs it: which product, which link, and the exact claim text. */
+export interface ClaimForCheck {
+  productId: string;
+  product: string;
+  vendor: string;
+  sourceUrl: string;
+  statement: string;
+}
+
+/** A saved claim check. `dismissedAt` is set when a person looked and kept the claim. */
+export interface ClaimCheckRow {
+  productId: string;
+  sourceUrl: string;
+  statement: string;
+  verdict: ClaimCheckVerdict;
+  quote: string | null;
+  note: string | null;
+  model: string | null;
+  checkedAt: string;
+  checkedByName: string | null;
+  dismissedAt: string | null;
+  dismissedByName: string | null;
+}
+
+export function claimCheckVerdictLabel(verdict: ClaimCheckVerdict): string {
+  switch (verdict) {
+    case 'supported': return 'Still supported';
+    case 'changed': return 'Changed';
+    case 'cant_tell': return "Can't tell";
+  }
+}
+
+/** The key a claim and its saved check share: product, link and exact text. */
+export function claimCheckKey(row: { productId: string; sourceUrl: string; statement: string }): string {
+  return `${row.productId}\u0000${row.sourceUrl.trim()}\u0000${row.statement}`;
+}

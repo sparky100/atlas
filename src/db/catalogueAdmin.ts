@@ -3,9 +3,10 @@
  * reference tables directly: every mutation is one of the guarded RPCs in
  * `20261122120000_catalogue_admin.sql`, which re-check platform-admin status
  * and optimistic revisions. This module only maps rows and calls those RPCs.
- * One exception, step 5a: the source-link check results (`catalogue_source_checks`)
- * are plain records that platform admins write directly under row-level
- * security, with who and when stamped by the server.
+ * One exception, steps 5a and 5b-1: the source-link and claim check results
+ * (`catalogue_source_checks`, `catalogue_claim_checks`) are plain records that
+ * platform admins write directly under row-level security, with who and when
+ * stamped by the server.
  */
 import type { UUID } from '../contracts/delta';
 import {
@@ -25,11 +26,14 @@ import {
   type ClaimReviewState,
   type ClaimWaitingForReview,
   type ProductPublicationState,
+  type ClaimCheckRow,
+  type ClaimForCheck,
   type SourceCheckInput,
   type SourceCheckRow,
   productPublicationLabel,
   sourceCheckSchema,
 } from '../contracts/catalogueAdmin';
+import { claimCheckResultSchema, type ClaimCheckResult } from '../tools/catalogueClaimCheck';
 import type { Client } from './client';
 import { queryInChunks } from './inFilterLimit';
 
@@ -624,4 +628,104 @@ export async function listFlaggedSourceLinks(client: Client, checks: readonly So
       .map((row) => ({ productId: row.product_id, productName: byId.get(row.product_id)?.product ?? 'Unknown product', vendor: byId.get(row.product_id)?.vendor ?? '', position: row.position, statement: row.statement }))
       .sort((a, b) => a.productName.localeCompare(b.productName) || a.position - b.position),
   }));
+}
+
+/** The function's own sentence when it sent one (a daily limit, a missing key), instead of a generic message. */
+async function functionErrorMessage(error: unknown, fallback: string): Promise<string> {
+  const context = (error as { context?: unknown }).context;
+  if (context instanceof Response) {
+    const body = (await context.json().catch(() => null)) as { message?: unknown } | null;
+    if (typeof body?.message === 'string' && body.message !== '') return body.message;
+  }
+  return fallback;
+}
+
+/** Every claim with its product, for the claim check. Claims are read in pages and products in pieces of at most 50 (build rule 8). */
+export async function listClaimsForCheck(client: Client): Promise<ClaimForCheck[]> {
+  const rows: { product_id: string; statement: string; source_url: string }[] = [];
+  for (let from = 0; ; from += SOURCE_PAGE) {
+    const { data, error } = await client.from('catalogue_product_claims')
+      .select('product_id,statement,source_url').order('id').range(from, from + SOURCE_PAGE - 1);
+    if (error) throw new Error(`listClaimsForCheck: ${error.message}`);
+    const page = (data as { product_id: string; statement: string; source_url: string }[] | null) ?? [];
+    rows.push(...page);
+    if (page.length < SOURCE_PAGE) break;
+  }
+  const productIds = [...new Set(rows.map((row) => row.product_id))];
+  const products = await queryInChunks<string, { id: string; product: string; vendor: string }>('listClaimsForCheck', 'id', productIds, (chunk) =>
+    client.from('catalogue_products').select('id,product,vendor').in('id', chunk));
+  const byId = new Map(products.map((product) => [product.id, product]));
+  return rows.flatMap((row) => {
+    const product = byId.get(row.product_id);
+    return product === undefined ? [] : [{ productId: row.product_id, product: product.product, vendor: product.vendor, sourceUrl: row.source_url.trim(), statement: row.statement }];
+  });
+}
+
+interface ClaimCheckDbRow {
+  product_id: string;
+  source_url: string;
+  statement: string;
+  verdict: ClaimCheckRow['verdict'];
+  quote: string | null;
+  note: string | null;
+  model: string | null;
+  checked_at: string;
+  checked_by_name: string | null;
+  dismissed_at: string | null;
+  dismissed_by_name: string | null;
+}
+
+/** The latest saved claim check of every claim, newest first. */
+export async function listClaimChecks(client: Client): Promise<ClaimCheckRow[]> {
+  const rows: ClaimCheckDbRow[] = [];
+  for (let from = 0; ; from += SOURCE_PAGE) {
+    const { data, error } = await client.from('catalogue_claim_checks')
+      .select('product_id,source_url,statement,verdict,quote,note,model,checked_at,checked_by_name,dismissed_at,dismissed_by_name')
+      .order('checked_at', { ascending: false }).order('product_id').order('statement').range(from, from + SOURCE_PAGE - 1);
+    if (error) throw new Error(`listClaimChecks: ${error.message}`);
+    const page = (data as ClaimCheckDbRow[] | null) ?? [];
+    rows.push(...page);
+    if (page.length < SOURCE_PAGE) break;
+  }
+  return rows.map((row) => ({
+    productId: row.product_id, sourceUrl: row.source_url, statement: row.statement, verdict: row.verdict, quote: row.quote, note: row.note, model: row.model,
+    checkedAt: row.checked_at, checkedByName: row.checked_by_name, dismissedAt: row.dismissed_at, dismissedByName: row.dismissed_by_name,
+  }));
+}
+
+/** Ask the claim checker about a few claims (at most 5). It writes nothing; the answers are saved by `saveClaimChecks`. */
+export async function checkClaims(client: Client, claims: readonly ClaimForCheck[]): Promise<ClaimCheckResult[]> {
+  // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment -- untyped Supabase function response
+  const { data, error } = await client.functions.invoke('catalogue-claim-check', { body: { claims } });
+  if (error) throw new Error(await functionErrorMessage(error, 'The claim checker is not available right now. If it has not been deployed yet, deploy catalogue-claim-check, then try again.'));
+  const result = data as { status?: string; message?: string; results?: unknown } | null;
+  if (!result) throw new Error('The claim checker gave no answer.');
+  if (result.status === 'error') throw new Error(result.message ?? 'The claim check failed.');
+  const parsed = claimCheckResultSchema.array().safeParse(result.results);
+  if (!parsed.success) throw new Error('The claim checker gave an answer this page does not understand.');
+  return parsed.data;
+}
+
+/** Save results. The server stamps who and when; a later check of the same claim replaces the earlier one and clears any "I looked". */
+export async function saveClaimChecks(client: Client, results: readonly ClaimCheckResult[]): Promise<void> {
+  if (results.length === 0) return;
+  const { error } = await client.from('catalogue_claim_checks').upsert(
+    results.map((result) => ({
+      product_id: result.productId, source_url: result.sourceUrl, statement: result.statement, verdict: result.verdict, quote: result.quote,
+      note: result.note, model: result.model, input_tokens: result.inputTokens, output_tokens: result.outputTokens,
+    })),
+    { onConflict: 'product_id,source_url,statement' },
+  );
+  if (error) throw new Error(`saveClaimChecks: ${error.message}`);
+}
+
+/** "I looked: it still stands". The server records who and when. */
+export async function dismissClaimCheck(client: Client, check: Pick<ClaimCheckRow, 'productId' | 'sourceUrl' | 'statement'>): Promise<void> {
+  const { data, error } = await client.from('catalogue_claim_checks')
+    .update({ dismissed_at: new Date().toISOString() })
+    .eq('product_id', check.productId).eq('source_url', check.sourceUrl).eq('statement', check.statement)
+    .is('dismissed_at', null)
+    .select('product_id');
+  if (error) throw new Error(`dismissClaimCheck: ${error.message}`);
+  if (((data as unknown[] | null) ?? []).length === 0) throw new Error('That check was replaced or already cleared. Reload the page.');
 }

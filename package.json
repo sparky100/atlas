@@ -56,6 +56,8 @@
     "functions:bundle:design-agent": "tsx scripts/bundleDesignAgentFunction.ts",
     "functions:bundle:research-agent": "tsx scripts/bundleResearchAgentFunction.ts",
     "functions:bundle:catalogue-link-check": "tsx scripts/bundleCatalogueLinkCheckFunction.ts",
+    "functions:bundle:catalogue-claim-check": "tsx scripts/bundleCatalogueClaimCheckFunction.ts",
+    "functions:deploy:catalogue-claim-check": "pnpm functions:bundle:catalogue-claim-check && supabase functions deploy catalogue-claim-check --use-api",
     "functions:deploy:catalogue-link-check": "pnpm functions:bundle:catalogue-link-check && supabase functions deploy catalogue-link-check --use-api",
     "functions:bundle:review-agent": "tsx scripts/bundleReviewAgentFunction.ts",
     "functions:deploy:review-agent": "pnpm functions:bundle:review-agent && supabase functions deploy review-agent --use-api",

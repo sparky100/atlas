@@ -24,6 +24,7 @@ supabase/functions/org-ai-key/index.ts
 supabase/functions/design-agent/index.ts
 supabase/functions/research-agent/index.ts
 supabase/functions/catalogue-link-check/index.ts
+supabase/functions/catalogue-claim-check/index.ts
 supabase/functions/review-agent/index.ts
 supabase/functions/api/index.ts
 supabase/functions/connector-fetch/index.ts
