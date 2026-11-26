@@ -1,5 +1,5 @@
-import { readdirSync, readFileSync, statSync } from 'node:fs';
-import { join, relative } from 'node:path';
+import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs';
+import { dirname, join, relative } from 'node:path';
 import { describe, expect, it } from 'vitest';
 
 /**
@@ -34,7 +34,12 @@ const isTest = (p: string): boolean => /\.(test|spec)\.(ts|tsx)$/.test(p);
 const isSource = (p: string): boolean => /\.(ts|tsx)$/.test(p) && !isTest(p) && !p.endsWith('.d.ts');
 
 const appFiles = walk(join(ROOT, 'src'), isSource);
-const functionFiles = walk(join(ROOT, 'supabase', 'functions'), isSource);
+// A function with a `_source/` folder is bundled by `pnpm functions:bundle:<name>` into a generated,
+// git-ignored `index.ts` that inlines everything it reaches in `src/`. Scanning that copy would flag
+// code this test already checks at its source, and would make the result depend on whether someone
+// has bundled for a deploy on this machine. Only hand-written files count.
+const isGeneratedBundle = (p: string): boolean => /supabase[\\/]functions[\\/][^\\/]+[\\/]index\.ts$/.test(p) && existsSync(join(dirname(p), '_source'));
+const functionFiles = walk(join(ROOT, 'supabase', 'functions'), (p) => isSource(p) && !isGeneratedBundle(p));
 const mcpFiles = walk(join(ROOT, 'mcp', 'src'), isSource);
 const rel = (p: string): string => relative(ROOT, p).split('\\').join('/');
 const read = (p: string): string => readFileSync(p, 'utf8');
