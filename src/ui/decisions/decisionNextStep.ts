@@ -1,5 +1,5 @@
 /** What the decision page tells this person to do next: one sentence and, at most, one action. Driven by the decision's state and the viewer's role (CLAUDE.md UX rules 4 and 7). */
-export type DecisionNextAction = 'add-outcome' | 'add-option' | 'compare' | 'choose' | 'ask-to-choose' | 'start-delivery' | 'open-delivery' | 'none';
+export type DecisionNextAction = 'add-outcome' | 'add-option' | 'compare' | 'choose' | 'ask-to-choose' | 'start-delivery' | 'open-delivery' | 'start-product-decision' | 'open-product-decision' | 'none';
 
 export interface DecisionNextStepInput {
   status: 'proposed' | 'accepted' | 'rejected' | 'superseded';
@@ -21,6 +21,10 @@ export interface DecisionNextStepInput {
   hasOutcome?: boolean;
   /** Whether this person can edit the decision, and so write its outcome. */
   canEditOutcome?: boolean;
+  /** True when the chosen option is Buy: the product is decided next, in its own decision (Simon, 2026-11-26). */
+  chosenIsBuy?: boolean;
+  /** The product decision for the chosen Buy option, once started; `null` when none is open or decided. */
+  productDecision?: { title: string; status: 'proposed' | 'accepted'; chosenTitle: string | null } | null;
 }
 
 export interface DecisionNextStep {
@@ -38,6 +42,18 @@ export function decisionNextStep(i: DecisionNextStepInput): DecisionNextStep | n
     }
     if (i.chosenTitle === null) {
       return { title: 'Chosen', body: 'An option was chosen. Its delivery change is no longer linked to this decision.', action: 'none', actionLabel: null };
+    }
+    if (i.chosenIsBuy === true && i.deliveryStarted !== true) {
+      const pd = i.productDecision ?? null;
+      if (pd === null) {
+        return i.canStartDelivery === true
+          ? { title: 'Choose the product', body: `${i.chosenTitle} was chosen. Next, decide which product. A new decision starts with the need, the outcome and the listed products already filled in. If the product is already settled, start delivery on the option instead.`, action: 'start-product-decision', actionLabel: 'Start the product decision' }
+          : { title: 'Choose the product', body: `${i.chosenTitle} was chosen. Next, an owner, architect or contributor starts a decision on which product.`, action: 'none', actionLabel: null };
+      }
+      if (pd.status === 'proposed') {
+        return { title: 'Choosing the product', body: `${i.chosenTitle} was chosen. Which product is being decided in "${pd.title}".`, action: 'open-product-decision', actionLabel: 'Open the product decision' };
+      }
+      return { title: 'Product chosen', body: `${pd.chosenTitle ?? 'A product'} was chosen in "${pd.title}". Delivery starts from that decision.`, action: 'open-product-decision', actionLabel: 'Open the product decision' };
     }
     if (i.deliveryStarted !== true) {
       return i.canStartDelivery === true

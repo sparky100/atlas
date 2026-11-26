@@ -13,6 +13,7 @@
  */
 import { expect, test, type Page } from '@playwright/test';
 import { goToModelHome, seedStarterCapabilityMap, signUpCreateOrgAndModel } from './fixtures/goldenPath';
+import { optionSurface } from './fixtures/decisionLayout';
 
 /** The search dialog, as a user at this width opens it (same as golden-path-search-and-landscape-find). */
 async function openSearch(page: Page): Promise<void> {
@@ -69,4 +70,60 @@ test('a listed product becomes an option in one click, with the product saved as
   await grid.getByRole('button', { name: 'Sources (1)' }).first().click();
   await expect(grid.getByText('Salesforce Energy and Utilities Cloud — Salesforce').first()).toBeVisible();
   expect(await page.evaluate(() => document.documentElement.scrollWidth > document.documentElement.clientWidth + 1)).toBe(false);
+});
+
+/** Simon, 2026-11-26: approach first, then product. */
+test('choosing Buy starts a product decision with the need, outcome and products carried over, and the two are linked', async ({ page }) => {
+  test.slow();
+  await signUpCreateOrgAndModel(page, 'productdecision');
+  await seedStarterCapabilityMap(page, /^Electricity Network Operator$/);
+  await goToModelHome(page);
+
+  await openSearch(page);
+  await page.getByLabel('Search elements, changes, decisions and projects').fill('Connection Quotations');
+  await page.getByRole('option', { name: /Connection Quotations/ }).first().click();
+  await expect(page.getByRole('heading', { name: 'Connection Quotations' }).first()).toBeVisible();
+  await page.getByRole('button', { name: 'Element actions' }).click();
+  await page.getByRole('link', { name: 'Start a decision…' }).click();
+  await page.getByRole('button', { name: 'Start decision' }).click();
+  await expect(page.getByTestId('decision-outcome')).toBeVisible();
+  const approachUrl = page.url();
+
+  const card = page.getByTestId('decision-next-step');
+  await card.getByRole('button', { name: 'Add the outcome' }).click();
+  await page.getByTestId('decision-edit-outcome').getByLabel('Outcome: what will be better, for whom, by when').fill('Issue a quote in two days, not ten, by March 2027');
+  await page.getByRole('button', { name: 'Save', exact: true }).click();
+  await expect(page.getByTestId('decision-outcome')).toContainText('Issue a quote in two days, not ten, by March 2027');
+
+  // The approach: a Buy option, chosen before any product is picked.
+  await page.getByRole('button', { name: '+ Add an option' }).click();
+  await page.getByRole('radio', { name: 'Buy a product', exact: true }).check();
+  await page.getByPlaceholder("What's this option? (e.g. Replace with Workday)").fill('Buy a quoting product');
+  await page.getByRole('button', { name: 'Add option' }).click();
+  const buy = optionSurface(page, 'Buy a quoting product');
+  await expect(buy).toBeVisible();
+  await buy.getByRole('button', { name: 'Choose' }).click();
+  await page.getByPlaceholder('The reasons this option was chosen over the others').fill('A product is quicker than building one.');
+  await page.getByRole('button', { name: 'Confirm choice' }).click();
+  await expect(page.getByText('accepted', { exact: true }).first()).toBeVisible();
+
+  // There is nothing to deliver until a product is picked, so the next step is the product decision.
+  await expect(card).toContainText('Choose the product');
+  await card.getByRole('button', { name: 'Start the product decision' }).click();
+  await expect(page.getByRole('heading', { name: 'Which product for: Buy a quoting product?' })).toBeVisible();
+  await expect(page).not.toHaveURL(approachUrl);
+  await expect(page.getByTestId('decision-follows')).toContainText('Buy a quoting product');
+  // Carried over: the outcome, the capability, and the reviewed products as options beside staying as we are.
+  await expect(page.getByTestId('decision-outcome')).toContainText('Issue a quote in two days, not ten, by March 2027');
+  await expect(page.getByRole('link', { name: 'Connection Quotations' }).first()).toBeVisible();
+  await expect(optionSurface(page, 'Use Salesforce Energy and Utilities Cloud')).toBeVisible();
+  await expect(optionSurface(page, 'Use Microsoft Dynamics 365 Customer Service')).toBeVisible();
+  await expect(page.getByTestId('decision-next-step')).toContainText('Choose an option');
+  expect(await page.evaluate(() => document.documentElement.scrollWidth > document.documentElement.clientWidth + 1)).toBe(false);
+
+  // Back on the approach decision, its Buy option says the product decision is under way.
+  await page.getByTestId('decision-follows').getByRole('link').click();
+  await expect(page.getByTestId('decision-next-step')).toContainText('Choosing the product');
+  await page.getByTestId('decision-next-step').getByRole('button', { name: 'Open the product decision' }).click();
+  await expect(page.getByRole('heading', { name: 'Which product for: Buy a quoting product?' })).toBeVisible();
 });

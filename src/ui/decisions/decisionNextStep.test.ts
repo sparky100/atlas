@@ -55,4 +55,19 @@ describe('decisionNextStep: the outcome comes first (item 3)', () => {
     expect(decisionNextStep({ ...base, hasOutcome: true, canEditOutcome: true })?.action).toBe('compare');
     expect(decisionNextStep({ ...base, status: 'accepted', chosenTitle: 'Configure the CRM', hasOutcome: false, canEditOutcome: true })?.action).not.toBe('add-outcome');
   });
+
+  it('after choosing Buy, offers the product decision, then follows it, and still allows delivery once started', () => {
+    const chosen = { ...base, status: 'accepted' as const, chosenTitle: 'Replace with a product', chosenIsBuy: true, canStartDelivery: true };
+    expect(decisionNextStep({ ...chosen, productDecision: null })).toMatchObject({ title: 'Choose the product', action: 'start-product-decision', actionLabel: 'Start the product decision' });
+    expect(decisionNextStep({ ...chosen, canStartDelivery: false, productDecision: null })).toMatchObject({ title: 'Choose the product', action: 'none' });
+    expect(decisionNextStep({ ...chosen, productDecision: { title: 'Which product for: Replace with a product?', status: 'proposed', chosenTitle: null } }))
+      .toMatchObject({ title: 'Choosing the product', action: 'open-product-decision' });
+    const decided = decisionNextStep({ ...chosen, productDecision: { title: 'Which product for: Replace with a product?', status: 'accepted', chosenTitle: 'Use Salesforce Energy and Utilities Cloud' } });
+    expect(decided).toMatchObject({ title: 'Product chosen', action: 'open-product-decision' });
+    expect(decided?.body).toContain('Use Salesforce Energy and Utilities Cloud was chosen');
+    // A Buy option whose product was settled and delivered directly keeps the delivery step.
+    expect(decisionNextStep({ ...chosen, deliveryStarted: true, productDecision: null })?.action).toBe('open-delivery');
+    // Configure or Build go straight to delivery as before.
+    expect(decisionNextStep({ ...chosen, chosenIsBuy: false })?.action).toBe('start-delivery');
+  });
 });

@@ -473,6 +473,8 @@ export interface DecisionRow {
   baseline_branch_id: UUID | null;
   /** The option this decision chose; set together with `status: 'accepted'`. */
   chosen_option_id: UUID | null;
+  /** Approach first, then product: the chosen Buy option of another decision that this decision picks a product for (20261126110000). Set on insert, never changed; `null` for an ordinary decision. */
+  follows_option_id: UUID | null;
   /** The chosen option's delivery change. `null` until delivery starts, even on an accepted decision. */
   branch_id: UUID | null;
   superseded_decision_id: UUID | null;
