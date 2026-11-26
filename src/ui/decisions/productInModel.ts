@@ -1,3 +1,4 @@
+import type { OptionApproach } from '../../contracts/optionApproach';
 import type { UUID } from '../../contracts/delta';
 
 /** A system or module in the current model, with the platform it belongs to when it is a module. */
@@ -41,4 +42,14 @@ export function productInModelText(match: ModelElementName): string {
   return match.type === 'container' && match.platformName !== null
     ? `${match.name}, a module of ${match.platformName}`
     : match.name;
+}
+
+/**
+ * What kind of option a product option is. A product that is already in the model (a system or a
+ * module) is Use, not Buy: it is a suggestion, shown on the option and changeable by a person.
+ * Anything else keeps the approach it had.
+ */
+export function suggestedApproach<A extends OptionApproach>(approach: A, productNames: readonly string[], elements: readonly ModelElementName[]): A | 'use' {
+  if (approach !== 'buy') return approach;
+  return productNames.some((name) => findProductInModel(name, elements) !== null) ? 'use' : approach;
 }

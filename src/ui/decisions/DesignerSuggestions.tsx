@@ -21,6 +21,7 @@ import { hostOf } from './researchCatalogueMatches';
 import { designerCostLine, designerTrialLine } from './designerRequest';
 import { useDesignerTrial } from './useDesignerTrial';
 import { clockNow, loadPending, pendingKey, savePending, type PendingOption } from './pendingOptions';
+import { suggestedApproach, type ModelElementName } from './productInModel';
 import formStyles from './DecisionsView.module.css';
 import styles from './DesignerSuggestions.module.css';
 
@@ -75,18 +76,18 @@ const TOOL_LABELS: Record<string, string> = {
 
 const toolLabel = (name: string) => TOOL_LABELS[name] ?? name.replaceAll('_', ' ');
 
-function newCards(draft: DesignerDraft, draftedAt: string): SuggestionCard[] {
-  return draft.options.map((o) => ({ id: crypto.randomUUID(), title: o.title, approach: o.approach, summary: o.summary, toWeigh: o.toWeigh, suggestedTitle: o.title, suggestedSummary: o.summary, draftedAt, catalogueRefs: o.catalogueRefs, catalogueProducts: o.catalogueProducts, webRefs: o.webRefs, included: true }));
+function newCards(draft: DesignerDraft, draftedAt: string, elements: readonly ModelElementName[]): SuggestionCard[] {
+  return draft.options.map((o) => ({ id: crypto.randomUUID(), title: o.title, approach: o.approach === 'buy' ? suggestedApproach('buy', o.catalogueProducts.map((p) => p.product), elements) : o.approach, summary: o.summary, toWeigh: o.toWeigh, suggestedTitle: o.title, suggestedSummary: o.summary, draftedAt, catalogueRefs: o.catalogueRefs, catalogueProducts: o.catalogueProducts, webRefs: o.webRefs, included: true }));
 }
 
 /** The option a person gets when they pick one reviewed product out of a replacement card. */
-function productSuggestion(product: DesignerCatalogueProduct, draftedAt: string): SuggestionCard {
+function productSuggestion(product: DesignerCatalogueProduct, draftedAt: string, elements: readonly ModelElementName[]): SuggestionCard {
   const title = productOptionTitle(product);
   const summary = `${product.product} by ${product.vendor}. ${product.howItSupports}`.trim().slice(0, DESIGNER_SUMMARY_MAX);
   return {
     id: crypto.randomUUID(),
     title,
-    approach: 'buy',
+    approach: suggestedApproach('buy', [product.product], elements),
     summary,
     toWeigh: '',
     suggestedTitle: title,
@@ -181,7 +182,7 @@ export function DesignerSuggestions({ orgId, userId, modelId, elementId, brief, 
       });
       if (mine !== runNo.current) return;
       setEarlier((prev) => [...cards, ...prev]);
-      setCards(newCards(draft, new Date().toISOString()));
+      setCards(newCards(draft, new Date().toISOString(), modelElements));
       setMeta({ gaps: draft.gaps, stayNote: draft.stayNote, problems: draft.problems, citedNames: draft.citedNames, grounded: draft.grounded, usage: { ...draft.usage, trial: onTrial } });
       setState('idle');
       if (onTrial) setRanOnTrial((n) => n + 1);
@@ -205,7 +206,7 @@ export function DesignerSuggestions({ orgId, userId, modelId, elementId, brief, 
   }
 
   function addProductOption(product: DesignerCatalogueProduct): void {
-    setCards((prev) => [productSuggestion(product, new Date().toISOString()), ...prev]);
+    setCards((prev) => [productSuggestion(product, new Date().toISOString(), modelElements), ...prev]);
   }
 
   function renderProduct(product: DesignerCatalogueProduct) {

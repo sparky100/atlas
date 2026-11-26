@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { findProductInModel, productInModelText, type ModelElementName } from './productInModel';
+import { findProductInModel, productInModelText, suggestedApproach, type ModelElementName } from './productInModel';
 
 const el = (id: number, name: string, type: 'system' | 'container' = 'system', platformName: string | null = null): ModelElementName => ({ id: `00000000-0000-4000-8000-${String(id).padStart(12, '0')}`, name, type, platformName });
 
@@ -35,5 +35,20 @@ describe('findProductInModel', () => {
   it('says a module is a module of its platform', () => {
     expect(productInModelText(utilityNetwork)).toBe('Utility Network, a module of Esri ArcGIS Platform');
     expect(productInModelText(smallworld)).toBe('Smallworld GIS');
+  });
+});
+
+describe('suggestedApproach', () => {
+  const utilityNetwork = el(1, 'Utility Network', 'container', 'Esri ArcGIS Platform');
+
+  it('suggests Use for a product already in the model, Buy for one that is not', () => {
+    expect(suggestedApproach('buy', ['Esri ArcGIS Utility Network'], [utilityNetwork])).toBe('use');
+    expect(suggestedApproach('buy', ['Salesforce Energy and Utilities Cloud'], [utilityNetwork])).toBe('buy');
+    expect(suggestedApproach('buy', [], [utilityNetwork])).toBe('buy');
+  });
+
+  it('leaves every other approach alone', () => {
+    expect(suggestedApproach('build', ['Esri ArcGIS Utility Network'], [utilityNetwork])).toBe('build');
+    expect(suggestedApproach('configure', ['Esri ArcGIS Utility Network'], [utilityNetwork])).toBe('configure');
   });
 });

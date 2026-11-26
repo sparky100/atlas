@@ -4,11 +4,12 @@ import { designerApproach } from './designerOptions';
 
 describe('option approach', () => {
   it('labels every approach in plain words, with Buy for the product option', () => {
-    expect(OPTION_APPROACH_LABELS).toEqual({ keep: 'Keep', configure: 'Configure', buy: 'Buy', build: 'Build', no_change: 'No change' });
+    expect(OPTION_APPROACH_LABELS).toEqual({ keep: 'Keep', use: 'Use', configure: 'Configure', buy: 'Buy', build: 'Build', no_change: 'No change' });
   });
 
   it('accepts only the stored values', () => {
     expect(isOptionApproach('buy')).toBe(true);
+    expect(isOptionApproach('use')).toBe(true);
     expect(isOptionApproach('replace')).toBe(false);
     expect(isOptionApproach(null)).toBe(false);
   });

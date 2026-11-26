@@ -75,6 +75,7 @@ import { useDecisionOptions } from './useDecisionOptions';
 import { usePendingOptions } from './usePendingOptions';
 import { optionProvenance, optionRowProvenance } from './optionProvenance';
 import { useDecisionRatings } from './useDecisionRatings';
+import { suggestedApproach } from './productInModel';
 import { useModelElementNames } from './useModelElementNames';
 import { useOptionSources } from './useOptionSources';
 import type { OptionCatalogueSource, OptionSource } from '../../contracts/optionSource';
@@ -247,7 +248,7 @@ export function DecisionView({ modelId, decisionId, orgId, orgSlug, modelSlug, r
     return element?.element_type === 'capability' ? [element] : [];
   });
   const readyOptions = readyState?.options ?? [];
-  const hasReplaceOrBuildOption = readyOptions.some((option) => option.approach === 'buy' || option.approach === 'build');
+  const hasReplaceOrBuildOption = readyOptions.some((option) => option.approach === 'buy' || option.approach === 'use' || option.approach === 'build');
   const concernedCapabilityIds = readyState ? elementLinks.map((l) => l.linked_id).filter((id) => readyState.linkedElementsById.get(id)?.element_type === 'capability') : [];
   // F6.3 (Part B) rule 5: a system/container concern gets its own outcome
   // row (unchanged/retired/replaced by X) alongside a capability concern's
@@ -329,7 +330,7 @@ export function DecisionView({ modelId, decisionId, orgId, orgSlug, modelSlug, r
     ? {
         optionTitles: options.map((option) => option.title),
         onMake: async (product, optionId) => {
-          const result = await addProductOption({ decisionId, userId, product, optionId });
+          const result = await addProductOption({ decisionId, userId, product, optionId, approach: suggestedApproach('buy', [product.product], modelElements) });
           applyCreatedOption(result.option);
           void queryClient.invalidateQueries({ queryKey: ['optionSources', decisionId] });
           return result.sourceError;

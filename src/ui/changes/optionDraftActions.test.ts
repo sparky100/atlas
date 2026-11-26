@@ -11,6 +11,10 @@ describe('optionDraftActions', () => {
     expect(labels('buy', [], [quote], ['Connection Quotations'])).toEqual(['Retire Quote Tool and replace it with a new system']);
   });
 
+  it('use: the same first edit as buy', () => {
+    expect(labels('use', [quote], [quote], ['Connection Quotations'])).toEqual(['Retire Quote Tool and replace it with a new system']);
+  });
+
   it('buy: only the system the decision names, not the capability\'s other supporters', () => {
     expect(labels('buy', [quote], [quote, sys(2, 'IS-U')], ['Billing'])).toEqual(['Retire Quote Tool and replace it with a new system']);
   });

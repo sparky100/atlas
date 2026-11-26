@@ -129,6 +129,18 @@ describe('cross-organisation boundaries for options, gaps and research requests'
       expect(renamed.data?.approach).toBe('buy');
     });
 
+    it('stores Use for a product already in the model, round-trips it, and still refuses an unknown value', async () => {
+      const { decisionId } = await seed();
+      const created = await createDecisionOption(owner.client, { decisionId, title: 'Use Esri ArcGIS Utility Network', approach: 'use', createdBy: owner.id });
+      expect(created.approach).toBe('use');
+      const branch = await workOnDecisionOption(owner.client, created.id);
+      expect(await getOptionApproachForBranch(owner.client, branch.id)).toBe('use');
+      const changed = await setDecisionOptionApproach(owner.client, created.id, 'buy', owner.id);
+      expect(changed.approach).toBe('buy');
+      const { error } = await owner.client.from('decision_options').update({ approach: 'rent', updated_by: owner.id }).eq('id', created.id);
+      expect(error).not.toBeNull();
+    });
+
     it('a person can change it or leave it undecided; nothing else about the option changes', async () => {
       const { candidateId } = await seed();
       const built = await setDecisionOptionApproach(owner.client, candidateId, 'build', owner.id);
