@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import type { ElementType, UUID } from '../../contracts/delta';
+import { SYSTEM_LIKE_TYPES } from '../../contracts/elementKinds';
 import type { ElementsHeadRow } from '../../contracts/rows';
 import { countMatches, loadSearchPoolForTypes, matchElements, overlayBranchElements, type SearchPoolElement } from '../../db/elementSearch';
 import { getElementsByIds } from '../../db/elements';
@@ -8,7 +9,7 @@ import { reportError } from '../errors/errorBannerStore';
 import { supabase } from '../supabaseClient';
 
 /** "An application" for every picker that asks the user to find one: a system, or a module inside a platform (shown "Platform · Module" via `resultParents`). Use this rather than `['system']`, so no picker quietly misses modules. */
-export const SYSTEM_OR_MODULE_TYPES: readonly ElementType[] = ['system', 'container'];
+export const SYSTEM_OR_MODULE_TYPES: readonly ElementType[] = SYSTEM_LIKE_TYPES;
 
 export type RelationshipTargetSearchStatus = 'loading' | 'ready' | 'error';
 

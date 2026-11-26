@@ -5,6 +5,7 @@ import tseslint from 'typescript-eslint';
 import reactHooks from 'eslint-plugin-react-hooks';
 import reactRefresh from 'eslint-plugin-react-refresh';
 import jsxA11y from 'eslint-plugin-jsx-a11y';
+import atlasRules from './eslint-rules/noBareSystemCheck.js';
 
 export default defineConfig(
   {
@@ -27,7 +28,7 @@ export default defineConfig(
     languageOptions: {
       parserOptions: {
         projectService: {
-          allowDefaultProject: ['*.js'],
+          allowDefaultProject: ['*.js', 'eslint-rules/*.js'],
         },
         tsconfigRootDir: import.meta.dirname,
       },
@@ -116,13 +117,22 @@ export default defineConfig(
       ],
     },
   },
+  // Model rule M2 (CLAUDE.md): a module is an element too. A bare check for the type 'system'
+  // needs isSystemLike() or a 'system-only:' comment saying why. Sites that existed when the
+  // rule was added are recorded in eslint-suppressions.json; only new ones fail.
+  {
+    files: ['src/**/*.ts', 'src/**/*.tsx'],
+    ignores: ['**/*.test.ts', '**/*.test.tsx', '**/*.spec.ts', '**/*.property.test.ts', '**/*.integration.test.ts', '**/*.stories.tsx'],
+    plugins: { atlas: atlasRules },
+    rules: { 'atlas/no-bare-system-check': 'error' },
+  },
   {
     // This file itself: it's a *.js file, so parserOptions.projectService's
     // allowDefaultProject above gives it a synthetic, type-info-poor
     // program — eslint-plugin-jsx-a11y's exports resolve to `any` under
     // that program even though they're perfectly typed under the real
     // tsconfig. A tooling-config quirk, not a real type-safety gap.
-    files: ['eslint.config.js'],
+    files: ['eslint.config.js', 'eslint-rules/*.js'],
     rules: {
       '@typescript-eslint/no-unsafe-assignment': 'off',
       '@typescript-eslint/no-unsafe-member-access': 'off',
