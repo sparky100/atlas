@@ -6,6 +6,7 @@ import {
   createCatalogueDraft,
   listCatalogueVersions,
   readCatalogueProduct,
+  reviewProductClaims,
   saveCatalogueProduct,
   publishCatalogueDraft,
   validateCatalogueDraft,
@@ -52,8 +53,6 @@ const claim = {
   statement: 'The vendor describes this product as a commerce platform.',
   sourceUrl: 'https://example.test/product',
   sourceDate: '2026-11-21',
-  reviewedBy: 'Platform reviewer',
-  reviewedAt: '2026-11-22',
 };
 
 describe('platform product catalogue, real database', () => {
@@ -96,6 +95,49 @@ describe('platform product catalogue, real database', () => {
     expect(detail.content.product).toBe(productContent.product);
     expect(detail.content.capabilities).toHaveLength(2);
     expect(new Set(detail.content.capabilities.map((link) => link.capabilityMapId))).toEqual(new Set([retailMapId, utilityMapId]));
+    // A claim a person types is drafted, not reviewed, and the server records who drafted it.
+    expect(detail.claimReviews).toEqual([expect.objectContaining({ reviewState: 'drafted', origin: 'person', reviewedByName: null, reviewedAt: null })]);
+    expect(detail.claimReviews[0]?.draftedByName).toBeTruthy();
+  });
+
+  it('blocks publication while a claim is waiting for review', async () => {
+    const issues = await validateCatalogueDraft(admin.client, {
+      sector: 'retail_ecommerce', version: catalogueVersion + 10, capabilityMapVersion: mapVersion,
+      title: 'Waiting catalogue', sourceDescription: 'Not ready.', productIds: [productId],
+    });
+    expect(issues.join(' ')).toContain('waiting for review');
+  });
+
+  it('records who reviewed a claim on the server, and no browser can name a reviewer', async () => {
+    const before = await readCatalogueProduct(admin.client, productId);
+    const claimId = before.claimReviews[0]?.claimId ?? '';
+    expect(await reviewProductClaims(admin.client, productId, [claimId])).toBe(1);
+    const after = await readCatalogueProduct(admin.client, productId);
+    expect(after.claimReviews[0]).toEqual(expect.objectContaining({ reviewState: 'reviewed' }));
+    expect(after.claimReviews[0]?.reviewedByName).toBeTruthy();
+    expect(after.claimReviews[0]?.reviewedAt).toBeTruthy();
+    // Reviewing again changes nothing.
+    expect(await reviewProductClaims(admin.client, productId, [claimId])).toBe(0);
+    const events = await service.from('catalogue_product_events').select('action,actor_id,actor_name').eq('product_id', productId);
+    check(events);
+    expect(events.data).toContainEqual(expect.objectContaining({ action: 'reviewed', actor_id: admin.id }));
+    // The actor's name is filled by the database, never supplied by the browser.
+    const reviewedClaim = await service.from('catalogue_product_claims').select('reviewed_by_user').eq('id', claimId).single();
+    check(reviewedClaim);
+    expect((reviewedClaim.data as { reviewed_by_user: string }).reviewed_by_user).toBe(admin.id);
+  });
+
+  it('refuses a signed-in user from another organisation reviewing a claim', async () => {
+    const denied = await outside.client.schema('atlas').rpc('save_catalogue_product', {
+      p_id: productId, p_expected_revision: 2,
+      p_content: { ...productContent, claims: [{ ...claim, review: true }] },
+    });
+    expect(denied.error).not.toBeNull();
+    const direct = await outside.client.from('catalogue_product_claims').update({ review_state: 'reviewed' }).eq('product_id', productId);
+    expect(direct.error).not.toBeNull();
+    const claims = await service.from('catalogue_product_claims').select('reviewed_by_user').eq('product_id', productId);
+    check(claims);
+    expect(claims.data).toEqual([{ reviewed_by_user: admin.id }]);
   });
 
   it('refuses another signed-in user and direct client writes', async () => {
@@ -133,16 +175,18 @@ describe('platform product catalogue, real database', () => {
     expect(products.data).toHaveLength(1);
   });
 
-  it('blocks publication while a claim is still marked pending review', async () => {
-    const content: CatalogueDraftContent = {
-      sector: 'retail_ecommerce', version: catalogueVersion + 10, capabilityMapVersion: mapVersion,
-      title: 'Pending catalogue', sourceDescription: 'Not ready.', productIds: [productId],
-    };
-    const pending = await saveCatalogueProduct(admin.client, productId, 1, {
-      ...productContent, claims: [{ ...claim, reviewedBy: 'Pending review' }],
+  it('sends a changed claim back to drafted and blocks publication again', async () => {
+    const current = await readCatalogueProduct(admin.client, productId);
+    const changed = await saveCatalogueProduct(admin.client, productId, current.product.edit_revision, {
+      ...productContent, claims: [{ ...claim, statement: 'The vendor now describes this product as a retail commerce platform.' }],
     });
-    expect(pending.revision).toBe(2);
-    const issues = await validateCatalogueDraft(admin.client, content);
-    expect(issues.join(' ')).toContain('pending review');
+    expect(changed.reviewed).toBe(0);
+    const detail = await readCatalogueProduct(admin.client, productId);
+    expect(detail.claimReviews).toEqual([expect.objectContaining({ reviewState: 'drafted', reviewedByName: null })]);
+    const issues = await validateCatalogueDraft(admin.client, {
+      sector: 'retail_ecommerce', version: catalogueVersion + 10, capabilityMapVersion: mapVersion,
+      title: 'Waiting catalogue', sourceDescription: 'Not ready.', productIds: [productId],
+    });
+    expect(issues.join(' ')).toContain('waiting for review');
   });
 });

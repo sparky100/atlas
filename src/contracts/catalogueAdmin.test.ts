@@ -7,11 +7,22 @@ const claim = {
   statement: 'The vendor describes the product as an online checkout.',
   sourceUrl: 'https://example.com/product',
   sourceDate: '2026-11-21',
-  reviewedBy: 'Platform reviewer',
-  reviewedAt: '2026-11-22',
 };
 
 describe('catalogue admin contracts', () => {
+  const product = { code: 'product-x', product: 'Product', vendor: 'Vendor', summary: 'A product.', capabilities: [] };
+
+  it('lets the editor ask for a review but never name the reviewer', () => {
+    expect(catalogueProductContentSchema.safeParse({ ...product, claims: [{ ...claim, review: true }] }).success).toBe(true);
+    expect(catalogueProductContentSchema.safeParse({ ...product, claims: [{ ...claim, reviewedBy: 'Someone else' }] }).success).toBe(false);
+    expect(catalogueProductContentSchema.safeParse({ ...product, claims: [{ ...claim, reviewedAt: '2026-11-22' }] }).success).toBe(false);
+  });
+
+  it('refuses a claim source that is not a public HTTPS link', () => {
+    expect(catalogueProductContentSchema.safeParse({ ...product, claims: [{ ...claim, sourceUrl: 'http://example.com/a' }] }).success).toBe(false);
+    expect(catalogueProductContentSchema.safeParse({ ...product, claims: [{ ...claim, sourceUrl: 'https://user:pw@example.com/a' }] }).success).toBe(false);
+  });
+
   it('accepts one product with links into more than one capability set', () => {
     const parsed = catalogueProductContentSchema.parse({
       code: 'shopify-plus',

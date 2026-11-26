@@ -19,15 +19,18 @@ export const catalogueCitationSchema = z.object({
 }).strict();
 export type CatalogueCitation = z.infer<typeof catalogueCitationSchema>;
 export const catalogueCapabilitySchema = z.object({ code: text(40), name: text(200), howItSupports: text(300) }).strict();
+/** A public HTTPS source link, shared by the file contract and the platform editor. */
+export const catalogueSourceUrlSchema = text(2000).refine((v) => {
+  if (!url.test(v)) return false;
+  try {
+    const host = new URL(v).hostname.toLowerCase();
+    return host.includes('.') && !host.endsWith('.localhost') && !/^[0-9.]+$/.test(host) && !host.includes(':');
+  } catch { return false; }
+}, 'Use a public HTTPS source URL without credentials or a port');
+export const catalogueClaimTextSchema = text(400);
 export const catalogueClaimSchema = z.object({
-  position: z.number().int().positive(), kind: z.enum(CATALOGUE_CLAIM_KINDS), statement: text(400),
-  sourceUrl: text(2000).refine((v) => {
-    if (!url.test(v)) return false;
-    try {
-      const host = new URL(v).hostname.toLowerCase();
-      return host.includes('.') && !host.endsWith('.localhost') && !/^[0-9.]+$/.test(host) && !host.includes(':');
-    } catch { return false; }
-  }, 'Use a public HTTPS source URL without credentials or a port'),
+  position: z.number().int().positive(), kind: z.enum(CATALOGUE_CLAIM_KINDS), statement: catalogueClaimTextSchema,
+  sourceUrl: catalogueSourceUrlSchema,
   sourceDate: z.iso.date(), reviewedBy: text(120), reviewedAt: z.iso.date(),
 }).strict().refine((c) => c.reviewedAt >= c.sourceDate, 'Review cannot precede the source date');
 export const catalogueEntrySchema = z.object({

@@ -30,6 +30,8 @@ export function CatalogueProductsAdmin() {
     return products.filter((product) => `${product.product} ${product.vendor} ${product.code}`.toLowerCase().includes(term));
   }, [products, search]);
 
+  const waiting = products.reduce((sum, product) => sum + product.claimsWaitingForReview, 0);
+
   if (loading) return <Loading />;
 
   return (
@@ -40,6 +42,11 @@ export function CatalogueProductsAdmin() {
         <span>{String(filtered.length)} shown</span>
         <LinkButton variant="secondary" to="/platform-admin/catalogue/products/new">New product</LinkButton>
       </div>
+      {waiting > 0 && (
+        <p role="status">
+          {String(waiting)} claim{waiting === 1 ? ' is' : 's are'} waiting for review. <Link to="/platform-admin/catalogue/review">Review them</Link>
+        </p>
+      )}
       {products.length === 0 && <p>No products in the library yet.</p>}
       {products.length > 0 && filtered.length === 0 && <p>No products match.</p>}
       <div className={styles.productList} aria-label="Products">
@@ -50,7 +57,7 @@ export function CatalogueProductsAdmin() {
               <small>{product.vendor} · {product.code}</small>
             </span>
             <span>
-              {product.capabilitySetCount} capability sets · {product.capabilityCount} links · {product.claimCount} claims
+              {product.capabilitySetCount} capability sets · {product.capabilityCount} links · {product.claimCount} claims{product.claimsWaitingForReview > 0 ? ` (${String(product.claimsWaitingForReview)} to review)` : ''}
             </span>
           </Link>
         ))}

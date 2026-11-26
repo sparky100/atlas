@@ -41,6 +41,14 @@ else in this product checks platform-admin status.
    publication snapshots that select products and pin one published set
    (`docs/ADR-038-product-catalogue-admin.md`). Both editors are
    platform-admin-only; ordinary organisation owners cannot reach them.
+   `/platform-admin/catalogue/review` ("Waiting for review") lists every
+   product claim that is drafted and not yet reviewed. A claim is drafted
+   first (typed by a person, loaded from a file, or later found by the
+   Researcher) and reviewed second. Anyone with platform admin rights can
+   review, including the person who drafted the claim. The server records who
+   drafted and who reviewed each claim, with dates, and who published a
+   catalogue version, and a product cannot be published while any of its claims
+   is waiting for review.
 4. **Withdraw or reinstate a published sample model** at
    `/platform-admin/sample-models`, with each sample's own page at
    `/platform-admin/sample-models/:slug`. A sample is withdrawn
@@ -49,10 +57,11 @@ else in this product checks platform-admin status.
    existing organisation copies are untouched. See
    `docs/ADR-033-sample-models.md`.
 
-Reviewer metadata is audit data. A new catalogue claim or capability-set
-source records the acting platform admin automatically; the name is never
-displayed in the admin UI, any catalogue reader view, an exported document or
-a decision pack.
+Reviewer metadata is audit data. A catalogue claim's drafter and reviewer, and
+a capability-set source's reviewer, are recorded by the server from the signed-in
+platform admin; a browser cannot supply a name. The names are shown to platform
+admins in the product editor and the review queue only, and never in any
+catalogue reader view, an exported document or a decision pack.
 
 Provider is a real picker, not a label — `LLM_PROXY_PROVIDER_OPTIONS`
 (`src/ui/admin/useLlmProxyConfig.ts`) holds one entry today ("Anthropic"),

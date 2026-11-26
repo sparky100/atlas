@@ -12,6 +12,7 @@ const LINKS: readonly NavItem[] = [
   { to: '/platform-admin', label: 'Overview', match: (pathname) => pathname === '/platform-admin' || pathname === '/platform-admin/' },
   { to: '/platform-admin/capability-sets', label: 'Capability sets', match: (pathname) => pathname === '/platform-admin/capability-sets' || pathname.startsWith('/platform-admin/capability-sets/') },
   { to: '/platform-admin/catalogue', label: 'Products', match: (pathname) => pathname === '/platform-admin/catalogue' || pathname.startsWith('/platform-admin/catalogue/products') },
+  { to: '/platform-admin/catalogue/review', label: 'Waiting for review', match: (pathname) => pathname.startsWith('/platform-admin/catalogue/review') },
   { to: '/platform-admin/catalogue/sectors', label: 'Sector catalogues', match: (pathname) => pathname.startsWith('/platform-admin/catalogue/sectors') },
   { to: '/platform-admin/sample-models', label: 'Sample models', match: (pathname) => pathname.startsWith('/platform-admin/sample-models') },
   { to: '/platform-admin/llm-proxy', label: 'LLM proxy', match: (pathname) => pathname.startsWith('/platform-admin/llm-proxy') },
