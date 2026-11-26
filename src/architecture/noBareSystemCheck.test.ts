@@ -1,6 +1,12 @@
 import { RuleTester } from 'eslint';
 import { describe, it } from 'vitest';
-import { noBareSystemCheck } from '../../eslint-rules/noBareSystemCheck.js';
+import type { Rule } from 'eslint';
+// The rule is plain JavaScript (ESLint loads it directly), so it has no type declaration. A
+// declaration file next to it would differ from it only by extension and trip the case-collision check.
+// @ts-expect-error TS7016: untyped JavaScript module
+import { noBareSystemCheck as untypedRule } from '../../eslint-rules/noBareSystemCheck.js';
+
+const noBareSystemCheck = untypedRule as Rule.RuleModule;
 
 // Model rule M2: a bare check for the type 'system' needs isSystemLike() or a 'system-only:' reason.
 const tester = new RuleTester({ languageOptions: { ecmaVersion: 2022, sourceType: 'module' } });
