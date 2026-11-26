@@ -408,7 +408,7 @@ function DecisionGroup({
           <ChangeRow key={item.id} branch={item.branch} orgSlug={orgSlug} modelSlug={modelSlug} unresolvedCount={threadCounts?.get(item.branch.id)?.open} summary={summaries?.get(item.branch.id)} />
         ) : (
           <li key={item.id} className={styles.row}>
-            <div>
+            <div className={styles.rowText}>
               <Link to={`/o/${orgSlug}/m/${modelSlug}/decisions/${block.decision.id}`}>
                 <Text as="span" size="lg">{item.title}</Text>
               </Link>
@@ -443,7 +443,7 @@ function ChangeRow({
   const impact = summary ? focusImpact(summary.affectedCapabilities, summary.affectedValueStreams, summary.projectScopeIds) : null;
   return (
     <li className={styles.row}>
-      <div>
+      <div className={styles.rowText}>
         <Text as="span" size="lg">
           {branch.title ?? branch.name}
         </Text>
@@ -534,7 +534,7 @@ function ChangeRow({
           </ul>
         )}
       </div>
-      <LinkButton to={`/o/${orgSlug}/m/${modelSlug}/changes/${branch.id}`} variant="secondary">
+      <LinkButton to={`/o/${orgSlug}/m/${modelSlug}/changes/${branch.id}`} variant="secondary" className={styles.rowAction}>
         Open →
       </LinkButton>
     </li>

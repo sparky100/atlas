@@ -257,7 +257,7 @@ export function ProjectsView({ modelId, orgId, userId, orgSlug, modelSlug, canCr
 function ProjectRowItem({ project, orgSlug, modelSlug }: { project: ProjectRow; orgSlug: string; modelSlug: string }) {
   return (
     <li className={styles.row}>
-      <div>
+      <div className={styles.rowText}>
         <Text as="span" size="lg">
           {project.title}
         </Text>
@@ -275,7 +275,7 @@ function ProjectRowItem({ project, orgSlug, modelSlug }: { project: ProjectRow; 
           )}
         </div>
       </div>
-      <LinkButton to={`/o/${orgSlug}/m/${modelSlug}/projects/${project.id}`} variant="secondary" aria-label={`Open ${project.title}`}>
+      <LinkButton to={`/o/${orgSlug}/m/${modelSlug}/projects/${project.id}`} variant="secondary" className={styles.rowAction} aria-label={`Open ${project.title}`}>
         Open →
       </LinkButton>
     </li>

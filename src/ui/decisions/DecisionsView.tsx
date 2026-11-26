@@ -255,7 +255,7 @@ export function DecisionsView({ modelId, orgId, userId, orgSlug, modelSlug, canC
 function DecisionRowItem({ decision, orgSlug, modelSlug }: { decision: DecisionRow; orgSlug: string; modelSlug: string }) {
   return (
     <li className={styles.row}>
-      <div>
+      <div className={styles.rowText}>
         <Text as="span" size="lg">
           {decision.title}
         </Text>
@@ -273,7 +273,7 @@ function DecisionRowItem({ decision, orgSlug, modelSlug }: { decision: DecisionR
           )}
         </div>
       </div>
-      <LinkButton to={`/o/${orgSlug}/m/${modelSlug}/decisions/${decision.id}`} variant="secondary">
+      <LinkButton to={`/o/${orgSlug}/m/${modelSlug}/decisions/${decision.id}`} variant="secondary" className={styles.rowAction}>
         Open →
       </LinkButton>
     </li>
