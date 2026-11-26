@@ -338,6 +338,29 @@ export async function currentCatalogueEntriesForCapabilityElement(
   return listCurrentCatalogueEntriesForCapability(client, { sector: resolved.sector, capabilityCode: resolved.capabilityCode });
 }
 
+/**
+ * The same products, with the catalogue sector and version each would be
+ * cited from, so they can be saved as an option's source. Empty when the
+ * capability has no starter-map link or its sector has no published catalogue.
+ */
+export async function citableCatalogueProductsForCapabilityElement(
+  client: Client,
+  modelId: string,
+  attributes: unknown,
+): Promise<{ sector: string; version: number; entry: CatalogueEntry }[]> {
+  if (typeof attributes !== 'object' || attributes === null || Array.isArray(attributes)) return [];
+  const attrs = attributes as Record<string, unknown>;
+  const templateRef = typeof attrs.templateRef === 'string' && attrs.templateRef.trim() !== '' ? attrs.templateRef : null;
+  const code = typeof attrs.code === 'string' && attrs.code.trim() !== '' ? attrs.code.trim() : '';
+  const match = templateRef !== null ? await capabilityMapMatch(client, templateRef) : null;
+  const resolved = match ?? (code !== '' ? await publishedCapabilityMatchForModel(client, modelId, code) : null);
+  if (resolved === null) return [];
+  const catalogue = await currentCatalogue(client, resolved.sector);
+  if (!catalogue) return [];
+  const entries = await listCurrentCatalogueEntriesForCapability(client, { sector: resolved.sector, capabilityCode: resolved.capabilityCode });
+  return entries.map((entry) => ({ sector: resolved.sector, version: catalogue.version, entry }));
+}
+
 /** One entry by the citation stored on an option or a pack, with its standing. */
 export async function catalogueEntryByCitation(client: Client, citation: CatalogueCitation): Promise<CitedCatalogueEntry | null> {
   const catalogue = await client

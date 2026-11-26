@@ -1,6 +1,6 @@
 import { Loading } from '../components/Loading/Loading';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { OutcomeField } from './OutcomeField';
 import { DecisionBenefit } from './DecisionBenefit';
 import { Link, useNavigate, useSearchParams } from 'react-router';
@@ -55,7 +55,10 @@ import { goalTitlesServedBy } from '../goals/goalModel';
 import { useModelGoals } from '../goals/useModelGoals';
 import { canLinkDecisionPrinciples } from '../orgs/roleGates';
 import { decisionStatusLabel, decisionStatusMeaning, decisionStatusTone } from './decisionStatus';
-import { cancelDecision, createDecisionLink, updateDecision } from '../../db/decisions';
+import { cancelDecision, createDecisionLink, getDecision, getDecisionFollowingOption, updateDecision } from '../../db/decisions';
+import { getDecisionOption } from '../../db/decisionOptions';
+import { citableCatalogueProductsForCapabilityElement } from '../../db/productCatalogue';
+import { productsToCarry, startProductDecision } from './startProductDecision';
 import { getElementsByIds } from '../../db/elements';
 import type { ElementsHeadRow } from '../../contracts/rows';
 import { setDecisionProject } from '../../db/projects';
@@ -195,6 +198,33 @@ export function DecisionView({ modelId, decisionId, orgId, orgSlug, modelSlug, r
   // comparison hook too, even before `state` has resolved to `ready`;
   // it degrades to its own `'empty'` state on an empty/not-yet-loaded input.
   const readyState = state.status === 'ready' ? state : null;
+  // Approach first, then product (Simon, 2026-11-26): the product decision
+  // that follows this decision's chosen Buy option, and, on a product
+  // decision, the Buy option and decision it picks a product for.
+  const chosenForProduct = readyState?.decision.status === 'accepted' ? readyState.decision.chosen_option_id : null;
+  const { data: productDecision = null } = useQuery({
+    queryKey: ['productDecision', chosenForProduct],
+    enabled: chosenForProduct !== null,
+    queryFn: async () => {
+      if (chosenForProduct === null) return null;
+      const found = await getDecisionFollowingOption(supabase, chosenForProduct);
+      if (found === null) return null;
+      const chosen = found.chosen_option_id !== null ? await getDecisionOption(supabase, found.chosen_option_id) : null;
+      return { decision: found, chosenTitle: chosen?.title ?? null };
+    },
+  });
+  const followsOptionId = readyState?.decision.follows_option_id ?? null;
+  const { data: follows = null } = useQuery({
+    queryKey: ['followsOption', followsOptionId],
+    enabled: followsOptionId !== null,
+    queryFn: async () => {
+      if (followsOptionId === null) return null;
+      const option = await getDecisionOption(supabase, followsOptionId);
+      const parent = option !== null ? await getDecision(supabase, option.decision_id) : null;
+      return option !== null && parent !== null ? { option, parent } : null;
+    },
+  });
+  const productDecisionId = useRef<string | null>(null);
   const elementLinks = readyState ? readyState.links.filter((l) => l.linked_type === 'element' || l.linked_type === 'relationship') : [];
   const branchLinks = readyState ? readyState.links.filter((l) => l.linked_type === 'branch') : [];
   const optionByBranchId = new Map<UUID, DecisionOptionRow>();
@@ -339,6 +369,10 @@ export function DecisionView({ modelId, decisionId, orgId, orgSlug, modelSlug, r
     canStartDelivery: canCreateChangeBranch(role),
     hasOutcome: decision.outcome.trim() !== '',
     canEditOutcome: canEditDecision(role, decision, userId),
+    chosenIsBuy: chosenOption?.approach === 'buy',
+    productDecision: productDecision !== null && (productDecision.decision.status === 'proposed' || productDecision.decision.status === 'accepted')
+      ? { title: productDecision.decision.title, status: productDecision.decision.status, chosenTitle: productDecision.chosenTitle }
+      : null,
   });
 
   function onNextStepAction() {
@@ -349,6 +383,14 @@ export function DecisionView({ modelId, decisionId, orgId, orgSlug, modelSlug, r
     }
     if (nextStep.action === 'start-delivery') {
       if (chosenOption !== undefined) workOnOption(chosenOption.id);
+      return;
+    }
+    if (nextStep.action === 'start-product-decision') {
+      void startTheProductDecision();
+      return;
+    }
+    if (nextStep.action === 'open-product-decision') {
+      if (productDecision !== null) void navigate(`/o/${orgSlug}/m/${modelSlug}/decisions/${productDecision.decision.id}`);
       return;
     }
     if (nextStep.action === 'open-delivery') {
@@ -375,6 +417,34 @@ export function DecisionView({ modelId, decisionId, orgId, orgSlug, modelSlug, r
         .finally(() => {
           setAskBusy(false);
         });
+    }
+  }
+
+  async function startTheProductDecision(): Promise<void> {
+    if (chosenOption === undefined || userId === null) return;
+    setAskBusy(true);
+    setAskError(null);
+    try {
+      const saved = (sourcesByOption.get(chosenOption.id) ?? []).filter((source): source is OptionCatalogueSource => source.kind === 'catalogue');
+      const listed = (await Promise.all(capabilityConcerns.map((capability) => citableCatalogueProductsForCapabilityElement(supabase, modelId, capability.attributes))))
+        .flat()
+        .map(({ sector, version, entry }) => ({ product: entry.product, vendor: entry.vendor, summary: entry.summary, sector, version, entryCode: entry.code }));
+      productDecisionId.current ??= crypto.randomUUID();
+      const started = await startProductDecision({
+        id: productDecisionId.current,
+        parent: decision,
+        option: chosenOption,
+        links,
+        products: productsToCarry(saved, listed),
+        userId,
+      });
+      if (started.problems.length > 0) reportError(`The product decision started, but: ${started.problems.join(' ')}`);
+      await queryClient.invalidateQueries({ queryKey: ['productDecision', chosenOption.id] });
+      void navigate(`/o/${orgSlug}/m/${modelSlug}/decisions/${started.decision.id}`);
+    } catch (e) {
+      setAskError(e instanceof Error && e.message !== '' ? `Couldn't start the product decision: ${e.message}` : "Couldn't start the product decision. Try again.");
+    } finally {
+      setAskBusy(false);
     }
   }
 
@@ -491,6 +561,14 @@ export function DecisionView({ modelId, decisionId, orgId, orgSlug, modelSlug, r
           await refreshOptionsAndArguments();
         }}
       />
+      {follows !== null && (
+        <div data-testid="decision-follows">
+          <Text as="p" size="sm" tone="muted">
+            Picks the product for &ldquo;{follows.option.title}&rdquo;, chosen in{' '}
+            <Link to={`/o/${orgSlug}/m/${modelSlug}/decisions/${follows.parent.id}`}>{follows.parent.title}</Link>.
+          </Text>
+        </div>
+      )}
       <section className={styles.context} aria-label="Outcome we want" data-testid="decision-outcome">
         <Text as="h2" size="lg">Outcome we want</Text>
         <Text as="p" tone={decision.outcome.trim() !== '' ? 'default' : 'muted'}>

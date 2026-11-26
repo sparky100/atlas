@@ -39,6 +39,7 @@ import {
   createDecision,
   createDecisionLink,
   getDecision,
+  getDecisionFollowingOption,
   listDecisionArgumentsForDecision,
   listDecisionLinksForDecision,
   listDecisionsForModel,
@@ -585,6 +586,46 @@ describe('decisions/decision_links/decision_arguments/assumptions/evidence again
       await updateDecision(alice.client, decision.id, { baselineOptionId: baseline.id });
       await chooseDecisionOption(alice.client, decision.id, baseline.id, 'Not worth changing yet.');
       await expect(recordDecisionBenefit(alice.client, { decisionId: decision.id, result: 'yes', note: '', confirmedBy: alice.id })).rejects.toThrow(/nothing to deliver/);
+    });
+  });
+
+  describe('approach first, then product (follows_option_id)', () => {
+    it('starts one product decision for a chosen Buy option; refuses other options, a second open one and other organisations; the pointer never changes', async () => {
+      const parent = await createDecision(alice.client, { id: randomUUID(), orgId, modelId, title: 'Keep or replace the GIS?', statement: 'The GIS is out of support.', outcome: 'Crews see changes the same day', ownerId: alice.id, createdBy: alice.id });
+      const buy = await createDecisionOption(alice.client, { decisionId: parent.id, title: 'Replace with a product', approach: 'buy', createdBy: alice.id });
+      const build = await createDecisionOption(alice.client, { decisionId: parent.id, title: 'Build our own', approach: 'build', createdBy: alice.id });
+      const start = (as: Client, optionId: string, org = orgId) => createDecision(as, { id: randomUUID(), orgId: org, modelId, title: 'Which product for: Replace with a product?', statement: '', ownerId: alice.id, createdBy: alice.id, followsOptionId: optionId });
+
+      // Not before the option is chosen, and only for the chosen Buy option.
+      await expect(start(alice.client, buy.id)).rejects.toThrow(/choose the option/);
+      await chooseDecisionOption(alice.client, parent.id, buy.id, 'A product fits.');
+      await expect(start(alice.client, build.id)).rejects.toThrow(/choose the option/);
+
+      const first = await start(alice.client, buy.id);
+      expect(first.follows_option_id).toBe(buy.id);
+      expect((await getDecisionFollowingOption(alice.client, buy.id))?.id).toBe(first.id);
+      await expect(start(alice.client, buy.id)).rejects.toThrow(/already open or decided/);
+
+      // The pointer is set once.
+      const moved = await alice.client.from('decisions').update({ follows_option_id: null }).eq('id', first.id).select('id');
+      expect(moved.error).not.toBeNull();
+
+      // Once the first is cancelled, another can be started.
+      await cancelDecision(alice.client, first.id, 'Started by mistake.');
+      expect(await getDecisionFollowingOption(alice.client, buy.id)).toBeNull();
+      const second = await start(alice.client, buy.id);
+      expect((await getDecisionFollowingOption(alice.client, buy.id))?.id).toBe(second.id);
+
+      // A signed-in user from a different organisation cannot see the option or start one from it.
+      const outsider = await createSignedInUser('follows-outsider');
+      try {
+        const otherOrg = randomUUID();
+        await createOrganisation(outsider.client, { id: otherOrg, name: 'Other Org', slug: `follows-other-${otherOrg.slice(0, 8)}`, createdBy: outsider.id });
+        await expect(createDecision(outsider.client, { id: randomUUID(), orgId: otherOrg, modelId, title: 'Steal the option', statement: '', ownerId: outsider.id, createdBy: outsider.id, followsOptionId: buy.id })).rejects.toThrow();
+        expect(await getDecisionFollowingOption(outsider.client, buy.id)).toBeNull();
+      } finally {
+        await service.auth.admin.deleteUser(outsider.id);
+      }
     });
   });
 

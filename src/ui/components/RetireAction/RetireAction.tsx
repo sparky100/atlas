@@ -33,6 +33,8 @@ export interface RetireActionProps {
   onCancel: () => void;
   /** Sourcing to record on a brand-new replacement created here (e.g. `custom_build` for a "Build ourselves" option). */
   defaultSourcing?: Sourcing | undefined;
+  /** The product that replaces this system, named by the option being delivered (a "Use <product>" option). Opens the "create new" step with the name filled in; the person still sets the date and confirms. */
+  initialReplacementName?: string | undefined;
 }
 
 /**
@@ -67,14 +69,15 @@ export function RetireAction({
   onReplacedWithNew,
   onCancel,
   defaultSourcing,
+  initialReplacementName,
 }: RetireActionProps) {
   const currentPlannedEnd = attributesRecord(element.attributes).plannedEnd;
   const [plannedEnd, setPlannedEnd] = useState(typeof currentPlannedEnd === 'string' ? currentPlannedEnd : '');
   const [replacement, setReplacement] = useState<RetireReplacement | null>(null);
   // 'none': nothing chosen yet, both options offered. 'searching': the
   // existing-element picker. 'creating': the new "doesn't exist yet" mode.
-  const [mode, setMode] = useState<'none' | 'searching' | 'creating'>('none');
-  const [newReplacementName, setNewReplacementName] = useState('');
+  const [mode, setMode] = useState<'none' | 'searching' | 'creating'>(initialReplacementName ? 'creating' : 'none');
+  const [newReplacementName, setNewReplacementName] = useState(initialReplacementName ?? '');
   // Links left unticked are not copied to the replacement. Everything is ticked by default.
   const [unticked, setUnticked] = useState<ReadonlySet<UUID>>(new Set());
   const plannedEndId = useId();

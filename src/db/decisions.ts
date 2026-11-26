@@ -33,6 +33,8 @@ export interface CreateDecisionInput {
   lensMapUrl?: string;
   /** ADR-024: start the decision inside this project (its decision log). */
   projectId?: UUID | null;
+  /** Approach first, then product: the chosen Buy option this decision picks a product for. Set at creation only. */
+  followsOptionId?: UUID | null;
   /** The agent drafted part of the context (Simon, 2026-11-19: AI help is always indicated). Set at creation only. */
   aiDraft?: { agent: 'designer'; draftedAt: string; edited: boolean };
   createdBy: UUID;
@@ -51,6 +53,7 @@ export async function createDecision(supabase: Client, input: CreateDecisionInpu
     source_finding_key: input.sourceFindingKey ?? null,
     lens_map_url: input.lensMapUrl ?? null,
     project_id: input.projectId ?? null,
+    ...(input.followsOptionId ? { follows_option_id: input.followsOptionId } : {}),
     ...(input.aiDraft ? { ai_draft_agent: input.aiDraft.agent, ai_drafted_at: input.aiDraft.draftedAt, ai_draft_edited: input.aiDraft.edited } : {}),
     created_by: input.createdBy,
   };
@@ -58,6 +61,20 @@ export async function createDecision(supabase: Client, input: CreateDecisionInpu
   const { data, error } = await supabase.from('decisions').insert(row).select('*').single();
   if (error) throw new Error(`createDecision: ${error.message}`);
   return data as DecisionRow;
+}
+
+/**
+ * The product decision that follows a chosen Buy option, if one was started
+ * and not cancelled. At most one is open or decided at a time (the insert
+ * trigger refuses a second); the newest is returned.
+ */
+export async function getDecisionFollowingOption(supabase: Client, optionId: UUID): Promise<DecisionRow | null> {
+  assertRealId('getDecisionFollowingOption', 'follows_option_id', optionId);
+  // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment -- untyped client; see branches.ts's module comment.
+  const { data, error } = await supabase.from('decisions').select('*').eq('follows_option_id', optionId).neq('status', 'rejected')
+    .order('created_at', { ascending: false }).limit(1).maybeSingle();
+  if (error) throw new Error(`getDecisionFollowingOption: ${error.message}`);
+  return (data as DecisionRow | null) ?? null;
 }
 
 export async function getDecision(supabase: Client, decisionId: UUID): Promise<DecisionRow | null> {
