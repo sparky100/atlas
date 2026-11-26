@@ -9,6 +9,7 @@ import type { OptionApproach } from '../../contracts/optionApproach';
  * ourselves are different first edits:
  *   - keep      : nothing. "Keep and tidy up" starts from the existing system, so there is no obvious first edit.
  *   - configure : "Extend X to cover C" for a system that supports (or is named by) the decision.
+ *   - use       : the same first edit as buy: the replacement is a system or module already in the model, found first in the Retire panel.
  *   - buy       : "Retire X and replace it with a new system" for the system the decision names or the capability's supporter.
  *   - build     : "Retire X and replace it with a custom-built app" for the same systems; "Create a new system for C" only when no existing system is known.
  * An option whose approach is not decided yet gets nothing rather than a wrong suggestion.
@@ -51,6 +52,7 @@ export function optionDraftActions(kind: OptionKind | null, concernedSystems: re
   const candidates = () => unique(concernedSystems.length > 0 ? concernedSystems : supporters.filter((s) => s.module !== true));
   switch (kind) {
     case 'buy':
+    case 'use':
       return candidates().slice(0, MAX_PER_KIND).map((s): OptionDraftAction => ({ kind: 'retire-and-replace', systemId: s.id, systemName: s.name, ...(s.module === true ? { module: true } : {}), capabilityName: capability, ...(product === null ? {} : { product }) }));
     case 'configure':
       return capability === null ? [] : candidates().slice(0, MAX_PER_KIND).map((s): OptionDraftAction => ({ kind: 'extend', systemId: s.id, systemName: s.name, ...(s.module === true ? { module: true } : {}), capabilityName: capability }));

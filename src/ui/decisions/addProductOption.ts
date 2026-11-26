@@ -19,7 +19,7 @@ export interface ProductForOption {
  * Pure: "Use Esri ArcGIS Utility Network". The same title the Designer's
  * "Use this product" and a researched page's "Use as an option" give, so a
  * product option reads the same whichever way it was added. The option's
- * approach is stored as Buy separately.
+ * approach is stored separately: Buy, or Use when the product is already in the model.
  */
 export function productOptionTitle(product: Pick<ProductForOption, 'product'>): string {
   return `Use ${product.product.trim()}`.slice(0, DESIGNER_TITLE_MAX);
@@ -37,6 +37,8 @@ export interface AddProductOptionInput {
   product: ProductForOption;
   /** Stable for one button, so a retry after a partial failure finishes the same option instead of duplicating it. */
   optionId: UUID;
+  /** Buy, or Use when the product is already in the model (`suggestedApproach`); a person can change it. */
+  approach?: 'buy' | 'use';
 }
 
 export interface AddProductOptionResult {
@@ -57,7 +59,7 @@ export async function addProductOption(input: AddProductOptionInput): Promise<Ad
     decisionId: input.decisionId,
     title: productOptionTitle(input.product),
     summary: input.product.summary.slice(0, DESIGNER_SUMMARY_MAX),
-    approach: 'buy',
+    approach: input.approach ?? 'buy',
     createdBy: input.userId,
   }));
   let sourceError: string | null = null;

@@ -251,6 +251,8 @@ test('a product that is already a module of a platform is found and chosen as th
   if ((page.viewportSize()?.width ?? 1280) < 700) await grid.getByText('Details and evidence').last().click();
   await grid.getByRole('button', { name: 'Sources (1)' }).first().click();
   await expect(grid.getByTestId('option-sources').getByTestId('product-in-model').first()).toContainText('a module of Microsoft Platform');
+  // A product already in the model is a Use option, not a Buy; the person can still change it.
+  await expect(grid.getByRole('combobox', { name: /Dynamics 365 Customer Service/ })).toHaveValue('use');
 
   await optionSurface(page, 'Replace with a product').getByRole('button', { name: 'Work on this option' }).click();
   await expect(page).toHaveURL(/\/changes\//);

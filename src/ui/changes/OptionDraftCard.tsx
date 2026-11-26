@@ -51,7 +51,7 @@ export function OptionDraftCard({ branch, mainHeadCommitId, orgSlug, modelSlug }
         const approach = await getOptionApproachForBranch(supabase, branch.id);
         // A "Use <product>" option carries its product as a saved source: the replacement is that product.
         let product: string | null = null;
-        if (approach === 'buy') {
+        if (approach === 'buy' || approach === 'use') {
           const option = await getDecisionOptionForBranch(supabase, decision.id, branch.id);
           const sources = option === null ? [] : (await listCatalogueSources(supabase, decision.id)).filter((r) => r.option_id === option.id);
           product = sources.length === 1 ? (sources[0]?.snapshot.product ?? null) : null;

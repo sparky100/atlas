@@ -1,5 +1,7 @@
 /**
  * An option's approach (walkthrough finding 2, Simon 2026-11-20; proposal
+ * PROPOSAL-option-approach, 2026-11-25; Use added 2026-11-26: a product already in the model
+ * is used, not bought). Original note: (proposal
  * PROPOSAL-option-approach, 2026-11-25): Keep, Configure, Buy or Build, or No
  * change for a decision's "Stay as we are" baseline. Stored on
  * `decision_options.approach` (20261125120000_decision_option_approach.sql),
@@ -7,15 +9,16 @@
  * a person has not decided yet. No I/O.
  */
 
-export const OPTION_APPROACHES = ['keep', 'configure', 'buy', 'build', 'no_change'] as const;
+export const OPTION_APPROACHES = ['keep', 'use', 'configure', 'buy', 'build', 'no_change'] as const;
 export type OptionApproach = (typeof OPTION_APPROACHES)[number];
 
 /** The approaches a person can choose for an option they add; No change belongs to the baseline only. */
-export const CHOOSABLE_OPTION_APPROACHES = ['keep', 'configure', 'buy', 'build'] as const satisfies readonly OptionApproach[];
+export const CHOOSABLE_OPTION_APPROACHES = ['keep', 'use', 'configure', 'buy', 'build'] as const satisfies readonly OptionApproach[];
 
 /** The short label on an option card, comparison column and pack heading. */
 export const OPTION_APPROACH_LABELS: Readonly<Record<OptionApproach, string>> = {
   keep: 'Keep',
+  use: 'Use',
   configure: 'Configure',
   buy: 'Buy',
   build: 'Build',
@@ -25,6 +28,7 @@ export const OPTION_APPROACH_LABELS: Readonly<Record<OptionApproach, string>> = 
 /** The longer wording on the add-option buttons, in plain task words. */
 export const OPTION_APPROACH_CHOICES: Readonly<Record<(typeof CHOOSABLE_OPTION_APPROACHES)[number], string>> = {
   keep: 'Keep and tidy up',
+  use: 'Use something we already have',
   configure: 'Configure what we run',
   buy: 'Buy a product',
   build: 'Build ourselves',
