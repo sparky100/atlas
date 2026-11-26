@@ -8,17 +8,21 @@ import { CANNOT_SEE_LINE, type SupporterReading } from './estateUncertainty';
 export function EstateReading({ reading }: { reading: SupporterReading | null }) {
   if (reading === null) {
     return (
-      <Text as="p" size="xs" tone="muted" data-testid="estate-reading">
-        Nothing we run is checked for this option; it is a judgement.
-      </Text>
+      <div data-testid="estate-reading">
+        <Text as="p" size="xs" tone="muted">
+          Nothing we run is checked for this option; it is a judgement.
+        </Text>
+      </div>
     );
   }
   return (
     <div data-testid="estate-reading">
       {reading.check && (
-        <Text as="p" size="xs" data-testid="estate-check-tag">
-          <strong>Check before relying on this.</strong>
-        </Text>
+        <div data-testid="estate-check-tag">
+          <Text as="p" size="xs">
+            <strong>Check before relying on this.</strong>
+          </Text>
+        </div>
       )}
       {reading.known.length > 0 && (
         <Text as="p" size="xs" tone="muted">
