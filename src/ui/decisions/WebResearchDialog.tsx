@@ -7,6 +7,8 @@ import { Button } from '../components/Button/Button';
 import { Text } from '../components/Text/Text';
 import { supabase } from '../supabaseClient';
 import { researchOptionTitle } from './researchOptionText';
+import { ProductInModelNote } from './ProductInModelNote';
+import type { ModelElementName } from './productInModel';
 import { ResearchResultCard, type ResearchCardAction } from './ResearchResultCard';
 import { catalogueMatchFor, type KnownCatalogueProduct } from './researchCatalogueMatches';
 import { buildResearchQuery, suggestResearchQuery, type ResearchProduct } from './researchQuerySuggestion';
@@ -15,6 +17,8 @@ import styles from './WebResearchDialog.module.css';
 
 export interface WebResearchDialogProps {
   decisionId: UUID;
+  /** Systems and modules already in the model, so a result whose title names one says so. */
+  modelElements?: readonly ModelElementName[];
   /** The candidate option being researched; it need not have a change. */
   optionId: UUID;
   /** The option's change, when it has one. */
@@ -58,6 +62,7 @@ export interface WebResearchDialogProps {
  */
 export function WebResearchDialog({
   decisionId,
+  modelElements = [],
   optionId: researchedOptionId,
   branchId,
   optionLabel,
@@ -589,6 +594,7 @@ export function WebResearchDialog({
                       onSelect={() => { select(candidate); }}
                       actions={actionsFor(candidate)}
                     >
+                      <ProductInModelNote productName={candidate.title} elements={modelElements} />
                       {isSelected && renderCheck()}
                     </ResearchResultCard>
                   );

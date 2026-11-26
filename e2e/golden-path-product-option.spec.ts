@@ -245,6 +245,13 @@ test('a product that is already a module of a platform is found and chosen as th
   await expect(salesforce).toBeVisible();
   await expect(salesforce.getByTestId('product-in-model')).toHaveCount(0);
 
+  // The saved product on an option says so too.
+  await dynamics.getByRole('button', { name: 'Make it an option' }).click();
+  const grid = page.getByTestId('decision-criteria-grid');
+  if ((page.viewportSize()?.width ?? 1280) < 700) await grid.getByText('Details and evidence').last().click();
+  await grid.getByRole('button', { name: 'Sources (1)' }).first().click();
+  await expect(grid.getByTestId('option-sources').getByTestId('product-in-model').first()).toContainText('a module of Microsoft Platform');
+
   await optionSurface(page, 'Replace with a product').getByRole('button', { name: 'Work on this option' }).click();
   await expect(page).toHaveURL(/\/changes\//);
   const draftLink = page.getByRole('link', { name: "Draft this option's changes" });
