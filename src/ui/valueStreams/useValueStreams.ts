@@ -97,6 +97,7 @@ export function useValueStreams(
         capabilities = projection.elementsHead.filter((e) => e.element_type === 'capability');
         supportsEdges = projection.relationshipsHead.filter((r) => r.relationship_type === 'supports');
         ownsEdges = projection.relationshipsHead.filter((r) => r.relationship_type === 'owns');
+        // system-only: modules are loaded into `containers` on the next line.
         systems = projection.elementsHead.filter((e) => e.element_type === 'system');
         containers = projection.elementsHead.filter((e) => e.element_type === 'container');
       } else {

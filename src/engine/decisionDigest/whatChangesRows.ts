@@ -71,6 +71,7 @@ import type { CapabilityComparisonMetrics, OptionComparisonRow } from './compare
 import type { OptionTouch } from './optionTouch';
 
 import type { WhatChangesRow } from './whatChangesType';
+import { isSystemLikeType } from '../../contracts/elementKinds';
 export type { WhatChangesRow } from './whatChangesType';
 export type WhatChangesCell = WhatChangesRow['main'];
 
@@ -300,7 +301,7 @@ export type RunCostChange =
   | { kind: 'add'; added: { name: string; band: AnnualRunCost | null } };
 
 function isCostBearing(element: ElementsHeadRow): boolean {
-  return element.element_type === 'system' || element.element_type === 'container';
+  return isSystemLikeType(element.element_type);
 }
 
 /**

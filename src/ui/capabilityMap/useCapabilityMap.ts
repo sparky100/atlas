@@ -141,6 +141,7 @@ export function useCapabilityMap(
           commitId = resolved.commitId;
         }
         capabilities = projection.elementsHead.filter((e) => e.element_type === 'capability');
+        // system-only: a module only exists inside a platform system, so any module implies a system.
         hasSystems = projection.elementsHead.some((e) => e.element_type === 'system');
         replacedIds = replacedElementIds(projection.relationshipsHead);
         const capabilityIdSet = new Set(capabilities.map((c) => c.element_id));

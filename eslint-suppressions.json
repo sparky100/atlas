@@ -44,11 +44,6 @@
       "count": 1
     }
   },
-  "src/db/changeSummary.ts": {
-    "atlas/no-bare-system-check": {
-      "count": 3
-    }
-  },
   "src/db/deriveReviewers.ts": {
     "atlas/no-bare-system-check": {
       "count": 1
@@ -59,44 +54,14 @@
       "count": 2
     }
   },
-  "src/db/healthFindings.ts": {
-    "atlas/no-bare-system-check": {
-      "count": 3
-    }
-  },
   "src/db/modelFindings.ts": {
     "atlas/no-bare-system-check": {
       "count": 1
     }
   },
-  "src/db/modelHome.ts": {
-    "atlas/no-bare-system-check": {
-      "count": 3
-    }
-  },
-  "src/db/roadmapChangeEvents.ts": {
-    "atlas/no-bare-system-check": {
-      "count": 3
-    }
-  },
-  "src/engine/changeImpactProblems.ts": {
-    "atlas/no-bare-system-check": {
-      "count": 2
-    }
-  },
   "src/engine/convertSystemToModule.ts": {
     "atlas/no-bare-system-check": {
       "count": 2
-    }
-  },
-  "src/engine/decisionDigest/compareOptions.ts": {
-    "atlas/no-bare-system-check": {
-      "count": 1
-    }
-  },
-  "src/engine/decisionDigest/whatChangesRows.ts": {
-    "atlas/no-bare-system-check": {
-      "count": 1
     }
   },
   "src/engine/deltas.ts": {
@@ -122,16 +87,6 @@
   "src/engine/elementRead/systemKind.ts": {
     "atlas/no-bare-system-check": {
       "count": 2
-    }
-  },
-  "src/engine/plannedFuture.ts": {
-    "atlas/no-bare-system-check": {
-      "count": 1
-    }
-  },
-  "src/ui/capabilityMap/useCapabilityMap.ts": {
-    "atlas/no-bare-system-check": {
-      "count": 1
     }
   },
   "src/ui/capture/useCaptureReviewQueue.ts": {
@@ -224,11 +179,6 @@
       "count": 1
     }
   },
-  "src/ui/gaps/gaps.ts": {
-    "atlas/no-bare-system-check": {
-      "count": 1
-    }
-  },
   "src/ui/integrations/IntegrationsView.tsx": {
     "atlas/no-bare-system-check": {
       "count": 1
@@ -259,24 +209,9 @@
       "count": 1
     }
   },
-  "src/ui/projects/useSupportedCapabilities.ts": {
-    "atlas/no-bare-system-check": {
-      "count": 1
-    }
-  },
-  "src/ui/roadmap/roadmapModules.ts": {
-    "atlas/no-bare-system-check": {
-      "count": 1
-    }
-  },
   "src/ui/routes/ElementPage.tsx": {
     "atlas/no-bare-system-check": {
       "count": 14
-    }
-  },
-  "src/ui/valueStreams/useValueStreams.ts": {
-    "atlas/no-bare-system-check": {
-      "count": 1
     }
   }
 }

@@ -54,6 +54,7 @@ import { foldFromGenesis, mustLoadCommit, type CommitLoader } from '../engine/he
 import { buildCommitLoader } from './commitLoader';
 import type { Client } from './client';
 import type { BranchRow } from './types';
+import { isSystemLikeType } from '../contracts/elementKinds';
 
 export interface RoadmapAddMarker {
   kind: 'add';
@@ -109,12 +110,12 @@ export function deriveRoadmapChangeEvents(ownDeltas: readonly Delta[], asIsHead:
     // can carry `lifecycleStatus`/`plannedEnd` same as a system, per
     // `roadmapLifecycleRows.ts`'s own module comment) — a module being
     // added or retired is exactly as roadmap-meaningful as a system.
-    if (delta.kind === 'element.create' && (delta.elementType === 'system' || delta.elementType === 'container')) {
+    if (delta.kind === 'element.create' && isSystemLikeType(delta.elementType)) {
       events.push({ kind: 'add', elementId: delta.elementId, elementName: delta.name });
       continue;
     }
 
-    if (delta.kind === 'element.update' && (delta.elementType === 'system' || delta.elementType === 'container') && delta.attribute === 'lifecycleStatus' && delta.value === 'retiring') {
+    if (delta.kind === 'element.update' && isSystemLikeType(delta.elementType) && delta.attribute === 'lifecycleStatus' && delta.value === 'retiring') {
       events.push({ kind: 'retire', elementId: delta.elementId, elementName: elementNameOf(toBeHead, asIsHead, delta.elementId) });
       continue;
     }
@@ -251,7 +252,7 @@ export function deriveMainCommittedChangeEvents(directMainDeltas: readonly Delta
   const shownReplacePairs = new Set(alreadyShown.flatMap(({ events }) => events.filter((e) => e.kind === 'replace').map((e) => `${e.fromSystemId}|${e.toSystemId}`)));
 
   for (const delta of directMainDeltas) {
-    if (delta.kind === 'element.update' && (delta.elementType === 'system' || delta.elementType === 'container') && delta.attribute === 'lifecycleStatus' && delta.value === 'retiring') {
+    if (delta.kind === 'element.update' && isSystemLikeType(delta.elementType) && delta.attribute === 'lifecycleStatus' && delta.value === 'retiring') {
       if (shownRetires.has(delta.elementId)) continue;
       const element = head.elements.get(delta.elementId);
       const plannedEnd = typeof element?.attributes.plannedEnd === 'string' ? element.attributes.plannedEnd : undefined;

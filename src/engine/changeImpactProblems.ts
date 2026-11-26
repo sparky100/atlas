@@ -70,7 +70,9 @@ export function findImpactProblems(ownDeltas: readonly Delta[], asIsHead: Head, 
   /** The system an element stands for: itself, or a module's platform. */
   const owningSystemId = (id: UUID): UUID | null => {
     const row = element(id);
+    // system-only: a system is its own owning system; the next line resolves a module to its platform.
     if (row?.elementType === 'system') return id;
+    // system-only: a module's parent must be a platform system.
     if (row?.elementType === 'container' && row.parentId !== null && element(row.parentId)?.elementType === 'system') return row.parentId;
     return null;
   };

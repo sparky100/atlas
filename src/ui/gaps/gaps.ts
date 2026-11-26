@@ -47,6 +47,7 @@ function isLive(row: PortfolioRow): boolean {
 }
 
 function isSystem(row: PortfolioRow): boolean {
+  // system-only: criticality, disposition and owner are asked of whole systems; a module's own value is an optional override (see gaps.test.ts).
   return row.element.element_type === 'system';
 }
 

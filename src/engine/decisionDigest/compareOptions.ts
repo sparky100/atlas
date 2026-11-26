@@ -17,6 +17,7 @@ import { computeAlsoAffected, type AlsoAffectedElement } from './alsoAffected';
 import { summarizeOptionChanges } from './optionChangeSummary';
 import { deriveOptionTouch } from './optionTouch';
 import { buildWhatChangesRows, type WhatChangesOptionInput, type WhatChangesRow } from './whatChangesRows';
+import { isSystemLikeType } from '../../contracts/elementKinds';
 
 export interface CapabilityComparisonMetrics {
   coverage: number;
@@ -110,7 +111,7 @@ async function computeComparisonRow(
   if (affected.length > 0) {
     const allCapabilities = projection.elementsHead.filter((e) => e.element_type === 'capability');
     const allValueStreams = projection.elementsHead.filter((e) => e.element_type === 'value_stream');
-    const systemsById = new Map(projection.elementsHead.filter((e) => e.element_type === 'system' || e.element_type === 'container').map((e) => [e.element_id, e]));
+    const systemsById = new Map(projection.elementsHead.filter((e) => isSystemLikeType(e.element_type)).map((e) => [e.element_id, e]));
     const selfOwnedIds = computeSelfOwnedCapabilityIds(allCapabilities, supportsEdges, ownsEdges);
     // Every capability that enables *any* stage in this projection — the
     // set `computeStageRollup` actually needs tiles for, not every

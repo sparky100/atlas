@@ -34,6 +34,7 @@ import { isPlatform } from '../ui/elements/systemKind';
 import { resolveElementDomain } from '../ui/elements/systemDomain';
 import type { Client } from './client';
 import { selectAll } from './selectAll';
+import { isSystemLikeType } from '../contracts/elementKinds';
 
 /** All `owns` edges at `commitId` — the ownership-rollup half of the health findings, same shape as `listAllSupportsEdges` (`src/db/modelHome.ts`) for the exposure-rollup half. */
 export async function listAllOwnsEdges(supabase: Client, commitId: string): Promise<RelationshipsHeadRow[]> {
@@ -346,6 +347,7 @@ export function findUnusedIntegrationInterfaces(systems: readonly ElementsHeadRo
 }
 
 function isIntegrationPlatformSystem(row: ElementsHeadRow): boolean {
+  // system-only: an integration platform is a whole system; modules are not platforms.
   return row.element_type === 'system' && attributesRecord(row.attributes).kind === 'integration_platform';
 }
 
@@ -497,6 +499,7 @@ export function findFlowsToPlatformInsteadOfModule(edges: readonly Relationships
   const containers = [...elementsById.values()].filter((el) => el.element_type === 'container');
   const modulesByPlatformId = groupModulesByPlatformId(containers);
   const platformsWithModulesIds = new Set(
+    // system-only: a platform is a whole system; its modules are grouped by platform id above.
     [...elementsById.values()].filter((el) => el.element_type === 'system' && isPlatform(el) && (modulesByPlatformId.get(el.element_id)?.length ?? 0) > 0).map((el) => el.element_id),
   );
 
@@ -763,7 +766,7 @@ export function findCriticalSystemsPastOrNearSupportEnd(systems: readonly Elemen
  */
 export function findOutgoingWithoutRetiringChange(elements: readonly ElementsHeadRow[], retiringElementIds: ReadonlySet<UUID>, elementsById: ReadonlyMap<UUID, ElementsHeadRow> = new Map()): ElementsHeadRow[] {
   return elements.filter((element) => {
-    if (element.element_type !== 'system' && element.element_type !== 'container') return false;
+    if (!isSystemLikeType(element.element_type)) return false;
     const attrs = attributesRecord(element.attributes);
     if (attrs.disposition !== 'migrate' && attrs.disposition !== 'eliminate') return false;
     if (retiringElementIds.has(element.element_id)) return false;
