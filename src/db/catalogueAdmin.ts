@@ -381,6 +381,16 @@ export async function listCatalogueVersions(client: Client): Promise<CatalogueVe
   return data;
 }
 
+/** Vendor and name of every product that is published now (newest revision, not withdrawn), for the check before a sector catalogue is withdrawn. */
+export async function listPublishedProductNames(client: Client): Promise<{ vendor: string; product: string }[]> {
+  const { data, error } = await client.from('catalogue_product_revisions')
+    .select('vendor,product')
+    .is('withdrawn_at', null)
+    .is('superseded_at', null);
+  if (error) throw new Error(`listPublishedProductNames: ${error.message}`);
+  return data;
+}
+
 export interface CatalogueEntryDetail {
   id: string;
   code: string;

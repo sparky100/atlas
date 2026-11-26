@@ -72,3 +72,14 @@ export function publicationStatusText(state: ProductPublicationState | null): st
   }
   return `Published, revision ${String(state.revision)}, ${approved}.${state.unpublishedChanges ? ' It has unpublished changes: the published revision stays as it is until you publish again.' : ''}`;
 }
+
+/** Vendor and product name, trimmed and lower-cased: how a catalogue entry and a published product are matched as the same product. */
+export function productMatchKey(vendor: string, product: string): string {
+  return `${vendor.trim().toLowerCase()}\u0000${product.trim().toLowerCase()}`;
+}
+
+/** The entries of a sector catalogue that no currently published product matches, so withdrawing the catalogue would make them disappear for users. */
+export function entriesNotYetPublished<T extends { vendor: string; product: string }>(entries: readonly T[], publishedProducts: readonly { vendor: string; product: string }[]): T[] {
+  const published = new Set(publishedProducts.map((row) => productMatchKey(row.vendor, row.product)));
+  return entries.filter((entry) => !published.has(productMatchKey(entry.vendor, entry.product)));
+}

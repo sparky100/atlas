@@ -146,3 +146,22 @@ for (const viewport of [{ width: 1280, height: 800 }, { width: 390, height: 844 
     await page.screenshot({ path: `test-results/catalogue-publish-${String(viewport.width)}.png`, fullPage: true });
   });
 }
+
+/** Step 4b-3: the sector catalogue is read-only history, and withdrawing it is blocked while its products exist nowhere else. */
+test('the sector catalogue is read-only history and withdrawing it is blocked until its products are published', async ({ page }) => {
+  await signUpAdmin(page);
+  await page.goto('/platform-admin/catalogue/sectors');
+  await expect(page.getByText('Read-only history').first()).toBeVisible();
+  await page.getByRole('link', { name: /electricity network/i }).first().click();
+  await expect(page.getByTestId('catalogue-sector-admin')).toBeVisible();
+  // No way to start a new sector catalogue.
+  await expect(page.getByRole('button', { name: /Create v\d+ draft/ })).toHaveCount(0);
+  await expect(page.getByRole('heading', { name: 'Drafts' })).toHaveCount(0);
+  // Electricity v1's products are not published as products here, so withdrawing says why and stays off.
+  await expect(page.getByTestId('sector-withdraw-blocked')).toContainText('not yet published');
+  await page.getByLabel(/Withdrawal reason/).fill('Replaced by published products');
+  await expect(page.getByRole('button', { name: 'Withdraw current version' })).toBeDisabled();
+  await page.getByRole('link', { name: 'View current products' }).click();
+  await expect(page.getByTestId('catalogue-version-admin')).toBeVisible();
+  expect(await page.evaluate(() => document.documentElement.scrollWidth > document.documentElement.clientWidth + 1)).toBe(false);
+});

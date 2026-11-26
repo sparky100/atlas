@@ -6,7 +6,7 @@ export function CatalogueSectorsPage() {
   return (
     <PlatformAdminPageShell
       title="Sector catalogues"
-      intro="A sector catalogue is a fixed publication that selects products and pins one published capability set. Earlier versions stay readable by their citations."
+      intro="Read-only history. A sector catalogue is a fixed publication that selected products and pinned one capability set; earlier versions stay readable by the citations that name them. Products are now maintained and published one at a time under Products."
     >
       <CatalogueSectorsAdmin />
     </PlatformAdminPageShell>
