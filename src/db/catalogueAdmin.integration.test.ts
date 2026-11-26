@@ -122,9 +122,10 @@ describe('platform product catalogue, real database', () => {
     check(events);
     expect(events.data).toContainEqual(expect.objectContaining({ action: 'reviewed', actor_id: admin.id }));
     // The actor's name is filled by the database, never supplied by the browser.
-    const reviewedClaim = await service.from('catalogue_product_claims').select('reviewed_by_user').eq('id', claimId).single();
+    // A save writes the claim rows afresh, so look the claim up by its product, not by the id read before the save.
+    const reviewedClaim = await service.from('catalogue_product_claims').select('reviewed_by_user').eq('product_id', productId);
     check(reviewedClaim);
-    expect((reviewedClaim.data as { reviewed_by_user: string }).reviewed_by_user).toBe(admin.id);
+    expect(reviewedClaim.data).toEqual([{ reviewed_by_user: admin.id }]);
   });
 
   it('refuses a signed-in user from another organisation reviewing a claim', async () => {
