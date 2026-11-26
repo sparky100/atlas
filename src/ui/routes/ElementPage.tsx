@@ -77,6 +77,7 @@ import { CapabilityProblemsBand } from '../elements/CapabilityProblemsBand';
 import { completenessOf, firstWalkableKind, missingFactsText, sumCompleteness } from '../gaps/gaps';
 import { usePortfolio } from '../portfolio/usePortfolio';
 import styles from './ElementPage.module.css';
+import { isSystemLikeType } from '../../contracts/elementKinds';
 
 /**
  * The element page (UI-principles.md §4) — the product's unit of trust.
@@ -282,7 +283,7 @@ export function ElementPage() {
   // `supports` edges, already loaded here (`data.relationships`/
   // `data.relationshipEndpoints`) — `useValueStreamImpact.ts` only fetches
   // the `enables`/`value_stream` half of the hop this doesn't already have.
-  const isImpactEligible = elementType === 'system' || elementType === 'container' || elementType === 'capability';
+  const isImpactEligible = isSystemLikeType(elementType ?? '') || elementType === 'capability';
   const impactCapabilityIds: UUID[] =
     elementType === 'capability' && data
       ? [data.element.element_id]
@@ -451,9 +452,10 @@ export function ElementPage() {
                   : undefined
               }
               rename={canEdit ? rename : undefined}
-              onRetire={canEdit && (state.data.element.element_type === 'system' || state.data.element.element_type === 'container') ? () => { setRetiring(true); } : undefined}
+              onRetire={canEdit && isSystemLikeType(state.data.element.element_type) ? () => { setRetiring(true); } : undefined}
               onRemoveFromModel={canEdit && state.data.element.element_type !== 'value_stream' && state.data.children.length === 0 ? () => { setRemovingFromModel(true); } : undefined}
               onMerge={canEdit && state.data.element.element_type !== 'value_stream' ? () => { setMerging(true); } : undefined}
+              // system-only: converting a system into a module applies to a system only; a module is already one.
               onConvertToModule={canEdit && state.data.element.element_type === 'system' && state.data.children.length === 0 ? () => { setConverting(true); } : undefined}
               onDeactivate={
                 canEditValueStream && state.data.element.element_type === 'value_stream' && state.data.element.parent_id === null && attributesRecord(state.data.element.attributes).inactive !== true
@@ -466,7 +468,7 @@ export function ElementPage() {
                   : undefined
               }
               contextHref={
-                state.data.element.element_type === 'system' || state.data.element.element_type === 'container'
+                isSystemLikeType(state.data.element.element_type)
                   ? `/o/${orgSlug ?? ''}/m/${model.slug}/context/${state.data.element.element_id}?${refQueryParam(ref, viewing)}`
                   : undefined
               }
@@ -476,12 +478,12 @@ export function ElementPage() {
                   : undefined
               }
               startDecisionHref={
-                canStartDecision(role) && (state.data.element.element_type === 'capability' || state.data.element.element_type === 'system' || state.data.element.element_type === 'container')
+                canStartDecision(role) && (state.data.element.element_type === 'capability' || isSystemLikeType(state.data.element.element_type))
                   ? startDecisionFromElementHref(`/o/${orgSlug ?? ''}/m/${model.slug}/decisions`, { id: state.data.element.element_id, name: state.data.element.name })
                   : undefined
               }
               startProjectHref={
-                !bandOwnsStartProject && canStartProject(role) && (state.data.element.element_type === 'capability' || state.data.element.element_type === 'system' || state.data.element.element_type === 'container')
+                !bandOwnsStartProject && canStartProject(role) && (state.data.element.element_type === 'capability' || isSystemLikeType(state.data.element.element_type))
                   ? startProjectFromElementHref(`/o/${orgSlug ?? ''}/m/${model.slug}/projects`, { id: state.data.element.element_id, name: state.data.element.name, type: state.data.element.element_type })
                   : undefined
               }
@@ -495,7 +497,7 @@ export function ElementPage() {
                 </Text>
               </div>
             )}
-            {retiring && canEdit && (state.data.element.element_type === 'system' || state.data.element.element_type === 'container') && (
+            {retiring && canEdit && isSystemLikeType(state.data.element.element_type) && (
               <RetireAction
                 modelId={model.id}
                 orgId={organisation?.id ?? ''}
@@ -567,6 +569,7 @@ export function ElementPage() {
                 onCancel={() => { setMerging(false); }}
               />
             )}
+            {/* system-only: converting a system into a module applies to a system only. */}
             {converting && state.data.element.element_type === 'system' && (
               <ConvertToModuleAction
                 modelId={model.id}
@@ -605,6 +608,7 @@ export function ElementPage() {
                 onCancel={() => { setDeactivatePanel(null); }}
               />
             )}
+            {/* system-only: the AI assistant drafts changes for a whole system. */}
             {ref.kind === 'main' && state.data.element.element_type === 'system' && canCreateChangeBranch(role) && userId && organisation?.ai_assistant_enabled && (
               <DraftWithAi key={state.data.element.element_id} modelId={model.id} orgId={organisation.id} userId={userId} basePath={`/o/${orgSlug ?? ''}/m/${model.slug}`} elementName={state.data.element.name} />
             )}
@@ -674,7 +678,7 @@ export function ElementPage() {
                       customFields={customFieldsForEditing}
                     />
                   )}
-                  {canEdit && (state.data.element.element_type === 'system' || state.data.element.element_type === 'container') && userId && (
+                  {canEdit && isSystemLikeType(state.data.element.element_type) && userId && (
                     <ExternalReferenceAdder modelId={model.id} orgId={organisation?.id ?? ''} userId={userId} elementId={state.data.element.element_id} onAdded={reload} />
                   )}
                   {canEdit && state.data.element.element_type === 'actor' && userId && (
@@ -703,6 +707,7 @@ export function ElementPage() {
                   />
                 </CollapsibleSection>
                 {/* An integration platform's own interfaces and flows come first after its attributes — what it exposes, and what goes through it, is what the page is for (ADR-026). */}
+                {/* system-only: an integration platform is a whole system; a module is never a platform. */}
                 {state.data.element.element_type === 'system' && isIntegrationPlatform(state.data.element) && (state.data.children.some((c) => c.element_type === 'container') || canAddRelationship) && (
                   <CollapsibleSection title="Interfaces" meta={`(${String(state.data.children.filter((c) => c.element_type === 'container').length)})`}>
                     <InterfacesSection orgSlug={organisation?.slug ?? ''} modelSlug={model.slug} interfaces={state.data.children.filter((c) => c.element_type === 'container')} flows={state.data.flowsViaThisPlatform} />
@@ -720,6 +725,7 @@ export function ElementPage() {
                     )}
                   </CollapsibleSection>
                 )}
+                {/* system-only: an integration platform is a whole system; a module is never a platform. */}
                 {((isIntegrationPlatform(state.data.element) && state.data.element.element_type === 'system') || isIntegrationInterface(state.data.element, state.data.parent)) && state.data.flowsViaThisPlatform.length > 0 ? (
                   <CollapsibleSection title={state.data.element.element_type === 'container' ? 'Flows via this interface' : 'Flows via this platform'} meta={`(${String(state.data.flowsViaThisPlatform.length)})`}>
                     <PlatformFlowsSection
@@ -740,6 +746,7 @@ export function ElementPage() {
                       elementType={state.data.element.element_type}
                       elementName={state.data.element.name}
                       elementParentId={state.data.element.parent_id}
+                      // system-only: a platform is a whole system; a module is never a platform.
                       elementIsPlatform={state.data.element.element_type === 'system' && isPlatform(state.data.element)}
                       elementIsExternal={state.data.element.element_type === 'actor' && attributesRecord(state.data.element.attributes).isExternal === true}
                       isInterface={isIntegrationInterface(state.data.element, state.data.parent)}
@@ -869,6 +876,7 @@ export function ElementPage() {
                     {valueStreamImpact.status === 'ready' && <ValueStreamImpactSection orgSlug={organisation?.slug ?? ''} modelSlug={model.slug} affected={valueStreamImpact.affected} />}
                   </CollapsibleSection>
                 )}
+                {/* system-only: a platform is a whole system; a module is never a platform. */}
                 {state.data.element.element_type === 'system' && isPlatform(state.data.element) && (state.data.children.length > 0 || canAddRelationship) && (
                   <CollapsibleSection title="Modules" meta={`(${String(state.data.children.length)})`}>
                     <ModulesSection
