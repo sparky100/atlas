@@ -1,0 +1,605 @@
+{
+  "sector": "any_organisation",
+  "version": 2,
+  "capabilityMapVersion": 2,
+  "status": "draft",
+  "title": "Any Organisation (Generic) product catalogue, version 2",
+  "sourceDescription": "Version 2, checked 25 November 2026. It corrects the Workday mapping, adds customer-contact and case-tracking links to the CRM entries, adds strategy and risk links to Planview, corrects the Miro claim and mapping, and adds reviewed-candidate products including Ivalua, Diligent, Workday Financial Management and Qlik. Every new or changed claim is Pending review until a named reviewer signs it. Coverage is a first slice, not an exhaustive market survey.",
+  "licence": "CC-BY-4.0",
+  "entries": [
+    {
+      "code": "servicenow-customer-service-management",
+      "product": "ServiceNow Customer Service Management",
+      "vendor": "ServiceNow",
+      "summary": "Customer service case management and self-service software.",
+      "capabilities": [
+        {
+          "code": "5",
+          "name": "Customer Contact",
+          "howItSupports": "Handles customer contact and service requests across channels."
+        },
+        {
+          "code": "5.3",
+          "name": "Case & Request Tracking",
+          "howItSupports": "Tracks customer cases and requests with an owner and history."
+        },
+        {
+          "code": "5.4",
+          "name": "Complaints & Feedback",
+          "howItSupports": "Records complaints and feedback as service cases."
+        },
+        {
+          "code": "9.3",
+          "name": "Relationship Management",
+          "howItSupports": "Maintains the customer record and service history."
+        }
+      ],
+      "claims": [
+        {
+          "position": 1,
+          "kind": "functional",
+          "statement": "The vendor describes ServiceNow Customer Service Management as customer service case management and self-service software.",
+          "sourceUrl": "https://www.servicenow.com/uk/products/customer-service-management.html",
+          "sourceDate": "2026-11-21",
+          "reviewedBy": "Pending review",
+          "reviewedAt": "2026-11-21"
+        }
+      ]
+    },
+    {
+      "code": "microsoft-dynamics-365-customer-service",
+      "product": "Microsoft Dynamics 365 Customer Service",
+      "vendor": "Microsoft",
+      "summary": "Customer service and case management software.",
+      "capabilities": [
+        {
+          "code": "5",
+          "name": "Customer Contact",
+          "howItSupports": "Holds customer contact and service cases across channels."
+        },
+        {
+          "code": "5.3",
+          "name": "Case & Request Tracking",
+          "howItSupports": "Tracks customer requests as cases with an owner and history."
+        },
+        {
+          "code": "5.4",
+          "name": "Complaints & Feedback",
+          "howItSupports": "Records complaints and feedback as cases."
+        },
+        {
+          "code": "9.3",
+          "name": "Relationship Management",
+          "howItSupports": "Maintains the customer record and service history."
+        }
+      ],
+      "claims": [
+        {
+          "position": 1,
+          "kind": "functional",
+          "statement": "The vendor describes Microsoft Dynamics 365 Customer Service as customer service and case management software.",
+          "sourceUrl": "https://www.microsoft.com/en-gb/dynamics-365/products/customer-service",
+          "sourceDate": "2026-11-25",
+          "reviewedBy": "Pending review",
+          "reviewedAt": "2026-11-25"
+        }
+      ]
+    },
+    {
+      "code": "microsoft-dynamics-365-field-service",
+      "product": "Microsoft Dynamics 365 Field Service",
+      "vendor": "Microsoft",
+      "summary": "Field work scheduling and service management software.",
+      "capabilities": [
+        {
+          "code": "11.1",
+          "name": "Work Planning & Scheduling",
+          "howItSupports": "Schedules work and assigns it to field teams"
+        },
+        {
+          "code": "11.2",
+          "name": "Service Delivery",
+          "howItSupports": "Supports field delivery and completion records"
+        }
+      ],
+      "claims": [
+        {
+          "position": 1,
+          "kind": "functional",
+          "statement": "The vendor describes Microsoft Dynamics 365 Field Service as field work scheduling and service management software.",
+          "sourceUrl": "https://www.microsoft.com/en-us/dynamics-365/products/field-service",
+          "sourceDate": "2026-11-21",
+          "reviewedBy": "Pending review",
+          "reviewedAt": "2026-11-21"
+        }
+      ]
+    },
+    {
+      "code": "planview-adaptivework",
+      "product": "Planview AdaptiveWork",
+      "vendor": "Planview",
+      "summary": "AI-powered portfolio, project and work management software.",
+      "capabilities": [
+        {
+          "code": "8.1",
+          "name": "Strategy & Performance",
+          "howItSupports": "Connects goals and strategy to portfolios, plans and delivery."
+        },
+        {
+          "code": "8.2",
+          "name": "Risk Management",
+          "howItSupports": "Tracks project risks and issues in a risk register."
+        },
+        {
+          "code": "12.1",
+          "name": "Portfolio & Programme Management",
+          "howItSupports": "Plans projects and tracks portfolio delivery."
+        }
+      ],
+      "claims": [
+        {
+          "position": 1,
+          "kind": "functional",
+          "statement": "The vendor describes Planview AdaptiveWork as AI-powered portfolio and work management software.",
+          "sourceUrl": "https://www.planview.com/products-solutions/products/adaptivework/",
+          "sourceDate": "2026-11-25",
+          "reviewedBy": "Pending review",
+          "reviewedAt": "2026-11-25"
+        }
+      ]
+    },
+    {
+      "code": "workday-human-capital-management",
+      "product": "Workday Human Capital Management",
+      "vendor": "Workday",
+      "summary": "Human capital management software for core HR, workforce planning, talent, learning, pay and employee experience.",
+      "capabilities": [
+        {
+          "code": "2",
+          "name": "Human Resources",
+          "howItSupports": "Runs core HR data and employment processes."
+        },
+        {
+          "code": "2.1",
+          "name": "Workforce Planning",
+          "howItSupports": "Models, forecasts and budgets the workforce."
+        },
+        {
+          "code": "2.2",
+          "name": "Recruitment & Onboarding",
+          "howItSupports": "Manages the talent acquisition lifecycle and onboarding."
+        },
+        {
+          "code": "2.3",
+          "name": "Learning & Development",
+          "howItSupports": "Supports learning, skills and talent development."
+        },
+        {
+          "code": "2.4",
+          "name": "Pay, Reward & Pensions",
+          "howItSupports": "Supports payroll, compensation and benefits."
+        },
+        {
+          "code": "2.5",
+          "name": "Employee Relations & Wellbeing",
+          "howItSupports": "Supports employee voice, engagement and wellbeing."
+        }
+      ],
+      "claims": [
+        {
+          "position": 1,
+          "kind": "functional",
+          "statement": "The vendor describes Workday Human Capital Management as a suite of HR solutions for core HR, workforce planning, talent, learning, pay and employee experience.",
+          "sourceUrl": "https://www.workday.com/en-gb/products/human-capital-management/overview.html",
+          "sourceDate": "2026-11-25",
+          "reviewedBy": "Pending review",
+          "reviewedAt": "2026-11-25"
+        }
+      ]
+    },
+    {
+      "code": "miro",
+      "product": "Miro",
+      "vendor": "Miro",
+      "summary": "An AI-powered visual workspace for collaboration, workshops and process mapping.",
+      "capabilities": [
+        {
+          "code": "10.1",
+          "name": "Service Design",
+          "howItSupports": "Supports collaborative service design and customer journey workshops."
+        },
+        {
+          "code": "12.2",
+          "name": "Business Analysis & Design",
+          "howItSupports": "Supports process mapping and design workshops."
+        }
+      ],
+      "claims": [
+        {
+          "position": 1,
+          "kind": "functional",
+          "statement": "The vendor describes Miro as an AI-powered visual workspace for collaboration, workshops and process mapping.",
+          "sourceUrl": "https://miro.com/",
+          "sourceDate": "2026-11-25",
+          "reviewedBy": "Pending review",
+          "reviewedAt": "2026-11-25"
+        }
+      ]
+    },
+    {
+      "code": "oracle-fusion-financials",
+      "product": "Oracle Fusion Cloud Financial Management",
+      "vendor": "Oracle",
+      "summary": "Financial management software for accounting, planning, payments, reporting and controls.",
+      "capabilities": [
+        {
+          "code": "1",
+          "name": "Finance",
+          "howItSupports": "Runs core financial management processes."
+        },
+        {
+          "code": "1.1",
+          "name": "Financial Planning & Budgeting",
+          "howItSupports": "Supports planning and budgeting."
+        },
+        {
+          "code": "1.2",
+          "name": "Financial Accounting & Reporting",
+          "howItSupports": "Supports accounting and financial reporting."
+        },
+        {
+          "code": "1.4",
+          "name": "Payments & Receivables",
+          "howItSupports": "Supports payments and receivables."
+        },
+        {
+          "code": "1.5",
+          "name": "Financial Control & Audit Support",
+          "howItSupports": "Supports financial controls and audit."
+        }
+      ],
+      "claims": [
+        {
+          "position": 1,
+          "kind": "functional",
+          "statement": "The vendor describes Oracle Fusion Cloud Financial Management as financial management software for AI-driven automation, real-time insights and global compliance.",
+          "sourceUrl": "https://www.oracle.com/erp/financials/",
+          "sourceDate": "2026-11-25",
+          "reviewedBy": "Pending review",
+          "reviewedAt": "2026-11-25"
+        }
+      ]
+    },
+    {
+      "code": "microsoft-purview",
+      "product": "Microsoft Purview",
+      "vendor": "Microsoft",
+      "summary": "A unified data security, governance and compliance platform for discovering, classifying and protecting sensitive data.",
+      "capabilities": [
+        {
+          "code": "4.1",
+          "name": "Records Management",
+          "howItSupports": "Retains and manages records through their lifecycle."
+        },
+        {
+          "code": "4.2",
+          "name": "Data Governance & Quality",
+          "howItSupports": "Discovers and classifies data across the estate."
+        },
+        {
+          "code": "4.3",
+          "name": "Information Rights & Access",
+          "howItSupports": "Controls access and protects sensitive information."
+        },
+        {
+          "code": "4.4",
+          "name": "Data Protection & Privacy",
+          "howItSupports": "Supports data loss prevention and compliance."
+        }
+      ],
+      "claims": [
+        {
+          "position": 1,
+          "kind": "functional",
+          "statement": "The vendor describes Microsoft Purview as a unified data security, governance and compliance platform for discovering, classifying and protecting sensitive data.",
+          "sourceUrl": "https://www.microsoft.com/en-us/security/business/microsoft-purview",
+          "sourceDate": "2026-11-25",
+          "reviewedBy": "Pending review",
+          "reviewedAt": "2026-11-25"
+        }
+      ]
+    },
+    {
+      "code": "microsoft-power-bi",
+      "product": "Power BI",
+      "vendor": "Microsoft",
+      "summary": "A business intelligence platform for visualising data and sharing interactive reports and dashboards.",
+      "capabilities": [
+        {
+          "code": "4.5",
+          "name": "Analytics & Business Intelligence",
+          "howItSupports": "Visualises data and shares interactive reports and dashboards."
+        }
+      ],
+      "claims": [
+        {
+          "position": 1,
+          "kind": "functional",
+          "statement": "The vendor describes Power BI as a unified analytics platform for visualising data and sharing interactive reports.",
+          "sourceUrl": "https://www.microsoft.com/en-us/power-platform/products/power-bi",
+          "sourceDate": "2026-11-25",
+          "reviewedBy": "Pending review",
+          "reviewedAt": "2026-11-25"
+        }
+      ]
+    },
+    {
+      "code": "planon-iwms",
+      "product": "Planon Integrated Workplace Management Solution",
+      "vendor": "Planon",
+      "summary": "Integrated workplace and real estate management software for real estate, space, maintenance and sustainability.",
+      "capabilities": [
+        {
+          "code": "6",
+          "name": "Estates",
+          "howItSupports": "Manages real estate, facilities and workplace services."
+        },
+        {
+          "code": "6.1",
+          "name": "Property Portfolio & Strategy",
+          "howItSupports": "Manages real estate portfolios and strategy."
+        },
+        {
+          "code": "6.2",
+          "name": "Facilities & Building Operations",
+          "howItSupports": "Runs facilities and building operations."
+        },
+        {
+          "code": "6.3",
+          "name": "Maintenance & Compliance",
+          "howItSupports": "Plans asset maintenance and compliance."
+        },
+        {
+          "code": "6.4",
+          "name": "Space & Workplace",
+          "howItSupports": "Manages space and workplace services."
+        },
+        {
+          "code": "6.5",
+          "name": "Energy & Sustainability",
+          "howItSupports": "Supports energy and sustainability management."
+        }
+      ],
+      "claims": [
+        {
+          "position": 1,
+          "kind": "functional",
+          "statement": "The vendor describes Planon as integrated workplace and real estate management software for real estate, space, maintenance and sustainability.",
+          "sourceUrl": "https://www.planonsoftware.com/",
+          "sourceDate": "2026-11-25",
+          "reviewedBy": "Pending review",
+          "reviewedAt": "2026-11-25"
+        }
+      ]
+    },
+    {
+      "code": "qualtrics-xm",
+      "product": "Qualtrics XM",
+      "vendor": "Qualtrics",
+      "summary": "An experience management platform for understanding customers and employees and acting on their feedback.",
+      "capabilities": [
+        {
+          "code": "9.1",
+          "name": "Understanding Needs",
+          "howItSupports": "Collects experience data to understand customer and employee needs."
+        },
+        {
+          "code": "9.2",
+          "name": "Engagement & Communications",
+          "howItSupports": "Supports engagement and feedback across channels."
+        },
+        {
+          "code": "9.4",
+          "name": "Feedback & Insight",
+          "howItSupports": "Turns feedback into insight and action."
+        }
+      ],
+      "claims": [
+        {
+          "position": 1,
+          "kind": "functional",
+          "statement": "The vendor describes Qualtrics as an experience management platform for understanding customers and employees and acting on their feedback.",
+          "sourceUrl": "https://www.qualtrics.com/",
+          "sourceDate": "2026-11-25",
+          "reviewedBy": "Pending review",
+          "reviewedAt": "2026-11-25"
+        }
+      ]
+    },
+    {
+      "code": "atlassian-jsm",
+      "product": "Jira Service Management",
+      "vendor": "Atlassian",
+      "summary": "An AI-powered service management platform for IT, HR, facilities and other teams to manage requests and incidents.",
+      "capabilities": [
+        {
+          "code": "7.2",
+          "name": "Application Delivery & Support",
+          "howItSupports": "Connects development and operations teams to support delivery."
+        },
+        {
+          "code": "7.6",
+          "name": "Technology Service Management",
+          "howItSupports": "Manages service requests, incidents and changes."
+        }
+      ],
+      "claims": [
+        {
+          "position": 1,
+          "kind": "functional",
+          "statement": "The vendor describes Jira Service Management as an AI-powered service management platform for IT, HR, facilities and other teams to manage requests and incidents.",
+          "sourceUrl": "https://www.atlassian.com/software/jira/service-management",
+          "sourceDate": "2026-11-25",
+          "reviewedBy": "Pending review",
+          "reviewedAt": "2026-11-25"
+        }
+      ]
+    },
+    {
+      "code": "ivalua",
+      "product": "Ivalua",
+      "vendor": "Ivalua",
+      "summary": "An enterprise procurement platform covering sourcing, contract management, supplier management and spend analysis.",
+      "capabilities": [
+        {
+          "code": "3",
+          "name": "Procurement",
+          "howItSupports": "Runs source-to-pay procurement processes."
+        },
+        {
+          "code": "3.1",
+          "name": "Category & Sourcing Strategy",
+          "howItSupports": "Supports strategic sourcing and category management."
+        },
+        {
+          "code": "3.2",
+          "name": "Tendering & Contract Award",
+          "howItSupports": "Supports sourcing events and contract award."
+        },
+        {
+          "code": "3.3",
+          "name": "Contract & Supplier Management",
+          "howItSupports": "Manages contracts and supplier relationships."
+        },
+        {
+          "code": "3.4",
+          "name": "Spend Control & Compliance",
+          "howItSupports": "Provides spend analysis and procurement controls."
+        }
+      ],
+      "claims": [
+        {
+          "position": 1,
+          "kind": "functional",
+          "statement": "The vendor describes Ivalua as an enterprise procurement platform covering sourcing, contract management, supplier management and spend analysis.",
+          "sourceUrl": "https://www.ivalua.com/",
+          "sourceDate": "2026-11-25",
+          "reviewedBy": "Pending review",
+          "reviewedAt": "2026-11-25"
+        }
+      ]
+    },
+    {
+      "code": "diligent",
+      "product": "Diligent One Platform",
+      "vendor": "Diligent",
+      "summary": "Governance, risk and compliance software for enterprise risk, internal audit, compliance and board governance.",
+      "capabilities": [
+        {
+          "code": "8",
+          "name": "Governance & Assurance",
+          "howItSupports": "Runs governance, risk and compliance activities in one platform."
+        },
+        {
+          "code": "8.2",
+          "name": "Risk Management",
+          "howItSupports": "Identifies, assesses and mitigates enterprise risks."
+        },
+        {
+          "code": "8.3",
+          "name": "Internal Audit & Assurance",
+          "howItSupports": "Manages audit plans, requests and assurance work."
+        },
+        {
+          "code": "8.4",
+          "name": "Legal & Regulatory Compliance",
+          "howItSupports": "Tracks regulatory obligations and compliance."
+        },
+        {
+          "code": "8.5",
+          "name": "Corporate Governance",
+          "howItSupports": "Supports board management and corporate governance."
+        }
+      ],
+      "claims": [
+        {
+          "position": 1,
+          "kind": "functional",
+          "statement": "The vendor describes Diligent as governance, risk and compliance software for enterprise risk, internal audit, compliance and board governance.",
+          "sourceUrl": "https://www.diligent.com/",
+          "sourceDate": "2026-11-25",
+          "reviewedBy": "Pending review",
+          "reviewedAt": "2026-11-25"
+        }
+      ]
+    },
+    {
+      "code": "workday-financial-management",
+      "product": "Workday Financial Management",
+      "vendor": "Workday",
+      "summary": "Cloud financial management software for accounting, planning, revenue and financial controls.",
+      "capabilities": [
+        {
+          "code": "1",
+          "name": "Finance",
+          "howItSupports": "Runs core financial management processes."
+        },
+        {
+          "code": "1.1",
+          "name": "Financial Planning & Budgeting",
+          "howItSupports": "Supports financial planning and budgeting."
+        },
+        {
+          "code": "1.2",
+          "name": "Financial Accounting & Reporting",
+          "howItSupports": "Supports accounting and financial reporting."
+        },
+        {
+          "code": "1.4",
+          "name": "Payments & Receivables",
+          "howItSupports": "Supports revenue lifecycles and receivables."
+        },
+        {
+          "code": "1.5",
+          "name": "Financial Control & Audit Support",
+          "howItSupports": "Provides continuous controls and audit support."
+        }
+      ],
+      "claims": [
+        {
+          "position": 1,
+          "kind": "functional",
+          "statement": "The vendor describes Workday Financial Management as cloud financial management software for accounting, planning and financial processes.",
+          "sourceUrl": "https://www.workday.com/en-gb/products/financial-management.html",
+          "sourceDate": "2026-11-25",
+          "reviewedBy": "Pending review",
+          "reviewedAt": "2026-11-25"
+        }
+      ]
+    },
+    {
+      "code": "qlik",
+      "product": "Qlik Cloud Analytics",
+      "vendor": "Qlik",
+      "summary": "Data integration, AI and analytics software for dashboards, visualizations and business insight.",
+      "capabilities": [
+        {
+          "code": "4.5",
+          "name": "Analytics & Business Intelligence",
+          "howItSupports": "Creates dashboards and visualizations for business intelligence."
+        }
+      ],
+      "claims": [
+        {
+          "position": 1,
+          "kind": "functional",
+          "statement": "The vendor describes Qlik as data integration, AI and analytics software for dashboards, visualizations and insight.",
+          "sourceUrl": "https://www.qlik.com/",
+          "sourceDate": "2026-11-25",
+          "reviewedBy": "Pending review",
+          "reviewedAt": "2026-11-25"
+        }
+      ]
+    }
+  ]
+}
