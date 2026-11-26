@@ -169,7 +169,7 @@ export function CatalogueDraftAdmin({ draftId }: { draftId: string }) {
       <p>
         The pinned set is v{content.capabilityMapVersion}
         {pinnedSet?.status === 'published' ? '' : ' (not published; validation will block publication)'}.
-        Each product needs 1-10 links in this set.
+        Each product needs 1-10 links that apply to this set: its own links in this sector's sets plus its shared capabilities. Validate counts them.
       </p>
       <div className={styles.split}>
         <div className={styles.tree}>
@@ -180,7 +180,7 @@ export function CatalogueDraftAdmin({ draftId }: { draftId: string }) {
               const chosen = content.productIds.includes(product.id);
               return (
                 <div className={styles.pickRow} key={product.id}>
-                  <span><strong>{product.product}</strong> <small>{product.vendor} · {count} link{count === 1 ? '' : 's'} in this set</small></span>
+                  <span><strong>{product.product}</strong> <small>{product.vendor} · {count} link{count === 1 ? '' : 's'} in this set · {product.sharedCapabilityCount} shared</small></span>
                   <button type="button" onClick={() => { if (chosen) removeProduct(product.id); else addProduct(product.id); }} disabled={busy}>{chosen ? 'Remove' : 'Add'}</button>
                 </div>
               );
@@ -195,7 +195,7 @@ export function CatalogueDraftAdmin({ draftId }: { draftId: string }) {
             const count = product?.capabilityCountsByMap[pinnedSet?.id ?? ''] ?? 0;
             return (
               <div className={styles.linkRow} key={id}>
-                <span><strong>{product?.product ?? 'Unknown product'}</strong> <small>{product?.vendor ?? ''} · {count} link{count === 1 ? '' : 's'} in this set</small></span>
+                <span><strong>{product?.product ?? 'Unknown product'}</strong> <small>{product?.vendor ?? ''} · {count} link{count === 1 ? '' : 's'} in this set · {product?.sharedCapabilityCount ?? 0} shared</small></span>
                 <button type="button" onClick={() => { removeProduct(id); }} disabled={busy}>Remove</button>
               </div>
             );

@@ -85,6 +85,38 @@ export interface CatalogueClaimReview {
   reviewedAt: string | null;
 }
 
+/**
+ * Publishing or withdrawing a product is an action sent with a save, so it
+ * goes through the one guarded save function. The server records who and when;
+ * the browser cannot name an approver.
+ */
+export const catalogueProductPublicationSchema = z.discriminatedUnion('action', [
+  z.object({ action: z.literal('publish') }).strict(),
+  z.object({ action: z.literal('withdraw'), reason: text(500) }).strict(),
+]);
+export type CatalogueProductPublication = z.infer<typeof catalogueProductPublicationSchema>;
+
+/** The latest published revision of a product, for platform admins. */
+export interface ProductPublicationState {
+  revision: number;
+  approvedByName: string | null;
+  approvedAt: string;
+  withdrawnAt: string | null;
+  withdrawnReason: string | null;
+  withdrawnByName: string | null;
+  /** The product has been edited or reviewed since this revision was published. */
+  unpublishedChanges: boolean;
+}
+
+/** Where a product stands for users, in plain words. */
+export type ProductPublicationLabel = 'not_published' | 'published' | 'published_with_changes' | 'withdrawn';
+
+export function productPublicationLabel(state: ProductPublicationState | null): ProductPublicationLabel {
+  if (state === null) return 'not_published';
+  if (state.withdrawnAt !== null) return 'withdrawn';
+  return state.unpublishedChanges ? 'published_with_changes' : 'published';
+}
+
 export const catalogueProductContentSchema = z.object({
   code: text(CATALOGUE_PRODUCT_LIMITS.code).regex(/^[a-z0-9][a-z0-9-]{1,60}$/, 'Use lowercase letters, numbers and hyphens'),
   product: text(CATALOGUE_PRODUCT_LIMITS.product),
@@ -93,6 +125,7 @@ export const catalogueProductContentSchema = z.object({
   capabilities: z.array(catalogueProductCapabilitySchema).max(CATALOGUE_PRODUCT_LIMITS.capabilities),
   generalCapabilities: z.array(catalogueProductGeneralCapabilitySchema).max(CATALOGUE_PRODUCT_LIMITS.generalCapabilities).optional(),
   claims: z.array(catalogueProductClaimSchema).max(CATALOGUE_PRODUCT_LIMITS.claims),
+  publication: catalogueProductPublicationSchema.optional(),
 }).strict().superRefine((value, ctx) => {
   const links = new Set(value.capabilities.map((link) => `${link.capabilityMapId}\u0000${link.capabilityCode}`));
   if (links.size !== value.capabilities.length) ctx.addIssue({ code: 'custom', message: 'A capability can appear only once for a product' });
@@ -140,6 +173,7 @@ export interface CatalogueProductSummary {
   capabilitySetCount: number;
   claimCount: number;
   claimsWaitingForReview: number;
+  publication: ProductPublicationLabel;
   capabilityCountsByMap: Record<string, number>;
 }
 
