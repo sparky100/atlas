@@ -5,6 +5,7 @@
  */
 import type { UUID } from '../contracts/delta';
 import type { Client } from './client';
+import { queryInChunks } from './inFilterLimit';
 import type { ModelShareRow } from './types';
 
 export interface CreateModelShareInput {
@@ -68,11 +69,11 @@ export interface ModelSharedWithOrg {
  * though this function still does (defence in depth, same convention
  * every other org-scoped list query in this codebase already follows,
  * matching `listMembers`/`listInvites`'s own explicit `.eq(org_id, ...)`).
- * Three small follow-up reads (models/organisations/tags), never an
- * `.in()` over a caller-supplied id list that grows with the model
- * (CLAUDE.md rule 8) — bounded by however many shares exist for this org,
- * which is small by construction (a deliberate cross-org grant, not
- * ordinary model content).
+ * Three small follow-up reads (models/organisations/tags). The id lists
+ * are bounded by however many shares exist for this org, which is small by
+ * construction (a deliberate cross-org grant, not ordinary model content),
+ * but they still go in pieces of at most 50 (CLAUDE.md rule 8) so a very
+ * large number of shares cannot make the request too long.
  */
 export async function listModelsSharedWithOrg(supabase: Client, orgId: UUID): Promise<ModelSharedWithOrg[]> {
   const { data: shareRows, error: shareError } = await supabase.from('model_shares').select('*').eq('shared_with_org_id', orgId).order('created_at', { ascending: false });
@@ -81,21 +82,18 @@ export async function listModelsSharedWithOrg(supabase: Client, orgId: UUID): Pr
   if (shares.length === 0) return [];
 
   const modelIds = [...new Set(shares.map((s) => s.model_id))];
-  const { data: modelRows, error: modelError } = await supabase.from('models').select('id, org_id, name, slug').in('id', modelIds);
-  if (modelError) throw new Error(`listModelsSharedWithOrg (models): ${modelError.message}`);
-  const modelsById = new Map(((modelRows as { id: UUID; org_id: UUID; name: string; slug: string }[] | null) ?? []).map((m) => [m.id, m]));
+  const modelRows = await queryInChunks<UUID, { id: UUID; org_id: UUID; name: string; slug: string }>('listModelsSharedWithOrg (models)', 'id', modelIds, (chunk) => supabase.from('models').select('id, org_id, name, slug').in('id', chunk));
+  const modelsById = new Map(modelRows.map((m) => [m.id, m]));
 
   const ownerOrgIds = [...new Set([...modelsById.values()].map((m) => m.org_id))];
-  const { data: orgRows, error: orgError } = await supabase.from('organisations').select('id, name, slug').in('id', ownerOrgIds);
-  if (orgError) throw new Error(`listModelsSharedWithOrg (organisations): ${orgError.message}`);
-  const orgsById = new Map(((orgRows as { id: UUID; name: string; slug: string }[] | null) ?? []).map((o) => [o.id, o]));
+  const orgRows = await queryInChunks<UUID, { id: UUID; name: string; slug: string }>('listModelsSharedWithOrg (organisations)', 'id', ownerOrgIds, (chunk) => supabase.from('organisations').select('id, name, slug').in('id', chunk));
+  const orgsById = new Map(orgRows.map((o) => [o.id, o]));
 
   const tagIds = [...new Set(shares.map((s) => s.tag_id).filter((id): id is UUID => id !== null))];
   let tagsById = new Map<UUID, string>();
   if (tagIds.length > 0) {
-    const { data: tagRows, error: tagError } = await supabase.from('tags').select('id, name').in('id', tagIds);
-    if (tagError) throw new Error(`listModelsSharedWithOrg (tags): ${tagError.message}`);
-    tagsById = new Map(((tagRows as { id: UUID; name: string }[] | null) ?? []).map((t) => [t.id, t.name]));
+    const tagRows = await queryInChunks<UUID, { id: UUID; name: string }>('listModelsSharedWithOrg (tags)', 'id', tagIds, (chunk) => supabase.from('tags').select('id, name').in('id', chunk));
+    tagsById = new Map(tagRows.map((t) => [t.id, t.name]));
   }
 
   const result: ModelSharedWithOrg[] = [];
