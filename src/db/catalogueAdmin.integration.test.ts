@@ -406,11 +406,9 @@ describe('platform product catalogue, real database', () => {
       expect(after).toEqual([expect.objectContaining({ revision: 2, summary: 'Edited, not published.' })]);
     });
 
-    it('does not expose who published or aligned, only the names', async () => {
+    it('does not expose who published a product, only the name', async () => {
       const who = await outside.client.from('catalogue_product_revisions').select('published_by').eq('product_id', pid);
       expect(who.error).not.toBeNull();
-      const basis = await outside.client.from('reference_map_item_links').select('review_basis, mapped_by');
-      expect(basis.error).not.toBeNull();
     });
 
     it('stops showing a withdrawn product', async () => {

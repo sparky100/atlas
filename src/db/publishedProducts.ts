@@ -1,5 +1,5 @@
 import type { Client } from './client';
-import { queryInChunks } from './inFilterLimit';
+import { assertInFilterSize, queryInChunks } from './inFilterLimit';
 
 /**
  * Catalogue step 4b-1: the products a platform admin has published, read for
@@ -33,18 +33,18 @@ export interface PublishedProduct {
   claims: PublishedProductClaim[];
 }
 
-/** The general capability a published map item is aligned to, or null when it has none. */
-async function sharedCapabilityId(client: Client, sector: string, capabilityCode: string): Promise<string | null> {
-  const map = await client.from('capability_maps').select('id').eq('sector', sector).eq('status', 'published').order('version', { ascending: false }).limit(1).maybeSingle();
-  if (map.error) throw new Error(`listPublishedProductsForCapability: ${map.error.message}`);
-  if (!map.data) return null;
-  const item = await client.from('capability_map_items').select('id').eq('map_id', map.data.id).eq('code', capabilityCode).maybeSingle();
-  if (item.error) throw new Error(`listPublishedProductsForCapability: ${item.error.message}`);
-  if (!item.data) return null;
-  const link = await client.from('reference_map_item_links').select('capability_id').eq('map_item_id', item.data.id).maybeSingle();
-  if (link.error) throw new Error(`listPublishedProductsForCapability: ${link.error.message}`);
-  const row: { capability_id: string } | null = link.data;
-  return row?.capability_id ?? null;
+/** The general capabilities that published map items for this sector and code are aligned to. */
+async function sharedCapabilityIds(client: Client, sector: string, capabilityCode: string): Promise<string[]> {
+  const maps = await client.from('capability_maps').select('id').eq('sector', sector).eq('status', 'published');
+  if (maps.error) throw new Error(`listPublishedProductsForCapability: ${maps.error.message}`);
+  const mapIds = ((maps.data as { id: string }[] | null) ?? []).map((m) => m.id);
+  if (mapIds.length === 0) return [];
+  const items = await queryInChunks<string, { id: string }>('listPublishedProductsForCapability', 'map_id', mapIds, (chunk) =>
+    client.from('capability_map_items').select('id').eq('code', capabilityCode).in('map_id', chunk));
+  if (items.length === 0) return [];
+  const links = await queryInChunks<string, { capability_id: string }>('listPublishedProductsForCapability', 'map_item_id', items.map((i) => i.id), (chunk) =>
+    client.from('reference_map_item_links').select('capability_id').in('map_item_id', chunk));
+  return [...new Set(links.map((l) => l.capability_id))];
 }
 
 /**
@@ -53,11 +53,12 @@ async function sharedCapabilityId(client: Client, sector: string, capabilityCode
  * One entry per product, with the newest published revision and its claims.
  */
 export async function listPublishedProductsForCapability(client: Client, match: { sector: string; capabilityCode: string }): Promise<PublishedProduct[]> {
-  const capabilityId = await sharedCapabilityId(client, match.sector, match.capabilityCode);
+  const capabilityIds = await sharedCapabilityIds(client, match.sector, match.capabilityCode);
+  assertInFilterSize('listPublishedProductsForCapability', 'capability_id', capabilityIds);
   const sectorLinks = client.from('catalogue_product_revision_links').select('revision_id, how_it_supports')
     .eq('kind', 'sector').eq('sector', match.sector).eq('capability_code', match.capabilityCode);
-  const sharedLinks = capabilityId === null ? null
-    : client.from('catalogue_product_revision_links').select('revision_id, how_it_supports').eq('kind', 'shared').eq('capability_id', capabilityId);
+  const sharedLinks = capabilityIds.length === 0 ? null
+    : client.from('catalogue_product_revision_links').select('revision_id, how_it_supports').eq('kind', 'shared').in('capability_id', capabilityIds);
   const [sector, shared] = await Promise.all([sectorLinks, sharedLinks]);
   if (sector.error) throw new Error(`listPublishedProductsForCapability: ${sector.error.message}`);
   if (shared?.error) throw new Error(`listPublishedProductsForCapability: ${shared.error.message}`);

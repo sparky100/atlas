@@ -8,9 +8,9 @@
 --     that a newer one has replaced, stay admin-only (saved citations to them
 --     are read through their own snapshot, in a later step).
 --   * Any signed-in user can read which general capability a published map
---     item is aligned to (three columns only). The reviewer and the written
---     basis of the alignment stay admin-only. Published maps are already
---     readable by every signed-in user.
+--     item is aligned to, including the written basis and who aligned it.
+--     Draft and unpublished-map alignments stay admin-only. Published maps are
+--     already readable by every signed-in user.
 -- One policy per table and action (not an extra one) so the advisor's
 -- multiple-permissive-policies count does not grow.
 
@@ -81,11 +81,7 @@ create policy reference_map_item_links_read on public.reference_map_item_links
       select 1 from public.capability_map_items i join public.capability_maps m on m.id = i.map_id
       where i.id = reference_map_item_links.map_item_id and m.status = 'published')
   );
--- Browsers read only the alignment itself, never who made it or why.
-revoke select on public.reference_map_item_links from authenticated;
-grant select (map_item_id, capability_id, capability_revision) on public.reference_map_item_links to authenticated;
-
--- The product-revision claims and links carry a user id for who published or
+-- The product revisions and their claims carry a user id for who published or
 -- reviewed; the name is shown, the id need not leave the server.
 revoke select on public.catalogue_product_revisions from authenticated;
 grant select (id, product_id, revision, product_edit_revision, code, product, vendor, summary,

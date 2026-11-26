@@ -184,9 +184,10 @@ Migration `20261126230000_catalogue_published_products_readable.sql`.
 - **Who can see what changes.** Any signed-in user can read a product's newest,
   not-withdrawn revision with its claims and links. Withdrawn revisions and
   revisions a newer one replaced stay admin-only. Any signed-in user can read
-  which general capability a published map item is aligned to (three columns);
-  who aligned it and why stay admin-only. User ids of publishers and
-  reviewers are not readable by browsers; the names are.
+  which general capability a published map item is aligned to, with the written
+  basis and who aligned it; alignments of unpublished maps stay admin-only. User
+  ids of publishers and reviewers on product revisions are not readable by
+  browsers; the names are.
 - **Replaced is recorded once** on the older revision (`superseded_at`, set by a
   trigger when a newer revision is inserted), so the read policy does not read
   its own table.
