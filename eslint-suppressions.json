@@ -104,16 +104,6 @@
       "count": 2
     }
   },
-  "src/ui/components/ElementBrowseTable/ElementBrowseCards.tsx": {
-    "atlas/no-bare-system-check": {
-      "count": 1
-    }
-  },
-  "src/ui/components/ElementBrowseTable/ElementBrowseTable.tsx": {
-    "atlas/no-bare-system-check": {
-      "count": 1
-    }
-  },
   "src/ui/components/ElementHeader/ElementHeader.tsx": {
     "atlas/no-bare-system-check": {
       "count": 1
@@ -139,11 +129,6 @@
       "count": 1
     }
   },
-  "src/ui/elements/useElementBrowse.ts": {
-    "atlas/no-bare-system-check": {
-      "count": 12
-    }
-  },
   "src/ui/elements/useElementPage.ts": {
     "atlas/no-bare-system-check": {
       "count": 1
@@ -157,11 +142,6 @@
   "src/ui/projects/projectBeforeAfterModel.ts": {
     "atlas/no-bare-system-check": {
       "count": 1
-    }
-  },
-  "src/ui/routes/ElementPage.tsx": {
-    "atlas/no-bare-system-check": {
-      "count": 14
     }
   }
 }

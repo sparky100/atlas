@@ -126,7 +126,7 @@ export type DispositionFilter = 'all' | Disposition | 'not_assessed';
 /** `not_assessed` matches only systems and containers (the types that carry the attribute) with nothing recorded. */
 export function matchesDispositionFilter(row: Pick<BrowseRow, 'element' | 'disposition'>, filter: DispositionFilter): boolean {
   if (filter === 'all') return true;
-  if (filter === 'not_assessed') return (row.element.element_type === 'system' || row.element.element_type === 'container') && row.disposition === null;
+  if (filter === 'not_assessed') return isSystemLike(row.element) && row.disposition === null;
   return row.disposition === filter;
 }
 
@@ -383,11 +383,13 @@ export function useElementBrowse(
     async function compute(): Promise<void> {
       let ids: Set<UUID> | null = null;
       if (filter === 'unlinked-systems') {
+        // system-only: the finder takes whole systems and modules (`containers`) as separate lists, or the filter is about whole systems (platforms, AI agents).
         const systems = elements.filter((e) => e.element_type === 'system');
         const containers = elements.filter((e) => e.element_type === 'container');
         const usesAndFlowsToEdges = await b.getUsesAndFlowsToEdges();
         ids = new Set(findSystemsWithoutCapability(systems, supportsEdges, containers, usesAndFlowsToEdges).map((e) => e.element_id));
       } else if (filter === 'platform-supports-move-to-module') {
+        // system-only: the finder takes whole systems and modules (`containers`) as separate lists, or the filter is about whole systems (platforms, AI agents).
         const systems = elements.filter((e) => e.element_type === 'system');
         const containers = elements.filter((e) => e.element_type === 'container');
         ids = new Set(findPlatformSupportsThatShouldMoveToModule(systems, supportsEdges, containers).map((e) => e.element_id));
@@ -398,39 +400,41 @@ export function useElementBrowse(
         const facts = await b.getFacts();
         ids = new Set(computeStaleAttributesFinding(facts, elements, new Date(), staleAfterMonths).staleElements.map((e) => e.element_id));
       } else if (filter === 'no-technical-owner') {
-        const systems = elements.filter((e) => e.element_type === 'system');
-        const containers = elements.filter((e) => e.element_type === 'container');
-        ids = new Set(findSystemsWithoutTechnicalOwner([...systems, ...containers], ownsEdges).map((e) => e.element_id));
+        const systems = elements.filter(isSystemLike);
+        ids = new Set(findSystemsWithoutTechnicalOwner(systems, ownsEdges).map((e) => e.element_id));
       } else if (filter === 'ai-agent-no-technical-owner') {
+        // system-only: the finder takes whole systems and modules (`containers`) as separate lists, or the filter is about whole systems (platforms, AI agents).
         const systems = elements.filter((e) => e.element_type === 'system');
         ids = new Set(findAiAgentsActingAloneWithoutTechnicalOwner(systems, ownsEdges).map((e) => e.element_id));
       } else if (filter === 'ai-agents') {
+        // system-only: the finder takes whole systems and modules (`containers`) as separate lists, or the filter is about whole systems (platforms, AI agents).
         ids = new Set(elements.filter((e) => e.element_type === 'system' && isAiAgent(e)).map((e) => e.element_id));
       } else if (filter === 'uses-ai') {
+        // system-only: the finder takes whole systems and modules (`containers`) as separate lists, or the filter is about whole systems (platforms, AI agents).
         ids = new Set(elements.filter((e) => e.element_type === 'system' && usesAi(e)).map((e) => e.element_id));
       } else if (filter === 'critical-no-business-owner') {
-        const systems = elements.filter((e) => e.element_type === 'system');
-        const containers = elements.filter((e) => e.element_type === 'container');
-        ids = new Set(findCriticalSystemsWithoutBusinessOwner([...systems, ...containers], ownsEdges).map((e) => e.element_id));
+        const systems = elements.filter(isSystemLike);
+        ids = new Set(findCriticalSystemsWithoutBusinessOwner(systems, ownsEdges).map((e) => e.element_id));
       } else if (filter === 'critical-exposed') {
         const systems = elements.filter(isSystemLike);
         const replacesEdges = await b.getReplacesEdges();
         ids = new Set(findCriticalExposedSystems(systems, new Date(), replacedElementIds(replacesEdges)).map((e) => e.element_id));
       } else if (filter === 'unused-integration-platform') {
+        // system-only: the finder takes whole systems and modules (`containers`) as separate lists, or the filter is about whole systems (platforms, AI agents).
         const systems = elements.filter((e) => e.element_type === 'system');
         const usesAndFlowsToEdges = await b.getUsesAndFlowsToEdges();
         const containers = elements.filter((e) => e.element_type === 'container');
         ids = new Set(findUnusedIntegrationPlatforms(systems, usesAndFlowsToEdges, containers).map((e) => e.element_id));
       } else if (filter === 'unused-integration-interface') {
+        // system-only: the finder takes whole systems and modules (`containers`) as separate lists, or the filter is about whole systems (platforms, AI agents).
         const systems = elements.filter((e) => e.element_type === 'system');
         const containers = elements.filter((e) => e.element_type === 'container');
         const usesAndFlowsToEdges = await b.getUsesAndFlowsToEdges();
         ids = new Set(findUnusedIntegrationInterfaces(systems, containers, usesAndFlowsToEdges).map((e) => e.element_id));
       } else if (filter === 'essential-no-technical-owner') {
-        const systems = elements.filter((e) => e.element_type === 'system');
-        const containers = elements.filter((e) => e.element_type === 'container');
+        const systems = elements.filter(isSystemLike);
         const capabilities = elements.filter((e) => e.element_type === 'capability');
-        ids = new Set(findSystemsSupportingEssentialFunctionWithoutTechnicalOwner([...systems, ...containers], capabilities, supportsEdges, ownsEdges).map((e) => e.element_id));
+        ids = new Set(findSystemsSupportingEssentialFunctionWithoutTechnicalOwner(systems, capabilities, supportsEdges, ownsEdges).map((e) => e.element_id));
       } else if (filter === 'critical-support-end') {
         const systems = elements.filter(isSystemLike);
         ids = new Set(findCriticalSystemsPastOrNearSupportEnd(systems).map((e) => e.element_id));
@@ -440,7 +444,7 @@ export function useElementBrowse(
         ids = new Set(findCapabilitiesWithNoSupporters(level1Capabilities, capabilities, supportsEdges, ownsEdges).map((e) => e.element_id));
       } else if (filter === 'outgoing-no-retiring-change') {
         const retiring = await b.getRetiredByOpenChanges();
-        const candidates = elements.filter((e) => e.element_type === 'system' || e.element_type === 'container');
+        const candidates = elements.filter(isSystemLike);
         ids = new Set(findOutgoingWithoutRetiringChange(candidates, retiring, elementsById).map((e) => e.element_id));
       } else if (filter === 'lifecycle-date-mismatch') {
         ids = new Set(findLifecycleDateMismatches(elements, new Date()).map((m) => m.element.element_id));

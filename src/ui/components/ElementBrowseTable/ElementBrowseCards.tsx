@@ -21,6 +21,7 @@ import type { BulkEditController } from '../../elements/useBulkEdit';
 import { BulkEditCell } from './BulkEditCell';
 import { BULK_EDIT_CORE_KEYS, bulkEditFieldFor } from '../../elements/bulkEditFields';
 import styles from './ElementBrowseCards.module.css';
+import { isSystemLike } from '../../../contracts/elementKinds';
 
 export interface ElementBrowseCardsProps {
   rows: readonly BrowseRow[];
@@ -146,7 +147,7 @@ function ElementBrowseCard({
           {selectedCustomDefinition.label}: {customValue}
         </Text>
       )}
-      {linkSupportsInline && row.element.element_type === 'system' && (
+      {linkSupportsInline && isSystemLike(row.element) && (
         <div className={styles.cardActions}>
           <InlineSupportsPicker system={{ elementId: row.element.element_id, name: row.element.name }} config={linkSupportsInline} searchCommitId={commitId} />
         </div>

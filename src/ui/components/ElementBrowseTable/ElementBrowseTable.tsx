@@ -35,6 +35,7 @@ import { BULK_EDIT_CORE_KEYS, bulkEditFieldFor } from '../../elements/bulkEditFi
 import { ElementBrowseCards } from './ElementBrowseCards';
 import type { BulkEditController } from '../../elements/useBulkEdit';
 import styles from './ElementBrowseTable.module.css';
+import { isSystemLike } from '../../../contracts/elementKinds';
 
 /** Same breakpoint every other "table/canvas → mobile list" swap in this app uses (`LandscapePage.tsx`/`ContextPage.tsx`/`ValueStreamsPage.tsx`, all `useIsNarrowViewport(768)`) — one convention, not a bespoke value per view. */
 const MOBILE_BREAKPOINT_PX = 768;
@@ -786,7 +787,7 @@ export function ElementBrowseTable({ state, orgSlug, modelSlug, modelId, filenam
                     </td>
                     {linkSupportsInline && (
                       <td headers={`${headerIdBase}-link`}>
-                        {row.element.element_type === 'system' && (
+                        {isSystemLike(row.element) && (
                           <InlineSupportsPicker system={{ elementId: row.element.element_id, name: row.element.name }} config={linkSupportsInline} searchCommitId={state.commitId} />
                         )}
                       </td>
