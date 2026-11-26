@@ -45,7 +45,8 @@ async function seedAlignedSet(suffix: string): Promise<string> {
   const mapId = randomUUID();
   const itemId = randomUUID();
   const capabilityId = randomUUID();
-  const version = 900000 + Number.parseInt(suffix.slice(0, 5), 16) % 90000;
+  // The editor offers the NEWEST any_organisation set, so each seeded set must be newer than the last: seconds since 1970 only ever grows (and fits an int).
+  const version = Math.floor(Date.now() / 1000);
   const name = `Shared ledger ${suffix}`;
   const checked = (result: { error: { message: string } | null }) => { if (result.error) throw new Error(`catalogue-shared seed: ${result.error.message}`); };
   checked(await service.from('capability_maps').insert({ id: mapId, sector: 'any_organisation', version, status: 'draft', title: 'Shared test set', summary: 'Shared test set', source_description: 'Playwright seed.' }));
