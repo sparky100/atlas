@@ -12,6 +12,7 @@ import { Chip } from '../components/Chip/Chip';
 import { ClampedText } from '../components/ClampedText/ClampedText';
 import { Text } from '../components/Text/Text';
 import { OptionSources } from './OptionSources';
+import type { MakeProductOptionProps } from './MakeProductOption';
 import { stripIntentPrefix } from './optionLabel';
 import type { OptionSource } from '../../contracts/optionSource';
 import type { UseDecisionRatingsResult } from './useDecisionRatings';
@@ -46,6 +47,8 @@ export interface DecisionCriteriaOption {
 }
 
 export interface DecisionCriteriaGridProps {
+  /** Given when the person may add options: each saved catalogue product gets "Make it an option". */
+  makeProductOption?: MakeProductOptionProps | undefined;
   decisionId: UUID;
   options: DecisionCriteriaOption[];
   /** `canRateDecisionOption` at the call site — decision-status-and-role gated, same as `canAddOption`/`canChoose`. `false` renders every cell read-only, with no tap affordance at all (the grid at time-of-choosing still needs to render, just never editable). */
@@ -120,7 +123,7 @@ interface EditingCell {
  * only ever gets the person *into* the change workspace, never repeats
  * that flip.
  */
-export function DecisionCriteriaGrid({ decisionId, options, canRate, userId, neededBy, orgSlug, modelSlug, commitId, onChoose, chooseNote, canWorkOnChange, canWorkOnCandidate, onWorkOnThisChange, onWorkOnOption, canSetApproach, onSetApproach, canResearch, onResearch, ratingsState }: DecisionCriteriaGridProps) {
+export function DecisionCriteriaGrid({ makeProductOption, decisionId, options, canRate, userId, neededBy, orgSlug, modelSlug, commitId, onChoose, chooseNote, canWorkOnChange, canWorkOnCandidate, onWorkOnThisChange, onWorkOnOption, canSetApproach, onSetApproach, canResearch, onResearch, ratingsState }: DecisionCriteriaGridProps) {
   const ratings = ratingsState.ratings;
   const compact = useCompactDecisionLayout();
   const [editing, setEditing] = useState<EditingCell | null>(null);
@@ -260,7 +263,7 @@ export function DecisionCriteriaGrid({ decisionId, options, canRate, userId, nee
                     <Text as="p" size="sm" tone={o.summary === null ? 'muted' : 'default'}>
                       {o.summary ?? 'No changes recorded yet'}
                     </Text>
-                    <OptionSources sources={o.sources ?? []} />
+                    <OptionSources sources={o.sources ?? []} makeOption={makeProductOption} />
                     {o.summary === null && canEditOption(o) && (
                       <Text as="p" size="sm" tone="muted">
                         Use Work on this option to draft it.
@@ -408,7 +411,7 @@ export function DecisionCriteriaGrid({ decisionId, options, canRate, userId, nee
               <details className={styles.optionDetails}>
                 <summary>Details and evidence</summary>
                 {o.description?.trim() && <Text as="div" size="sm"><ClampedText text={o.description}><ElementNamedText text={o.description} commitId={commitId ?? null} /></ClampedText></Text>}
-                <OptionSources sources={o.sources ?? []} />
+                <OptionSources sources={o.sources ?? []} makeOption={makeProductOption} />
               </details>
             )}
             <div className={styles.ratingList}>

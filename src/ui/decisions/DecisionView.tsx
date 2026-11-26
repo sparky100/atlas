@@ -35,6 +35,8 @@ import { SecondOpinion } from './SecondOpinion';
 import { KeptQuestions } from './KeptQuestions';
 import { DecisionGaps } from './DecisionGaps';
 import { recordDecisionGap } from '../../db/decisionGaps';
+import { addProductOption } from './addProductOption';
+import type { MakeProductOptionProps } from './MakeProductOption';
 import { CapabilityProducts } from '../elements/CapabilityProducts';
 import type { OptionApproach } from '../../contracts/optionApproach';
 import { OptionApproachPicker } from './OptionApproach';
@@ -290,6 +292,18 @@ export function DecisionView({ modelId, decisionId, orgId, orgSlug, modelSlug, r
       optionProducts: [...byProduct.values()],
     };
   };
+  // A listed product becomes a Buy candidate in one click, with the product saved as its source.
+  const makeProductOption: MakeProductOptionProps | undefined = canAddOption && userId !== null
+    ? {
+        optionTitles: options.map((option) => option.title),
+        onMake: async (product, optionId) => {
+          const result = await addProductOption({ decisionId, userId, product, optionId });
+          applyCreatedOption(result.option);
+          void queryClient.invalidateQueries({ queryKey: ['optionSources', decisionId] });
+          return result.sourceError;
+        },
+      }
+    : undefined;
   const canChoose = canChooseDecisionOption(role) && decision.status === 'proposed';
   const canRate = canRateDecisionOption(role, decision);
   // The decision names its chosen option; that option's change (if delivery has started) is the delivery change.
@@ -704,6 +718,7 @@ export function DecisionView({ modelId, decisionId, orgId, orgSlug, modelSlug, r
               return (
                 <div id="decision-compare">
                 <DecisionCriteriaGrid
+                  makeProductOption={makeProductOption}
                   decisionId={decisionId}
                   options={criteriaOptions}
                   canRate={canRate}
@@ -828,7 +843,7 @@ export function DecisionView({ modelId, decisionId, orgId, orgSlug, modelSlug, r
       {hasReplaceOrBuildOption && capabilityConcerns.map((capability) => {
         const templateRef = attributesRecord(capability.attributes).templateRef;
         if (typeof templateRef !== 'string') return null;
-        return <CapabilityProducts key={capability.element_id} templateRef={templateRef} title={`Products that can support ${capability.name}`} />;
+        return <CapabilityProducts key={capability.element_id} templateRef={templateRef} title={`Products that can support ${capability.name}`} makeOption={makeProductOption} />;
       })}
 
       {(comparisonOptions.length > 0 || scoredOptions.length > 0) && (

@@ -14,8 +14,8 @@ import { createModel } from './models';
 import { createDecision, createDecisionLink } from './decisions';
 import { createChangeBranch, getMainBranch } from './branches';
 import { markOptionEdited } from './decisionOptionMarks';
-import { addDesignerCandidate, getDecisionOptionForBranch, listDecisionOptions, workOnDecisionOption } from './decisionOptions';
-import { addOptionWithCatalogueSources, catalogueToRows, catalogueSnapshotFromRows, listCatalogueSources, listOptionSources, publishedCapabilityMatchForModel, publishedMapItemForCapability } from './productCatalogue';
+import { addDesignerCandidate, createDecisionOption, getDecisionOptionForBranch, listDecisionOptions, workOnDecisionOption } from './decisionOptions';
+import { addOptionWithCatalogueSources, insertOptionCatalogueSource, catalogueToRows, catalogueSnapshotFromRows, listCatalogueSources, listOptionSources, publishedCapabilityMatchForModel, publishedMapItemForCapability } from './productCatalogue';
 import { listOptionWebSources } from './optionWebSources';
 
 function at<T>(items: readonly T[], index = 0): T {
@@ -405,6 +405,29 @@ describe('product catalogue and option evidence, real database', () => {
     expect(await listDecisionOptions(outsider.client, decisionId)).toEqual([]);
     check(await service.from('decisions').update({ status: 'rejected' }).eq('id', decisionId));
     await expect(addDesignerCandidate(owner.client, candidateInput(decisionId))).rejects.toThrow();
+  });
+
+  it('makes a listed product a Buy candidate with the product saved as its source; refuses viewers, other organisations and closed decisions', async () => {
+    const s = await seed(); check(await publish(s.id));
+    const { decisionId } = await option();
+    const optionId = randomUUID();
+    const saved = await createDecisionOption(contributor.client, { id: optionId, decisionId, title: 'Use Quotation Tool', summary: 'A quoting product.', approach: 'buy', createdBy: contributor.id });
+    expect(saved).toMatchObject({ id: optionId, branch_id: null, source: 'manual', approach: 'buy' });
+    const source = { decisionId, optionId, sector: s.citation.sector, version: s.citation.version, entryCode: s.citation.entryCode };
+    await insertOptionCatalogueSource(contributor.client, { ...source, citedBy: contributor.id });
+    expect(await listOptionSources(viewer.client, decisionId)).toEqual([expect.objectContaining({ kind: 'catalogue', optionId, branchId: null, product: 'Quotation Tool' })]);
+    await expect(insertOptionCatalogueSource(contributor.client, { ...source, citedBy: contributor.id })).rejects.toThrow('already saved');
+
+    const other = randomUUID();
+    await createDecisionOption(owner.client, { id: other, decisionId, title: 'Buy another tool', approach: 'buy', createdBy: owner.id });
+    const forOther = { ...source, optionId: other };
+    await expect(insertOptionCatalogueSource(viewer.client, { ...forOther, citedBy: viewer.id })).rejects.toThrow();
+    await expect(insertOptionCatalogueSource(outsider.client, { ...forOther, citedBy: outsider.id })).rejects.toThrow();
+    await expect(insertOptionCatalogueSource(owner.client, { ...forOther, citedBy: contributor.id })).rejects.toThrow();
+    await expect(createDecisionOption(outsider.client, { decisionId, title: 'Buy from outside', approach: 'buy', createdBy: outsider.id })).rejects.toThrow();
+    check(await service.from('decisions').update({ status: 'rejected' }).eq('id', decisionId));
+    await expect(insertOptionCatalogueSource(owner.client, { ...forOther, citedBy: owner.id })).rejects.toThrow();
+    expect((await listOptionSources(owner.client, decisionId)).map((x) => x.optionId)).toEqual([optionId]);
   });
 
   it('keeps snapshots unchanged across replacement/withdrawal and allows withdrawal only once', async () => {

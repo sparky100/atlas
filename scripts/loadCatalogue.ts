@@ -127,6 +127,11 @@ async function loadOne(supabase: ReturnType<typeof createServiceRoleClient>, fil
   }
 }
 
+/** One sector's catalogue file, loaded as a draft (or skipped when already published). Used by Playwright's global setup. */
+export async function loadCatalogueVersion(supabase: ReturnType<typeof createServiceRoleClient>, sector: string, version: number): Promise<void> {
+  await loadOne(supabase, path.join(CONTENT_ROOT, sector, `${String(version)}.json`));
+}
+
 async function main(): Promise<void> {
   const supabase = createServiceRoleClient(loadEnv());
   const files = await contentFiles();

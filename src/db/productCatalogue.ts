@@ -54,6 +54,36 @@ export async function addOptionWithCatalogueSources(client: Client, mark: Decisi
   if (error) throw new Error(`addOptionWithCatalogueSources: ${error.message}`);
 }
 
+export interface InsertOptionCatalogueSourceInput {
+  decisionId: string;
+  optionId: string;
+  sector: string;
+  version: number;
+  entryCode: string;
+  citedBy: string;
+}
+
+/**
+ * Saves one reviewed catalogue product with a candidate option that already
+ * exists. RLS checks the caller may add options to the proposed decision
+ * (option_catalogue_sources_insert); a repeat is reported plainly.
+ */
+export async function insertOptionCatalogueSource(client: Client, input: InsertOptionCatalogueSourceInput): Promise<void> {
+  const { error } = await client.from('option_catalogue_sources').insert({
+    decision_id: input.decisionId,
+    option_id: input.optionId,
+    branch_id: null,
+    catalogue_sector: input.sector,
+    catalogue_version: input.version,
+    entry_code: input.entryCode,
+    cited_by: input.citedBy,
+  });
+  if (error) {
+    if ((error as { code?: string }).code === '23505') throw new Error('This product is already saved with this option.');
+    throw new Error(`insertOptionCatalogueSource: ${error.message}`);
+  }
+}
+
 /** Decision-scoped read, not an unbounded list of branch IDs. Rendering arrives with the source contract. */
 export async function listCatalogueSources(client: Client, decisionId: string): Promise<OptionCatalogueSourceRow[]> {
   const { data, error } = await client.from('option_catalogue_sources').select('*').eq('decision_id', decisionId)

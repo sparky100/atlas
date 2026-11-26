@@ -5,7 +5,8 @@
  * line instead. No AI switch or key is needed.
  */
 import { useQuery } from '@tanstack/react-query';
-import { capabilityMapMatch, listCurrentCatalogueEntriesForCapability, type CatalogueEntry } from '../../db/productCatalogue';
+import { capabilityMapMatch, currentCatalogue, listCurrentCatalogueEntriesForCapability, type CatalogueEntry } from '../../db/productCatalogue';
+import { MakeProductOption, type MakeProductOptionProps } from '../decisions/MakeProductOption';
 import { CollapsibleSection } from '../components/CollapsibleSection/CollapsibleSection';
 import { Panel } from '../components/Panel/Panel';
 import { Text } from '../components/Text/Text';
@@ -13,7 +14,7 @@ import { supabase } from '../supabaseClient';
 import { catalogueAsOf, formatCatalogueDate as formatDate, sourceDomain } from './capabilityProductsText';
 import styles from './CapabilityProducts.module.css';
 
-function Entry({ entry }: { entry: CatalogueEntry }) {
+function Entry({ entry, citation, makeOption }: { entry: CatalogueEntry; citation: { sector: string; version: number } | null; makeOption: MakeProductOptionProps | undefined }) {
   const asOf = catalogueAsOf(entry);
   return (
     <li className={styles.entry}>
@@ -37,11 +38,23 @@ function Entry({ entry }: { entry: CatalogueEntry }) {
         </ul>
       </details>
       <Text as="p" size="xs" tone="muted">Check with the vendor before relying on it.</Text>
+      {makeOption !== undefined && citation !== null && (
+        <MakeProductOption
+          product={{ product: entry.product, vendor: entry.vendor, summary: entry.summary, sector: citation.sector, version: citation.version, entryCode: entry.code }}
+          optionTitles={makeOption.optionTitles}
+          onMake={makeOption.onMake}
+        />
+      )}
     </li>
   );
 }
 
-export function CapabilityProducts({ templateRef, title = 'Products that can support this' }: { templateRef: string | null; title?: string }) {
+/**
+ * `makeOption` is given on a proposed decision when the person may add
+ * options: each product then gets "Make it an option" (Simon, 2026-11-25:
+ * "listing the products doesn't help create an option").
+ */
+export function CapabilityProducts({ templateRef, title = 'Products that can support this', makeOption }: { templateRef: string | null; title?: string; makeOption?: MakeProductOptionProps | undefined }) {
   const match = useQuery({
     queryKey: ['capabilityCatalogueMatch', templateRef],
     enabled: templateRef !== null,
@@ -52,6 +65,12 @@ export function CapabilityProducts({ templateRef, title = 'Products that can sup
     enabled: match.data !== null && match.data !== undefined,
     queryFn: () => (match.data ? listCurrentCatalogueEntriesForCapability(supabase, { sector: match.data.sector, capabilityCode: match.data.capabilityCode }) : Promise.resolve([])),
   });
+  const catalogue = useQuery({
+    queryKey: ['currentCatalogue', match.data?.sector ?? ''],
+    enabled: makeOption !== undefined && match.data !== null && match.data !== undefined,
+    queryFn: () => (match.data ? currentCatalogue(supabase, match.data.sector) : Promise.resolve(null)),
+  });
+  const citation = match.data && catalogue.data ? { sector: match.data.sector, version: catalogue.data.version } : null;
 
   if (templateRef === null) {
     return (
@@ -68,7 +87,7 @@ export function CapabilityProducts({ templateRef, title = 'Products that can sup
           Reviewed products from the published catalogue, for a replacement or build option. They are candidates, not a procurement decision.
         </Text>
         <ul className={styles.list}>
-          {entries.data.map((entry) => <Entry key={entry.id} entry={entry} />)}
+          {entries.data.map((entry) => <Entry key={entry.id} entry={entry} citation={citation} makeOption={makeOption} />)}
         </ul>
       </CollapsibleSection>
     </Panel>
