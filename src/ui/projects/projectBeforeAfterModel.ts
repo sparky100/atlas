@@ -16,6 +16,7 @@ import type { ElementRow, Head, RelationshipRow } from '../../engine/deltas';
 import { edgesInForce, lifecycleStateOf } from '../../engine/elementRead/fitAndExposure';
 import { computeContextGroup, edgeLabel } from '../context/contextGrouping';
 import { moduleDisplayNameFromMap } from '../elements/moduleDisplayName';
+import { isSystemLike } from '../../contracts/elementKinds';
 
 export type BeforeAfterMark = 'same' | 'new' | 'ends';
 
@@ -84,7 +85,7 @@ function systemsIn(view: HeadView, capabilityId: UUID, now: Date): Map<UUID, { n
   const supporterIds = new Set(view.edges.filter((e) => e.relationship_type === 'supports' && e.to_element_id === capabilityId).map((e) => e.from_element_id));
   for (const id of supporterIds) {
     const system = view.elementsById.get(id);
-    if (!system || (system.element_type !== 'system' && system.element_type !== 'container')) continue;
+    if (!system || !isSystemLike(system)) continue;
     if (lifecycleStateOf(system, view.elementsById, now) !== 'active') continue;
     const touching = edgesInForce(
       view.edges.filter((e) => e.from_element_id === id || e.to_element_id === id),

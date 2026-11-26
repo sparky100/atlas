@@ -34,59 +34,9 @@
       "count": 2
     }
   },
-  "src/contracts/attributeSchema.ts": {
-    "atlas/no-bare-system-check": {
-      "count": 1
-    }
-  },
-  "src/db/branchProjection.ts": {
-    "atlas/no-bare-system-check": {
-      "count": 1
-    }
-  },
-  "src/db/deriveReviewers.ts": {
-    "atlas/no-bare-system-check": {
-      "count": 1
-    }
-  },
-  "src/db/elementBrowse.ts": {
-    "atlas/no-bare-system-check": {
-      "count": 2
-    }
-  },
-  "src/db/modelFindings.ts": {
-    "atlas/no-bare-system-check": {
-      "count": 1
-    }
-  },
-  "src/engine/convertSystemToModule.ts": {
-    "atlas/no-bare-system-check": {
-      "count": 2
-    }
-  },
   "src/engine/deltas.ts": {
     "atlas/no-bare-system-check": {
       "count": 1
-    }
-  },
-  "src/engine/elementRead/buildBrowseRows.ts": {
-    "atlas/no-bare-system-check": {
-      "count": 1
-    }
-  },
-  "src/engine/elementRead/lifecycleDateMismatch.ts": {
-    "atlas/no-bare-system-check": {
-      "count": 1
-    }
-  },
-  "src/engine/elementRead/moduleDisplayName.ts": {
-    "atlas/no-bare-system-check": {
-      "count": 1
-    }
-  },
-  "src/engine/elementRead/systemKind.ts": {
-    "atlas/no-bare-system-check": {
-      "count": 2
     }
   },
   "src/ui/capture/useCaptureReviewQueue.ts": {
@@ -94,52 +44,7 @@
       "count": 1
     }
   },
-  "src/ui/changes/ChangeView.tsx": {
-    "atlas/no-bare-system-check": {
-      "count": 2
-    }
-  },
-  "src/ui/changes/OptionDraftCard.tsx": {
-    "atlas/no-bare-system-check": {
-      "count": 2
-    }
-  },
-  "src/ui/components/ElementHeader/ElementHeader.tsx": {
-    "atlas/no-bare-system-check": {
-      "count": 1
-    }
-  },
-  "src/ui/components/RelationshipGroup/RelationshipAdd.tsx": {
-    "atlas/no-bare-system-check": {
-      "count": 2
-    }
-  },
-  "src/ui/components/RelationshipGroup/slotApplicability.ts": {
-    "atlas/no-bare-system-check": {
-      "count": 1
-    }
-  },
   "src/ui/decisions/useModelElementNames.ts": {
-    "atlas/no-bare-system-check": {
-      "count": 1
-    }
-  },
-  "src/ui/elements/systemDomain.ts": {
-    "atlas/no-bare-system-check": {
-      "count": 1
-    }
-  },
-  "src/ui/elements/useElementPage.ts": {
-    "atlas/no-bare-system-check": {
-      "count": 1
-    }
-  },
-  "src/ui/integrations/IntegrationsView.tsx": {
-    "atlas/no-bare-system-check": {
-      "count": 1
-    }
-  },
-  "src/ui/projects/projectBeforeAfterModel.ts": {
     "atlas/no-bare-system-check": {
       "count": 1
     }

@@ -15,6 +15,7 @@ import { Text } from '../Text/Text';
 import { defaultAttributesForPlainPick, hasExactNameMatch, NEW_OWNER_KINDS, newOwnerAttributes, type NewOwnerKind } from './relationshipAddDefaults';
 import { forcedOwnsAttributes } from './slotApplicability';
 import styles from './RelationshipAdd.module.css';
+import { isSystemLikeType } from '../../../contracts/elementKinds';
 
 export interface RelationshipAddProps {
   slot: RelationshipGroupSlot;
@@ -292,7 +293,7 @@ export function RelationshipAdd({ slot, direction, elementId, elementName, eleme
       void create(target.elementId, target.name, { role: 'service' }, null, newActor);
       return;
     }
-    if (elementType === 'system' || elementType === 'container') {
+    if (isSystemLikeType(elementType)) {
       setNewOwnerName(null);
       setPendingTarget(target);
       return;
@@ -461,6 +462,7 @@ export function RelationshipAdd({ slot, direction, elementId, elementName, eleme
   }
 
   if (pendingTarget && needsLabel && showViaStage) {
+    // system-only: an integration platform is a whole system; a module can only be an interface.
     const platformResults = viaSearch.results.filter((el) => el.element_id !== pendingTarget.elementId && (el.element_type === 'system' ? isIntegrationPlatform(el) : isIntegrationInterface(el, viaSearch.resultParents.get(el.element_id) ?? null)));
     return (
       <div className={styles.panel}>

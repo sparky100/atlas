@@ -24,6 +24,7 @@ import { listOwnsEdges } from './elementBrowse';
 import { listActorsForLandscape } from './landscape';
 import { listMembers } from './organisations';
 import type { BranchRow, MemberRole } from './types';
+import { isSystemLikeType } from '../contracts/elementKinds';
 
 export interface ReviewerCandidate {
   userId: UUID;
@@ -43,6 +44,11 @@ function memberIdOf(actor: ElementsHeadRow | undefined): UUID | null {
  * Deduplicated by member (a member who owns several touched things appears
  * once). Actors without a `memberId` are skipped, not errored on.
  */
+/** The touched elements whose owners should review: systems and modules (Model rule M2), since a module has owners of its own. */
+export function touchedSystemLikeIds(subjects: readonly { subjectType: string; subjectId: UUID; elementType?: string | null }[]): UUID[] {
+  return subjects.filter((s) => s.subjectType === 'element' && s.elementType !== undefined && s.elementType !== null && isSystemLikeType(s.elementType)).map((s) => s.subjectId);
+}
+
 export function ownerReviewerCandidates(
   touchedSystemIds: readonly UUID[],
   affectedCapabilityIds: readonly UUID[],
@@ -118,7 +124,7 @@ export function deriveReviewerSet(
  */
 export async function loadDerivedReviewers(supabase: Client, modelId: UUID, orgId: UUID, branch: BranchRow): Promise<ReviewerCandidate[]> {
   const summary = await loadChangeSummary(supabase, modelId, branch);
-  const touchedSystemIds = (summary?.subjects ?? []).filter((s) => s.subjectType === 'element' && s.elementType === 'system').map((s) => s.subjectId);
+  const touchedSystemIds = touchedSystemLikeIds(summary?.subjects ?? []);
   const affectedCapabilityIds = (summary?.affectedCapabilities ?? []).map((c) => c.capability.element_id);
 
   const main = await getMainBranch(supabase, modelId);

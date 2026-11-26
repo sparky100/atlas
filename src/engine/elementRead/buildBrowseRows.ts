@@ -10,6 +10,7 @@ import type { UUID } from '../../contracts/delta';
 import type { ElementsHeadRow } from '../../contracts/rows';
 import { criticalityOf, lifecycleStatusOf, type BrowseRow } from '../../db/elementBrowse';
 import { dispositionOf } from './disposition';
+import { isSystemLike } from '../../contracts/elementKinds';
 
 export function buildBrowseRows(elements: readonly ElementsHeadRow[], ownersByElementId: ReadonlyMap<UUID, ElementsHeadRow>): BrowseRow[] {
   const elementsById = new Map<UUID, ElementsHeadRow>(elements.map((e) => [e.element_id, e]));
@@ -21,7 +22,7 @@ export function buildBrowseRows(elements: readonly ElementsHeadRow[], ownersByEl
       // `parent` threaded through so a module whose own lifecycle/criticality is unset reads as its platform's, rather than blank — `lifecycleStatusOf`/`criticalityOf`'s own doc comment.
       lifecycleStatus: lifecycleStatusOf(element, parent),
       criticality: criticalityOf(element, parent),
-      disposition: element.element_type === 'system' || element.element_type === 'container' ? dispositionOf(element) : null,
+      disposition: isSystemLike(element) ? dispositionOf(element) : null,
       parent,
     };
   });

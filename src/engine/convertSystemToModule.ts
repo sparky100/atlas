@@ -133,9 +133,11 @@ export function buildConvertSystemToModuleDeltas(head: Head, systemId: UUID, tar
   if (systemId === targetPlatformId) throw new EngineError('convertSystemToModule: cannot convert a system into a module of itself');
   const system = head.elements.get(systemId);
   if (!system) throw new EngineError(`convertSystemToModule: ${systemId} does not exist in this head`);
+  // system-only: only a whole system can be converted into a module.
   if (system.elementType !== 'system') throw new EngineError(`convertSystemToModule: ${systemId} is a ${system.elementType}, not a system`);
   const targetPlatform = head.elements.get(targetPlatformId);
   if (!targetPlatform) throw new EngineError(`convertSystemToModule: target platform ${targetPlatformId} does not exist in this head`);
+  // system-only: a module sits inside a platform, which is a whole system.
   if (targetPlatform.elementType !== 'system') throw new EngineError(`convertSystemToModule: target platform ${targetPlatformId} is a ${targetPlatform.elementType}, not a system`);
 
   for (const [, element] of head.elements) {

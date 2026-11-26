@@ -61,6 +61,7 @@ export function resolveElementDomain(element: ElementsHeadRow, elementsById: Rea
   // of margin above the exact depth, same conservative-not-exact stance
   // this bound already took before S1 item 18 shortened the chain.
   for (let hop = 0; hop < 3 && current; hop++) {
+    // system-only: a system carries its own domain; a module takes its own value or walks up to its platform.
     if (current.element_type === 'system') return domainOf(current);
     const ownValue = attributesRecord(current.attributes).domain;
     if (ownValue === 'ot' || ownValue === 'hybrid') return ownValue;

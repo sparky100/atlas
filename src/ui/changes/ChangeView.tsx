@@ -46,6 +46,7 @@ import { useOpenMergeRequest } from './useOpenMergeRequest';
 import { useSubmitForReview } from './useSubmitForReview';
 import { ReviewerPicker } from './ReviewerPicker';
 import styles from './ChangeView.module.css';
+import { isSystemLikeType } from '../../contracts/elementKinds';
 
 /** A stable identity for `useImportSummary`'s own `sourcesById` before `useChangeSummary` has loaded — a fresh `new Map()` literal every render would retrigger that hook's load effect every render for no reason. */
 const EMPTY_SOURCES_BY_ID: ReadonlyMap<UUID, SourceRow> = new Map();
@@ -521,8 +522,8 @@ export function ChangeView({ orgId, modelId, branchId, orgSlug, modelSlug, role,
                     From {importSummary.state.fileName}
                   </Text>
                   <div className={styles.importCounts}>
-                    <Chip tone="neutral">{summaryState.status === 'ready' ? summaryState.summary.subjects.filter((s) => s.subjectType === 'element' && (s.elementType === 'system' || s.elementType === 'container') && s.deltas.some((d) => d.kind === 'element.create')).length : 0} new</Chip>
-                    <Chip tone="neutral">{summaryState.status === 'ready' ? summaryState.summary.subjects.filter((s) => s.subjectType === 'element' && (s.elementType === 'system' || s.elementType === 'container') && !s.deltas.some((d) => d.kind === 'element.create')).length : 0} changed</Chip>
+                    <Chip tone="neutral">{summaryState.status === 'ready' ? summaryState.summary.subjects.filter((s) => s.subjectType === 'element' && isSystemLikeType(s.elementType) && s.deltas.some((d) => d.kind === 'element.create')).length : 0} new</Chip>
+                    <Chip tone="neutral">{summaryState.status === 'ready' ? summaryState.summary.subjects.filter((s) => s.subjectType === 'element' && isSystemLikeType(s.elementType) && !s.deltas.some((d) => d.kind === 'element.create')).length : 0} changed</Chip>
                     {importSummary.state.notInFile.length > 0 && <Chip tone="warn">{importSummary.state.notInFile.length} not in file</Chip>}
                   </div>
                   {importSummary.state.notInFile.length > 0 && (
