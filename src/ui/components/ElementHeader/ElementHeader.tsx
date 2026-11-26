@@ -220,6 +220,7 @@ export function ElementHeader({ element, existsFact, existsSource, onEdit, onCon
   // way `lifecycleStatus` above only ever renders for the types that carry
   // it despite no explicit `element_type` check here either.
   const version = typeof attrs.version === 'string' ? attrs.version : null;
+  // system-only: the AI-agent mark is a setting of a whole system.
   const mark = element.element_type === 'system' ? aiMarkOf(element) : null;
   const isExternal = attrs.isExternal === true;
   const externalOrganisation = typeof attrs.externalOrganisation === 'string' ? attrs.externalOrganisation : null;

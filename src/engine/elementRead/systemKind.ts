@@ -32,6 +32,7 @@ export function isIntegrationPlatform(system: ElementsHeadRow): boolean {
 
 /** ADR-026: whether `element` is an *interface* — a container whose parent is an integration platform. Mirrors C18's other accepted `via` shape (`src/engine/deltas.ts`). */
 export function isIntegrationInterface(element: ElementsHeadRow, parent: ElementsHeadRow | null | undefined): boolean {
+  // system-only: a module's parent is always a platform system.
   return element.element_type === 'container' && parent?.element_type === 'system' && isIntegrationPlatform(parent);
 }
 
@@ -39,6 +40,7 @@ export function isIntegrationInterface(element: ElementsHeadRow, parent: Element
  * ADR-026: the ids a flow's `via` may name for this element to count as "flows via" it — a platform and every interface on it (its container children), or one interface alone. Empty for anything else.
  */
 export function flowViaIdsFor(element: ElementsHeadRow, parent: ElementsHeadRow | null | undefined, children: readonly ElementsHeadRow[]): UUID[] {
+  // system-only: an integration platform is a whole system.
   if (element.element_type === 'system' && isIntegrationPlatform(element)) return [element.element_id, ...children.filter((c) => c.element_type === 'container').map((c) => c.element_id)];
   if (isIntegrationInterface(element, parent)) return [element.element_id];
   return [];

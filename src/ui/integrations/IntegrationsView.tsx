@@ -274,6 +274,7 @@ function RowDetail({ row, elementHref }: { row: IntegrationRow; elementHref: (id
 
 /** The plain "AI" tag after an endpoint that is an AI agent; nothing for any other element. */
 function AgentTagFor({ element }: { element: IntegrationRow['source'] }) {
+  // system-only: the AI-agent mark is a setting of a whole system.
   const mark = element.element_type === 'system' ? aiMarkOf(element) : null;
   return mark === null ? null : <AiTag mark={mark} />;
 }

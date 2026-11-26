@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { ElementsHeadRow, RelationshipsHeadRow } from '../contracts/rows';
 import type { MemberRole } from './types';
-import { deriveReviewerSet, ownerReviewerCandidates, pickArchitect } from './deriveReviewers';
+import { deriveReviewerSet, ownerReviewerCandidates, pickArchitect, touchedSystemLikeIds } from './deriveReviewers';
 
 function actor(id: string, memberId: string | null): ElementsHeadRow {
   return { element_id: id, element_type: 'actor', name: id, parent_id: null, attributes: memberId ? { memberId } : {}, exists_delta_id: `d-${id}` };
@@ -81,5 +81,17 @@ describe('deriveReviewerSet', () => {
   it('does not duplicate an architect who is already an owner', () => {
     const result = deriveReviewerSet([{ userId: 'u-arch', required: true }], 'u-arch');
     expect(result).toHaveLength(1);
+  });
+});
+
+describe('touchedSystemLikeIds', () => {
+  it('includes touched modules as well as systems, so a module\'s owners are asked to review (M2)', () => {
+    const subjects = [
+      { subjectType: 'element', subjectId: 's1', elementType: 'system' },
+      { subjectType: 'element', subjectId: 'm1', elementType: 'container' },
+      { subjectType: 'element', subjectId: 'c1', elementType: 'capability' },
+      { subjectType: 'relationship', subjectId: 'r1', elementType: null },
+    ];
+    expect(touchedSystemLikeIds(subjects)).toEqual(['s1', 'm1']);
   });
 });

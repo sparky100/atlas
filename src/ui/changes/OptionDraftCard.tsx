@@ -16,6 +16,7 @@ import { getDecisionOptionForBranch, getOptionApproachForBranch } from '../../db
 import { listCatalogueSources } from '../../db/productCatalogue';
 import styles from './OptionDraftCard.module.css';
 import { optionDraftActions, optionDraftLabel, type DraftSystem, type OptionDraftAction } from './optionDraftActions';
+import { isSystemLike } from '../../contracts/elementKinds';
 
 /** At most this many linked elements and supporters are read, so the lookups stay small (CLAUDE.md rule 8). */
 const MAX_IDS = 50;
@@ -42,12 +43,12 @@ export function OptionDraftCard({ branch, mainHeadCommitId, orgSlug, modelSlug }
         const links = (await listDecisionLinksForDecision(supabase, decision.id)).filter((l) => l.linked_type === 'element').slice(0, MAX_IDS);
         const linked = links.length > 0 ? await getElementsByIds(supabase, commitId, links.map((l) => l.linked_id)) : new Map<UUID, ElementsHeadRow>();
         const now = new Date();
-        const concernedSystems: DraftSystem[] = [...linked.values()].filter((e) => (e.element_type === 'system' || e.element_type === 'container') && lifecycleStateOf(e, linked, now) === 'active').map((e) => ({ id: e.element_id, name: e.name, module: e.element_type === 'container' }));
+        const concernedSystems: DraftSystem[] = [...linked.values()].filter((e) => isSystemLike(e) && lifecycleStateOf(e, linked, now) === 'active').map((e) => ({ id: e.element_id, name: e.name, module: e.element_type === 'container' }));
         const capabilities = [...linked.values()].filter((e) => e.element_type === 'capability');
         const edges = await listSupportsEdgesForCapabilities(supabase, commitId, capabilities.map((c) => c.element_id).slice(0, 20));
         const supporterIds = [...new Set(edges.map((e) => e.from_element_id))].slice(0, MAX_IDS);
         const supporters = supporterIds.length > 0 ? await getElementsByIds(supabase, commitId, supporterIds) : new Map<UUID, ElementsHeadRow>();
-        const supporterSystems: DraftSystem[] = [...supporters.values()].filter((e) => (e.element_type === 'system' || e.element_type === 'container') && lifecycleStateOf(e, supporters, now) === 'active').map((e) => ({ id: e.element_id, name: e.name, module: e.element_type === 'container' }));
+        const supporterSystems: DraftSystem[] = [...supporters.values()].filter((e) => isSystemLike(e) && lifecycleStateOf(e, supporters, now) === 'active').map((e) => ({ id: e.element_id, name: e.name, module: e.element_type === 'container' }));
         const approach = await getOptionApproachForBranch(supabase, branch.id);
         // A "Use <product>" option carries its product as a saved source: the replacement is that product.
         let product: string | null = null;

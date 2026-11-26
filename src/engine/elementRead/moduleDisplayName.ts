@@ -31,6 +31,7 @@ import { isIntegrationPlatform, isPlatform } from './systemKind';
 export function moduleDisplayName(element: ElementsHeadRow, parent: ElementsHeadRow | null): string {
   if (element.element_type !== 'container' || parent === null) return element.name;
   // ADR-026: an interface on an integration platform is named the same way ("MuleSoft · Reads API").
+  // system-only: a module's parent is always a platform system.
   return isPlatform(parent) || (parent.element_type === 'system' && isIntegrationPlatform(parent)) ? `${parent.name} · ${element.name}` : element.name;
 }
 

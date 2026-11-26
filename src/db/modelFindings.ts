@@ -31,6 +31,7 @@ export interface FindingInputs {
 /** Every finding's flagged elements, keyed as `FINDING_FILTER_OPTIONS` keys them. Pure. */
 export function computeFindings({ snapshot, facts, retiredByOpenChanges, now, staleAfterMonths }: FindingInputs): Map<string, readonly ElementsHeadRow[]> {
   const elements = snapshot.elements;
+  // system-only: systems and modules are kept as two lists here, and joined as `systemsAndModules` below.
   const systems = elements.filter((e) => e.element_type === 'system');
   const containers = elements.filter((e) => e.element_type === 'container');
   const capabilities = elements.filter((e) => e.element_type === 'capability');

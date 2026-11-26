@@ -17,6 +17,7 @@ import type { LifecycleStatus, UUID } from '../../contracts/delta';
 import type { ElementsHeadRow } from '../../contracts/rows';
 import { attributesRecord } from './attributesRecord';
 import { lifecycleStateFromDates } from './fitAndExposure';
+import { isSystemLike } from '../../contracts/elementKinds';
 
 export type LifecycleMismatchKind = 'active-not-yet-introduced' | 'planned-already-introduced' | 'active-past-end';
 
@@ -50,7 +51,7 @@ export function formatPlainDate(iso: string): string {
 
 /** The disagreement for one element, or `null` when its status and dates agree. `inheritedStatus` is the platform's status, read only when the element has none of its own. */
 export function lifecycleMismatchOf(element: ElementsHeadRow, inheritedStatus: unknown, now: Date, parent?: ElementsHeadRow | null): LifecycleMismatch | null {
-  if (element.element_type !== 'system' && element.element_type !== 'container') return null;
+  if (!isSystemLike(element)) return null;
   const attrs = attributesRecord(element.attributes);
   const status = typeof attrs.lifecycleStatus === 'string' ? attrs.lifecycleStatus : inheritedStatus;
   if (status !== 'active' && status !== 'planned') return null;

@@ -92,6 +92,7 @@ export interface BrowseRow {
 
 /** `parent` is only ever consulted for a `container` whose own value is unset — a `system` never has one to inherit from, and an already-set container value always wins over its parent's, matching `effectiveModuleAttributes`'s own precedence. Omitting `parent` (existing call sites that don't have one loaded) just means "no inheritance," same as before this function looked at containers at all. */
 export function lifecycleStatusOf(element: ElementsHeadRow, parent?: ElementsHeadRow | null): string | null {
+  // system-only: a system has no parent to inherit from; a module is handled in the branch below.
   if (element.element_type === 'system') {
     const value = attributesRecord(element.attributes).lifecycleStatus;
     return typeof value === 'string' ? value : null;
@@ -107,6 +108,7 @@ export function lifecycleStatusOf(element: ElementsHeadRow, parent?: ElementsHea
 
 /** See `lifecycleStatusOf`'s own doc comment — identical resolution, `criticality` in place of `lifecycleStatus`. */
 export function criticalityOf(element: ElementsHeadRow, parent?: ElementsHeadRow | null): string | null {
+  // system-only: a system has no parent to inherit from; a module is handled in the branch below.
   if (element.element_type === 'system') {
     const value = attributesRecord(element.attributes).criticality;
     return typeof value === 'string' ? value : null;

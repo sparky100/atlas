@@ -375,6 +375,7 @@ export function useElementPage(
       // "Platforms and modules": a platform's own children are its modules —
       // which capabilities they support, once per module.
       const loadModuleSupports = async (): Promise<{ edges: RelationshipsHeadRow[]; capabilities: Map<UUID, ElementsHeadRow> }> => {
+        // system-only: a platform is a whole system; its modules are the children loaded here.
         if (element.element_type !== 'system' || !isPlatform(element) || children.length === 0) return { edges: [], capabilities: new Map() };
         const perModuleRelationships = await Promise.all(children.map((module) => source.relationships(module.element_id)));
         const edges = perModuleRelationships.flat().filter((rel) => rel.relationship_type === 'supports');

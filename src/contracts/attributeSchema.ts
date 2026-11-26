@@ -500,6 +500,7 @@ export function defaultCreateAttributes(elementType: ElementType, context: { onM
       if (firstOption !== undefined) attributes[field.key] = firstOption;
     }
   }
+  // system-only: a new system starts active on the live model; a module inherits from its platform.
   if (elementType === 'system' && context.onMain) {
     attributes.lifecycleStatus = 'active';
   }

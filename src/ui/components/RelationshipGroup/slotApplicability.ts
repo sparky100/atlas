@@ -20,6 +20,7 @@ import type { Json } from '../../../contracts/rows';
  */
 export function isSlotApplicable(relationshipType: RelationshipType, direction: 'outbound' | 'inbound', elementType: ElementType, parentId: string | null, isPlatformKind = false): boolean {
   // A `platform`-kind system never supports a capability itself — its modules do (`relationshipTypeRules.ts`'s `(supports, container, capability)` row comment). Rows already recorded still show.
+  // system-only: a platform is a whole system; its modules do support capabilities.
   if (relationshipType === 'supports' && direction === 'outbound' && elementType === 'system' && isPlatformKind) return false;
   if (relationshipType === 'enables' && direction === 'inbound' && elementType === 'value_stream') return parentId !== null;
   return true;

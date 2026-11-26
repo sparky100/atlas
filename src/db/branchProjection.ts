@@ -136,6 +136,7 @@ export function projectionFactsForSubject(projection: HeadProjection, subjectId:
 
 /** Mirrors src/db/landscape.ts's `listSystemsForLandscape`, name-sorted to match. */
 export function projectionSystemsForLandscape(projection: HeadProjection): ElementsHeadRow[] {
+  // system-only: this lists whole systems for the landscape; modules are fetched separately.
   return projection.elementsHead.filter((e) => e.element_type === 'system').sort((a, b) => a.name.localeCompare(b.name));
 }
 
