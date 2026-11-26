@@ -160,6 +160,8 @@ export function ElementPage() {
   // from the URL afterward, so the link stays valid if revisited.
   const mergePrefill = parseMergePrefillFromSearchParams(searchParams);
   const sourcingPrefill = searchParams.get('sourcing');
+  const replacementText = (searchParams.get('replacement') ?? '').trim().slice(0, 200);
+  const replacementPrefill = replacementText === '' ? undefined : replacementText;
   const defaultSourcing = sourcingPrefill === 'product' || sourcingPrefill === 'custom_build' ? sourcingPrefill : undefined;
   // E7's own "Merge into…" — same inline-panel convention as `retiring`/
   // `removingFromModel` above.
@@ -505,6 +507,7 @@ export function ElementPage() {
                 searchCommitId={searchCommitId ?? state.data.commitId}
                 branch={editingBranch}
                 expectedHeadCommitId={state.data.commitId}
+                initialReplacementName={replacementPrefill}
                 onRetired={() => {
                   setRetiring(false);
                   reloadAfterCommit();

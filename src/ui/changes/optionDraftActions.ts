@@ -25,6 +25,8 @@ export interface OptionDraftAction {
   capabilityName: string | null;
   /** True for "Build ourselves": the replacement is a custom-built app, not a product. */
   custom?: boolean;
+  /** The product the option names (from its saved catalogue source); the replacement is created with this name. */
+  product?: string;
 }
 
 export interface DraftSystem {
@@ -34,12 +36,12 @@ export interface DraftSystem {
 
 const MAX_PER_KIND = 3;
 
-export function optionDraftActions(kind: OptionKind | null, concernedSystems: readonly DraftSystem[], supporters: readonly DraftSystem[], capabilityNames: readonly string[]): OptionDraftAction[] {
+export function optionDraftActions(kind: OptionKind | null, concernedSystems: readonly DraftSystem[], supporters: readonly DraftSystem[], capabilityNames: readonly string[], product: string | null = null): OptionDraftAction[] {
   const capability = capabilityNames[0] ?? null;
   const unique = (systems: readonly DraftSystem[]) => [...new Map(systems.map((s) => [s.id, s])).values()];
   switch (kind) {
     case 'buy':
-      return unique([...concernedSystems, ...supporters]).slice(0, MAX_PER_KIND).map((s): OptionDraftAction => ({ kind: 'retire-and-replace', systemId: s.id, systemName: s.name, capabilityName: capability }));
+      return unique([...concernedSystems, ...supporters]).slice(0, MAX_PER_KIND).map((s): OptionDraftAction => ({ kind: 'retire-and-replace', systemId: s.id, systemName: s.name, capabilityName: capability, ...(product === null ? {} : { product }) }));
     case 'configure':
       return capability === null ? [] : unique([...concernedSystems, ...supporters]).slice(0, MAX_PER_KIND).map((s): OptionDraftAction => ({ kind: 'extend', systemId: s.id, systemName: s.name, capabilityName: capability }));
     case 'build': {
@@ -57,7 +59,7 @@ export function optionDraftActions(kind: OptionKind | null, concernedSystems: re
 export function optionDraftLabel(action: OptionDraftAction): string {
   switch (action.kind) {
     case 'retire-and-replace':
-      return `Retire ${action.systemName} and replace it with ${action.custom ? 'a custom-built app' : 'a new system'}`;
+      return `Retire ${action.systemName} and replace it with ${action.product ?? (action.custom ? 'a custom-built app' : 'a new system')}`;
     case 'extend':
       return `Extend ${action.systemName} to cover ${action.capabilityName ?? 'this'}`;
     case 'create':

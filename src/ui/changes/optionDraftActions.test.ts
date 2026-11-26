@@ -41,4 +41,11 @@ describe('optionDraftActions', () => {
     const many = [1, 2, 3, 4, 5].map((n) => sys(n, `S${String(n)}`));
     expect(optionDraftActions('buy', many, [], ['C'])).toHaveLength(3);
   });
+
+  it('names the product a Use <product> option carries as the replacement', () => {
+    const actions = optionDraftActions('buy', [sys(1, 'Smallworld GIS')], [], ['Network Mapping'], 'Esri ArcGIS Utility Network');
+    expect(actions.map(optionDraftLabel)).toEqual(['Retire Smallworld GIS and replace it with Esri ArcGIS Utility Network']);
+    expect(actions[0]?.product).toBe('Esri ArcGIS Utility Network');
+    expect(optionDraftActions('buy', [sys(1, 'Smallworld GIS')], [], ['Network Mapping']).map(optionDraftLabel)).toEqual(['Retire Smallworld GIS and replace it with a new system']);
+  });
 });

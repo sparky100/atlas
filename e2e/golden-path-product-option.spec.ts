@@ -12,17 +12,19 @@
  * boundary is in productCatalogue.integration.test.ts.
  */
 import { expect, test, type Page } from '@playwright/test';
-import { goToModelHome, seedStarterCapabilityMap, signUpCreateOrgAndModel } from './fixtures/goldenPath';
+import { addSystemFromHome, goToModelHome, seedStarterCapabilityMap, signUpCreateOrgAndModel } from './fixtures/goldenPath';
 import { optionSurface } from './fixtures/decisionLayout';
 
 /** The search dialog, as a user at this width opens it (same as golden-path-search-and-landscape-find). */
 async function openSearch(page: Page): Promise<void> {
   const nav = page.getByRole('navigation', { name: 'Model navigation' });
   if ((page.viewportSize()?.width ?? 1280) > 768) {
+    // Control+K toggles, so press again only while the dialog is still closed.
+    const dialog = page.getByRole('dialog', { name: 'Search' });
     await expect(async () => {
-      await page.keyboard.press('Control+K');
-      await expect(page.getByRole('dialog', { name: 'Search' })).toBeVisible({ timeout: 1_500 });
-    }).toPass({ timeout: 10_000 });
+      if (!(await dialog.isVisible())) await page.keyboard.press('Control+K');
+      await expect(dialog).toBeVisible({ timeout: 3_000 });
+    }).toPass({ timeout: 20_000 });
     return;
   }
   await nav.getByRole('button', { name: /^More/ }).click();
@@ -126,4 +128,46 @@ test('choosing Buy starts a product decision with the need, outcome and products
   await expect(page.getByTestId('decision-next-step')).toContainText('Choosing the product');
   await page.getByTestId('decision-next-step').getByRole('button', { name: 'Open the product decision' }).click();
   await expect(page.getByRole('heading', { name: 'Which product for: Buy a quoting product?' })).toBeVisible();
+});
+
+/** Simon, 2026-11-26: the product is placed on the change as the replacement, so nothing is drawn by hand. */
+test('working on a Use <product> option offers to retire the current system and create that product as its replacement', async ({ page }) => {
+  test.slow();
+  await signUpCreateOrgAndModel(page, 'productreplaces');
+  await seedStarterCapabilityMap(page, /^Electricity Network Operator$/);
+  await goToModelHome(page);
+  await addSystemFromHome(page, { name: 'Legacy Quote Tool', description: 'Issues connection quotes.', capabilityName: 'Connection Quotations' });
+  await goToModelHome(page);
+
+  await openSearch(page);
+  await page.getByLabel('Search elements, changes, decisions and projects').fill('Connection Quotations');
+  await page.getByRole('option', { name: /Connection Quotations/ }).first().click();
+  await page.getByRole('button', { name: 'Element actions' }).click();
+  await page.getByRole('link', { name: 'Start a decision…' }).click();
+  await page.getByRole('button', { name: 'Start decision' }).click();
+  await expect(page.getByTestId('decision-outcome')).toBeVisible();
+
+  // The products list appears once the decision has a Buy option.
+  await page.getByRole('button', { name: '+ Add an option' }).click();
+  await page.getByRole('radio', { name: 'Buy a product', exact: true }).check();
+  await page.getByPlaceholder("What's this option? (e.g. Replace with Workday)").fill('Buy a quoting product');
+  await page.getByRole('button', { name: 'Add option' }).click();
+  await expect(optionSurface(page, 'Buy a quoting product')).toBeVisible();
+  const product = page.getByTestId('capability-products').getByRole('listitem').filter({ hasText: 'Salesforce Energy and Utilities Cloud' }).first();
+  await product.getByRole('button', { name: 'Make it an option' }).click();
+  await expect(product.getByText('Added a new option: Use Salesforce Energy and Utilities Cloud.')).toBeVisible();
+  await optionSurface(page, 'Use Salesforce Energy and Utilities Cloud').getByRole('button', { name: 'Work on this option' }).click();
+  await expect(page).toHaveURL(/\/changes\//);
+  const draftLink = page.getByRole('link', { name: "Draft this option's changes" });
+  if (await draftLink.count() > 0) await draftLink.click();
+
+  const card = page.getByTestId('option-draft-card');
+  const link = card.getByRole('link', { name: 'Retire Legacy Quote Tool and replace it with Salesforce Energy and Utilities Cloud' });
+  await expect(link).toBeVisible();
+  expect(await page.evaluate(() => document.documentElement.scrollWidth > document.documentElement.clientWidth + 1)).toBe(false);
+  await link.click();
+  await expect(page).toHaveURL(/action=retire/);
+  // The product's name is already in the "create new" step; the person sets the date and confirms.
+  await expect(page.getByLabel('New system name')).toHaveValue('Salesforce Energy and Utilities Cloud');
+  await expect(page.getByLabel('Planned end', { exact: true })).toBeVisible();
 });

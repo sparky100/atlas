@@ -11,7 +11,8 @@ import { LinkButton } from '../components/Button/LinkButton';
 import { Text } from '../components/Text/Text';
 import { reportError } from '../errors/errorBannerStore';
 import { supabase } from '../supabaseClient';
-import { getOptionApproachForBranch } from '../../db/decisionOptions';
+import { getDecisionOptionForBranch, getOptionApproachForBranch } from '../../db/decisionOptions';
+import { listCatalogueSources } from '../../db/productCatalogue';
 import { optionDraftActions, optionDraftLabel, type DraftSystem } from './optionDraftActions';
 
 /** At most this many linked elements and supporters are read, so the lookups stay small (CLAUDE.md rule 8). */
@@ -42,7 +43,15 @@ export function OptionDraftCard({ branch, mainHeadCommitId, orgSlug, modelSlug }
         const supporterIds = [...new Set(edges.map((e) => e.from_element_id))].slice(0, MAX_IDS);
         const supporters = supporterIds.length > 0 ? await getElementsByIds(supabase, commitId, supporterIds) : new Map<UUID, ElementsHeadRow>();
         const supporterSystems: DraftSystem[] = [...supporters.values()].filter((e) => lifecycleStateOf(e, supporters, now) === 'active').map((e) => ({ id: e.element_id, name: e.name }));
-        return optionDraftActions(await getOptionApproachForBranch(supabase, branch.id), concernedSystems, supporterSystems, capabilities.map((c) => c.name));
+        const approach = await getOptionApproachForBranch(supabase, branch.id);
+        // A "Use <product>" option carries its product as a saved source: the replacement is that product.
+        let product: string | null = null;
+        if (approach === 'buy') {
+          const option = await getDecisionOptionForBranch(supabase, decision.id, branch.id);
+          const sources = option === null ? [] : (await listCatalogueSources(supabase, decision.id)).filter((r) => r.option_id === option.id);
+          product = sources.length === 1 ? (sources[0]?.snapshot.product ?? null) : null;
+        }
+        return optionDraftActions(approach, concernedSystems, supporterSystems, capabilities.map((c) => c.name), product);
       } catch (e) {
         reportError("Couldn't read what this option's decision concerns.", e);
         throw e;
@@ -61,7 +70,7 @@ export function OptionDraftCard({ branch, mainHeadCommitId, orgSlug, modelSlug }
         {data.map((action) => (
           <LinkButton
             key={`${action.kind}-${action.systemId ?? 'new'}`}
-            to={action.systemId === null ? `${base}?${ref}&add=system` : `${base}/e/${action.systemId}?${ref}&action=${action.kind === 'extend' ? 'edit' : 'retire'}${action.kind !== 'extend' && action.custom ? '&sourcing=custom_build' : ''}`}
+            to={action.systemId === null ? `${base}?${ref}&add=system` : `${base}/e/${action.systemId}?${ref}&action=${action.kind === 'extend' ? 'edit' : 'retire'}${action.kind !== 'extend' && action.custom ? '&sourcing=custom_build' : ''}${action.kind === 'retire-and-replace' && action.product ? `&sourcing=product&replacement=${encodeURIComponent(action.product)}` : ''}`}
             variant="secondary"
           >
             {optionDraftLabel(action)}
