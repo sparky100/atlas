@@ -1,4 +1,5 @@
 import type { OptionApproach } from '../../contracts/optionApproach';
+import { readSupporter, uncertaintyText, type EstateSupporter, type SupporterReading } from './estateUncertainty';
 
 /**
  * Starting points for a decision's options, read from what Atlas already holds
@@ -14,19 +15,29 @@ export interface OptionSuggestion {
   approach: OptionApproach;
   /** Why this one is suggested, in plain words. */
   reason: string;
+  /** What the model records and does not record about the system; `null` for Buy and Build, which nothing we run backs. */
+  reading: SupporterReading | null;
+  /** The reason plus the known and not-recorded lines, saved as the option's text when this starting point is added. */
+  text: string;
 }
 
 const MAX_SYSTEMS = 5;
 
-export function suggestOptions(capabilityNames: readonly string[], supporterNames: readonly string[]): OptionSuggestion[] {
+export function suggestOptions(capabilityNames: readonly string[], supporters: readonly EstateSupporter[], now: Date = new Date()): OptionSuggestion[] {
   const subject = capabilityNames.length === 1 ? (capabilityNames[0] ?? 'this') : 'these capabilities';
   const out: OptionSuggestion[] = [];
-  const unique = [...new Set(supporterNames)].sort((a, b) => a.localeCompare(b));
-  for (const name of unique.slice(0, MAX_SYSTEMS)) {
-    out.push({ title: `Extend ${name} to cover this`, approach: 'configure', reason: `${name} already supports ${subject}.` });
+  const byName = new Map<string, EstateSupporter>();
+  for (const s of supporters) if (!byName.has(s.name)) byName.set(s.name, s);
+  const unique = [...byName.values()].sort((a, b) => a.name.localeCompare(b.name));
+  for (const supporter of unique.slice(0, MAX_SYSTEMS)) {
+    const reason = `${supporter.name} already supports ${subject}.`;
+    const reading = readSupporter(supporter, now);
+    out.push({ title: `Extend ${supporter.name} to cover this`, approach: 'configure', reason, reading, text: uncertaintyText(reason, reading) });
   }
-  out.push({ title: 'Buy or adopt a new product', approach: 'buy', reason: 'A product we do not run yet may meet it.' });
-  out.push({ title: 'Build it ourselves', approach: 'build', reason: 'A custom build is always an option to weigh.' });
+  const buy = 'A product we do not run yet may meet it.';
+  const build = 'A custom build is always an option to weigh.';
+  out.push({ title: 'Buy or adopt a new product', approach: 'buy', reason: buy, reading: null, text: uncertaintyText(buy, null) });
+  out.push({ title: 'Build it ourselves', approach: 'build', reason: build, reading: null, text: uncertaintyText(build, null) });
   return out;
 }
 

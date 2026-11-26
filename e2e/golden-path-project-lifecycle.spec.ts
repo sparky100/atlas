@@ -62,6 +62,8 @@ test('project lifecycle: start from a finding, decide inside it, deliver the cho
   // Starting points read from the model (no AI): the person adds one, edits it, or ignores them.
   const suggestions = page.getByTestId('option-suggestions');
   await expect(suggestions.getByText('no AI', { exact: false })).toBeVisible();
+  // Estate check: nothing we run supports Housing Repairs, so Buy and Build say plainly they are a judgement.
+  await expect(suggestions.getByTestId('estate-reading').first()).toContainText('Nothing we run is checked for this option; it is a judgement.');
   await suggestions.getByRole('button', { name: 'Build it ourselves' }).click();
   await expect(page.getByLabel("What's this option?")).toHaveValue('Build it ourselves');
   await page.getByRole('button', { name: 'Cancel', exact: true }).click();
