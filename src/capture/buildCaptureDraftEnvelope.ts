@@ -22,9 +22,9 @@
  *    duplicate PR2's own job and cut across the `src/capture` layering.
  *    `ambiguous` resolves against `match`'s own best hit (`draftSubjectId`
  *    is already that), same shape as a plain `update` from here down.
- *  - `gone` (re-import only, PR9): system → one `element.update`
- *    `lifecycleStatus = 'retired'`; any other element type →
- *    `element.retract`. `GONE_CONFIDENCE` always (K-14) — the retirement
+ *  - `gone` (re-import only, PR9): system or module → one `element.update`
+ *    `lifecycleStatus = 'retired'` (Model rule M2; Simon, 2026-11-26); any
+ *    other element type → `element.retract`. `GONE_CONFIDENCE` always (K-14) — the retirement
  *    is an inference from absence, not a document-stated fact with its
  *    own per-attribute confidence, so `proposal` is never consulted here.
  *  - `invalid` / `unsourced`: no deltas (§4.4 — these never reach this
@@ -60,6 +60,7 @@ import { formatSourceRef } from '../contracts/sourceRef';
 import type { Head } from '../engine/deltas';
 import { factMapKey } from '../engine/deltas';
 import { GONE_CONFIDENCE, matchConfidenceFor, updateConf } from './confidence';
+import { isSystemLikeType } from '../contracts/elementKinds';
 
 export class CaptureDraftEnvelopeError extends Error {}
 
@@ -189,8 +190,7 @@ export function buildCaptureDraftEnvelope(input: BuildCaptureDraftEnvelopeInput)
       const subjectId = requireDraftSubjectId(candidate, "a 'gone' candidate");
       const elementType = candidate.elementType;
       const existsDeltaId = requireExistsDeltaId(mainHead, 'element', subjectId, candidate.seq);
-      // system-only: SPEC-capture K-14: a gone system is retired by lifecycle; every other type, a module included, is retracted. Whether a gone module should be retired too is open.
-      if (elementType === 'system') {
+      if (isSystemLikeType(elementType)) {
         const previousDeltaId = mainHead.facts.get(factMapKey(subjectId, 'lifecycleStatus'))?.deltaId ?? existsDeltaId;
         deltas.push({
           kind: 'element.update',

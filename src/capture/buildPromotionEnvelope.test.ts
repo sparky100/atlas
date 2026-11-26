@@ -173,12 +173,21 @@ describe('buildPromotionEnvelope — gone', () => {
     expect(deltas).toEqual([expect.objectContaining({ kind: 'element.update', elementId: 'sys', attribute: 'lifecycleStatus', value: 'retired', previousDeltaId: targetExistsDeltaId, confidence: 0.5, sourceId: DRAFT_SOURCE_ID })]);
   });
 
-  it('accepted on a container: retract, confidence 0.50', () => {
-    const draftHead = headFrom([createElement('draft-retract', 'mod', 'container', 'PM', 'sap', SYSTEM_ATTRS, DRAFT_SOURCE_ID)]);
+  it('accepted on a module: lifecycleStatus update like a system, confidence 0.50 (M2)', () => {
+    const draftHead = headFrom([createElement('draft-retire', 'mod', 'container', 'PM', 'sap', SYSTEM_ATTRS, DRAFT_SOURCE_ID)]);
     const targetHead = headFrom([createElement('target-sap', 'sap', 'system', 'SAP', null, SYSTEM_ATTRS), createElement('target-mod', 'mod', 'container', 'PM', 'sap', SYSTEM_ATTRS)]);
     const c = candidate({ seq: 0, class: 'gone', elementType: 'container', draftSubjectId: 'mod', decision: 'accepted', proposal: { kind: 'element', elementType: 'container', name: 'PM', parent: null, attributes: {} } });
     const { deltas } = buildPromotionEnvelope({ candidates: [c], draftHead, targetHead, reviewerSourceId: REVIEWER_SOURCE_ID, mintId });
-    expect(deltas).toEqual([expect.objectContaining({ kind: 'element.retract', elementId: 'mod', confidence: 0.5 })]);
+    expect(deltas).toEqual([expect.objectContaining({ kind: 'element.update', elementId: 'mod', attribute: 'lifecycleStatus', value: 'retired', confidence: 0.5, sourceId: DRAFT_SOURCE_ID })]);
+    expect(() => fold(cloneHead(targetHead), deltas, ctx)).not.toThrow();
+  });
+
+  it('accepted on any other type (an actor): retract, confidence 0.50', () => {
+    const draftHead = headFrom([createElement('draft-retract', 'act', 'actor', 'Finance team', null, {}, DRAFT_SOURCE_ID)]);
+    const targetHead = headFrom([createElement('target-act', 'act', 'actor', 'Finance team', null, {})]);
+    const c = candidate({ seq: 0, class: 'gone', elementType: 'actor', draftSubjectId: 'act', decision: 'accepted', proposal: { kind: 'element', elementType: 'actor', name: 'Finance team', parent: null, attributes: {} } });
+    const { deltas } = buildPromotionEnvelope({ candidates: [c], draftHead, targetHead, reviewerSourceId: REVIEWER_SOURCE_ID, mintId });
+    expect(deltas).toEqual([expect.objectContaining({ kind: 'element.retract', elementId: 'act', confidence: 0.5 })]);
     expect(() => fold(cloneHead(targetHead), deltas, ctx)).not.toThrow();
   });
 

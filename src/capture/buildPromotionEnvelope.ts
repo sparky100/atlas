@@ -64,6 +64,7 @@ import type { CandidateDecisionDetail, CandidateRef, CaptureCandidate } from '..
 import { EXISTS_ATTRIBUTE, type Delta, type Json, type UUID } from '../contracts/delta';
 import { factMapKey, type FactRow, type Head } from '../engine/deltas';
 import { GONE_CONFIDENCE, matchConfidenceFor } from './confidence';
+import { isSystemLikeType } from '../contracts/elementKinds';
 
 /**
  * `seq` (every throw site already computes it — this just stops discarding
@@ -273,8 +274,7 @@ export function buildPromotionEnvelope(input: BuildPromotionEnvelopeInput): Buil
       if (subjectId === undefined) throw new BuildPromotionEnvelopeError(seq, `seq ${String(seq)}: internal — 'gone' candidate has no promoted subject id`);
       const existsDeltaId = requireExistsDeltaIdOnTarget(targetHead, 'element', subjectId, seq, `'gone' candidate ${subjectId}`);
       const draftSubjectId = candidate.draftSubjectId ?? subjectId;
-      // system-only: SPEC-capture K-14: a gone system is retired by lifecycle; every other type, a module included, is retracted. Whether a gone module should be retired too is open.
-      if (elementType === 'system') {
+      if (isSystemLikeType(elementType)) {
         const attribute = 'lifecycleStatus';
         const previousDeltaId = targetHead.facts.get(factMapKey(subjectId, attribute))?.deltaId ?? existsDeltaId;
         const provenance = { ...provenanceFromDraftFact(draftFact(draftHead, draftSubjectId, attribute), seq, `${subjectId}.${attribute}`), confidence: GONE_CONFIDENCE };
