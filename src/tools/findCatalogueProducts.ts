@@ -46,6 +46,7 @@ export const findCatalogueProducts = defineTool({
     }
     const products = catalogue.entries.map((entry) => ({
       entryCode: entry.code,
+      catalogueRef: catalogueRefFor(entry.citation, entry.code),
       product: entry.product,
       vendor: entry.vendor,
       summary: entry.summary,
@@ -61,7 +62,6 @@ export const findCatalogueProducts = defineTool({
       ctx,
       {
         capability: { id: element.element_id, name: displayNameOf(index, element), code: catalogue.capabilityCode },
-        catalogue: { sector: catalogue.sector, version: catalogue.catalogueVersion },
         products,
         note: 'Reviewed candidates from the published catalogue, not a recommendation or a procurement decision.',
       },
@@ -73,8 +73,8 @@ export const findCatalogueProducts = defineTool({
 export interface CatalogueProductRef { sector: string; version: number; entryCode: string }
 
 /** The citation a model should use for one product in this answer. */
-export function catalogueRefFor(catalogue: { sector: string; catalogueVersion: number }, entryCode: string): CatalogueProductRef {
-  return { sector: catalogue.sector, version: catalogue.catalogueVersion, entryCode };
+export function catalogueRefFor(citation: { sector: string; version: number }, entryCode: string): CatalogueProductRef {
+  return { sector: citation.sector, version: citation.version, entryCode };
 }
 
 export const catalogueRefKey = (ref: CatalogueProductRef): string => `${ref.sector}\u0000${String(ref.version)}\u0000${ref.entryCode}`;

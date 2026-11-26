@@ -5,7 +5,7 @@
  * line instead. No AI switch or key is needed.
  */
 import { useQuery } from '@tanstack/react-query';
-import { capabilityMapMatch, currentCatalogue, listCurrentCatalogueEntriesForCapability, type CatalogueEntry } from '../../db/productCatalogue';
+import { capabilityMapMatch, listCurrentCatalogueEntriesForCapability, type CitableCatalogueEntry } from '../../db/productCatalogue';
 import { ProductInModelNote } from '../decisions/ProductInModelNote';
 import { useModelElementNames } from '../decisions/useModelElementNames';
 import type { ModelElementName } from '../decisions/productInModel';
@@ -17,7 +17,7 @@ import { supabase } from '../supabaseClient';
 import { catalogueAsOf, formatCatalogueDate as formatDate, sourceDomain } from './capabilityProductsText';
 import styles from './CapabilityProducts.module.css';
 
-function Entry({ entry, citation, makeOption, modelElements }: { entry: CatalogueEntry; citation: { sector: string; version: number } | null; makeOption: MakeProductOptionProps | undefined; modelElements: readonly ModelElementName[] }) {
+function Entry({ entry, makeOption, modelElements }: { entry: CitableCatalogueEntry; makeOption: MakeProductOptionProps | undefined; modelElements: readonly ModelElementName[] }) {
   const asOf = catalogueAsOf(entry);
   return (
     <li className={styles.entry}>
@@ -42,9 +42,9 @@ function Entry({ entry, citation, makeOption, modelElements }: { entry: Catalogu
         </ul>
       </details>
       <Text as="p" size="xs" tone="muted">Check with the vendor before relying on it.</Text>
-      {makeOption !== undefined && citation !== null && (
+      {makeOption !== undefined && (
         <MakeProductOption
-          product={{ product: entry.product, vendor: entry.vendor, summary: entry.summary, sector: citation.sector, version: citation.version, entryCode: entry.code }}
+          product={{ product: entry.product, vendor: entry.vendor, summary: entry.summary, sector: entry.citation.sector, version: entry.citation.version, entryCode: entry.code }}
           optionTitles={makeOption.optionTitles}
           onMake={makeOption.onMake}
         />
@@ -70,12 +70,6 @@ export function CapabilityProducts({ templateRef, title = 'Products that can sup
     enabled: match.data !== null && match.data !== undefined,
     queryFn: () => (match.data ? listCurrentCatalogueEntriesForCapability(supabase, { sector: match.data.sector, capabilityCode: match.data.capabilityCode }) : Promise.resolve([])),
   });
-  const catalogue = useQuery({
-    queryKey: ['currentCatalogue', match.data?.sector ?? ''],
-    enabled: makeOption !== undefined && match.data !== null && match.data !== undefined,
-    queryFn: () => (match.data ? currentCatalogue(supabase, match.data.sector) : Promise.resolve(null)),
-  });
-  const citation = match.data && catalogue.data ? { sector: match.data.sector, version: catalogue.data.version } : null;
 
   if (templateRef === null) {
     return (
@@ -92,7 +86,7 @@ export function CapabilityProducts({ templateRef, title = 'Products that can sup
           Reviewed products from the published catalogue, for a replacement or build option. They are candidates, not a procurement decision.
         </Text>
         <ul className={styles.list}>
-          {entries.data.map((entry) => <Entry modelElements={modelElements} key={entry.id} entry={entry} citation={citation} makeOption={makeOption} />)}
+          {entries.data.map((entry) => <Entry modelElements={modelElements} key={entry.id} entry={entry} makeOption={makeOption} />)}
         </ul>
       </CollapsibleSection>
     </Panel>

@@ -101,9 +101,10 @@ export function createToolContext(supabase: Client, model: { id: UUID; name: str
           const match = (await capabilityMapMatch(supabase, templateRef))
             ?? (code === null ? null : await publishedCapabilityMatchForModel(supabase, model.id, code));
           if (!match) return null;
-          const catalogue = await currentCatalogue(supabase, match.sector);
-          if (!catalogue) return null;
-          return { ...match, catalogueVersion: catalogue.version, entries: await listCurrentCatalogueEntriesForCapability(supabase, match) };
+          const entries = await listCurrentCatalogueEntriesForCapability(supabase, match);
+          // Nothing published for this capability and no sector catalogue either: say there is no catalogue, rather than "no products".
+          if (entries.length === 0 && !(await currentCatalogue(supabase, match.sector))) return null;
+          return { ...match, entries };
         })();
         catalogues.set(key, lookup);
       }

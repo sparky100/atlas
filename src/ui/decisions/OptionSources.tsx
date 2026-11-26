@@ -1,4 +1,4 @@
-import type { OptionCatalogueSource, OptionSource } from '../../contracts/optionSource';
+import { citationLabel, type OptionCatalogueSource, type OptionSource } from '../../contracts/optionSource';
 import { CollapsibleSection } from '../components/CollapsibleSection/CollapsibleSection';
 import { Text } from '../components/Text/Text';
 import { MakeProductOption, type MakeProductOptionProps } from './MakeProductOption';
@@ -9,11 +9,11 @@ import styles from './OptionSources.module.css';
 function standingText(source: OptionCatalogueSource): string {
   switch (source.standing) {
     case 'current':
-      return `current in catalogue v${String(source.version)}`;
+      return `current in ${citationLabel(source)}`;
     case 'replaced':
-      return `saved from catalogue v${String(source.version)}, which has since been replaced`;
+      return `saved from ${citationLabel(source)}, which has since been replaced`;
     case 'withdrawn':
-      return `saved from catalogue v${String(source.version)}, now withdrawn`;
+      return `saved from ${citationLabel(source)}, now withdrawn`;
   }
 }
 

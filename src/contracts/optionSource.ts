@@ -72,3 +72,8 @@ export interface OptionWebSourceRow {
   checked_by: string | null;
   checked_at: string | null;
 }
+
+/** What a saved citation names, in words: "product revision 3" for a product published on its own, otherwise "catalogue v1". */
+export function citationLabel(source: { sector: string; version: number }): string {
+  return source.sector === 'product' ? `product revision ${String(source.version)}` : `catalogue v${String(source.version)}`;
+}

@@ -5,6 +5,7 @@ import { productCatalogueContentSchema } from '../contracts/productCatalogue';
 import type { Client } from './client';
 import { queryInChunks } from './inFilterLimit';
 import { listOptionWebSources } from './optionWebSources';
+import { listPublishedProductsForCapability } from './publishedProducts';
 
 export type { CatalogueStanding };
 
@@ -141,6 +142,26 @@ export interface CatalogueEntry {
   claims: CatalogueClaim[];
 }
 
+/**
+ * A product the user can cite, with the citation that would be saved for it.
+ * A published product revision cites as sector 'product', its revision number
+ * and the product's code (20261126240000); a sector catalogue entry cites as
+ * its sector, catalogue version and entry code.
+ */
+export interface CitableCatalogueEntry extends CatalogueEntry {
+  citation: { sector: string; version: number };
+}
+
+/** The sector name a citation to a published product revision carries. Not a sector. */
+export const PRODUCT_CITATION_SECTOR = 'product';
+
+/** What stands for a citation in a map of standings. A product's version is its own revision number, so its code is part of the key. */
+export function citationStandingKey(citation: { sector: string; version: number; entryCode?: string }): string {
+  return citation.sector === PRODUCT_CITATION_SECTOR
+    ? `${citation.sector}\u0000${String(citation.version)}\u0000${citation.entryCode ?? ''}`
+    : `${citation.sector}\u0000${String(citation.version)}`;
+}
+
 export interface CitedCatalogueEntry extends CatalogueEntry {
   sector: string;
   version: number;
@@ -152,26 +173,48 @@ export interface CitedCatalogueEntry extends CatalogueEntry {
   newerVersion: number | null;
 }
 
-/** The live standing of every cited catalogue, so saved citations can be marked without one query per source. */
-export async function catalogueStandingByCitation(client: Client, citations: readonly { sector: string; version: number }[]): Promise<Map<string, CatalogueStanding>> {
-  const sectors = [...new Set(citations.map((c) => c.sector))];
-  if (sectors.length === 0) return new Map();
-  const rows = await queryInChunks<string, { sector: string; version: number; status: 'draft' | 'published'; withdrawn_at: string | null }>('catalogueStandingByCitation', 'sector', sectors, (chunk) =>
-    client.from('product_catalogues').select('sector, version, status, withdrawn_at').in('sector', chunk),
-  );
-  const currentVersion = new Map<string, number>();
-  for (const row of rows) {
-    if (row.status !== 'published' || row.withdrawn_at !== null) continue;
-    if ((currentVersion.get(row.sector) ?? 0) < row.version) currentVersion.set(row.sector, row.version);
-  }
+/** The live standing of every cited catalogue or product revision, so saved citations can be marked without one query per source. */
+export async function catalogueStandingByCitation(client: Client, citations: readonly { sector: string; version: number; entryCode?: string }[]): Promise<Map<string, CatalogueStanding>> {
   const standing = new Map<string, CatalogueStanding>();
-  for (const citation of citations) {
-    const row = rows.find((r) => r.sector === citation.sector && r.version === citation.version);
-    // A published catalogue cannot be deleted. If it cannot be read at all, treat the saved citation as no longer current rather than presenting it as current.
-    const value: CatalogueStanding = row?.withdrawn_at !== null
-      ? 'withdrawn'
-      : (currentVersion.get(citation.sector) ?? 0) > citation.version ? 'replaced' : 'current';
-    standing.set(`${citation.sector}\u0000${String(citation.version)}`, value);
+  const sectorCitations = citations.filter((c) => c.sector !== PRODUCT_CITATION_SECTOR);
+  const productCitations = citations.filter((c) => c.sector === PRODUCT_CITATION_SECTOR);
+  const sectors = [...new Set(sectorCitations.map((c) => c.sector))];
+  if (sectors.length > 0) {
+    const rows = await queryInChunks<string, { sector: string; version: number; status: 'draft' | 'published'; withdrawn_at: string | null }>('catalogueStandingByCitation', 'sector', sectors, (chunk) =>
+      client.from('product_catalogues').select('sector, version, status, withdrawn_at').in('sector', chunk),
+    );
+    const currentVersion = new Map<string, number>();
+    for (const row of rows) {
+      if (row.status !== 'published' || row.withdrawn_at !== null) continue;
+      if ((currentVersion.get(row.sector) ?? 0) < row.version) currentVersion.set(row.sector, row.version);
+    }
+    for (const citation of sectorCitations) {
+      const row = rows.find((r) => r.sector === citation.sector && r.version === citation.version);
+      // A published catalogue cannot be deleted. If it cannot be read at all, treat the saved citation as no longer current rather than presenting it as current.
+      const value: CatalogueStanding = row?.withdrawn_at !== null
+        ? 'withdrawn'
+        : (currentVersion.get(citation.sector) ?? 0) > citation.version ? 'replaced' : 'current';
+      standing.set(citationStandingKey(citation), value);
+    }
+  }
+  const codes = [...new Set(productCitations.map((c) => c.entryCode ?? ''))].filter((code) => code !== '');
+  if (codes.length > 0) {
+    const revisions = await queryInChunks<string, { code: string; revision: number; withdrawn_at: string | null; superseded_at: string | null }>('catalogueStandingByCitation', 'code', codes, (chunk) =>
+      client.from('catalogue_product_revisions').select('code, revision, withdrawn_at, superseded_at').in('code', chunk),
+    );
+    for (const citation of productCitations) {
+      const code = citation.entryCode ?? '';
+      const cited = revisions.find((r) => r.code === code && r.revision === citation.version);
+      let value: CatalogueStanding;
+      if (cited?.withdrawn_at !== null) value = 'withdrawn';
+      else if (cited.superseded_at === null) value = 'current';
+      else {
+        // Replaced only if the newer revision is itself published; a product whose newer revision was withdrawn is no longer published at all.
+        const newer = revisions.some((r) => r.code === code && r.revision > citation.version && r.withdrawn_at === null && r.superseded_at === null);
+        value = newer ? 'replaced' : 'withdrawn';
+      }
+      standing.set(citationStandingKey(citation), value);
+    }
   }
   return standing;
 }
@@ -190,7 +233,7 @@ export function optionSourcesFromRows(rows: readonly OptionCatalogueSourceRow[],
     vendor: row.snapshot.vendor,
     summary: row.snapshot.summary,
     licence: row.snapshot.licence,
-    standing: standingByCitation.get(`${row.catalogue_sector}\u0000${String(row.catalogue_version)}`) ?? 'withdrawn',
+    standing: standingByCitation.get(citationStandingKey({ sector: row.catalogue_sector, version: row.catalogue_version, entryCode: row.entry_code })) ?? 'withdrawn',
     citedBy: row.cited_by,
     citedAt: row.cited_at,
     claims: row.snapshot.claims,
@@ -201,7 +244,7 @@ export function optionSourcesFromRows(rows: readonly OptionCatalogueSourceRow[],
 export async function listOptionSources(client: Client, decisionId: string): Promise<OptionSource[]> {
   const [rows, web] = await Promise.all([listCatalogueSources(client, decisionId), listOptionWebSources(client, decisionId)]);
   if (rows.length === 0) return web;
-  const standing = await catalogueStandingByCitation(client, rows.map((r) => ({ sector: r.catalogue_sector, version: r.catalogue_version })));
+  const standing = await catalogueStandingByCitation(client, rows.map((r) => ({ sector: r.catalogue_sector, version: r.catalogue_version, entryCode: r.entry_code })));
   return [...optionSourcesFromRows(rows, standing), ...web];
 }
 
@@ -293,8 +336,8 @@ async function claimsForEntries(client: Client, entryIds: readonly string[]): Pr
   return byEntry;
 }
 
-/** Current published entries that support this capability code, with their claims. */
-export async function listCurrentCatalogueEntriesForCapability(client: Client, match: { sector: string; capabilityCode: string }): Promise<CatalogueEntry[]> {
+/** Published sector-catalogue entries only (the history kept from before products were published on their own). */
+async function listSectorCatalogueEntriesForCapability(client: Client, match: { sector: string; capabilityCode: string }): Promise<CitableCatalogueEntry[]> {
   const catalogue = await currentCatalogue(client, match.sector);
   if (!catalogue) return [];
   const links = await client.from('catalogue_entry_capabilities').select('entry_id, how_it_supports').eq('capability_code', match.capabilityCode);
@@ -307,8 +350,38 @@ export async function listCurrentCatalogueEntriesForCapability(client: Client, m
   );
   const howByEntry = new Map(linkRows.map((l) => [l.entry_id, l.how_it_supports]));
   const claims = await claimsForEntries(client, entryRows.map((e) => e.id));
-  return entryRows
-    .map((e) => ({ id: e.id, code: e.code, product: e.product, vendor: e.vendor, summary: e.summary, howItSupports: howByEntry.get(e.id) ?? '', claims: claims.get(e.id) ?? [] }))
+  return entryRows.map((e) => ({
+    id: e.id, code: e.code, product: e.product, vendor: e.vendor, summary: e.summary, howItSupports: howByEntry.get(e.id) ?? '', claims: claims.get(e.id) ?? [],
+    citation: { sector: match.sector, version: catalogue.version },
+  }));
+}
+
+/** The same product, whichever list it came from: vendor and product name, ignoring case and spacing. */
+const productIdentity = (entry: { vendor: string; product: string }): string => `${entry.vendor.trim().toLowerCase()}\u0000${entry.product.trim().toLowerCase()}`;
+
+/**
+ * Current published products that support this capability, each with the
+ * citation to save for it (step 4b-2). Products published on their own come
+ * first and win; an entry from a sector catalogue that is the same product is
+ * not listed a second time. A product that is only in a sector catalogue
+ * (electricity v1, until it is re-published as a product) keeps showing from it.
+ */
+export async function listCurrentCatalogueEntriesForCapability(client: Client, match: { sector: string; capabilityCode: string }): Promise<CitableCatalogueEntry[]> {
+  const [published, sector] = await Promise.all([
+    listPublishedProductsForCapability(client, match),
+    listSectorCatalogueEntriesForCapability(client, match),
+  ]);
+  return mergeCatalogueEntries(published.map((p) => ({
+    id: p.revisionId, code: p.code, product: p.product, vendor: p.vendor, summary: p.summary, howItSupports: p.howItSupports,
+    claims: p.claims.map((c) => ({ statement: c.statement, kind: c.kind, sourceUrl: c.sourceUrl, sourceDate: c.sourceDate, reviewedBy: c.reviewedBy, reviewedAt: c.reviewedAt })),
+    citation: { sector: PRODUCT_CITATION_SECTOR, version: p.revision },
+  })), sector);
+}
+
+/** Pure: products published on their own first; a sector entry that is the same product is dropped; sorted by product name. */
+export function mergeCatalogueEntries(fromProducts: readonly CitableCatalogueEntry[], fromSectors: readonly CitableCatalogueEntry[]): CitableCatalogueEntry[] {
+  const seen = new Set(fromProducts.map(productIdentity));
+  return [...fromProducts, ...fromSectors.filter((entry) => !seen.has(productIdentity(entry)))]
     .sort((a, b) => a.product.localeCompare(b.product));
 }
 
@@ -322,7 +395,7 @@ export async function currentCatalogueEntriesForCapabilityElement(
   client: Client,
   modelId: string,
   attributes: unknown,
-): Promise<CatalogueEntry[]> {
+): Promise<CitableCatalogueEntry[]> {
   if (typeof attributes !== 'object' || attributes === null || Array.isArray(attributes)) return [];
   const attrs = attributes as Record<string, unknown>;
   const templateRef = typeof attrs.templateRef === 'string' && attrs.templateRef.trim() !== '' ? attrs.templateRef : null;
@@ -334,26 +407,17 @@ export async function currentCatalogueEntriesForCapabilityElement(
 }
 
 /**
- * The same products, with the catalogue sector and version each would be
- * cited from, so they can be saved as an option's source. Empty when the
- * capability has no starter-map link or its sector has no published catalogue.
+ * The same products, with the citation each would be saved under, so they can
+ * be saved as an option's source. Empty when the capability has no starter-map
+ * link or nothing is published for it.
  */
 export async function citableCatalogueProductsForCapabilityElement(
   client: Client,
   modelId: string,
   attributes: unknown,
 ): Promise<{ sector: string; version: number; entry: CatalogueEntry }[]> {
-  if (typeof attributes !== 'object' || attributes === null || Array.isArray(attributes)) return [];
-  const attrs = attributes as Record<string, unknown>;
-  const templateRef = typeof attrs.templateRef === 'string' && attrs.templateRef.trim() !== '' ? attrs.templateRef : null;
-  const code = typeof attrs.code === 'string' && attrs.code.trim() !== '' ? attrs.code.trim() : '';
-  const match = templateRef !== null ? await capabilityMapMatch(client, templateRef) : null;
-  const resolved = match ?? (code !== '' ? await publishedCapabilityMatchForModel(client, modelId, code) : null);
-  if (resolved === null) return [];
-  const catalogue = await currentCatalogue(client, resolved.sector);
-  if (!catalogue) return [];
-  const entries = await listCurrentCatalogueEntriesForCapability(client, { sector: resolved.sector, capabilityCode: resolved.capabilityCode });
-  return entries.map((entry) => ({ sector: resolved.sector, version: catalogue.version, entry }));
+  const entries = await currentCatalogueEntriesForCapabilityElement(client, modelId, attributes);
+  return entries.map((entry) => ({ sector: entry.citation.sector, version: entry.citation.version, entry }));
 }
 
 /** One entry by the citation stored on an option or a pack, with its standing. */
