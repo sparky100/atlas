@@ -26,3 +26,34 @@ export function assertInFilterSize(context: string, column: string, values: read
     );
   }
 }
+
+/**
+ * Runs an `.in()` query over an id list of any length by splitting it into
+ * pieces of at most `MAX_IN_FILTER_VALUES`, one request per piece, and
+ * joining the rows. Use it where the list cannot be replaced by a model or
+ * catalogue scope filter (a table with no such column). Every piece is
+ * checked with `assertInFilterSize` first. Rows from different pieces are
+ * simply joined, so do not rely on one overall order; a caller that sorts
+ * must sort the joined rows itself.
+ */
+export async function queryInChunks<Value, Row>(
+  context: string,
+  column: string,
+  values: readonly Value[],
+  run: (chunk: Value[]) => PromiseLike<{ data: unknown; error: { message: string } | null }>,
+): Promise<Row[]> {
+  const pieces: Value[][] = [];
+  for (let i = 0; i < values.length; i += MAX_IN_FILTER_VALUES) pieces.push(values.slice(i, i + MAX_IN_FILTER_VALUES));
+  const results = await Promise.all(
+    pieces.map((piece) => {
+      assertInFilterSize(context, column, piece);
+      return run(piece);
+    }),
+  );
+  const rows: Row[] = [];
+  for (const result of results) {
+    if (result.error) throw new Error(`${context}: ${result.error.message}`);
+    rows.push(...((result.data as Row[] | null) ?? []));
+  }
+  return rows;
+}

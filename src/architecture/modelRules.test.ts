@@ -128,27 +128,15 @@ describe('A2: cost is removed at one place before anything reaches an AI, the AP
 });
 
 describe('build rule 8: an .in() over a growing id list is size-checked', () => {
-  // Baseline, 2026-11-26: files that already filter on an id list with no size check. Each is a
-  // finding to review (is the list bounded by something other than model size?) and then either
-  // guard or justify. New files do not get added here: they call assertInFilterSize.
-  const REVIEWED: Record<string, string> = {
-    'src/db/catalogueAdmin.ts': 'entry ids of one catalogue draft; not yet reviewed against a large catalogue',
-    'src/db/decisions.ts': 'bounded by the caller: element ids capped at 3 (see the comment at the call)',
-    'src/db/modelShares.ts': 'model, organisation and tag ids from one viewer\'s shares; not yet reviewed against many shares',
-    'src/db/productCatalogue.ts': 'entry ids of one catalogue; not yet reviewed against a large catalogue',
-  };
-
-  it('every file that filters on an id list calls assertInFilterSize, chunks it, or is reviewed', () => {
+  it('every file that filters on an id list calls assertInFilterSize or splits the list (queryInChunks)', () => {
     const offenders: string[] = [];
     for (const path of [...appFiles, ...functionFiles]) {
       const text = withoutComments(read(path));
       const calls = [...text.matchAll(/\.in\(\s*['"`](\w+)['"`]/g)].filter((m) => /(^id$|_id$|_ids$)/.test(m[1] ?? ''));
       if (calls.length === 0) continue;
       const safe = /assertInFilterSize|MAX_IN|chunk/i.test(text);
-      if (!safe && !(rel(path) in REVIEWED)) offenders.push(`${rel(path)}: ${[...new Set(calls.map((m) => m[1]))].join(', ')}`);
+      if (!safe) offenders.push(`${rel(path)}: ${[...new Set(calls.map((m) => m[1]))].join(', ')}`);
     }
-    const stale = Object.keys(REVIEWED).filter((f) => !offenders.length && !appFiles.map(rel).includes(f));
-    expect(stale).toEqual([]);
     expect(offenders, 'Call assertInFilterSize before an .in() over ids that grow with the model, or chunk it (src/db/inFilterLimit.ts).').toEqual([]);
   });
 });

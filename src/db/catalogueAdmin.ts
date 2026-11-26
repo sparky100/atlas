@@ -18,6 +18,7 @@ import {
   type CatalogueVersionSummary,
 } from '../contracts/catalogueAdmin';
 import type { Client } from './client';
+import { queryInChunks } from './inFilterLimit';
 
 interface ProductRow {
   id: string;
@@ -212,14 +213,15 @@ export async function listCatalogueEntries(client: Client, catalogueId: UUID): P
   const rows = (entries.data as { id: string; code: string; product: string; vendor: string; summary: string }[] | null) ?? [];
   if (rows.length === 0) return [];
   const ids = rows.map((row) => row.id);
-  const [links, claims] = await Promise.all([
-    client.from('catalogue_entry_capabilities').select('entry_id,capability_code,capability_name,how_it_supports').in('entry_id', ids),
-    client.from('catalogue_claims').select('entry_id,position,kind,statement,source_url,source_date,reviewed_by,reviewed_at').in('entry_id', ids).order('position'),
+  // A catalogue can hold many entries and these two tables have no catalogue column to filter on, so the entry ids go in pieces of at most 50 (build rule 8).
+  const [linkRows, claimRows] = await Promise.all([
+    queryInChunks<string, { entry_id: string; capability_code: string; capability_name: string; how_it_supports: string }>('listCatalogueEntries', 'entry_id', ids, (chunk) =>
+      client.from('catalogue_entry_capabilities').select('entry_id,capability_code,capability_name,how_it_supports').in('entry_id', chunk),
+    ),
+    queryInChunks<string, { entry_id: string; position: number; kind: string; statement: string; source_url: string; source_date: string; reviewed_by: string; reviewed_at: string }>('listCatalogueEntries', 'entry_id', ids, (chunk) =>
+      client.from('catalogue_claims').select('entry_id,position,kind,statement,source_url,source_date,reviewed_by,reviewed_at').in('entry_id', chunk).order('position'),
+    ),
   ]);
-  if (links.error) throw new Error(`listCatalogueEntries: ${links.error.message}`);
-  if (claims.error) throw new Error(`listCatalogueEntries: ${claims.error.message}`);
-  const linkRows = (links.data as { entry_id: string; capability_code: string; capability_name: string; how_it_supports: string }[] | null) ?? [];
-  const claimRows = (claims.data as { entry_id: string; kind: string; statement: string; source_url: string; source_date: string; reviewed_by: string; reviewed_at: string }[] | null) ?? [];
   return rows.map((row) => ({
     ...row,
     capabilities: linkRows.filter((link) => link.entry_id === row.id)

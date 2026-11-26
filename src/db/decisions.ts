@@ -13,6 +13,7 @@
  */
 import { assertRealId } from './assertRealId';
 import type { Client } from './client';
+import { assertInFilterSize } from './inFilterLimit';
 import { selectAll } from './selectAll';
 import type { DecisionApprovalLens, DecisionApprovalRow, DecisionApprovalVerdict, DecisionArgumentRow, DecisionPackRow, DecisionLinkedType, DecisionLinkRow, DecisionRow } from './types';
 import type { UUID } from '../contracts/delta';
@@ -229,6 +230,7 @@ export interface ElementDecisionLink {
 
 export async function listDecisionsLinkingElements(supabase: Client, elementIds: readonly UUID[]): Promise<ElementDecisionLink[]> {
   if (elementIds.length === 0) return [];
+  assertInFilterSize('listDecisionsLinkingElements', 'linked_id', elementIds);
   // Two plain queries rather than a postgrest embed: `decision_links` is a
   // polymorphic link (SPEC §3.8) — `linked_id` has no FK to embed through
   // at all, and even `decision_id`'s own real FK to `decisions(id)` isn't

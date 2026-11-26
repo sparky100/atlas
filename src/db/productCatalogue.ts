@@ -3,6 +3,7 @@ import type { CatalogueCitation, CatalogueSnapshot, ProductCatalogueContent, Pro
 import type { OptionSource } from '../contracts/optionSource';
 import { productCatalogueContentSchema } from '../contracts/productCatalogue';
 import type { Client } from './client';
+import { queryInChunks } from './inFilterLimit';
 import { listOptionWebSources } from './optionWebSources';
 
 export type { CatalogueStanding };
@@ -155,12 +156,9 @@ export interface CitedCatalogueEntry extends CatalogueEntry {
 export async function catalogueStandingByCitation(client: Client, citations: readonly { sector: string; version: number }[]): Promise<Map<string, CatalogueStanding>> {
   const sectors = [...new Set(citations.map((c) => c.sector))];
   if (sectors.length === 0) return new Map();
-  const { data, error } = await client
-    .from('product_catalogues')
-    .select('sector, version, status, withdrawn_at')
-    .in('sector', sectors);
-  if (error) throw new Error(`catalogueStandingByCitation: ${error.message}`);
-  const rows = (data as { sector: string; version: number; status: 'draft' | 'published'; withdrawn_at: string | null }[] | null) ?? [];
+  const rows = await queryInChunks<string, { sector: string; version: number; status: 'draft' | 'published'; withdrawn_at: string | null }>('catalogueStandingByCitation', 'sector', sectors, (chunk) =>
+    client.from('product_catalogues').select('sector, version, status, withdrawn_at').in('sector', chunk),
+  );
   const currentVersion = new Map<string, number>();
   for (const row of rows) {
     if (row.status !== 'published' || row.withdrawn_at !== null) continue;
@@ -226,9 +224,8 @@ export async function templateSectorsForModel(client: Client, modelId: string): 
   if (sources.error) throw new Error(`templateSectorsForModel: ${sources.error.message}`);
   const ids = [...new Set(((sources.data as { capability_map_id: string | null }[] | null) ?? []).flatMap((s) => (s.capability_map_id === null ? [] : [s.capability_map_id])))];
   if (ids.length === 0) return [];
-  const maps = await client.from('capability_maps').select('sector').in('id', ids);
-  if (maps.error) throw new Error(`templateSectorsForModel: ${maps.error.message}`);
-  return [...new Set(((maps.data as { sector: string }[] | null) ?? []).map((m) => m.sector))];
+  const maps = await queryInChunks<string, { sector: string }>('templateSectorsForModel', 'id', ids, (chunk) => client.from('capability_maps').select('sector').in('id', chunk));
+  return [...new Set(maps.map((m) => m.sector))];
 }
 
 /** A capability code's item in the current published map for one sector. Codes are stable across map versions; item ids are not. */
@@ -284,13 +281,11 @@ export async function currentCatalogue(client: Client, sector: string): Promise<
 async function claimsForEntries(client: Client, entryIds: readonly string[]): Promise<Map<string, CatalogueClaim[]>> {
   const byEntry = new Map<string, CatalogueClaim[]>();
   if (entryIds.length === 0) return byEntry;
-  const { data, error } = await client
-    .from('catalogue_claims')
-    .select('entry_id, statement, kind, source_url, source_date, reviewed_by, reviewed_at, position')
-    .in('entry_id', entryIds)
-    .order('position', { ascending: true });
-  if (error) throw new Error(`claimsForEntries: ${error.message}`);
-  for (const row of (data as { entry_id: string; statement: string; kind: CatalogueClaim['kind']; source_url: string; source_date: string; reviewed_by: string; reviewed_at: string }[] | null) ?? []) {
+  // Pieces of at most 50 ids (build rule 8). Each entry's claims all come from one piece, so their order by position is kept.
+  const data = await queryInChunks<string, { entry_id: string; statement: string; kind: CatalogueClaim['kind']; source_url: string; source_date: string; reviewed_by: string; reviewed_at: string }>('claimsForEntries', 'entry_id', entryIds, (chunk) =>
+    client.from('catalogue_claims').select('entry_id, statement, kind, source_url, source_date, reviewed_by, reviewed_at, position').in('entry_id', chunk).order('position', { ascending: true }),
+  );
+  for (const row of data) {
     const list = byEntry.get(row.entry_id) ?? [];
     list.push({ statement: row.statement, kind: row.kind, sourceUrl: row.source_url, sourceDate: row.source_date, reviewedBy: row.reviewed_by, reviewedAt: row.reviewed_at });
     byEntry.set(row.entry_id, list);
@@ -307,9 +302,9 @@ export async function listCurrentCatalogueEntriesForCapability(client: Client, m
   const linkRows = (links.data as { entry_id: string; how_it_supports: string }[] | null) ?? [];
   if (linkRows.length === 0) return [];
   const entryIds = linkRows.map((l) => l.entry_id);
-  const entries = await client.from('catalogue_entries').select('id, code, product, vendor, summary').eq('catalogue_id', catalogue.id).in('id', entryIds);
-  if (entries.error) throw new Error(`listCurrentCatalogueEntriesForCapability: ${entries.error.message}`);
-  const entryRows = (entries.data as { id: string; code: string; product: string; vendor: string; summary: string }[] | null) ?? [];
+  const entryRows = await queryInChunks<string, { id: string; code: string; product: string; vendor: string; summary: string }>('listCurrentCatalogueEntriesForCapability', 'id', entryIds, (chunk) =>
+    client.from('catalogue_entries').select('id, code, product, vendor, summary').eq('catalogue_id', catalogue.id).in('id', chunk),
+  );
   const howByEntry = new Map(linkRows.map((l) => [l.entry_id, l.how_it_supports]));
   const claims = await claimsForEntries(client, entryRows.map((e) => e.id));
   return entryRows
