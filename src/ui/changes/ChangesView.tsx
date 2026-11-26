@@ -534,7 +534,7 @@ function ChangeRow({
           </ul>
         )}
       </div>
-      <LinkButton to={`/o/${orgSlug}/m/${modelSlug}/changes/${branch.id}`} variant="secondary">
+      <LinkButton to={`/o/${orgSlug}/m/${modelSlug}/changes/${branch.id}`} variant="secondary" className={styles.rowAction}>
         Open →
       </LinkButton>
     </li>

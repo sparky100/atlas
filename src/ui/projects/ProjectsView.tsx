@@ -275,7 +275,7 @@ function ProjectRowItem({ project, orgSlug, modelSlug }: { project: ProjectRow; 
           )}
         </div>
       </div>
-      <LinkButton to={`/o/${orgSlug}/m/${modelSlug}/projects/${project.id}`} variant="secondary" aria-label={`Open ${project.title}`}>
+      <LinkButton to={`/o/${orgSlug}/m/${modelSlug}/projects/${project.id}`} variant="secondary" className={styles.rowAction} aria-label={`Open ${project.title}`}>
         Open →
       </LinkButton>
     </li>

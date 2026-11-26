@@ -91,6 +91,11 @@
   min-width: 0;
 }
 
+.rowAction {
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
 .rowMeta {
   display: flex;
   align-items: center;
