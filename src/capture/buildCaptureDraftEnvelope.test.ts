@@ -250,12 +250,21 @@ describe('buildCaptureDraftEnvelope — gone (K-14)', () => {
     expect(() => fold(cloneHead(mainHead), envelope.deltas, ctx)).not.toThrow();
   });
 
-  it('a non-system element (e.g. a container) retracts outright, confidence 0.50', () => {
+  it("a module retires via element.update lifecycleStatus='retired', like a system, confidence 0.50 (M2)", () => {
     const mainHead = headFrom([createElement('d-sap', 'sap', 'system', 'SAP', null, SYSTEM_ATTRS), createElement('d-mod', 'mod', 'container', 'PM', 'sap', SYSTEM_ATTRS)]);
-    const existsDeltaId = mainHead.elements.get('mod')?.existsDeltaId;
+    const priorDeltaId = mainHead.facts.get(factMapKey('mod', 'lifecycleStatus'))?.deltaId ?? mainHead.elements.get('mod')?.existsDeltaId;
     const c = candidate({ seq: 0, class: 'gone', elementType: 'container', draftSubjectId: 'mod', proposal: { kind: 'element', elementType: 'container', name: 'PM', parent: null, attributes: {} } });
     const { envelope } = buildCaptureDraftEnvelope({ ...BASE_INPUT, mainHead, candidates: [c], mintId });
-    expect(envelope.deltas).toEqual([expect.objectContaining({ kind: 'element.retract', elementId: 'mod', previousDeltaId: existsDeltaId, confidence: 0.5 })]);
+    expect(envelope.deltas).toEqual([expect.objectContaining({ kind: 'element.update', elementId: 'mod', attribute: 'lifecycleStatus', value: 'retired', previousDeltaId: priorDeltaId, confidence: 0.5 })]);
+    expect(() => fold(cloneHead(mainHead), envelope.deltas, ctx)).not.toThrow();
+  });
+
+  it('any other element type (e.g. an actor) retracts outright, confidence 0.50', () => {
+    const mainHead = headFrom([createElement('d-act', 'act', 'actor', 'Finance team', null, {})]);
+    const existsDeltaId = mainHead.elements.get('act')?.existsDeltaId;
+    const c = candidate({ seq: 0, class: 'gone', elementType: 'actor', draftSubjectId: 'act', proposal: { kind: 'element', elementType: 'actor', name: 'Finance team', parent: null, attributes: {} } });
+    const { envelope } = buildCaptureDraftEnvelope({ ...BASE_INPUT, mainHead, candidates: [c], mintId });
+    expect(envelope.deltas).toEqual([expect.objectContaining({ kind: 'element.retract', elementId: 'act', previousDeltaId: existsDeltaId, confidence: 0.5 })]);
     expect(() => fold(cloneHead(mainHead), envelope.deltas, ctx)).not.toThrow();
   });
 
