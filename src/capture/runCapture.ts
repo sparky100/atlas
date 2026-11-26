@@ -96,6 +96,7 @@ import { diffAgainstPreviousImport, type PreviousCandidateForDiff } from './reim
 import { isRelationshipsSheet, relationshipSheetToCandidates } from './relationshipSheetToCandidates';
 import { elementRowKey, relationshipRowKey } from './rowKey';
 import { applyRequiredDefaults, rowsToCandidates, type CapabilityColumnRow, type RowCandidate } from './rowsToCandidates';
+import { isSystemLike } from '../contracts/elementKinds';
 
 export class RunCaptureError extends Error {}
 
@@ -326,6 +327,7 @@ function resolveTextRef(text: string, expectedTypes: readonly ElementType[], run
   return null;
 }
 
+// system-only: an integration platform is a whole system.
 const INTEGRATION_PLATFORM_FILTER = (elementType: ElementType, attributes: Record<string, unknown>): boolean => elementType === 'system' && attributes.kind === 'integration_platform';
 
 /**
@@ -986,7 +988,7 @@ function inferChangeTargetType(name: string, matchIndex: MatchIndex): ElementTyp
   const normalised = normaliseName(name);
   const aliasHit = matchIndex.aliasByNormalisedValue.get(normalised);
   const aliasElement = aliasHit ? matchIndex.elements.get(aliasHit.elementId) : undefined;
-  if (aliasElement?.element_type === 'system' || aliasElement?.element_type === 'container') return aliasElement.element_type;
+  if (aliasElement !== undefined && isSystemLike(aliasElement)) return aliasElement.element_type;
   for (const type of ['system', 'container'] as const) {
     if ((matchIndex.elementsByType.get(type) ?? []).some((el) => normaliseName(el.name) === normalised)) return type;
   }

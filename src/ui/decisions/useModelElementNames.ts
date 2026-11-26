@@ -20,6 +20,7 @@ export function useModelElementNames(modelId: UUID | null): ModelElementName[] {
       const pool = await loadSearchPoolForTypes(supabase, commitId, modelId, ['system', 'container']);
       const byId = new Map(pool.map((p) => [p.element.element_id, p.element]));
       return pool.flatMap(({ element }): ModelElementName[] => {
+        // system-only: this narrows the type to system or module for `type` below; the pool is already only those two.
         if (element.element_type !== 'system' && element.element_type !== 'container') return [];
         const parent = element.parent_id === null ? undefined : byId.get(element.parent_id);
         return [{ id: element.element_id, name: element.name, type: element.element_type, platformName: parent?.name ?? null }];

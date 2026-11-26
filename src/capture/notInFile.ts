@@ -38,5 +38,6 @@ export function computeNotInFile(systems: readonly ElementsHeadRow[], containers
     ...systems.map((s): NotInFileElement => ({ elementId: s.element_id, name: s.name, elementType: 'system' })),
     ...containers.filter((c) => c.parent_id !== null && platformIds.has(c.parent_id)).map((c): NotInFileElement => ({ elementId: c.element_id, name: c.name, elementType: 'container' })),
   ];
+  // system-only: lists whole systems before their modules.
   return candidates.filter((c) => !touchedElementIds.has(c.elementId)).sort((a, b) => (a.elementType === b.elementType ? a.name.localeCompare(b.name) : a.elementType === 'system' ? -1 : 1));
 }

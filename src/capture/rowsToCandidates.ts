@@ -44,6 +44,7 @@ import { normaliseName } from './normalise';
 import { looksLikePersonName, parseBool, parseDate, parseDisposition, parseEmail, parseHostingModel, parseLifecycle, parseName, parseOwnerCell } from './normaliseValue';
 import { extractDataRows, type CellMeta, type RawSheet } from './parse/sheetGrid';
 import type { ColumnRole } from './columnSynonyms';
+import { isSystemLikeType } from '../contracts/elementKinds';
 
 export interface RowCandidate {
   seq: number;
@@ -244,12 +245,13 @@ function actorGroupKey(name: string): string {
 
 /** §5.4's two defaults, applied only when the document didn't state the value at all — shared by every extractor (sheet rows here; prose in `extractProse.ts`, PR11), since §5.4 sits after both §5.2 and §5.3 in the spec and states no per-extractor scope. */
 export function applyRequiredDefaults(elementType: ElementType, attributes: Record<string, unknown>, attributeConfidence: Record<string, number>, attributeRefs: Record<string, SourceRef>, rowRange: SourceRef): void {
+  // system-only: a new system starts active; a module inherits its lifecycle from its platform.
   if (elementType === 'system' && attributes.lifecycleStatus === undefined) {
     attributes.lifecycleStatus = 'active';
     attributeConfidence.lifecycleStatus = DEFAULTED_ATTRIBUTE_CONFIDENCE;
     attributeRefs.lifecycleStatus = rowRange;
   }
-  if ((elementType === 'system' || elementType === 'container') && attributes.isExternal === undefined) {
+  if (isSystemLikeType(elementType) && attributes.isExternal === undefined) {
     attributes.isExternal = false;
     attributeConfidence.isExternal = DEFAULTED_ATTRIBUTE_CONFIDENCE;
     attributeRefs.isExternal = rowRange;

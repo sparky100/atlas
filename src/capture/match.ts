@@ -25,6 +25,7 @@ import type { MatchOutcome } from '../contracts/capture';
 import type { ElementsHeadRow } from '../contracts/rows';
 import { normaliseName } from './normalise';
 import type { MatchIndex } from './matchIndex';
+import { isSystemLikeType } from '../contracts/elementKinds';
 
 /**
  * §7.4: system/actor carry no parent context at all; container/capability
@@ -54,6 +55,7 @@ const AMBIGUOUS_MARGIN = 0.05;
 const MAX_AMBIGUOUS = 5;
 
 function contextMatches(elementType: ElementType, context: MatchContext, candidate: ElementsHeadRow): boolean {
+  // system-only: a system and an actor are top-level, so the parent context does not apply; a module's context is its platform.
   if (elementType === 'system' || elementType === 'actor') return true;
   if (context === TOP_LEVEL_CONTEXT) return candidate.parent_id === null;
   return candidate.parent_id === context;
@@ -73,6 +75,7 @@ function contextMatches(elementType: ElementType, context: MatchContext, candida
  * (nothing in Prompt B's own taxonomy could produce that confusion).
  */
 function crossTypeFallback(elementType: ElementType): ElementType | null {
+  // system-only: one half of the system/module pair; the next line is the other half.
   if (elementType === 'system') return 'container';
   if (elementType === 'container') return 'system';
   return null;
@@ -201,7 +204,7 @@ export function matchElement(input: MatchElementInput, index: MatchIndex): Match
   // the same pair `crossTypeFallback` covers — a document's own inline
   // "Platform Module" habit is a name-composition mistake about the same
   // two types, never `capability`/`actor`.
-  if (input.elementType === 'system' || input.elementType === 'container') {
+  if (isSystemLikeType(input.elementType)) {
     const prefixed = resolvePlatformPrefixed(input.name, index);
     if (prefixed) {
       const { resolvedParentId, ...outcome } = prefixed;

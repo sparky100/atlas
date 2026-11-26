@@ -370,6 +370,7 @@ export async function extractProseChunk(input: ExtractProseChunkInput): Promise<
     return normalised !== '' && brief.includes(` ${normalised} `);
   };
   const elements = isChangeBrief
+    // system-only: a change brief names whole systems; a module is named through its platform.
     ? result.data.elements.filter((element) => element.elementType === 'system' && element.parentName === null && mentions(element.name))
     : result.data.elements;
   const relationships = isChangeBrief
