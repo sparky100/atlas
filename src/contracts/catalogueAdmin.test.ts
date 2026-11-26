@@ -18,6 +18,16 @@ describe('catalogue admin contracts', () => {
     expect(catalogueProductContentSchema.safeParse({ ...product, claims: [{ ...claim, reviewedAt: '2026-11-22' }] }).success).toBe(false);
   });
 
+  it('accepts shared capability links, once each, and nothing else on them', () => {
+    const id = '33333333-3333-4333-8333-333333333333';
+    const link = { capabilityId: id, howItSupports: 'Runs the general ledger' };
+    expect(catalogueProductContentSchema.safeParse({ ...product, generalCapabilities: [link], claims: [claim] }).success).toBe(true);
+    expect(catalogueProductContentSchema.safeParse({ ...product, claims: [claim] }).success).toBe(true);
+    expect(catalogueProductContentSchema.safeParse({ ...product, generalCapabilities: [link, link], claims: [claim] }).success).toBe(false);
+    expect(catalogueProductContentSchema.safeParse({ ...product, generalCapabilities: [{ ...link, capabilityId: 'not-an-id' }], claims: [claim] }).success).toBe(false);
+    expect(catalogueProductContentSchema.safeParse({ ...product, generalCapabilities: [{ ...link, extra: 1 }], claims: [claim] }).success).toBe(false);
+  });
+
   it('refuses a claim source that is not a public HTTPS link', () => {
     expect(catalogueProductContentSchema.safeParse({ ...product, claims: [{ ...claim, sourceUrl: 'http://example.com/a' }] }).success).toBe(false);
     expect(catalogueProductContentSchema.safeParse({ ...product, claims: [{ ...claim, sourceUrl: 'https://user:pw@example.com/a' }] }).success).toBe(false);

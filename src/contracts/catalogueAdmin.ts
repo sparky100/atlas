@@ -16,6 +16,7 @@ export const CATALOGUE_PRODUCT_LIMITS = {
   vendor: 120,
   summary: 500,
   capabilities: 200,
+  generalCapabilities: 60,
   claims: 200,
   title: 120,
   sourceDescription: 1000,
@@ -30,6 +31,26 @@ export const catalogueProductCapabilitySchema = z.object({
   howItSupports: text(300),
 }).strict();
 export type CatalogueProductCapability = z.infer<typeof catalogueProductCapabilitySchema>;
+
+/**
+ * A link to a shared capability (ADR-036): one of the general capabilities
+ * that every sector set carries with the same meaning. One link makes the
+ * product apply in every sector whose set aligns to that capability.
+ */
+export const catalogueProductGeneralCapabilitySchema = z.object({
+  capabilityId: z.uuid(),
+  howItSupports: text(300),
+}).strict();
+export type CatalogueProductGeneralCapability = z.infer<typeof catalogueProductGeneralCapabilitySchema>;
+
+/** A shared capability the picker offers, with the code it has in current sector sets. */
+export interface GeneralCapabilityOption {
+  capabilityId: string;
+  code: string;
+  name: string;
+  definition: string;
+  level: number;
+}
 
 /**
  * What the editor sends for one claim. There is no reviewer here on purpose:
@@ -70,10 +91,13 @@ export const catalogueProductContentSchema = z.object({
   vendor: text(CATALOGUE_PRODUCT_LIMITS.vendor),
   summary: text(CATALOGUE_PRODUCT_LIMITS.summary),
   capabilities: z.array(catalogueProductCapabilitySchema).max(CATALOGUE_PRODUCT_LIMITS.capabilities),
+  generalCapabilities: z.array(catalogueProductGeneralCapabilitySchema).max(CATALOGUE_PRODUCT_LIMITS.generalCapabilities).optional(),
   claims: z.array(catalogueProductClaimSchema).max(CATALOGUE_PRODUCT_LIMITS.claims),
 }).strict().superRefine((value, ctx) => {
   const links = new Set(value.capabilities.map((link) => `${link.capabilityMapId}\u0000${link.capabilityCode}`));
   if (links.size !== value.capabilities.length) ctx.addIssue({ code: 'custom', message: 'A capability can appear only once for a product' });
+  const shared = value.generalCapabilities ?? [];
+  if (new Set(shared.map((link) => link.capabilityId)).size !== shared.length) ctx.addIssue({ code: 'custom', message: 'A shared capability can appear only once for a product' });
   const positions = new Set(value.claims.map((claim) => claim.position));
   if (positions.size !== value.claims.length) ctx.addIssue({ code: 'custom', message: 'Claim positions must be unique' });
 });
@@ -111,6 +135,8 @@ export interface CatalogueProductSummary {
   revision: number;
   updatedAt: string;
   capabilityCount: number;
+  /** Links to shared capabilities (every sector). Counted apart from sector links. */
+  sharedCapabilityCount: number;
   capabilitySetCount: number;
   claimCount: number;
   claimsWaitingForReview: number;

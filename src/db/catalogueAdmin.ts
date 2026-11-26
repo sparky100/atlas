@@ -16,6 +16,7 @@ import {
   type CatalogueProductContent,
   type CatalogueProductRow,
   type CatalogueProductSummary,
+  type GeneralCapabilityOption,
   type CatalogueVersionSummary,
   type ClaimOrigin,
   type ClaimReviewState,
@@ -69,12 +70,14 @@ export interface CatalogueProductDetail {
 }
 
 export async function listCatalogueProducts(client: Client): Promise<CatalogueProductSummary[]> {
-  const [products, links, claims] = await Promise.all([
+  const [products, links, claims, shared] = await Promise.all([
     client.from('catalogue_products').select('id,code,product,vendor,summary,edit_revision,created_at,updated_at').order('product'),
     client.from('catalogue_product_capabilities').select('product_id,capability_map_id'),
     client.from('catalogue_product_claims').select('product_id,review_state'),
+    client.from('catalogue_product_general_links').select('product_id'),
   ]);
   if (products.error) throw new Error(`listCatalogueProducts: ${products.error.message}`);
+  if (shared.error) throw new Error(`listCatalogueProducts: ${shared.error.message}`);
   if (links.error) throw new Error(`listCatalogueProducts: ${links.error.message}`);
   if (claims.error) throw new Error(`listCatalogueProducts: ${claims.error.message}`);
 
@@ -89,6 +92,10 @@ export async function listCatalogueProducts(client: Client): Promise<CataloguePr
     const byMap = countsByMap.get(row.product_id) ?? {};
     byMap[row.capability_map_id] = (byMap[row.capability_map_id] ?? 0) + 1;
     countsByMap.set(row.product_id, byMap);
+  }
+  const sharedCount = new Map<string, number>();
+  for (const row of (shared.data as { product_id: string }[] | null) ?? []) {
+    sharedCount.set(row.product_id, (sharedCount.get(row.product_id) ?? 0) + 1);
   }
   const claimCount = new Map<string, number>();
   const waitingCount = new Map<string, number>();
@@ -106,6 +113,7 @@ export async function listCatalogueProducts(client: Client): Promise<CataloguePr
     revision: row.edit_revision,
     updatedAt: row.updated_at,
     capabilityCount: capabilityCount.get(row.id) ?? 0,
+    sharedCapabilityCount: sharedCount.get(row.id) ?? 0,
     capabilitySetCount: sets.get(row.id)?.size ?? 0,
     claimCount: claimCount.get(row.id) ?? 0,
     claimsWaitingForReview: waitingCount.get(row.id) ?? 0,
@@ -114,13 +122,16 @@ export async function listCatalogueProducts(client: Client): Promise<CataloguePr
 }
 
 export async function readCatalogueProduct(client: Client, productId: UUID): Promise<CatalogueProductDetail> {
-  const [product, links, claims] = await Promise.all([
+  const [product, links, claims, shared] = await Promise.all([
     client.from('catalogue_products').select('id,code,product,vendor,summary,edit_revision,created_at,updated_at').eq('id', productId).maybeSingle(),
     client.from('catalogue_product_capabilities').select('product_id,capability_map_id,capability_code,capability_name,how_it_supports').eq('product_id', productId),
     client.from('catalogue_product_claims').select(CLAIM_COLUMNS)
       .eq('product_id', productId).order('position'),
+    client.from('catalogue_product_general_links').select('capability_id,how_it_supports')
+      .eq('product_id', productId).order('capability_id'),
   ]);
   if (product.error) throw new Error(`readCatalogueProduct: ${product.error.message}`);
+  if (shared.error) throw new Error(`readCatalogueProduct: ${shared.error.message}`);
   if (links.error) throw new Error(`readCatalogueProduct: ${links.error.message}`);
   if (claims.error) throw new Error(`readCatalogueProduct: ${claims.error.message}`);
   const row: ProductRow | null = product.data;
@@ -135,6 +146,10 @@ export async function readCatalogueProduct(client: Client, productId: UUID): Pro
       capabilityMapId: link.capability_map_id,
       capabilityCode: link.capability_code,
       capabilityName: link.capability_name,
+      howItSupports: link.how_it_supports,
+    })),
+    generalCapabilities: ((shared.data as { capability_id: string; how_it_supports: string }[] | null) ?? []).map((link) => ({
+      capabilityId: link.capability_id,
       howItSupports: link.how_it_supports,
     })),
     claims: ((claims.data as ClaimRow[] | null) ?? []).map((claim) => ({
@@ -242,6 +257,41 @@ export async function reviewProductClaims(client: Client, productId: UUID, claim
   };
   const result = await saveCatalogueProduct(client, productId, detail.product.edit_revision, content);
   return result.reviewed;
+}
+
+/**
+ * The shared capabilities a product can link to: the general capabilities
+ * (codes 1 to 8) of the newest published any-organisation set, each with its
+ * published identity. A capability appears only if its item is aligned.
+ */
+export async function listGeneralCapabilities(client: Client): Promise<GeneralCapabilityOption[]> {
+  const map = await client.from('capability_maps').select('id')
+    .eq('sector', 'any_organisation').eq('status', 'published')
+    .order('version', { ascending: false }).limit(1).maybeSingle();
+  if (map.error) throw new Error(`listGeneralCapabilities: ${map.error.message}`);
+  const mapRow = map.data;
+  if (!mapRow) return [];
+  const items = await client.from('capability_map_items').select('id,code,level,item_order')
+    .eq('map_id', mapRow.id).order('item_order');
+  if (items.error) throw new Error(`listGeneralCapabilities: ${items.error.message}`);
+  const general = ((items.data as { id: string; code: string; level: number }[] | null) ?? []).filter((item) => /^[1-8](\.|$)/.test(item.code));
+  const links = await queryInChunks<string, { map_item_id: string; capability_id: string; capability_revision: number }>(
+    'listGeneralCapabilities', 'map_item_id', general.map((item) => item.id), (chunk) =>
+      client.from('reference_map_item_links').select('map_item_id,capability_id,capability_revision').in('map_item_id', chunk));
+  const linkByItem = new Map(links.map((link) => [link.map_item_id, link]));
+  const identityIds = [...new Set(links.map((link) => link.capability_id))];
+  const revisions = await queryInChunks<string, { capability_id: string; revision: number; name: string; definition: string }>(
+    'listGeneralCapabilities', 'capability_id', identityIds, (chunk) =>
+      client.from('reference_capability_revisions').select('capability_id,revision,name,definition').eq('status', 'published').in('capability_id', chunk));
+  const revision = new Map(revisions.map((row) => [`${row.capability_id}:${String(row.revision)}`, row]));
+  const options: GeneralCapabilityOption[] = [];
+  for (const item of general) {
+    const link = linkByItem.get(item.id);
+    const meaning = link ? revision.get(`${link.capability_id}:${String(link.capability_revision)}`) : undefined;
+    if (!link || !meaning) continue;
+    options.push({ capabilityId: link.capability_id, code: item.code, name: meaning.name, definition: meaning.definition, level: item.level });
+  }
+  return options;
 }
 
 export async function listCapabilitySets(client: Client): Promise<CapabilitySetOption[]> {
