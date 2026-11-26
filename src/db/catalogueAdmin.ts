@@ -21,6 +21,8 @@ import {
   type ClaimOrigin,
   type ClaimReviewState,
   type ClaimWaitingForReview,
+  type ProductPublicationState,
+  productPublicationLabel,
 } from '../contracts/catalogueAdmin';
 import type { Client } from './client';
 import { queryInChunks } from './inFilterLimit';
@@ -67,15 +69,42 @@ export interface CatalogueProductDetail {
   content: CatalogueProductContent;
   /** Each saved claim's review record. The editor's own claims carry no reviewer. */
   claimReviews: CatalogueClaimReview[];
+  /** The latest published revision, or null when the product has never been published. */
+  publication: ProductPublicationState | null;
+}
+
+interface RevisionRow {
+  product_id?: string;
+  revision: number;
+  product_edit_revision: number;
+  published_by_name: string | null;
+  published_at: string;
+  withdrawn_at: string | null;
+  withdrawn_reason: string | null;
+  withdrawn_by_name: string | null;
+}
+
+function publicationState(row: RevisionRow, editRevision: number): ProductPublicationState {
+  return {
+    revision: row.revision,
+    approvedByName: row.published_by_name,
+    approvedAt: row.published_at,
+    withdrawnAt: row.withdrawn_at,
+    withdrawnReason: row.withdrawn_reason,
+    withdrawnByName: row.withdrawn_by_name,
+    unpublishedChanges: editRevision > row.product_edit_revision,
+  };
 }
 
 export async function listCatalogueProducts(client: Client): Promise<CatalogueProductSummary[]> {
-  const [products, links, claims, shared] = await Promise.all([
+  const [products, links, claims, shared, revisions] = await Promise.all([
     client.from('catalogue_products').select('id,code,product,vendor,summary,edit_revision,created_at,updated_at').order('product'),
     client.from('catalogue_product_capabilities').select('product_id,capability_map_id'),
     client.from('catalogue_product_claims').select('product_id,review_state'),
     client.from('catalogue_product_general_links').select('product_id'),
+    client.from('catalogue_product_revisions').select('product_id,revision,product_edit_revision,published_by_name,published_at,withdrawn_at,withdrawn_reason,withdrawn_by_name'),
   ]);
+  if (revisions.error) throw new Error(`listCatalogueProducts: ${revisions.error.message}`);
   if (products.error) throw new Error(`listCatalogueProducts: ${products.error.message}`);
   if (shared.error) throw new Error(`listCatalogueProducts: ${shared.error.message}`);
   if (links.error) throw new Error(`listCatalogueProducts: ${links.error.message}`);
@@ -92,6 +121,11 @@ export async function listCatalogueProducts(client: Client): Promise<CataloguePr
     const byMap = countsByMap.get(row.product_id) ?? {};
     byMap[row.capability_map_id] = (byMap[row.capability_map_id] ?? 0) + 1;
     countsByMap.set(row.product_id, byMap);
+  }
+  const latestRevision = new Map<string, RevisionRow>();
+  for (const row of (revisions.data as (RevisionRow & { product_id: string })[] | null) ?? []) {
+    const current = latestRevision.get(row.product_id);
+    if (!current || row.revision > current.revision) latestRevision.set(row.product_id, row);
   }
   const sharedCount = new Map<string, number>();
   for (const row of (shared.data as { product_id: string }[] | null) ?? []) {
@@ -117,19 +151,24 @@ export async function listCatalogueProducts(client: Client): Promise<CataloguePr
     capabilitySetCount: sets.get(row.id)?.size ?? 0,
     claimCount: claimCount.get(row.id) ?? 0,
     claimsWaitingForReview: waitingCount.get(row.id) ?? 0,
+    publication: productPublicationLabel((() => { const latest = latestRevision.get(row.id); return latest ? publicationState(latest, row.edit_revision) : null; })()),
     capabilityCountsByMap: countsByMap.get(row.id) ?? {},
   }));
 }
 
 export async function readCatalogueProduct(client: Client, productId: UUID): Promise<CatalogueProductDetail> {
-  const [product, links, claims, shared] = await Promise.all([
+  const [product, links, claims, shared, revision] = await Promise.all([
     client.from('catalogue_products').select('id,code,product,vendor,summary,edit_revision,created_at,updated_at').eq('id', productId).maybeSingle(),
     client.from('catalogue_product_capabilities').select('product_id,capability_map_id,capability_code,capability_name,how_it_supports').eq('product_id', productId),
     client.from('catalogue_product_claims').select(CLAIM_COLUMNS)
       .eq('product_id', productId).order('position'),
     client.from('catalogue_product_general_links').select('capability_id,how_it_supports')
       .eq('product_id', productId).order('capability_id'),
+    client.from('catalogue_product_revisions')
+      .select('revision,product_edit_revision,published_by_name,published_at,withdrawn_at,withdrawn_reason,withdrawn_by_name')
+      .eq('product_id', productId).order('revision', { ascending: false }).limit(1).maybeSingle(),
   ]);
+  if (revision.error) throw new Error(`readCatalogueProduct: ${revision.error.message}`);
   if (product.error) throw new Error(`readCatalogueProduct: ${product.error.message}`);
   if (shared.error) throw new Error(`readCatalogueProduct: ${shared.error.message}`);
   if (links.error) throw new Error(`readCatalogueProduct: ${links.error.message}`);
@@ -177,6 +216,7 @@ export async function readCatalogueProduct(client: Client, productId: UUID): Pro
     },
     content,
     claimReviews,
+    publication: revision.data ? publicationState(revision.data, row.edit_revision) : null,
   };
 }
 
@@ -185,15 +225,33 @@ export async function saveCatalogueProduct(
   productId: UUID | null,
   expectedRevision: number,
   content: CatalogueProductContent,
-): Promise<{ productId: UUID; revision: number; reviewed: number }> {
+): Promise<{ productId: UUID; revision: number; reviewed: number; published: number | null; withdrawn: boolean }> {
   const parsed = catalogueProductContentSchema.parse(content);
   // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment -- the project client has untyped RPC results.
   const { data, error } = await client.schema('atlas').rpc('save_catalogue_product', {
     p_id: productId, p_expected_revision: expectedRevision, p_content: parsed,
   });
   if (error) throw new Error(`saveCatalogueProduct: ${error.message}`);
-  const result = data as { productId: UUID; revision: number; reviewed: number };
+  const result = data as { productId: UUID; revision: number; reviewed: number; published: number | null; withdrawn: boolean };
   return result;
+}
+
+/**
+ * Publishes the product as it is saved: freezes a new revision for users and
+ * records who approved it. The server refuses while any claim is waiting for
+ * review, and nothing is saved if it refuses.
+ */
+export async function publishCatalogueProduct(client: Client, productId: UUID): Promise<number> {
+  const detail = await readCatalogueProduct(client, productId);
+  const result = await saveCatalogueProduct(client, productId, detail.product.edit_revision, { ...detail.content, publication: { action: 'publish' } });
+  if (result.published === null) throw new Error('publishCatalogueProduct: the product was not published');
+  return result.published;
+}
+
+/** Withdraws the latest published revision from users, with a written reason. It stays readable for saved citations. */
+export async function withdrawCatalogueProduct(client: Client, productId: UUID, reason: string): Promise<void> {
+  const detail = await readCatalogueProduct(client, productId);
+  await saveCatalogueProduct(client, productId, detail.product.edit_revision, { ...detail.content, publication: { action: 'withdraw', reason } });
 }
 
 export async function validateCatalogueProduct(client: Client, content: CatalogueProductContent): Promise<string[]> {

@@ -152,3 +152,26 @@ hand-edited (a unit test fails if it drifts from the files).
   and `content:publish-catalogue` refuse to run against anything but a local
   Supabase (`scripts/catalogueFilesGuard.ts`). Changes are made in
   Platform admin > Products.
+
+## Amendment, 26 November 2026: a product is published on its own (step 4a)
+
+Step 4 of `proposals/PROPOSAL-catalogue-maintenance.md`, first half. Migration
+`20261126220000_catalogue_product_publication.sql`.
+
+- **A revision is a frozen copy of one product**: name, vendor, summary, claims
+  (with origin, drafter, reviewer and review date) and links (shared and
+  sector). Tables `catalogue_product_revisions`, `_revision_claims` and
+  `_revision_links`; immutable apart from one-time withdrawal columns.
+- **Who and when.** `published_by`, its name and `published_at` are recorded
+  from the signed-in platform admin; any platform admin can publish (Simon).
+- **Published** = the newest revision is not withdrawn. **Unpublished
+  changes** = the product was edited after that revision. Editing never
+  changes a revision.
+- **Withdraw** needs a written reason (1-500 characters) and applies once to
+  the newest revision, which stays readable.
+- **Rules to publish:** every claim reviewed, 1 to 8 claims, at least one
+  capability or shared link. A failed publish saves nothing.
+- **No new callable function.** Publish and withdraw are `publication` in the
+  existing `save_catalogue_product`, so the advisor count is unchanged.
+- **Users see no change in 4a.** Readers, option citations, Designer and packs
+  still use sector catalogues. Step 4b switches them, with its own walkthrough.

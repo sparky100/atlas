@@ -10,6 +10,8 @@ import {
   listCapabilitySetItems,
   listCapabilitySets,
   listGeneralCapabilities,
+  publishCatalogueProduct,
+  withdrawCatalogueProduct,
   readCatalogueProduct,
   saveCatalogueProduct,
   validateCatalogueProduct,
@@ -19,7 +21,7 @@ import { Loading } from '../components/Loading/Loading';
 import { Text } from '../components/Text/Text';
 import { useUnsavedChanges } from '../routes/platformAdmin/unsavedChanges';
 import { supabase } from '../supabaseClient';
-import { claimStatusText, emptyProduct, isGeneralCapabilityCode, sameClaimText, sectorLabel, setLabel } from './catalogueShared';
+import { claimStatusText, emptyProduct, isGeneralCapabilityCode, publicationStatusText, sameClaimText, sectorLabel, setLabel } from './catalogueShared';
 import styles from './CatalogueAdmin.module.css';
 
 const BASE = '/platform-admin/catalogue';
@@ -44,6 +46,7 @@ export function CatalogueProductAdmin({ productId }: { productId: string | null 
   const [general, setGeneral] = useState<GeneralCapabilityOption[]>([]);
   const [sharedId, setSharedId] = useState('');
   const [sharedHow, setSharedHow] = useState('');
+  const [withdrawReason, setWithdrawReason] = useState('');
   const [issues, setIssues] = useState<string[] | null>(null);
   const [notice, setNotice] = useState('');
   const [loadError, setLoadError] = useState('');
@@ -155,6 +158,22 @@ export function CatalogueProductAdmin({ productId }: { productId: string | null 
     setDetail(next); setContent(next.content); setIssues(null);
     setNotice(`Product saved (revision ${String(result.revision)}).${result.reviewed > 0 ? ` ${String(result.reviewed)} claim${result.reviewed === 1 ? '' : 's'} marked as reviewed by you.` : ''}`);
     if (productId === null) void navigate(`${BASE}/products/${result.productId}`, { replace: true });
+  });
+
+  const publish = () => void run(async () => {
+    if (detail === null) return;
+    const revision = await publishCatalogueProduct(supabase, detail.product.id);
+    const next = await readCatalogueProduct(supabase, detail.product.id);
+    setDetail(next); setContent(next.content); setIssues(null);
+    setNotice(`Published as revision ${String(revision)}, approved by you.`);
+  });
+
+  const withdraw = () => void run(async () => {
+    if (detail === null || withdrawReason.trim() === '') return;
+    await withdrawCatalogueProduct(supabase, detail.product.id, withdrawReason.trim());
+    const next = await readCatalogueProduct(supabase, detail.product.id);
+    setDetail(next); setContent(next.content); setWithdrawReason('');
+    setNotice('Withdrawn from users. The revision stays readable for saved citations.');
   });
 
   const validate = () => void run(async () => {
@@ -287,6 +306,36 @@ export function CatalogueProductAdmin({ productId }: { productId: string | null 
         })}
         {content.capabilities.length === 0 && <p>No sector capability links yet. A catalogue entry needs 1-10 links that apply to its pinned set, counting shared capabilities.</p>}
       </div>
+
+      <h2>Publication</h2>
+      <p data-testid="publication-status">{publicationStatusText(detail?.publication ?? null)}</p>
+      {detail !== null && (() => {
+        const waiting = detail.claimReviews.filter((review) => review.reviewState !== 'reviewed').length;
+        const published = detail.publication !== null && detail.publication.withdrawnAt === null;
+        const upToDate = published && detail.publication?.unpublishedChanges === false;
+        const blocked = dirty ? 'Save your changes first.'
+          : waiting > 0 ? `${String(waiting)} claim${waiting === 1 ? ' is' : 's are'} waiting for review. Review ${waiting === 1 ? 'it' : 'them'} before publishing.`
+          : detail.claimReviews.length === 0 || detail.claimReviews.length > 8 ? 'A published product needs 1 to 8 claims.'
+          : content.capabilities.length + (content.generalCapabilities ?? []).length === 0 ? 'Add at least one capability link before publishing.'
+          : upToDate ? 'This revision is already published.' : '';
+        return (
+          <>
+            {blocked !== '' && <p role="status" data-testid="publish-blocked">{blocked}</p>}
+            <div className={styles.actions}>
+              <button type="button" onClick={publish} disabled={busy || blocked !== ''}>
+                {detail.publication?.withdrawnAt == null ? 'Publish product' : 'Publish new revision'}
+              </button>
+            </div>
+            {published && (
+              <div className={styles.linkForm}>
+                <label>Reason for withdrawing <input value={withdrawReason} onChange={(event) => { setWithdrawReason(event.target.value); }} placeholder="Vendor sold the product" /></label>
+                <button type="button" onClick={withdraw} disabled={busy || dirty || withdrawReason.trim() === ''}>Withdraw from users</button>
+              </div>
+            )}
+          </>
+        );
+      })()}
+      {detail === null && <p>Save the product first. Publishing needs every claim reviewed and at least one capability link.</p>}
 
       <h2>Claims ({content.claims.length})</h2>
       <p>A claim is dated vendor evidence with an HTTPS source. A catalogue entry needs 1-8 claims, and every claim must be reviewed before the product can be published. Anyone with admin rights can review, including the person who entered the claim. Names and dates are recorded and shown to platform admins only.</p>

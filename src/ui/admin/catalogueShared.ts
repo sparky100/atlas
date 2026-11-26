@@ -1,4 +1,4 @@
-import type { CapabilitySetOption, CatalogueClaimReview, CatalogueProductContent, CatalogueVersionSummary, ClaimOrigin } from '../../contracts/catalogueAdmin';
+import type { CapabilitySetOption, CatalogueClaimReview, CatalogueProductContent, CatalogueVersionSummary, ClaimOrigin, ProductPublicationLabel, ProductPublicationState } from '../../contracts/catalogueAdmin';
 
 /** The label this admin UI uses everywhere for a sector id. */
 export function sectorLabel(sector: string): string {
@@ -51,4 +51,24 @@ export function claimStatusText(review: Pick<CatalogueClaimReview, 'reviewState'
 /** Two claims say the same thing when their kind, statement, source and source date match; the server keeps a review across a save only then. */
 export function sameClaimText(a: CatalogueProductContent['claims'][number], b: CatalogueProductContent['claims'][number]): boolean {
   return a.kind === b.kind && a.statement === b.statement && a.sourceUrl === b.sourceUrl && a.sourceDate === b.sourceDate;
+}
+
+/** The short label shown in the product list. */
+export function publicationLabelText(label: ProductPublicationLabel): string {
+  switch (label) {
+    case 'published': return 'Published';
+    case 'published_with_changes': return 'Published, unpublished changes';
+    case 'withdrawn': return 'Withdrawn';
+    case 'not_published': return 'Not published';
+  }
+}
+
+/** The line shown on a product page: state, revision, who approved and when. */
+export function publicationStatusText(state: ProductPublicationState | null): string {
+  if (state === null) return 'Not published. Users do not see this product yet.';
+  const approved = `approved by ${state.approvedByName ?? 'a platform admin'} on ${formatDay(state.approvedAt)}`;
+  if (state.withdrawnAt !== null) {
+    return `Withdrawn on ${formatDay(state.withdrawnAt)}${state.withdrawnByName === null ? '' : ` by ${state.withdrawnByName}`}: ${state.withdrawnReason ?? ''} Revision ${String(state.revision)} was ${approved}.`;
+  }
+  return `Published, revision ${String(state.revision)}, ${approved}.${state.unpublishedChanges ? ' It has unpublished changes: the published revision stays as it is until you publish again.' : ''}`;
 }

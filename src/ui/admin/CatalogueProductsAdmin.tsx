@@ -5,6 +5,7 @@ import { listCatalogueProducts } from '../../db/catalogueAdmin';
 import { LinkButton } from '../components/Button/LinkButton';
 import { Loading } from '../components/Loading/Loading';
 import { supabase } from '../supabaseClient';
+import { publicationLabelText } from './catalogueShared';
 import styles from './CatalogueAdmin.module.css';
 
 /**
@@ -14,6 +15,7 @@ import styles from './CatalogueAdmin.module.css';
 export function CatalogueProductsAdmin() {
   const [products, setProducts] = useState<CatalogueProductSummary[]>([]);
   const [search, setSearch] = useState('');
+  const [readyOnly, setReadyOnly] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
@@ -26,9 +28,12 @@ export function CatalogueProductsAdmin() {
 
   const filtered = useMemo(() => {
     const term = search.trim().toLowerCase();
-    if (term === '') return products;
-    return products.filter((product) => `${product.product} ${product.vendor} ${product.code}`.toLowerCase().includes(term));
-  }, [products, search]);
+    const base = readyOnly
+      ? products.filter((product) => product.claimCount > 0 && product.claimsWaitingForReview === 0 && product.capabilityCount + product.sharedCapabilityCount > 0 && product.publication !== 'published')
+      : products;
+    if (term === '') return base;
+    return base.filter((product) => `${product.product} ${product.vendor} ${product.code}`.toLowerCase().includes(term));
+  }, [products, search, readyOnly]);
 
   const waiting = products.reduce((sum, product) => sum + product.claimsWaitingForReview, 0);
 
@@ -39,6 +44,7 @@ export function CatalogueProductsAdmin() {
       {error !== '' && <p role="alert" className={styles.error}>{error}</p>}
       <div className={styles.controls}>
         <label>Find a product <input value={search} onChange={(event) => { setSearch(event.target.value); }} placeholder="Name, vendor or code" /></label>
+        <label><input type="checkbox" checked={readyOnly} onChange={(event) => { setReadyOnly(event.target.checked); }} /> Ready to publish</label>
         <span>{String(filtered.length)} shown</span>
         <LinkButton variant="secondary" to="/platform-admin/catalogue/products/new">New product</LinkButton>
       </div>
@@ -57,7 +63,7 @@ export function CatalogueProductsAdmin() {
               <small>{product.vendor} · {product.code}</small>
             </span>
             <span>
-              {product.capabilitySetCount} capability sets · {product.capabilityCount} links · {product.claimCount} claims{product.claimsWaitingForReview > 0 ? ` (${String(product.claimsWaitingForReview)} to review)` : ''}
+              {publicationLabelText(product.publication)} · {product.capabilitySetCount} capability sets · {product.capabilityCount + product.sharedCapabilityCount} links · {product.claimCount} claims{product.claimsWaitingForReview > 0 ? ` (${String(product.claimsWaitingForReview)} to review)` : ''}
             </span>
           </Link>
         ))}

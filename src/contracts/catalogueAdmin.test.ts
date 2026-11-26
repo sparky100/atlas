@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { catalogueDraftContentSchema, catalogueProductContentSchema } from './catalogueAdmin';
+import { catalogueDraftContentSchema, catalogueProductContentSchema, productPublicationLabel, type ProductPublicationState } from './catalogueAdmin';
 
 const claim = {
   position: 1,
@@ -26,6 +26,22 @@ describe('catalogue admin contracts', () => {
     expect(catalogueProductContentSchema.safeParse({ ...product, generalCapabilities: [link, link], claims: [claim] }).success).toBe(false);
     expect(catalogueProductContentSchema.safeParse({ ...product, generalCapabilities: [{ ...link, capabilityId: 'not-an-id' }], claims: [claim] }).success).toBe(false);
     expect(catalogueProductContentSchema.safeParse({ ...product, generalCapabilities: [{ ...link, extra: 1 }], claims: [claim] }).success).toBe(false);
+  });
+
+  it('accepts publish, and withdraw only with a reason; nobody can name an approver', () => {
+    expect(catalogueProductContentSchema.safeParse({ ...product, claims: [claim], publication: { action: 'publish' } }).success).toBe(true);
+    expect(catalogueProductContentSchema.safeParse({ ...product, claims: [claim], publication: { action: 'withdraw', reason: 'Vendor sold it.' } }).success).toBe(true);
+    expect(catalogueProductContentSchema.safeParse({ ...product, claims: [claim], publication: { action: 'withdraw' } }).success).toBe(false);
+    expect(catalogueProductContentSchema.safeParse({ ...product, claims: [claim], publication: { action: 'publish', approvedBy: 'Someone' } }).success).toBe(false);
+    expect(catalogueProductContentSchema.safeParse({ ...product, claims: [claim], publication: { action: 'unpublish' } }).success).toBe(false);
+  });
+
+  it('names a product publication state in plain terms', () => {
+    const base: ProductPublicationState = { revision: 1, approvedByName: 'A', approvedAt: '2026-11-27', withdrawnAt: null, withdrawnReason: null, withdrawnByName: null, unpublishedChanges: false };
+    expect(productPublicationLabel(null)).toBe('not_published');
+    expect(productPublicationLabel(base)).toBe('published');
+    expect(productPublicationLabel({ ...base, unpublishedChanges: true })).toBe('published_with_changes');
+    expect(productPublicationLabel({ ...base, withdrawnAt: '2026-11-28', withdrawnReason: 'Sold.' })).toBe('withdrawn');
   });
 
   it('refuses a claim source that is not a public HTTPS link', () => {

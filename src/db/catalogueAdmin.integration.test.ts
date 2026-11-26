@@ -9,7 +9,9 @@ import {
   reviewProductClaims,
   saveCatalogueProduct,
   publishCatalogueDraft,
+  publishCatalogueProduct,
   validateCatalogueDraft,
+  withdrawCatalogueProduct,
 } from './catalogueAdmin';
 import type { CatalogueDraftContent, CatalogueProductContent } from '../contracts/catalogueAdmin';
 
@@ -285,6 +287,83 @@ describe('platform product catalogue, real database', () => {
       expect(write.error).not.toBeNull();
       const helper = await outside.client.schema('atlas').rpc('catalogue_product_links_in_map', { p_product: sharedProductId, p_map: retailMapId });
       expect(helper.error).not.toBeNull();
+    });
+  });
+  describe('publishing a product', () => {
+    let pid: string;
+    const content = (): CatalogueProductContent => ({
+      code: `test-publish-${suffix}`, product: `Publish product ${suffix}`, vendor: 'Test vendor',
+      summary: 'A product used to test publication.',
+      capabilities: [{ capabilityMapId: retailMapId, capabilityCode: '1', capabilityName: 'Retail capability', howItSupports: 'Supports retail' }],
+      claims: [claim],
+    });
+
+    it('refuses to publish while a claim is waiting for review, and saves nothing', async () => {
+      await expect(saveCatalogueProduct(admin.client, null, 0, { ...content(), publication: { action: 'publish' } })).rejects.toThrow(/waiting for review/);
+      const found = await service.from('catalogue_products').select('id').eq('code', content().code);
+      check(found);
+      expect(found.data).toEqual([]);
+    });
+
+    it('freezes a revision and records who approved it', async () => {
+      pid = (await saveCatalogueProduct(admin.client, null, 0, { ...content(), claims: [{ ...claim, review: true }] })).productId;
+      const first = await readCatalogueProduct(admin.client, pid);
+      expect(first.publication).toBeNull();
+      expect(await publishCatalogueProduct(admin.client, pid)).toBe(1);
+      const detail = await readCatalogueProduct(admin.client, pid);
+      expect(detail.publication).toEqual(expect.objectContaining({ revision: 1, withdrawnAt: null, unpublishedChanges: false }));
+      expect(detail.publication?.approvedByName).toBeTruthy();
+      const revision = await service.from('catalogue_product_revisions').select('id,published_by,vendor').eq('product_id', pid).single();
+      check(revision);
+      expect(revision.data).toEqual(expect.objectContaining({ published_by: admin.id, vendor: 'Test vendor' }));
+      const links = await service.from('catalogue_product_revision_links').select('kind,sector,capability_code').eq('revision_id', (revision.data as { id: string }).id);
+      check(links);
+      expect(links.data).toEqual([{ kind: 'sector', sector: 'retail_ecommerce', capability_code: '1' }]);
+      const claims = await service.from('catalogue_product_revision_claims').select('reviewed_by_user').eq('revision_id', (revision.data as { id: string }).id);
+      check(claims);
+      expect(claims.data).toEqual([{ reviewed_by_user: admin.id }]);
+    });
+
+    it('does not change what was published when the product is edited, and the next publish is revision 2', async () => {
+      const current = await readCatalogueProduct(admin.client, pid);
+      await saveCatalogueProduct(admin.client, pid, current.product.edit_revision, { ...current.content, summary: 'A changed summary.' });
+      const edited = await readCatalogueProduct(admin.client, pid);
+      expect(edited.publication).toEqual(expect.objectContaining({ revision: 1, unpublishedChanges: true }));
+      const frozen = await service.from('catalogue_product_revisions').select('summary').eq('product_id', pid).eq('revision', 1).single();
+      check(frozen);
+      expect(frozen.data).toEqual({ summary: 'A product used to test publication.' });
+      expect(await publishCatalogueProduct(admin.client, pid)).toBe(2);
+    });
+
+    it('withdraws with a reason, keeps the revision, and refuses a second withdrawal', async () => {
+      await withdrawCatalogueProduct(admin.client, pid, 'The vendor sold the product.');
+      const detail = await readCatalogueProduct(admin.client, pid);
+      expect(detail.publication).toEqual(expect.objectContaining({ revision: 2, withdrawnReason: 'The vendor sold the product.' }));
+      await expect(withdrawCatalogueProduct(admin.client, pid, 'Again.')).rejects.toThrow(/not published/);
+      const rows = await service.from('catalogue_product_revisions').select('revision').eq('product_id', pid);
+      check(rows);
+      expect(rows.data).toHaveLength(2);
+    });
+
+    it('never lets a published revision be changed or deleted', async () => {
+      const edit = await service.from('catalogue_product_revisions').update({ summary: 'Changed.' }).eq('product_id', pid);
+      expect(edit.error).not.toBeNull();
+      const del = await service.from('catalogue_product_revision_claims').delete().neq('position', 0);
+      expect(del.error).not.toBeNull();
+    });
+
+    it('does not let another signed-in user read revisions, publish or withdraw', async () => {
+      const read = await outside.client.from('catalogue_product_revisions').select('id');
+      expect(read.error).toBeNull();
+      expect(read.data).toEqual([]);
+      const publish = await outside.client.schema('atlas').rpc('save_catalogue_product', {
+        p_id: pid, p_expected_revision: 99, p_content: { ...content(), claims: [{ ...claim, review: true }], publication: { action: 'publish' } },
+      });
+      expect(publish.error).not.toBeNull();
+      const write = await outside.client.from('catalogue_product_revisions').insert({
+        product_id: pid, revision: 9, product_edit_revision: 1, code: 'x', product: 'x', vendor: 'x', summary: 'x', published_by: outside.id,
+      });
+      expect(write.error).not.toBeNull();
     });
   });
 });

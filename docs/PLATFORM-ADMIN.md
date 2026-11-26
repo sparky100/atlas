@@ -79,6 +79,17 @@ that's a real, named gap (CLAUDE.md rule 7), not silently implied to exist.
 A natural follow-up if it's ever needed: list `platform_admins`, grant/revoke
 via a new admin-gated RPC, the same shape as the two `llm-proxy` RPCs below.
 
+## Publishing one product
+
+On a product's page, **Publication** shows whether it is not published,
+published (revision, who approved, when) or published with unpublished
+changes. **Publish product** is offered when every claim is reviewed, the
+product has 1 to 8 claims and at least one capability link. Publishing freezes a
+revision; editing afterwards never changes it. **Withdraw from users** needs a
+written reason and keeps the revision readable. The products list shows each
+product's state and can show only those ready to publish. Until the reader
+switch (step 4b) published products are not yet shown to users.
+
 ## Viewing a capability set before copying
 
 In **Platform admin → Capability sets**, choose a sector and select **View current set** before creating the next draft. The read-only view shows the published version, summary, searchable capability hierarchy and definitions, value-stream stages and their capability links, sources and origin. **Versions for [sector]** also lets you inspect older versions. An older version cannot be copied as a new draft; **Create draft from current** always uses the current published version. Viewing a set changes neither published content nor models previously seeded from it. On a narrow screen, the capability list and selected definition stack as cards.
