@@ -6,7 +6,7 @@
  * the Retire panel on that change (with its "Replaced by…" choice) and saves nothing.
  */
 import { expect, test, type Page } from '@playwright/test';
-import { addCapability, addSystemFromHome, clickNavItem, goToModelHome, signUpCreateOrgAndModel } from './fixtures/goldenPath';
+import { addCapability, addSystemFromHome, clickNavItem, goToModelHome, homeSearchResult, signUpCreateOrgAndModel } from './fixtures/goldenPath';
 
 async function startDecisionOnQuoteTool(page: Page, handle: string) {
   await signUpCreateOrgAndModel(page, handle);
@@ -105,4 +105,32 @@ test('an empty Keep option offers no starter edit', async ({ page }) => {
   await openOptionDraft(page, 'Keep and tidy up', 'Keep and tidy up');
   await expect(page.getByText('No change to the landscape recorded.')).toBeVisible();
   await expect(page.getByTestId('option-draft-card')).toHaveCount(0);
+});
+
+test('a Buy option offers to retire only the system the decision names, not the capability\'s other supporters', async ({ page }) => {
+  test.slow();
+  await signUpCreateOrgAndModel(page, 'optiononlyone');
+  await addCapability(page, 'Connect a new customer');
+  await goToModelHome(page);
+  await addSystemFromHome(page, { name: 'Quote Tool', description: 'Issues connection quotes.', capabilityName: 'Connect a new customer' });
+  await goToModelHome(page);
+  await addSystemFromHome(page, { name: 'Billing Tool', description: 'Bills new customers.', capabilityName: 'Connect a new customer' });
+  // Start the decision from Quote Tool itself, so it names that system.
+  await goToModelHome(page);
+  await page.getByPlaceholder('Search or create a capability, system, or actor…').fill('Quote Tool');
+  await homeSearchResult(page, 'Quote Tool').click();
+  await expect(page.getByRole('heading', { name: 'Quote Tool' }).first()).toBeVisible();
+  await page.getByRole('button', { name: 'Element actions' }).click();
+  await page.getByRole('link', { name: 'Start a decision…' }).click();
+  // The decision is about the system and the capability it supports, as one started from a capability page and a finding is.
+  await page.getByPlaceholder('Search capabilities or systems this decision concerns…').fill('Connect a new customer');
+  await page.getByRole('button', { name: /Connect a new customer/ }).click();
+  await page.getByRole('button', { name: 'Start decision' }).click();
+  await expect(page.getByTestId('decision-outcome')).toBeVisible();
+
+  await openOptionDraft(page, 'Replace with a product', 'Buy a product');
+  const card = page.getByTestId('option-draft-card');
+  await expect(card.getByRole('link', { name: 'Retire Quote Tool and replace it with a new system' })).toBeVisible();
+  await expect(card.getByRole('link', { name: /Billing Tool/ })).toHaveCount(0);
+  await expect(card.getByRole('link')).toHaveCount(1);
 });

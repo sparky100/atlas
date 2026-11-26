@@ -11,8 +11,20 @@ describe('optionDraftActions', () => {
     expect(labels('buy', [], [quote], ['Connection Quotations'])).toEqual(['Retire Quote Tool and replace it with a new system']);
   });
 
-  it('buy: a system the decision names and the same system as supporter appear once', () => {
-    expect(labels('buy', [quote], [quote, sys(2, 'IS-U')], ['Billing'])).toEqual(['Retire Quote Tool and replace it with a new system', 'Retire IS-U and replace it with a new system']);
+  it('buy: only the system the decision names, not the capability\'s other supporters', () => {
+    expect(labels('buy', [quote], [quote, sys(2, 'IS-U')], ['Billing'])).toEqual(['Retire Quote Tool and replace it with a new system']);
+  });
+
+  it('buy: Smallworld GIS decision offers only Smallworld GIS, though other systems support the capability', () => {
+    const smallworld = sys(3, 'Smallworld GIS');
+    const others = [sys(4, 'Utility Network'), sys(5, 'DIgSILENT PowerFactory')];
+    expect(labels('buy', [smallworld], [smallworld, ...others], ['Network Mapping'])).toEqual(['Retire Smallworld GIS and replace it with a new system']);
+    expect(labels('configure', [smallworld], [smallworld, ...others], ['Network Mapping'])).toEqual(['Extend Smallworld GIS to cover Network Mapping']);
+    expect(labels('build', [smallworld], [smallworld, ...others], ['Network Mapping'])).toEqual(['Retire Smallworld GIS and replace it with a custom-built app']);
+  });
+
+  it('buy: a decision about a capability, naming no system, offers the capability\'s supporters', () => {
+    expect(labels('buy', [], [quote, sys(2, 'IS-U')], ['Billing'])).toEqual(['Retire Quote Tool and replace it with a new system', 'Retire IS-U and replace it with a new system']);
   });
 
   it('configure: extend the supporting system to cover the capability', () => {
@@ -47,5 +59,13 @@ describe('optionDraftActions', () => {
     expect(actions.map(optionDraftLabel)).toEqual(['Retire Smallworld GIS and replace it with Esri ArcGIS Utility Network']);
     expect(actions[0]?.product).toBe('Esri ArcGIS Utility Network');
     expect(optionDraftActions('buy', [sys(1, 'Smallworld GIS')], [], ['Network Mapping']).map(optionDraftLabel)).toEqual(['Retire Smallworld GIS and replace it with a new system']);
+  });
+
+  it('modules: a module that only supports the capability is not suggested; one the decision names is, as a module', () => {
+    const smallworld = sys(3, 'Smallworld GIS');
+    const utilityNetwork = { ...sys(4, 'Utility Network'), module: true };
+    expect(labels('buy', [], [smallworld, utilityNetwork], ['Network Mapping'])).toEqual(['Retire Smallworld GIS and replace it with a new system']);
+    expect(labels('buy', [utilityNetwork], [smallworld, utilityNetwork], ['Network Mapping'])).toEqual(['Retire the Utility Network module and replace it with a new system']);
+    expect(labels('configure', [utilityNetwork], [], ['Network Mapping'])).toEqual(['Extend the Utility Network module to cover Network Mapping']);
   });
 });

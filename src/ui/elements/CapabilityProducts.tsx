@@ -6,6 +6,9 @@
  */
 import { useQuery } from '@tanstack/react-query';
 import { capabilityMapMatch, currentCatalogue, listCurrentCatalogueEntriesForCapability, type CatalogueEntry } from '../../db/productCatalogue';
+import { ProductInModelNote } from '../decisions/ProductInModelNote';
+import { useModelElementNames } from '../decisions/useModelElementNames';
+import type { ModelElementName } from '../decisions/productInModel';
 import { MakeProductOption, type MakeProductOptionProps } from '../decisions/MakeProductOption';
 import { CollapsibleSection } from '../components/CollapsibleSection/CollapsibleSection';
 import { Panel } from '../components/Panel/Panel';
@@ -14,7 +17,7 @@ import { supabase } from '../supabaseClient';
 import { catalogueAsOf, formatCatalogueDate as formatDate, sourceDomain } from './capabilityProductsText';
 import styles from './CapabilityProducts.module.css';
 
-function Entry({ entry, citation, makeOption }: { entry: CatalogueEntry; citation: { sector: string; version: number } | null; makeOption: MakeProductOptionProps | undefined }) {
+function Entry({ entry, citation, makeOption, modelElements }: { entry: CatalogueEntry; citation: { sector: string; version: number } | null; makeOption: MakeProductOptionProps | undefined; modelElements: readonly ModelElementName[] }) {
   const asOf = catalogueAsOf(entry);
   return (
     <li className={styles.entry}>
@@ -22,6 +25,7 @@ function Entry({ entry, citation, makeOption }: { entry: CatalogueEntry; citatio
         {entry.product} <Text as="span" size="sm" tone="muted">by {entry.vendor}</Text>
       </Text>
       <Text as="p">{entry.summary}</Text>
+      <ProductInModelNote productName={entry.product} elements={modelElements} />
       <Text as="p" size="sm" tone="muted">{entry.howItSupports}</Text>
       {asOf !== null && <Text as="p" size="sm" tone="muted">As of {formatDate(asOf)}</Text>}
       <details className={styles.claims}>
@@ -54,7 +58,8 @@ function Entry({ entry, citation, makeOption }: { entry: CatalogueEntry; citatio
  * options: each product then gets "Make it an option" (Simon, 2026-11-25:
  * "listing the products doesn't help create an option").
  */
-export function CapabilityProducts({ templateRef, title = 'Products that can support this', makeOption }: { templateRef: string | null; title?: string; makeOption?: MakeProductOptionProps | undefined }) {
+export function CapabilityProducts({ templateRef, title = 'Products that can support this', makeOption, modelId = null }: { templateRef: string | null; title?: string; makeOption?: MakeProductOptionProps | undefined; modelId?: string | null }) {
+  const modelElements = useModelElementNames(modelId);
   const match = useQuery({
     queryKey: ['capabilityCatalogueMatch', templateRef],
     enabled: templateRef !== null,
@@ -87,7 +92,7 @@ export function CapabilityProducts({ templateRef, title = 'Products that can sup
           Reviewed products from the published catalogue, for a replacement or build option. They are candidates, not a procurement decision.
         </Text>
         <ul className={styles.list}>
-          {entries.data.map((entry) => <Entry key={entry.id} entry={entry} citation={citation} makeOption={makeOption} />)}
+          {entries.data.map((entry) => <Entry modelElements={modelElements} key={entry.id} entry={entry} citation={citation} makeOption={makeOption} />)}
         </ul>
       </CollapsibleSection>
     </Panel>

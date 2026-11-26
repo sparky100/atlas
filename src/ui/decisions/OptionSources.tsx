@@ -2,6 +2,8 @@ import type { OptionCatalogueSource, OptionSource } from '../../contracts/option
 import { CollapsibleSection } from '../components/CollapsibleSection/CollapsibleSection';
 import { Text } from '../components/Text/Text';
 import { MakeProductOption, type MakeProductOptionProps } from './MakeProductOption';
+import { ProductInModelNote } from './ProductInModelNote';
+import type { ModelElementName } from './productInModel';
 import styles from './OptionSources.module.css';
 
 function standingText(source: OptionCatalogueSource): string {
@@ -23,7 +25,7 @@ function standingText(source: OptionCatalogueSource): string {
  * catalogue as if it were current. A web page is shown as unreviewed and
  * never carries a reviewer line.
  */
-export function OptionSources({ sources, makeOption }: { sources: readonly OptionSource[]; makeOption?: MakeProductOptionProps | undefined }) {
+export function OptionSources({ sources, makeOption, modelElements = [] }: { sources: readonly OptionSource[]; makeOption?: MakeProductOptionProps | undefined; modelElements?: readonly ModelElementName[] | undefined }) {
   if (sources.length === 0) return null;
   const hasWeb = sources.some((source) => source.kind === 'web');
   return (
@@ -48,6 +50,7 @@ export function OptionSources({ sources, makeOption }: { sources: readonly Optio
                   <Text as="p" size="xs" tone="muted">
                     {standingText(source)}
                   </Text>
+                  <ProductInModelNote productName={source.product} elements={modelElements} />
                   <ul className={styles.claims}>
                     {source.claims.map((claim) => (
                       <li key={String(claim.position)}>

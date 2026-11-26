@@ -12,7 +12,7 @@
  * boundary is in productCatalogue.integration.test.ts.
  */
 import { expect, test, type Page } from '@playwright/test';
-import { addSystemFromHome, goToModelHome, seedStarterCapabilityMap, signUpCreateOrgAndModel } from './fixtures/goldenPath';
+import { addContainerFromHome, addSystemFromHome, goToModelHome, seedStarterCapabilityMap, signUpCreateOrgAndModel } from './fixtures/goldenPath';
 import { optionSurface } from './fixtures/decisionLayout';
 
 /** The search dialog, as a user at this width opens it (same as golden-path-search-and-landscape-find). */
@@ -167,7 +167,103 @@ test('working on a Use <product> option offers to retire the current system and 
   expect(await page.evaluate(() => document.documentElement.scrollWidth > document.documentElement.clientWidth + 1)).toBe(false);
   await link.click();
   await expect(page).toHaveURL(/action=retire/);
-  // The product's name is already in the "create new" step; the person sets the date and confirms.
+  // The panel first looks for the product among what is already modelled; none matches, so create it, with the name filled in.
+  await page.getByRole('button', { name: 'Create new instead' }).click();
   await expect(page.getByLabel('New system name')).toHaveValue('Salesforce Energy and Utilities Cloud');
   await expect(page.getByLabel('Planned end', { exact: true })).toBeVisible();
+});
+
+/** Simon, 2026-11-26: the replacement might be a product that is not on the list, entered by hand. */
+test('a different product can be typed on the change and the Retire panel opens with that name', async ({ page }) => {
+  test.slow();
+  await signUpCreateOrgAndModel(page, 'productmanual');
+  await seedStarterCapabilityMap(page, /^Electricity Network Operator$/);
+  await goToModelHome(page);
+  await addSystemFromHome(page, { name: 'Legacy Quote Tool', description: 'Issues connection quotes.', capabilityName: 'Connection Quotations' });
+  await goToModelHome(page);
+  await openSearch(page);
+  await page.getByLabel('Search elements, changes, decisions and projects').fill('Connection Quotations');
+  await page.getByRole('option', { name: /Connection Quotations/ }).first().click();
+  await page.getByRole('button', { name: 'Element actions' }).click();
+  await page.getByRole('link', { name: 'Start a decision…' }).click();
+  await page.getByRole('button', { name: 'Start decision' }).click();
+  await expect(page.getByTestId('decision-outcome')).toBeVisible();
+  // A Buy option with no listed product behind it: the product is entered by hand on the change.
+  await page.getByRole('button', { name: '+ Add an option' }).click();
+  await page.getByRole('radio', { name: 'Buy a product', exact: true }).check();
+  await page.getByPlaceholder("What's this option? (e.g. Replace with Workday)").fill('Replace with a product');
+  await page.getByRole('button', { name: 'Add option' }).click();
+  await optionSurface(page, 'Replace with a product').getByRole('button', { name: 'Work on this option' }).click();
+  await expect(page).toHaveURL(/\/changes\//);
+  const draftLink = page.getByRole('link', { name: "Draft this option's changes" });
+  if (await draftLink.count() > 0) await draftLink.click();
+
+  const card = page.getByTestId('option-draft-card');
+  await expect(card.getByRole('link', { name: 'Retire Legacy Quote Tool and replace it with a new system' })).toBeVisible();
+  await card.getByLabel(/Product that replaces it/).fill('Acme Quoting Suite');
+  const link = card.getByRole('link', { name: 'Retire Legacy Quote Tool and replace it with Acme Quoting Suite' });
+  await expect(link).toBeVisible();
+  expect(await page.evaluate(() => document.documentElement.scrollWidth > document.documentElement.clientWidth + 1)).toBe(false);
+  await link.click();
+  await page.getByRole('button', { name: 'Create new instead' }).click();
+  await expect(page.getByLabel('New system name')).toHaveValue('Acme Quoting Suite');
+});
+
+/** Simon, 2026-11-26: the product may already be in the model as a module of a platform; use that element. */
+test('a product that is already a module of a platform is found and chosen as the replacement, not created again', async ({ page }) => {
+  test.slow();
+  await signUpCreateOrgAndModel(page, 'productmodule');
+  await seedStarterCapabilityMap(page, /^Electricity Network Operator$/);
+  await goToModelHome(page);
+  await addSystemFromHome(page, { name: 'Esri ArcGIS Platform', description: 'The Esri GIS platform.' });
+  await goToModelHome(page);
+  await addContainerFromHome(page, 'Utility Network', 'Esri ArcGIS Platform');
+  await goToModelHome(page);
+  await addSystemFromHome(page, { name: 'Microsoft Platform', description: 'The Microsoft business platform.' });
+  await goToModelHome(page);
+  await addContainerFromHome(page, 'Dynamics 365 Customer Service', 'Microsoft Platform');
+  await goToModelHome(page);
+  await addSystemFromHome(page, { name: 'Legacy Quote Tool', description: 'Issues connection quotes.', capabilityName: 'Connection Quotations' });
+  await goToModelHome(page);
+  await openSearch(page);
+  await page.getByLabel('Search elements, changes, decisions and projects').fill('Connection Quotations');
+  await page.getByRole('option', { name: /Connection Quotations/ }).first().click();
+  await page.getByRole('button', { name: 'Element actions' }).click();
+  await page.getByRole('link', { name: 'Start a decision…' }).click();
+  await page.getByRole('button', { name: 'Start decision' }).click();
+  await expect(page.getByTestId('decision-outcome')).toBeVisible();
+  await page.getByRole('button', { name: '+ Add an option' }).click();
+  await page.getByRole('radio', { name: 'Buy a product', exact: true }).check();
+  await page.getByPlaceholder("What's this option? (e.g. Replace with Workday)").fill('Replace with a product');
+  await page.getByRole('button', { name: 'Add option' }).click();
+
+  // The products list says which listed product is already in the model, and links to it.
+  const dynamics = page.getByTestId('capability-products').getByRole('listitem').filter({ hasText: 'Microsoft Dynamics 365 Customer Service' }).first();
+  await expect(dynamics.getByTestId('product-in-model')).toContainText('Dynamics 365 Customer Service, a module of Microsoft Platform');
+  await expect(dynamics.getByTestId('product-in-model').getByRole('link')).toHaveAttribute('href', /\/e\//);
+  const salesforce = page.getByTestId('capability-products').getByRole('listitem').filter({ hasText: 'Salesforce Energy and Utilities Cloud' }).first();
+  await expect(salesforce).toBeVisible();
+  await expect(salesforce.getByTestId('product-in-model')).toHaveCount(0);
+
+  // The saved product on an option says so too.
+  await dynamics.getByRole('button', { name: 'Make it an option' }).click();
+  const grid = page.getByTestId('decision-criteria-grid');
+  if ((page.viewportSize()?.width ?? 1280) < 700) await grid.getByText('Details and evidence').last().click();
+  await grid.getByRole('button', { name: 'Sources (1)' }).first().click();
+  await expect(grid.getByTestId('option-sources').getByTestId('product-in-model').first()).toContainText('a module of Microsoft Platform');
+
+  await optionSurface(page, 'Replace with a product').getByRole('button', { name: 'Work on this option' }).click();
+  await expect(page).toHaveURL(/\/changes\//);
+  const draftLink = page.getByRole('link', { name: "Draft this option's changes" });
+  if (await draftLink.count() > 0) await draftLink.click();
+
+  const card = page.getByTestId('option-draft-card');
+  await card.getByLabel(/Product that replaces it/).fill('Esri ArcGIS Utility Network');
+  await card.getByRole('link', { name: 'Retire Legacy Quote Tool and replace it with Esri ArcGIS Utility Network' }).click();
+  // The existing module is offered straight away, though the product's name is longer than the module's.
+  const module = page.getByRole('button', { name: /Utility Network/ });
+  await expect(module.first()).toBeVisible();
+  await module.first().click();
+  await expect(page.getByText(/Replaced by/)).toBeVisible();
+  await expect(page.getByLabel('New system name')).toHaveCount(0);
 });

@@ -1,4 +1,4 @@
-import { useId, useState } from 'react';
+import { useEffect, useId, useRef, useState } from 'react';
 import type { ElementsHeadRow, FactsRow, RelationshipsHeadRow } from '../../../contracts/rows';
 import type { Sourcing, UUID } from '../../../contracts/delta';
 import type { BranchRow } from '../../../db/types';
@@ -33,7 +33,7 @@ export interface RetireActionProps {
   onCancel: () => void;
   /** Sourcing to record on a brand-new replacement created here (e.g. `custom_build` for a "Build ourselves" option). */
   defaultSourcing?: Sourcing | undefined;
-  /** The product that replaces this system, named by the option being delivered (a "Use <product>" option). Opens the "create new" step with the name filled in; the person still sets the date and confirms. */
+  /** The product that replaces this system, named by the option being delivered or typed by the person. It may already be in the model (often as a module of a platform), so the existing-element search opens first with this name; "Create new instead" has it filled in. The person still chooses and confirms. */
   initialReplacementName?: string | undefined;
 }
 
@@ -76,7 +76,7 @@ export function RetireAction({
   const [replacement, setReplacement] = useState<RetireReplacement | null>(null);
   // 'none': nothing chosen yet, both options offered. 'searching': the
   // existing-element picker. 'creating': the new "doesn't exist yet" mode.
-  const [mode, setMode] = useState<'none' | 'searching' | 'creating'>(initialReplacementName ? 'creating' : 'none');
+  const [mode, setMode] = useState<'none' | 'searching' | 'creating'>(initialReplacementName ? 'searching' : 'none');
   const [newReplacementName, setNewReplacementName] = useState(initialReplacementName ?? '');
   // Links left unticked are not copied to the replacement. Everything is ticked by default.
   const [unticked, setUnticked] = useState<ReadonlySet<UUID>>(new Set());
@@ -92,6 +92,26 @@ export function RetireAction({
   // system and container ends (`relationshipTypeRules.ts`).
   const search = useRelationshipTargetSearch(searchCommitId, modelId, SYSTEM_OR_MODULE_TYPES, element.element_id, mode === 'searching', branch.kind === 'change' ? branch.head_commit_id : null);
   const searchPlaceholder = 'Search systems and modules…';
+  // A product name is often longer than the element it matches ("Esri ArcGIS Utility Network" is the module
+  // "Utility Network" of the ArcGIS platform): until the person types, drop leading words while nothing matches.
+  const autoSearch = useRef(initialReplacementName !== undefined && initialReplacementName !== '');
+  const seeded = useRef(false);
+  const { query: searchQuery, setQuery: setSearchQuery, status: searchStatus, results: searchResults } = search;
+  useEffect(() => {
+    if (!seeded.current && initialReplacementName) {
+      seeded.current = true;
+      setSearchQuery(initialReplacementName);
+      return;
+    }
+    if (!autoSearch.current || mode !== 'searching' || searchStatus !== 'ready') return;
+    if (searchResults.length > 0) {
+      autoSearch.current = false;
+      return;
+    }
+    const words = searchQuery.trim().split(/\s+/);
+    if (words.length > 2) setSearchQuery(words.slice(1).join(' '));
+    else autoSearch.current = false;
+  }, [initialReplacementName, mode, searchStatus, searchResults.length, searchQuery, setSearchQuery]);
   const { status, error, retire } = useElementRetire({
     modelId,
     orgId,
@@ -222,6 +242,7 @@ export function RetireAction({
             placeholder={searchPlaceholder}
             value={search.query}
             onChange={(e) => {
+              autoSearch.current = false;
               search.setQuery(e.target.value);
             }}
           />

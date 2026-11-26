@@ -75,6 +75,7 @@ import { useDecisionOptions } from './useDecisionOptions';
 import { usePendingOptions } from './usePendingOptions';
 import { optionProvenance, optionRowProvenance } from './optionProvenance';
 import { useDecisionRatings } from './useDecisionRatings';
+import { useModelElementNames } from './useModelElementNames';
 import { useOptionSources } from './useOptionSources';
 import type { OptionCatalogueSource, OptionSource } from '../../contracts/optionSource';
 import { groupWhatChangesRows, type WhatChangesRow } from './whatChangesRows';
@@ -153,6 +154,7 @@ export function DecisionView({ modelId, decisionId, orgId, orgSlug, modelSlug, r
   // Catalogue citations saved with each option, in the saved snapshot. The
   // pack, the grid and (later) the option page all read this same shape.
   const optionSources = useOptionSources(decisionId);
+  const modelElements = useModelElementNames(modelId);
   const sourcesByBranch = new Map<string, OptionSource[]>();
   const sourcesByOption = new Map<string, OptionSource[]>();
   for (const source of optionSources.data ?? []) {
@@ -797,6 +799,7 @@ export function DecisionView({ modelId, decisionId, orgId, orgSlug, modelSlug, r
                 <div id="decision-compare">
                 <DecisionCriteriaGrid
                   makeProductOption={makeProductOption}
+                  modelElements={modelElements}
                   decisionId={decisionId}
                   options={criteriaOptions}
                   canRate={canRate}
@@ -921,7 +924,7 @@ export function DecisionView({ modelId, decisionId, orgId, orgSlug, modelSlug, r
       {hasReplaceOrBuildOption && capabilityConcerns.map((capability) => {
         const templateRef = attributesRecord(capability.attributes).templateRef;
         if (typeof templateRef !== 'string') return null;
-        return <CapabilityProducts key={capability.element_id} templateRef={templateRef} title={`Products that can support ${capability.name}`} makeOption={makeProductOption} />;
+        return <CapabilityProducts key={capability.element_id} templateRef={templateRef} title={`Products that can support ${capability.name}`} makeOption={makeProductOption} modelId={modelId} />;
       })}
 
       {(comparisonOptions.length > 0 || scoredOptions.length > 0) && (
@@ -1219,6 +1222,7 @@ export function DecisionView({ modelId, decisionId, orgId, orgSlug, modelSlug, r
       {researchTarget !== null && userId !== null && (
         <WebResearchDialog
           decisionId={decisionId}
+          modelElements={modelElements}
           optionId={researchTarget.optionId}
           branchId={researchTarget.branchId}
           optionLabel={researchTarget.label}
