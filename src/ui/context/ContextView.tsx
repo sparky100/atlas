@@ -73,6 +73,7 @@ export function ContextView({ group, orgSlug, modelSlug, refParam, diff = null, 
   const neighbourContextHref = (elementId: UUID) => `/o/${orgSlug}/m/${modelSlug}/context/${elementId}?${refParam}`;
   const containersHref = `/o/${orgSlug}/m/${modelSlug}/container/${group.hub.element_id}?${refParam}`;
   const hubExternal = attributesRecord(group.hub.attributes).isExternal === true;
+  // system-only: the AI-agent mark is a setting of a whole system.
   const hubMark = group.hub.element_type === 'system' ? aiMarkOf(group.hub) : null;
   const diffById = new Map<UUID, ElementVersionDiff>(diff?.elements.map((e) => [e.elementId, e]) ?? []);
   const hubDiff = diffById.get(group.hub.element_id);
@@ -92,6 +93,7 @@ export function ContextView({ group, orgSlug, modelSlug, refParam, diff = null, 
           {diff && hubDiff && <DiffBadge state={hubDiff.state} changedCount={hubDiff.state === 'changed' ? hubDiff.changedAttributes.length : undefined} />}
         </div>
         {/* The one "descend a level" affordance this view offers (UI-principles §2.1's semantic zoom, as a discrete link rather than a continuous gesture this sprint doesn't build — see CapabilityMapView's own "→ Landscape" link for the same pattern one level up). A container is structurally terminal since "component" was removed (S1 item 18) — it has no containers of its own to descend into. */}
+        {/* system-only: a module has no modules of its own to descend into. */}
         {group.hub.element_type === 'system' && (
           <LinkButton to={containersHref} variant="secondary">
             Containers →

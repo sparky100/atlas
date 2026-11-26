@@ -19,6 +19,7 @@ import { containerParentIds } from '../elements/moduleDisplayName';
 import { flowViaIdsFor, isIntegrationInterface, isIntegrationPlatform, isPlatform } from '../elements/systemKind';
 import { reportError } from '../errors/errorBannerStore';
 import { supabase } from '../supabaseClient';
+import { isSystemLike } from '../../contracts/elementKinds';
 
 /**
  * V3's own "platform context simplified to structure only": a platform with
@@ -154,7 +155,7 @@ export function useElementContext(modelId: UUID, orgId: UUID, userId: UUID | nul
         diff = resolved.diff;
         projection = resolved.projection;
         hub = projectionElementById(resolved.projection, elementId);
-        if (hub?.element_type !== 'system' && hub?.element_type !== 'container') {
+        if (hub === null || !isSystemLike(hub)) {
           if (!cancelled) setState({ status: 'notPresentAtRef' });
           return;
         }
@@ -169,7 +170,7 @@ export function useElementContext(modelId: UUID, orgId: UUID, userId: UUID | nul
         projection = null;
         // Performance: the hub and its relationships in one round trip, not two.
         [hub, hubRelationships] = await Promise.all([getElementHead(supabase, commitId, elementId), listRelationshipsForElement(supabase, commitId, elementId)]);
-        if (hub?.element_type !== 'system' && hub?.element_type !== 'container') {
+        if (hub === null || !isSystemLike(hub)) {
           if (!cancelled) setState({ status: 'notPresentAtRef' });
           return;
         }
@@ -234,11 +235,14 @@ export function useElementContext(modelId: UUID, orgId: UUID, userId: UUID | nul
       // needs both, and the integration check below needs the parent.
       const otherIds = [...new Set(hubRelationships.flatMap((r) => [r.from_element_id, r.to_element_id]))].filter((id) => id !== elementId);
       const hubParentId = hub.element_type === 'container' ? hub.parent_id : null;
+      // system-only: an integration platform is a whole system; a module is never a platform.
       const skipNeighbours = hub.element_type === 'system' && isIntegrationPlatform(hub);
       const firstBatchIds = [...(skipNeighbours ? [] : otherIds), ...(hubParentId !== null ? [hubParentId] : [])];
       const firstBatch = projection ? projectionElementsByIds(projection, firstBatchIds) : await getElementsByIds(supabase, commitId, firstBatchIds);
       const hubParent = hubParentId !== null ? (firstBatch.get(hubParentId) ?? null) : null;
+      // system-only: an integration platform is a whole system; a module is never a platform.
       if ((hub.element_type === 'system' && isIntegrationPlatform(hub)) || isIntegrationInterface(hub, hubParent)) {
+        // system-only: an integration platform is a whole system; a module is never a platform.
         const hubChildren = hub.element_type === 'system' ? (projection ? projectionChildrenOf(projection, elementId) : await listChildrenOf(supabase, commitId, elementId)) : [];
         const viaIds = flowViaIdsFor(hub, hubParent, hubChildren);
         const interfaces = new Map(hubChildren.filter((c) => c.element_type === 'container').map((c) => [c.element_id, c]));

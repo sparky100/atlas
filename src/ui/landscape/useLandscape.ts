@@ -326,6 +326,7 @@ export function useLandscape(
         if (platform) moduleNodes.push({ ...container, name: moduleDisplayName(container, platform) });
       }
       if (moduleNodes.length > 0) allSystems = [...allSystems, ...moduleNodes];
+      // system-only: an integration platform is a whole system; a module is never a platform.
       const integrationPlatformIds = new Set(allSystems.filter((s) => s.element_type === 'system' && isIntegrationPlatform(s)).map((s) => s.element_id));
       const platformIdByInterfaceId = new Map(allContainers.flatMap((c) => (c.parent_id !== null && integrationPlatformIds.has(c.parent_id) ? [[c.element_id, c.parent_id] as const] : [])));
 

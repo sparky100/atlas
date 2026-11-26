@@ -8,6 +8,7 @@ import { lifecycleToneFor } from '../elements/lifecycleTone';
 import { edgeLabel, type ContextGroup } from './contextGrouping';
 import { contextInspectorFocusedNeighbour } from './contextInspectorSelection';
 import styles from './ContextInspectorContent.module.css';
+import { isSystemLikeType } from '../../contracts/elementKinds';
 
 function capitalize(value: string): string {
   return value.length === 0 ? value : value.charAt(0).toUpperCase() + value.slice(1);
@@ -158,8 +159,8 @@ export function ContextInspectorContent({ group, focusedElementId, elementHref, 
   const displayName = focusedNeighbour?.displayName ?? group.hubDisplayName;
   const attrs = attributesRecord(element.attributes);
   const external = attrs.isExternal === true;
-  const lifecycleStatus = (element.element_type === 'system' || element.element_type === 'container') && typeof attrs.lifecycleStatus === 'string' ? attrs.lifecycleStatus : null;
-  const canGoToContext = !isHub && (element.element_type === 'system' || element.element_type === 'container');
+  const lifecycleStatus = (isSystemLikeType(element.element_type)) && typeof attrs.lifecycleStatus === 'string' ? attrs.lifecycleStatus : null;
+  const canGoToContext = !isHub && (isSystemLikeType(element.element_type));
 
   return (
     <>

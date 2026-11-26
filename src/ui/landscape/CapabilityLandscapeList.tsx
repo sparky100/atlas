@@ -99,6 +99,7 @@ function Row({
   const external = attrs.isExternal === true;
   const lifecycleStatus = typeof attrs.lifecycleStatus === 'string' ? attrs.lifecycleStatus : null;
   const lifecycleTone = lifecycleStatus !== null ? lifecycleToneFor(lifecycleStatus) : undefined;
+  // system-only: the AI-agent mark is a setting of a whole system.
   const mark = system.element_type === 'system' ? aiMarkOf(system) : null;
   // See `elementHref`/`contextHref`'s own prop comments.
   const isModule = system.element_type === 'container';
