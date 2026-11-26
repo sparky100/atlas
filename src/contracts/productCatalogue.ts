@@ -52,7 +52,11 @@ export type CatalogueEntry = z.infer<typeof catalogueEntrySchema>;
 export type CatalogueClaim = z.infer<typeof catalogueClaimSchema>;
 export type CatalogueCapability = z.infer<typeof catalogueCapabilitySchema>;
 export interface CatalogueSnapshot {
-  sector: string; version: number; capabilityMapVersion: number; catalogueTitle: string; licence: 'CC-BY-4.0';
+  sector: string; version: number; catalogueTitle: string; licence: string;
+  /** Sector catalogue entries only: the starter-map version the catalogue was pinned to. A product revision has none. */
+  capabilityMapVersion?: number;
+  /** Product revisions only (sector 'product'): who approved the revision and when. */
+  approvedByName?: string | null; approvedAt?: string;
   entryCode: string; product: string; vendor: string; summary: string;
   capabilities: CatalogueCapability[]; claims: CatalogueClaim[];
 }

@@ -14,6 +14,9 @@
 import { expect, test, type Page } from '@playwright/test';
 import { addContainerFromHome, addSystemFromHome, goToModelHome, seedStarterCapabilityMap, signUpCreateOrgAndModel } from './fixtures/goldenPath';
 import { optionSurface } from './fixtures/decisionLayout';
+import { randomUUID } from 'node:crypto';
+import { createServiceRoleClient } from '../src/db/client';
+import { loadEnv } from '../src/db/env';
 
 /** The search dialog, as a user at this width opens it (same as golden-path-search-and-landscape-find). */
 async function openSearch(page: Page): Promise<void> {
@@ -268,4 +271,75 @@ test('a product that is already a module of a platform is found and chosen as th
   await module.first().click();
   await expect(page.getByText(/Replaced by/)).toBeVisible();
   await expect(page.getByLabel('New system name')).toHaveCount(0);
+});
+
+/**
+ * Catalogue step 4b-2: a product published on its own (not in the sector
+ * catalogue) is listed for the capability, and "Make it an option" saves a
+ * citation to that product's revision. Test setup, not a production path: the
+ * published revision is seeded with the service role, because publishing by an
+ * admin is covered in catalogue-shared-capability.engine.spec.ts. Withdrawn at
+ * the end so no other spec sees it.
+ */
+test('a product published on its own is listed and becomes an option citing its revision', async ({ page }) => {
+  test.slow();
+  const service = createServiceRoleClient(loadEnv());
+  const suffix = randomUUID().slice(0, 8);
+  const productName = `Quoting Suite ${suffix}`;
+  const zero = '00000000-0000-0000-0000-000000000000';
+  const checked = (result: { error: { message: string } | null }) => { if (result.error) throw new Error(`product-revision seed: ${result.error.message}`); };
+  const productResult: { data: { id: string } | null; error: { message: string } | null } = await service.from('catalogue_products').insert({
+    code: `quoting-suite-${suffix}`, product: productName, vendor: `Acme ${suffix}`, summary: 'Prepares connection quotes.', created_by: zero, updated_by: zero,
+  }).select('id').single();
+  const product = productResult.data;
+  if (productResult.error || !product) throw new Error(`product-revision seed: ${productResult.error?.message ?? 'no row'}`);
+  const revisionResult: { data: { id: string } | null; error: { message: string } | null } = await service.from('catalogue_product_revisions').insert({
+    product_id: product.id, revision: 1, product_edit_revision: 1, code: `quoting-suite-${suffix}`, product: productName, vendor: `Acme ${suffix}`,
+    summary: 'Prepares connection quotes.', published_by: zero, published_by_name: 'Test Approver',
+  }).select('id').single();
+  const revision = revisionResult.data;
+  if (revisionResult.error || !revision) throw new Error(`product-revision seed: ${revisionResult.error?.message ?? 'no row'}`);
+  checked(await service.from('catalogue_product_revision_claims').insert({
+    revision_id: revision.id, position: 1, kind: 'functional', statement: 'The vendor describes it as a quoting product.', source_url: 'https://example.test/quoting',
+    source_date: '2026-11-01', origin: 'person', drafted_by_name: 'Test Drafter', drafted_at: new Date().toISOString(), reviewed_by: 'Test Reviewer', reviewed_at: '2026-11-02',
+  }));
+  checked(await service.from('catalogue_product_revision_links').insert({
+    revision_id: revision.id, kind: 'sector', sector: 'electricity_network', capability_code: '11.4', capability_name: 'Connection Quotations', how_it_supports: 'Prepares the quote.',
+  }));
+
+  try {
+    await signUpCreateOrgAndModel(page, 'productrevision');
+    await seedStarterCapabilityMap(page, /^Electricity Network Operator$/);
+    await goToModelHome(page);
+    await openSearch(page);
+    await page.getByLabel('Search elements, changes, decisions and projects').fill('Connection Quotations');
+    await page.getByRole('option', { name: /Connection Quotations/ }).first().click();
+    await page.getByRole('button', { name: 'Element actions' }).click();
+    await page.getByRole('link', { name: 'Start a decision…' }).click();
+    await page.getByRole('button', { name: 'Start decision' }).click();
+    await expect(page.getByTestId('decision-outcome')).toBeVisible();
+    await page.getByRole('button', { name: '+ Add an option' }).click();
+    await page.getByRole('radio', { name: 'Buy a product', exact: true }).check();
+    await page.getByPlaceholder("What's this option? (e.g. Replace with Workday)").fill('Buy a quoting product');
+    await page.getByRole('button', { name: 'Add option' }).click();
+
+    // Listed beside the sector catalogue's products.
+    const listed = page.getByTestId('capability-products').getByRole('listitem').filter({ hasText: productName }).first();
+    await expect(listed).toBeVisible();
+    await expect(page.getByTestId('capability-products').getByRole('listitem').filter({ hasText: 'Salesforce Energy and Utilities Cloud' }).first()).toBeVisible();
+    await listed.getByRole('button', { name: 'Make it an option' }).click();
+    await expect(listed.getByText(`Added a new option: Use ${productName}.`)).toBeVisible();
+
+    await page.reload();
+    const grid = page.getByTestId('decision-criteria-grid');
+    await expect(grid.getByText(`Use ${productName}`).first()).toBeVisible();
+    if ((page.viewportSize()?.width ?? 1280) < 700) await grid.getByText('Details and evidence').last().click();
+    await grid.getByRole('button', { name: 'Sources (1)' }).first().click();
+    await expect(grid.getByTestId('option-sources').first()).toContainText('revision 1');
+    expect(await page.evaluate(() => document.documentElement.scrollWidth > document.documentElement.clientWidth + 1)).toBe(false);
+  } finally {
+    await service.from('catalogue_product_revisions').update({
+      withdrawn_at: new Date().toISOString(), withdrawn_by: zero, withdrawn_by_name: 'Test cleanup', withdrawn_reason: 'Playwright seed removed.',
+    }).eq('id', revision.id);
+  }
 });

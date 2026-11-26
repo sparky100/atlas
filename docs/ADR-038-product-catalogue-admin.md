@@ -197,3 +197,30 @@ Migration `20261126230000_catalogue_published_products_readable.sql`.
 - **One reader**, `listPublishedProductsForCapability` (`src/db/publishedProducts.ts`),
   matches a capability's shared identity or its sector code. No screen uses it
   yet (step 4b-2).
+
+## Amendment, 26 November 2026: screens and citations switch to published products (step 4b-2)
+
+Migration `20261126240000_catalogue_cite_product_revisions.sql`.
+
+- **What users see.** The capability page and the decision products panel list
+  published products first. A product that exists only in a sector catalogue
+  (electricity v1) keeps showing from it, so nothing disappears. When both
+  exist, the product wins, matched on vendor and product name (case ignored).
+  The Designer's product list uses the same reader.
+- **Citation convention (changes the walkthrough).** The walkthrough proposed a
+  new product-revision column on `option_catalogue_sources`. Instead a citation
+  to a product revision reuses the existing columns: `sector = 'product'`,
+  `version` = the revision number, `entry_code` = the product's stable code.
+  This keeps the two guarded functions, the Designer's `catalogueRefs` shape,
+  the pack and the ADR export working for old and new citations alike, and old
+  citations are untouched.
+- **Snapshot.** The existing snapshot trigger builds the snapshot of a product
+  revision (claims with reviewer, links, publisher and approver) through a
+  helper that is not callable through the API. Only a product's currently
+  published revision can be newly cited.
+- **Standing.** Computed from the cited revision: current, replaced by a newer
+  revision, or withdrawn (with its reason). A saved citation stays readable
+  after withdrawal.
+- **Who can see what.** A revision that is withdrawn or replaced becomes
+  readable to a user only if one of their organisation's options cites it. No
+  new callable function; no change to the guarded functions' checks.

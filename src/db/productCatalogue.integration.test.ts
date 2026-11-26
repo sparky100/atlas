@@ -430,6 +430,49 @@ describe('product catalogue and option evidence, real database', () => {
     expect((await listOptionSources(owner.client, decisionId)).map((x) => x.optionId)).toEqual([optionId]);
   });
 
+  it('cites a product published on its own: saved with a snapshot, replaced by a newer revision, withdrawn, and never cited once replaced', async () => {
+    const suffix = randomUUID().slice(0, 8);
+    const code = `test-cite-${suffix}`;
+    const productId = randomUUID();
+    check(await service.from('catalogue_products').insert({ id: productId, code, product: `Cited product ${suffix}`, vendor: 'Test vendor', summary: 'A product to cite.', created_by: owner.id, updated_by: owner.id }));
+    const revision = async (n: number, summary: string) => {
+      const id = randomUUID();
+      check(await service.from('catalogue_product_revisions').insert({ id, product_id: productId, revision: n, product_edit_revision: n, code, product: `Cited product ${suffix}`, vendor: 'Test vendor', summary, published_by: owner.id, published_by_name: 'Priya' }));
+      check(await service.from('catalogue_product_revision_claims').insert({ revision_id: id, position: 1, kind: 'functional', statement: 'The vendor describes this as a test product.', source_url: 'https://example.test/cite', source_date: '2026-11-01', origin: 'person', drafted_at: '2026-11-02T09:00:00Z', reviewed_by: 'Priya', reviewed_by_user: owner.id, reviewed_at: '2026-11-03' }));
+      return id;
+    };
+    await revision(1, 'First summary.');
+    const { decisionId } = await option();
+    const optionId = randomUUID();
+    await createDecisionOption(contributor.client, { id: optionId, decisionId, title: `Use Cited product ${suffix}`, summary: 'A product.', approach: 'buy', createdBy: contributor.id });
+    await insertOptionCatalogueSource(contributor.client, { decisionId, optionId, sector: 'product', version: 1, entryCode: code, citedBy: contributor.id });
+    const saved = await listOptionSources(viewer.client, decisionId);
+    expect(saved).toEqual([expect.objectContaining({ kind: 'catalogue', sector: 'product', version: 1, entryCode: code, summary: 'First summary.', standing: 'current' })]);
+    const first = saved[0];
+    expect(first?.kind === 'catalogue' ? first.claims : []).toHaveLength(1);
+
+    // A newer revision replaces it; the saved citation keeps its own words and says so.
+    await revision(2, 'Second summary.');
+    const replaced = await listOptionSources(viewer.client, decisionId);
+    expect(replaced).toEqual([expect.objectContaining({ version: 1, summary: 'First summary.', standing: 'replaced' })]);
+    // The cited revision stays readable to someone who can see the decision, but not to another organisation.
+    expect(((await viewer.client.from('catalogue_product_revisions').select('revision').eq('code', code).eq('revision', 1)).data ?? [])).toHaveLength(1);
+    expect(((await outsider.client.from('catalogue_product_revisions').select('revision').eq('code', code).eq('revision', 1)).data ?? [])).toHaveLength(0);
+    // A replaced revision cannot be newly cited; the current one can.
+    const second = randomUUID();
+    await createDecisionOption(owner.client, { id: second, decisionId, title: `Buy Cited product ${suffix}`, approach: 'buy', createdBy: owner.id });
+    await expect(insertOptionCatalogueSource(owner.client, { decisionId, optionId: second, sector: 'product', version: 1, entryCode: code, citedBy: owner.id })).rejects.toThrow();
+    await insertOptionCatalogueSource(owner.client, { decisionId, optionId: second, sector: 'product', version: 2, entryCode: code, citedBy: owner.id });
+
+    // Withdrawing the newest revision leaves both citations saved, and both say the product is no longer published.
+    check(await service.from('catalogue_product_revisions').update({ withdrawn_at: '2026-11-27T10:00:00Z', withdrawn_reason: 'The vendor sold the product.' }).eq('product_id', productId).eq('revision', 2));
+    const standings = (await listOptionSources(viewer.client, decisionId)).map((x) => (x.kind === 'catalogue' ? `${String(x.version)}:${x.standing}` : '')).sort();
+    expect(standings).toEqual(['1:withdrawn', '2:withdrawn']);
+    // Viewers and other organisations still cannot cite anything.
+    await expect(insertOptionCatalogueSource(viewer.client, { decisionId, optionId: second, sector: 'product', version: 2, entryCode: code, citedBy: viewer.id })).rejects.toThrow();
+    await expect(insertOptionCatalogueSource(outsider.client, { decisionId, optionId: second, sector: 'product', version: 2, entryCode: code, citedBy: outsider.id })).rejects.toThrow();
+  });
+
   it('keeps snapshots unchanged across replacement/withdrawal and allows withdrawal only once', async () => {
     const s = await seed(); check(await publish(s.id)); const m = await option();
     await addOptionWithCatalogueSources(owner.client, m, [s.citation]);

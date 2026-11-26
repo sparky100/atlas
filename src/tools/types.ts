@@ -11,15 +11,14 @@ import type { OpenDecisionElementLink } from '../db/decisions';
 import type { GoalCapabilityRow, GoalRow } from '../contracts/goals';
 import type { DecisionPrincipleRow, PrincipleRow } from '../contracts/principles';
 import type { BranchRow, DecisionRow, ProjectRow, SavedReportRow } from '../db/types';
-import type { CatalogueEntry } from '../db/productCatalogue';
+import type { CitableCatalogueEntry } from '../db/productCatalogue';
 
-/** Current published catalogue products for one capability, with the catalogue version they came from. */
+/** Current published products for one capability, each with the citation to save for it (a product revision or a sector catalogue entry). */
 export interface CapabilityCatalogue {
   sector: string;
   capabilityCode: string;
   capabilityName: string;
-  catalogueVersion: number;
-  entries: readonly CatalogueEntry[];
+  entries: readonly CitableCatalogueEntry[];
 }
 
 /** What the lookup needs from a capability when its stored starter-map item may be stale. */

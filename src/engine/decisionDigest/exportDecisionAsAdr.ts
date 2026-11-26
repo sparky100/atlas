@@ -1,6 +1,6 @@
 import { OPTION_APPROACH_LABELS, type OptionApproach } from '../../contracts/optionApproach';
 import type { DecisionAgentNote } from '../../contracts/decisionAgentNote';
-import type { OptionSource } from '../../contracts/optionSource';
+import { citationLabel, type OptionSource } from '../../contracts/optionSource';
 import type { UUID } from '../../contracts/delta';
 import { aiMarkLine } from './aiMarks';
 import type { BranchRow, DecisionRow } from '../../db/types';
@@ -143,10 +143,10 @@ function optionSourceLines(option: DecisionAdrExportOption): string[] {
       continue;
     }
     const standing = source.standing === 'current'
-      ? `current in catalogue v${String(source.version)}`
+      ? `current in ${citationLabel(source)}`
       : source.standing === 'replaced'
-        ? `saved from catalogue v${String(source.version)}, since replaced`
-        : `saved from catalogue v${String(source.version)}, now withdrawn`;
+        ? `saved from ${citationLabel(source)}, since replaced`
+        : `saved from ${citationLabel(source)}, now withdrawn`;
     lines.push(`    - ${source.product} - ${source.vendor} (${standing})`);
     for (const claim of source.claims) {
       lines.push(`      - ${claim.statement} - ${claim.sourceUrl} (source dated ${claim.sourceDate})`);

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import type { CatalogueEntry } from '../db/productCatalogue';
+import type { CitableCatalogueEntry } from '../db/productCatalogue';
 import { callTool } from './index';
 import type { CapabilityCatalogue, ToolContext, ToolResult } from './types';
 import { element, estateContext, estateSnapshot, uid } from './fixtures/estateSnapshot';
@@ -9,11 +9,12 @@ function ok(result: ToolResult) {
   return result;
 }
 
-const entry: CatalogueEntry = {
+const entry: CitableCatalogueEntry = {
+  citation: { sector: 'electricity_network', version: 2 },
   id: 'entry-1', code: 'crm-x', product: 'CRM X', vendor: 'Vendor Ltd', summary: 'A CRM.', howItSupports: 'Records complaints.',
   claims: [{ statement: 'Records complaints.', kind: 'functional', sourceUrl: 'https://vendor.example/crm', sourceDate: '2026-01-01', reviewedBy: 'Simon Parkinson', reviewedAt: '2026-01-02' }],
 };
-const catalogue: CapabilityCatalogue = { sector: 'electricity_network', capabilityCode: '5.4', capabilityName: 'Complaints', catalogueVersion: 2, entries: [entry] };
+const catalogue: CapabilityCatalogue = { sector: 'electricity_network', capabilityCode: '5.4', capabilityName: 'Complaints', entries: [entry] };
 
 function context(catalogueForCapability: ToolContext['catalogueForCapability']): ToolContext {
   return { ...estateContext({ snapshot: estateSnapshot({ elements: [element(70, 'capability', 'Complaints', { templateRef: uid(700), code: '5.4' }), element(71, 'capability', 'Hand-made capability')] }) }), ...(catalogueForCapability ? { catalogueForCapability } : {}) };
@@ -26,10 +27,20 @@ describe('find_catalogue_products', () => {
     expect(lookup).toEqual({ templateRef: uid(700), code: '5.4' });
     expect(result.data).toMatchObject({
       capability: { id: uid(70), name: 'Complaints', code: '5.4' },
-      catalogue: { sector: 'electricity_network', version: 2 },
-      products: [{ entryCode: 'crm-x', product: 'CRM X', vendor: 'Vendor Ltd', claims: [{ statement: 'Records complaints.' }] }],
+      products: [{ entryCode: 'crm-x', catalogueRef: { sector: 'electricity_network', version: 2, entryCode: 'crm-x' }, product: 'CRM X', vendor: 'Vendor Ltd', claims: [{ statement: 'Records complaints.' }] }],
     });
     expect(result.total).toBe(1);
+  });
+
+  it('gives a product published on its own the citation of its revision', async () => {
+    const published: CitableCatalogueEntry = { ...entry, id: 'rev-1', code: 'crm-y', product: 'CRM Y', citation: { sector: 'product', version: 3 } };
+    const result = ok(await callTool(context(() => Promise.resolve({ ...catalogue, entries: [published, entry] })), 'find_catalogue_products', { capability_element_id: uid(70) }));
+    expect(result.data).toMatchObject({
+      products: [
+        { catalogueRef: { sector: 'product', version: 3, entryCode: 'crm-y' } },
+        { catalogueRef: { sector: 'electricity_network', version: 2, entryCode: 'crm-x' } },
+      ],
+    });
   });
 
   it('refuses to guess for a hand-made capability or for an element that is not a capability', async () => {

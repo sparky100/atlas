@@ -107,7 +107,7 @@ async function returnedCatalogueProducts(ctx: ToolContext, toolUses: readonly { 
   for (const catalogue of catalogues) {
     if (catalogue === null) continue;
     for (const entry of catalogue.entries) {
-      const ref = { sector: catalogue.sector, version: catalogue.catalogueVersion, entryCode: entry.code };
+      const ref = { sector: entry.citation.sector, version: entry.citation.version, entryCode: entry.code };
       products.set(catalogueRefKey(ref), {
         ref,
         product: entry.product,

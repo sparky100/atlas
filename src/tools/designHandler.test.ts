@@ -186,8 +186,8 @@ describe('handleDesign', () => {
     const ctx: ToolContext = {
       ...estateContext({ snapshot: estateSnapshot({ elements: [element(70, 'capability', 'Complaints', { templateRef: uid(700) })] }) }),
       catalogueForCapability: () => Promise.resolve({
-        sector: 'electricity_network', capabilityCode: '5.4', capabilityName: 'Complaints', catalogueVersion: 2,
-        entries: [{ id: 'e1', code: 'crm-x', product: 'CRM X', vendor: 'Vendor Ltd', summary: 'A CRM.', howItSupports: 'Records complaints.', claims: [{ statement: 'Records complaints.', kind: 'functional', sourceUrl: 'https://vendor.example/crm', sourceDate: '2026-01-01', reviewedBy: 'Simmodlr', reviewedAt: '2026-01-02' }] }],
+        sector: 'electricity_network', capabilityCode: '5.4', capabilityName: 'Complaints',
+        entries: [{ citation: { sector: 'electricity_network', version: 2 }, id: 'e1', code: 'crm-x', product: 'CRM X', vendor: 'Vendor Ltd', summary: 'A CRM.', howItSupports: 'Records complaints.', claims: [{ statement: 'Records complaints.', kind: 'functional', sourceUrl: 'https://vendor.example/crm', sourceDate: '2026-01-01', reviewedBy: 'Simmodlr', reviewedAt: '2026-01-02' }] }],
       }),
     };
     const answer = JSON.stringify({ options: [{ title: 'Replace', summary: 'Buy a CRM.', catalogueRefs: [{ sector: 'electricity_network', version: 2, entryCode: 'crm-x' }] }, { title: 'Build', summary: 'Build it.', catalogueRefs: [{ sector: 'electricity_network', version: 2, entryCode: 'not-returned' }] }], gaps: [], stayNote: '' });

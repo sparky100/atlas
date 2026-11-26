@@ -264,6 +264,19 @@ describe('exportDecisionAsAdrMarkdown', () => {
     expect(markdown).toContain('These are questions a person kept, not a review, clearance or sign-off.');
     expect(exportDecisionAsAdrMarkdown(base)).not.toContain('## Questions raised by an AI reviewer');
   });
+  it('names a product revision in words when the saved evidence is a product published on its own', () => {
+    const branch = makeBranch();
+    const source: OptionSource = {
+      kind: 'catalogue', id: 'branch-1:product:3:crm-y', optionId: 'option-1', branchId: branch.id, sector: 'product', version: 3,
+      entryCode: 'crm-y', product: 'CRM Y', vendor: 'Vendor Ltd', summary: 'A CRM.', licence: 'Atlas product library',
+      standing: 'current', citedBy: 'user-1', citedAt: '2026-11-21T09:00:00Z', claims: [],
+    };
+    const markdown = exportDecisionAsAdrMarkdown({
+      decision: makeDecision(), ownerName: 'Alice', concerns: [], whatChangesRows: [], reasons: null,
+      options: [{ branch, isChosen: false, ratings: [], sources: [source] }],
+    });
+    expect(markdown).toContain('    - CRM Y - Vendor Ltd (current in product revision 3)');
+  });
   it('lists saved catalogue evidence under its option, with the claim, source and reviewer, and keeps standing live', () => {
     const branch = makeBranch();
     const source: OptionSource = {
