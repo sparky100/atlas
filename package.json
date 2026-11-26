@@ -32,6 +32,7 @@
     "content:export-capability-map": "tsx scripts/exportCapabilityMap.ts",
     "content:review-catalogue": "tsx scripts/reviewCatalogue.ts",
     "content:load-catalogue": "tsx scripts/loadCatalogue.ts",
+    "content:build-catalogue-import": "tsx scripts/buildCatalogueImport.ts",
     "content:publish-catalogue": "tsx scripts/publishCatalogue.ts",
     "content:inventory": "tsx scripts/referenceInventory.ts",
     "check:case-collisions": "tsx scripts/checkCaseCollisions.ts",

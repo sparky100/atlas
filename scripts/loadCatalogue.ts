@@ -19,6 +19,7 @@ import { fileURLToPath } from 'node:url';
 import { productCatalogueContentSchema, type ProductCatalogueContent } from '../src/contracts/productCatalogue';
 import { createServiceRoleClient } from '../src/db/client';
 import { loadEnv } from '../src/db/env';
+import { assertCatalogueFilesAllowed } from './catalogueFilesGuard';
 import { isCliEntrypoint } from './isCliEntrypoint';
 
 const CONTENT_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', 'content', 'catalogue');
@@ -133,7 +134,9 @@ export async function loadCatalogueVersion(supabase: ReturnType<typeof createSer
 }
 
 async function main(): Promise<void> {
-  const supabase = createServiceRoleClient(loadEnv());
+  const env = loadEnv();
+  assertCatalogueFilesAllowed(env.SUPABASE_URL);
+  const supabase = createServiceRoleClient(env);
   const files = await contentFiles();
   if (files.length === 0) {
     console.error('No catalogue content found under content/catalogue/<sector>/<version>.json.');

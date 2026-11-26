@@ -1,6 +1,8 @@
 # Sector catalogue content — editorial handoff
 
-Status: draft research, 21 November 2026. These files are not approved, loaded, or published.
+**Update, 26 November 2026:** these files were loaded into the product library once (migration `20261126210000_catalogue_import_from_files.sql`, every claim as drafted and waiting for review) and are now history. Products are maintained in Platform admin > Products; the loader scripts refuse to write to the live project.
+
+Status when written: draft research, 21 November 2026. These files were not approved, loaded, or published.
 
 The 16 new sector files contain 114 selected entries. The existing electricity-network catalogue remains at version 1, pinned to capability map version 4, with 19 entries and has not been edited here. Across all 17 files there are 133 entries. This is a broad starting selection, not an exhaustive market survey or a product recommendation.
 
