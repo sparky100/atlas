@@ -11,8 +11,20 @@ describe('optionDraftActions', () => {
     expect(labels('buy', [], [quote], ['Connection Quotations'])).toEqual(['Retire Quote Tool and replace it with a new system']);
   });
 
-  it('buy: a system the decision names and the same system as supporter appear once', () => {
-    expect(labels('buy', [quote], [quote, sys(2, 'IS-U')], ['Billing'])).toEqual(['Retire Quote Tool and replace it with a new system', 'Retire IS-U and replace it with a new system']);
+  it('buy: only the system the decision names, not the capability\'s other supporters', () => {
+    expect(labels('buy', [quote], [quote, sys(2, 'IS-U')], ['Billing'])).toEqual(['Retire Quote Tool and replace it with a new system']);
+  });
+
+  it('buy: Smallworld GIS decision offers only Smallworld GIS, though other systems support the capability', () => {
+    const smallworld = sys(3, 'Smallworld GIS');
+    const others = [sys(4, 'Utility Network'), sys(5, 'DIgSILENT PowerFactory')];
+    expect(labels('buy', [smallworld], [smallworld, ...others], ['Network Mapping'])).toEqual(['Retire Smallworld GIS and replace it with a new system']);
+    expect(labels('configure', [smallworld], [smallworld, ...others], ['Network Mapping'])).toEqual(['Extend Smallworld GIS to cover Network Mapping']);
+    expect(labels('build', [smallworld], [smallworld, ...others], ['Network Mapping'])).toEqual(['Retire Smallworld GIS and replace it with a custom-built app']);
+  });
+
+  it('buy: a decision about a capability, naming no system, offers the capability\'s supporters', () => {
+    expect(labels('buy', [], [quote, sys(2, 'IS-U')], ['Billing'])).toEqual(['Retire Quote Tool and replace it with a new system', 'Retire IS-U and replace it with a new system']);
   });
 
   it('configure: extend the supporting system to cover the capability', () => {

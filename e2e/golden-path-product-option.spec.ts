@@ -171,3 +171,38 @@ test('working on a Use <product> option offers to retire the current system and 
   await expect(page.getByLabel('New system name')).toHaveValue('Salesforce Energy and Utilities Cloud');
   await expect(page.getByLabel('Planned end', { exact: true })).toBeVisible();
 });
+
+/** Simon, 2026-11-26: the replacement might be a product that is not on the list, entered by hand. */
+test('a different product can be typed on the change and the Retire panel opens with that name', async ({ page }) => {
+  test.slow();
+  await signUpCreateOrgAndModel(page, 'productmanual');
+  await seedStarterCapabilityMap(page, /^Electricity Network Operator$/);
+  await goToModelHome(page);
+  await addSystemFromHome(page, { name: 'Legacy Quote Tool', description: 'Issues connection quotes.', capabilityName: 'Connection Quotations' });
+  await goToModelHome(page);
+  await openSearch(page);
+  await page.getByLabel('Search elements, changes, decisions and projects').fill('Connection Quotations');
+  await page.getByRole('option', { name: /Connection Quotations/ }).first().click();
+  await page.getByRole('button', { name: 'Element actions' }).click();
+  await page.getByRole('link', { name: 'Start a decision…' }).click();
+  await page.getByRole('button', { name: 'Start decision' }).click();
+  await expect(page.getByTestId('decision-outcome')).toBeVisible();
+  // A Buy option with no listed product behind it: the product is entered by hand on the change.
+  await page.getByRole('button', { name: '+ Add an option' }).click();
+  await page.getByRole('radio', { name: 'Buy a product', exact: true }).check();
+  await page.getByPlaceholder("What's this option? (e.g. Replace with Workday)").fill('Replace with a product');
+  await page.getByRole('button', { name: 'Add option' }).click();
+  await optionSurface(page, 'Replace with a product').getByRole('button', { name: 'Work on this option' }).click();
+  await expect(page).toHaveURL(/\/changes\//);
+  const draftLink = page.getByRole('link', { name: "Draft this option's changes" });
+  if (await draftLink.count() > 0) await draftLink.click();
+
+  const card = page.getByTestId('option-draft-card');
+  await expect(card.getByRole('link', { name: 'Retire Legacy Quote Tool and replace it with a new system' })).toBeVisible();
+  await card.getByLabel(/Product that replaces it/).fill('Acme Quoting Suite');
+  const link = card.getByRole('link', { name: 'Retire Legacy Quote Tool and replace it with Acme Quoting Suite' });
+  await expect(link).toBeVisible();
+  expect(await page.evaluate(() => document.documentElement.scrollWidth > document.documentElement.clientWidth + 1)).toBe(false);
+  await link.click();
+  await expect(page.getByLabel('New system name')).toHaveValue('Acme Quoting Suite');
+});

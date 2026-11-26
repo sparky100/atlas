@@ -3,6 +3,7 @@ import type { OptionApproach } from '../../contracts/optionApproach';
 
 /**
  * Deterministic starting edits for an option change that has none yet (no AI).
+ * Systems the decision names come first and are the only ones offered; the capability's supporters are used only when it names none.
  * What is offered follows the option's stored approach
  * (`decision_options.approach`), because buying a product and building
  * ourselves are different first edits:
@@ -39,13 +40,16 @@ const MAX_PER_KIND = 3;
 export function optionDraftActions(kind: OptionKind | null, concernedSystems: readonly DraftSystem[], supporters: readonly DraftSystem[], capabilityNames: readonly string[], product: string | null = null): OptionDraftAction[] {
   const capability = capabilityNames[0] ?? null;
   const unique = (systems: readonly DraftSystem[]) => [...new Map(systems.map((s) => [s.id, s])).values()];
+  // The decision already says which system it is about: offer only those. The capability's other
+  // supporters are a fallback for a decision that names none (it is about the capability itself).
+  const candidates = () => unique(concernedSystems.length > 0 ? concernedSystems : supporters);
   switch (kind) {
     case 'buy':
-      return unique([...concernedSystems, ...supporters]).slice(0, MAX_PER_KIND).map((s): OptionDraftAction => ({ kind: 'retire-and-replace', systemId: s.id, systemName: s.name, capabilityName: capability, ...(product === null ? {} : { product }) }));
+      return candidates().slice(0, MAX_PER_KIND).map((s): OptionDraftAction => ({ kind: 'retire-and-replace', systemId: s.id, systemName: s.name, capabilityName: capability, ...(product === null ? {} : { product }) }));
     case 'configure':
-      return capability === null ? [] : unique([...concernedSystems, ...supporters]).slice(0, MAX_PER_KIND).map((s): OptionDraftAction => ({ kind: 'extend', systemId: s.id, systemName: s.name, capabilityName: capability }));
+      return capability === null ? [] : candidates().slice(0, MAX_PER_KIND).map((s): OptionDraftAction => ({ kind: 'extend', systemId: s.id, systemName: s.name, capabilityName: capability }));
     case 'build': {
-      const existing = unique([...concernedSystems, ...supporters]).slice(0, MAX_PER_KIND);
+      const existing = candidates().slice(0, MAX_PER_KIND);
       if (existing.length > 0) return existing.map((s): OptionDraftAction => ({ kind: 'retire-and-replace', systemId: s.id, systemName: s.name, capabilityName: capability, custom: true }));
       return [{ kind: 'create', systemId: null, systemName: '', capabilityName: capability }];
     }
