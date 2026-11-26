@@ -1,4 +1,4 @@
-import { sourceCheckLabel, type SourceCheckRow } from '../../contracts/catalogueAdmin';
+import { claimCheckVerdictLabel, sourceCheckLabel, type ClaimCheckRow, type SourceCheckRow } from '../../contracts/catalogueAdmin';
 import type { CapabilitySetOption, CatalogueClaimReview, CatalogueProductContent, CatalogueVersionSummary, ClaimOrigin, ProductPublicationLabel, ProductPublicationState } from '../../contracts/catalogueAdmin';
 
 /** The label this admin UI uses everywhere for a sector id. */
@@ -94,3 +94,12 @@ export function sourceCheckSentence(check: SourceCheckRow): string {
   return `${sourceCheckLabel(check.result)}${status}, ${when}`;
 }
 
+
+/** What the AI found for one claim, or that it has not been checked, in a sentence for the product editor. Always says the AI did it (rule A1). */
+export function claimCheckSentence(check: ClaimCheckRow | undefined): string {
+  if (check === undefined) return 'Claim not checked against its source yet.';
+  const by = `checked by the AI${check.model === null ? '' : ` (${check.model})`} on ${formatDay(check.checkedAt)}`;
+  const looked = check.dismissedAt === null ? '' : ` Looked at and kept by ${check.dismissedByName ?? 'a platform admin'} on ${formatDay(check.dismissedAt)}.`;
+  const quote = check.quote === null ? '' : ` The page says: “${check.quote}”.`;
+  return `Source check: ${claimCheckVerdictLabel(check.verdict)}, ${by}.${quote}${check.note === null ? '' : ` ${check.note}`}${looked}`;
+}

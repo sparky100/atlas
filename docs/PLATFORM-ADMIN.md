@@ -60,6 +60,18 @@ else in this product checks platform-admin status.
    never edits a claim or unpublishes a product. It needs the
    `catalogue-link-check` function deployed (`pnpm functions:deploy:catalogue-link-check`);
    until then the screen says the checker is not available.
+   Below it, **Claims against their sources** has **Check claims against their
+   sources**: the AI reads each claim's page and says whether it is still
+   supported, has changed, or it can't tell. It must quote a sentence from the
+   page, and the quote is verified against the page text; without a real quote
+   the answer is saved as "Can't tell", never "Still supported". Claims that
+   changed or can't be told are listed under **Claims to look at**, marked as
+   checked by the AI and not by a person; **I looked: it still stands** records
+   your name and the date. The check only flags: it never edits a claim or
+   unpublishes a product, and it uses the platform AI key with a daily token
+   limit (1,000,000; re-checks are not counted until saved). It needs the
+   `catalogue-claim-check` function deployed
+   (`pnpm functions:deploy:catalogue-claim-check`) and the platform AI key set.
 4. **Withdraw or reinstate a published sample model** at
    `/platform-admin/sample-models`, with each sample's own page at
    `/platform-admin/sample-models/:slug`. A sample is withdrawn

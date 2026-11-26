@@ -210,3 +210,50 @@ for (const viewport of [{ width: 1280, height: 800 }, { width: 390, height: 844 
     await page.screenshot({ path: `test-results/catalogue-source-links-${String(viewport.width)}.png`, fullPage: true });
   });
 }
+
+/** Step 5b-1: a claim the AI found changed is listed with the page's own words; a platform admin can mark it as looked at, and the product editor says what was found. */
+for (const viewport of [{ width: 1280, height: 800 }, { width: 390, height: 844 }]) {
+  test(`claims the AI flagged are listed and can be marked as looked at at ${String(viewport.width)}`, async ({ page }) => {
+    await page.setViewportSize(viewport);
+    const service = createServiceRoleClient(loadEnv());
+    const suffix = randomUUID().slice(0, 8);
+    const productName = `Claim check product ${suffix}`;
+    const sourceUrl = `https://example.test/claim-${suffix}`;
+    const statement = `The vendor says this product supports feature ${suffix}.`;
+    const quote = 'This feature was retired in the latest release.';
+    const zero = '00000000-0000-0000-0000-000000000000';
+    const productResult: { data: { id: string } | null; error: { message: string } | null } = await service.from('catalogue_products').insert({
+      code: `claim-check-${suffix}`, product: productName, vendor: `Vendor ${suffix}`, summary: 'Used to check claim checks.', created_by: zero, updated_by: zero,
+    }).select('id').single();
+    if (productResult.error || !productResult.data) throw new Error(`claim-check seed: ${productResult.error?.message ?? 'no row'}`);
+    const productId = productResult.data.id;
+    const checked = (result: { error: { message: string } | null }) => { if (result.error) throw new Error(`claim-check seed: ${result.error.message}`); };
+    checked(await service.from('catalogue_product_claims').insert({ product_id: productId, position: 1, kind: 'functional', statement, source_url: sourceUrl, source_date: '2026-11-01' }));
+    checked(await service.from('catalogue_claim_checks').insert({ product_id: productId, source_url: sourceUrl, statement, verdict: 'changed', quote, note: 'The page now says the feature is gone.', model: 'test-model', input_tokens: 10, output_tokens: 5, checked_by: zero }));
+
+    await signUpAdmin(page);
+    await page.goto('/platform-admin/catalogue/review');
+    await expect(page.getByTestId('claim-checks-summary')).toBeVisible();
+    await expect(page.getByRole('button', { name: /Check claims against their sources/ })).toBeVisible();
+    const flagged = page.getByTestId('claim-checks-flagged');
+    await expect(flagged).toContainText(statement);
+    await expect(flagged.getByTestId('claim-check-quote')).toContainText(quote);
+    await expect(flagged).toContainText('Not checked by a person');
+    expect(await page.evaluate(() => document.documentElement.scrollWidth > document.documentElement.clientWidth + 1)).toBe(false);
+
+    // The product editor says what the AI found.
+    await flagged.getByRole('link', { name: productName }).first().click();
+    await expect(page.getByLabel('Product', { exact: true })).toHaveValue(productName);
+    await page.locator('details').first().locator('summary').click();
+    await expect(page.getByTestId('claim-ai-check').first()).toContainText('Source check: Changed, checked by the AI');
+    await page.screenshot({ path: `test-results/catalogue-claim-checks-${String(viewport.width)}.png`, fullPage: true });
+
+    // A person looks and keeps it: it leaves the list and the editor records who.
+    await page.goto('/platform-admin/catalogue/review');
+    await page.getByTestId('claim-checks-flagged').getByRole('button', { name: 'I looked: it still stands' }).click();
+    await expect(page.getByTestId('claim-checks-flagged')).toHaveCount(0);
+    await page.goto(`/platform-admin/catalogue/products/${productId}`);
+    await page.locator('details').first().locator('summary').click();
+    await expect(page.getByTestId('claim-ai-check').first()).toContainText('Looked at and kept by');
+  });
+}

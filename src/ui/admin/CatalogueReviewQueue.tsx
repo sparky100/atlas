@@ -4,6 +4,7 @@ import type { ClaimWaitingForReview } from '../../contracts/catalogueAdmin';
 import { listClaimsWaitingForReview, REVIEW_QUEUE_PAGE, reviewProductClaims } from '../../db/catalogueAdmin';
 import { Loading } from '../components/Loading/Loading';
 import { supabase } from '../supabaseClient';
+import { CatalogueClaimChecks } from './CatalogueClaimChecks';
 import { CatalogueSourceLinks } from './CatalogueSourceLinks';
 import { claimDraftedText } from './catalogueShared';
 import styles from './CatalogueAdmin.module.css';
@@ -83,6 +84,7 @@ export function CatalogueReviewQueue() {
   return (
     <div className={styles.page} data-testid="catalogue-review-queue">
       <CatalogueSourceLinks />
+      <CatalogueClaimChecks />
       {error !== '' && <p role="alert" className={styles.error}>{error}</p>}
       {notice !== '' && <p role="status">{notice}</p>}
       {error === '' && claims.length === 0 && <p>Nothing is waiting for review. Every claim in the product library has been reviewed.</p>}
