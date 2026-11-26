@@ -3,7 +3,7 @@ import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 
 /** Words from the engine/data model that must not appear in text a user reads (Simon, 2026-11-08: consistent plain English throughout). Checked against JSX text between tags only, so identifiers, data values and comments are untouched. */
-const BANNED = [/\bmerge requests?\b/i, /\bretracted\b/i, /\bretraction\b/i, /\bdeltas?\b/i, /\bsupports edges?\b/i, /\bcommits? since\b/i];
+const BANNED = [/\barchimate\b/i, /\btogaf\b/i, /\bmerge requests?\b/i, /\bretracted\b/i, /\bretraction\b/i, /\bdeltas?\b/i, /\bsupports edges?\b/i, /\bcommits? since\b/i];
 
 function tsxFiles(dir: string): string[] {
   return readdirSync(dir).flatMap((name) => {
