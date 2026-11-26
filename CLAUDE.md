@@ -31,6 +31,49 @@ These are not style preferences. Violating one is a defect, whatever else the ch
    - **No change may introduce a Supabase advisor finding.** Run the Supabase security and performance advisors (`get_advisors`) before and after every migration, and again before release. The set of findings afterwards must be the same as or smaller than before: a new ERROR, WARN or INFO (for example a function callable by `anon`, a table without a policy, a mutable `search_path`, a `SECURITY DEFINER` view) blocks the change until it is fixed, never waived or left for later. Report the before and after counts in the sprint summary. New functions therefore set `search_path`, revoke `anon` and `public` execute, and new tables enable RLS with a policy in the same migration.
    - A feature that changes who can see or change data (RLS, grants, edge function auth, API keys, SSO) says so plainly in its PR, with the test that proves the boundary.
 
+## Model rules
+
+The short list of what the model holds and how people and AI work with it. Read it before any change to elements, change drafting, decisions, projects, AI or data sharing. Each rule has an id so a walkthrough or PR can say "touches M2, I1". The reasoning is in `docs/ADR-000-foundations.md` (and its amendments), `docs/VOCABULARY.md` and `docs/ADR-024-projects.md`. Where this list and an ADR disagree, raise it; don't pick one.
+
+**What the model holds**
+
+- **M1. Five element types only: Capability, System, Module, Actor, Value stream.** Goals, projects, decisions, changes and principles are records beside the model. There are no Services, data, process, technology-layer or document elements.
+- **M2. A module is an element in its own right.** It sits inside one platform and can be supported, owned, retired, replaced, rated and linked like a system. Wherever code or AI looks for "a system", it looks at systems and modules, or a `// system-only: <reason>` comment says why only systems apply.
+- **M3. A platform's modules support capabilities, not the platform itself.** A platform that supports a capability directly is a finding to fix.
+- **M4. Every system and module supports a capability.** Where it doesn't yet, that is a visible gap, never hidden. Add-a-system asks first. It is a gap, not a hard block (Simon, 2026-11-26).
+- **M5. A project names at least one capability.** Same: a visible gap with a prompt, not a hard block.
+- **M6. Six relationship types, only between the types the rules table allows.** Ownership is an `owns` link with a role, never a field. Containment is the parent link. "External" is a setting, not a type.
+- **M7. Cost is a band, never a figure. No maturity scores, no stored documents.**
+
+**Identity and history**
+
+- **I1. Search before you create.** Every place that can create an element first searches names, aliases and modules and offers what exists (ADR-019).
+- **I2. Duplicates are merged reversibly, never deleted.**
+- **H1–H4** are build rules 4, 5, 2–3 and 6 above: facts through deltas with a source, nothing deleted, diagrams are queries, no randomness in anything stored.
+
+**People and decisions**
+
+- **P1. Four roles: Viewer, Contributor, Architect, Owner.** A contributor can propose; they can't approve.
+- **P2. Nobody accepts their own proposal unless they are the only owner or architect, and that is recorded with names and dates.**
+- **P3. People approve decisions and live-model changes. Drafts stay editable.**
+- **P4. States are truthful.** Suggested, saved, reviewed, chosen, approved and implemented are different things.
+- **P5. Estate checks narrow options and show uncertainty. They never remove one.** Staying as we are is always an option.
+- **P6. One step's output is the next step's input.** No copying or retyping between steps.
+
+**AI and data**
+
+- **A1. Anything an AI drafted is marked ("Drafted by the Designer, edited by <name>") for as long as it stands.**
+- **A2. Cost is withheld from Ask Atlas, agents, the API and MCP unless an owner shares it.** New AI or API paths build their context through `createToolContext` (`src/tools/runCostExclusion.ts`).
+- **A3. Secrets live in Vault or function secrets.** The UI only says whether one is set.
+- **A4. Users never coordinate agents.**
+
+**Security and words**
+
+- **S1.** Build rule 9, in short: every new `SECURITY DEFINER` function checks the caller fail-closed, sets `search_path`, revokes `public` and `anon`, and has a cross-organisation test; new tables enable RLS with a policy in the same migration; no new advisor finding.
+- **W1. Plain words from `docs/VOCABULARY.md`.** "Live model", not "main". No ArchiMate or TOGAF terms.
+
+**Where these are checked.** The walkthrough names the rules the change touches (UX rule 3). The PR description says how each is respected and what proves it (`.github/pull_request_template.md`). A rule that only a reader can see will be missed, so where one can be a test, a lint rule or a database check, it should become one.
+
 ## Vision and UX expectations
 
 Atlas is for business users as well as architects. Every feature must help a person complete an understandable task inside the existing journey. "Built but not reachable by a user" means it does not exist. This section is binding on every contributor, human or AI, including coding agents.
@@ -43,7 +86,7 @@ Atlas is for business users as well as architects. Every feature must help a per
 
 1. Define the user task before implementing: who, where they start, what they want, what success is, with a realistic example.
 2. Inspect the existing journey: entry points, screens, permissions, actions, what comes before and after. Reuse existing patterns.
-3. Describe the complete interaction before coding: what the user sees, does, what changes, where they go next. Make routine design choices without asking.
+3. Describe the complete interaction before coding: what the user sees, does, what changes, where they go next. Make routine design choices without asking. The walkthrough ends with **Rules this change touches**: the Model rule ids (for example M2, I1), and for each one sentence on how the change respects it. If it touches none, say "none" and why. If it needs to break one, stop and ask.
 4. Make every handoff work. One step's output must be usable by the next. "Draft options" must produce options the user can edit and compare, with no copying or reconstruction.
 5. Keep the business question visible. Lead with need, outcome, options, evidence and decision, in plain task labels.
 6. Maintain continuity: preserve work, explain what is saved, show progress, allow cancellation, make recovery easy.
