@@ -95,3 +95,36 @@ before this change and stay reviewed (origin `imported`).
 - Published `catalogue_entries`, `catalogue_claims` and saved citations are not
   touched.
 
+
+## Amendment, 26 November 2026: link a product to a capability's meaning
+
+Step 2 of `proposals/PROPOSAL-catalogue-maintenance.md`. Migration
+`20261126200000_catalogue_link_by_meaning.sql`.
+
+- **Shared capability links.** `catalogue_product_general_links(product_id,
+  capability_id, how_it_supports)` links a product once to a reference
+  capability identity (ADR-036). It is written only by
+  `atlas.save_catalogue_product` (the editor sends `generalCapabilities`),
+  readable by platform admins, with no browser write grant.
+- **One-off alignment.** The migration creates one published identity for each
+  general capability (codes 1 to 8) and aligns every published set's item to
+  it, only for a code that appears in every published set with one name and
+  one definition. The recorded basis says so and says Simon approved the bulk
+  alignment on 26 November 2026. It is idempotent and never aligns a draft or
+  deprecated set.
+- **Resolution into a pinned set.** `atlas.catalogue_product_links_in_map`
+  (invoker only, revoked from public, anon and authenticated, so no new
+  callable function) returns a product's own links in any version of that
+  sector's set, matched by code and worded as the pinned set words them, plus
+  its shared links resolved through the alignment. A sector link wins over a
+  shared link on the same code.
+- **Validation and publication** (`catalogue_draft_issues`,
+  `publish_catalogue_draft`) use that resolution, so the 1 to 10 rule counts
+  both kinds of link and publication freezes both into the entry. The reader
+  and earlier frozen catalogues are unchanged.
+- **Editor.** The product page offers "Shared capability (every sector)" and
+  "Sector capability". A sector capability whose code is a general one is not
+  added twice: the page says to link it as shared.
+- Existing links to codes 1 to 8 stay sector links; converting them belongs to
+  the import in step 3. A sector still publishes a new catalogue version to
+  show new links until per-product publication (step 4).

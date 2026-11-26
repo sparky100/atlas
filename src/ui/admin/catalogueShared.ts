@@ -10,9 +10,14 @@ export function setLabel(set: CapabilitySetOption): string {
   return `${sectorLabel(set.sector)} · ${set.title ?? 'Capability set'} · v${String(set.version)}${set.status === 'published' ? '' : ` (${set.status})`}`;
 }
 
+/** A general capability (codes 1 to 8) is shared by every sector set, so it is linked once as a shared capability. */
+export function isGeneralCapabilityCode(code: string): boolean {
+  return /^[1-8](\.|$)/.test(code);
+}
+
 /** The blank editable product a new-product page starts from. */
 export function emptyProduct(): CatalogueProductContent {
-  return { code: '', product: '', vendor: '', summary: '', capabilities: [], claims: [] };
+  return { code: '', product: '', vendor: '', summary: '', capabilities: [], generalCapabilities: [], claims: [] };
 }
 
 /** The highest published, non-withdrawn catalogue version for one sector. */

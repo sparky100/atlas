@@ -4,10 +4,12 @@ import type {
   CapabilitySetItem,
   CapabilitySetOption,
   CatalogueProductContent,
+  GeneralCapabilityOption,
 } from '../../contracts/catalogueAdmin';
 import {
   listCapabilitySetItems,
   listCapabilitySets,
+  listGeneralCapabilities,
   readCatalogueProduct,
   saveCatalogueProduct,
   validateCatalogueProduct,
@@ -17,7 +19,7 @@ import { Loading } from '../components/Loading/Loading';
 import { Text } from '../components/Text/Text';
 import { useUnsavedChanges } from '../routes/platformAdmin/unsavedChanges';
 import { supabase } from '../supabaseClient';
-import { claimStatusText, emptyProduct, sameClaimText, sectorLabel, setLabel } from './catalogueShared';
+import { claimStatusText, emptyProduct, isGeneralCapabilityCode, sameClaimText, sectorLabel, setLabel } from './catalogueShared';
 import styles from './CatalogueAdmin.module.css';
 
 const BASE = '/platform-admin/catalogue';
@@ -39,6 +41,9 @@ export function CatalogueProductAdmin({ productId }: { productId: string | null 
   const [linkMapId, setLinkMapId] = useState('');
   const [linkCode, setLinkCode] = useState('');
   const [linkHow, setLinkHow] = useState('');
+  const [general, setGeneral] = useState<GeneralCapabilityOption[]>([]);
+  const [sharedId, setSharedId] = useState('');
+  const [sharedHow, setSharedHow] = useState('');
   const [issues, setIssues] = useState<string[] | null>(null);
   const [notice, setNotice] = useState('');
   const [loadError, setLoadError] = useState('');
@@ -49,11 +54,13 @@ export function CatalogueProductAdmin({ productId }: { productId: string | null 
   useEffect(() => {
     void (async () => {
       try {
-        const [nextSets, nextDetail] = await Promise.all([
+        const [nextSets, nextGeneral, nextDetail] = await Promise.all([
           listCapabilitySets(supabase),
+          listGeneralCapabilities(supabase),
           productId === null ? Promise.resolve(null) : readCatalogueProduct(supabase, productId),
         ]);
         setSets(nextSets);
+        setGeneral(nextGeneral);
         setDetail(nextDetail);
         setContent(nextDetail === null ? emptyProduct() : nextDetail.content);
       } catch (cause) {
@@ -101,11 +108,25 @@ export function CatalogueProductAdmin({ productId }: { productId: string | null 
     if (content === null || linkMapId === '' || linkCode === '' || linkHow.trim() === '') return;
     const item = (itemsBySet[linkMapId] ?? []).find((candidate) => candidate.code === linkCode);
     if (!item) return;
+    // A general capability is the same in every sector: link it once, as a shared capability.
+    if (isGeneralCapabilityCode(item.code) && general.some((option) => option.code === item.code)) return;
     if (content.capabilities.some((link) => link.capabilityMapId === linkMapId && link.capabilityCode === item.code)) return;
     updateProduct({ capabilities: [...content.capabilities, {
       capabilityMapId: linkMapId, capabilityCode: item.code, capabilityName: item.name, howItSupports: linkHow.trim(),
     }] });
     setLinkCode(''); setLinkHow('');
+  };
+
+  const addSharedLink = () => {
+    if (content === null || sharedId === '' || sharedHow.trim() === '') return;
+    if ((content.generalCapabilities ?? []).some((link) => link.capabilityId === sharedId)) return;
+    updateProduct({ generalCapabilities: [...(content.generalCapabilities ?? []), { capabilityId: sharedId, howItSupports: sharedHow.trim() }] });
+    setSharedId(''); setSharedHow('');
+  };
+
+  const removeSharedLink = (capabilityId: string) => {
+    if (content === null) return;
+    updateProduct({ generalCapabilities: (content.generalCapabilities ?? []).filter((link) => link.capabilityId !== capabilityId) });
   };
 
   const removeCapabilityLink = (mapId: string, code: string) => {
@@ -186,8 +207,42 @@ export function CatalogueProductAdmin({ productId }: { productId: string | null 
         <label>Summary <textarea value={content.summary} onChange={(event) => { updateProduct({ summary: event.target.value }); }} /></label>
       </div>
 
-      <h2>Capability links ({content.capabilities.length})</h2>
-      <p>Link the same product to capabilities in as many sets as it genuinely supports. Each link belongs to one exact capability-set version.</p>
+      <h2>Capability links ({content.capabilities.length + (content.generalCapabilities ?? []).length})</h2>
+      <p>A shared capability is the same in every sector, so one link covers them all and survives new versions of any set. A sector capability belongs to one sector&apos;s set; it carries over to that sector&apos;s newer versions by its code.</p>
+
+      <h3>Shared capability (every sector)</h3>
+      <div className={styles.linkForm}>
+        <label>
+          Shared capability{' '}
+          <select value={sharedId} onChange={(event) => { setSharedId(event.target.value); }} data-testid="shared-capability-select">
+            <option value="">Choose a shared capability</option>
+            {general.filter((option) => !(content.generalCapabilities ?? []).some((link) => link.capabilityId === option.capabilityId)).map((option) => (
+              <option key={option.capabilityId} value={option.capabilityId}>{option.name} ({option.code})</option>
+            ))}
+          </select>
+        </label>
+        <label>How it supports it <input value={sharedHow} onChange={(event) => { setSharedHow(event.target.value); }} placeholder="Runs general ledger and reporting" /></label>
+        <button type="button" onClick={addSharedLink} disabled={busy || sharedId === '' || sharedHow.trim() === ''}>Add shared link</button>
+      </div>
+      <div className={styles.cards}>
+        {(content.generalCapabilities ?? []).map((link) => {
+          const option = general.find((candidate) => candidate.capabilityId === link.capabilityId);
+          return (
+            <div className={styles.itemCard} key={link.capabilityId} data-testid="shared-link">
+              <div className={styles.linkRow}>
+                <span><strong>{option?.name ?? 'Shared capability'}</strong> <small>{option?.code ?? ''} · every sector</small><br />{link.howItSupports}</span>
+                <button type="button" onClick={() => { removeSharedLink(link.capabilityId); }} disabled={busy}>Remove</button>
+              </div>
+            </div>
+          );
+        })}
+        {(content.generalCapabilities ?? []).length === 0 && <p>No shared capabilities yet.</p>}
+      </div>
+
+      <h3>Sector capability</h3>
+      {linkCode !== '' && isGeneralCapabilityCode(linkCode) && general.some((option) => option.code === linkCode) && (
+        <p role="status" data-testid="use-shared-hint">This capability is shared by every sector. Link it as a shared capability above instead.</p>
+      )}
       <div className={styles.linkForm}>
         <label>
           Capability set{' '}
@@ -208,7 +263,7 @@ export function CatalogueProductAdmin({ productId }: { productId: string | null 
           </select>
         </label>
         <label>How it supports it <input value={linkHow} onChange={(event) => { setLinkHow(event.target.value); }} placeholder="Runs the online checkout" /></label>
-        <button type="button" onClick={addCapabilityLink} disabled={busy || linkMapId === '' || linkCode === '' || linkHow.trim() === ''}>Add link</button>
+        <button type="button" onClick={addCapabilityLink} disabled={busy || linkMapId === '' || linkCode === '' || linkHow.trim() === '' || (isGeneralCapabilityCode(linkCode) && general.some((option) => option.code === linkCode))}>Add link</button>
       </div>
       <div className={styles.cards}>
         {Object.entries(content.capabilities.reduce<Record<string, CatalogueProductContent['capabilities']>>((groups, link) => {
@@ -230,7 +285,7 @@ export function CatalogueProductAdmin({ productId }: { productId: string | null 
             </div>
           );
         })}
-        {content.capabilities.length === 0 && <p>No capability links yet. A catalogue entry needs 1-10 links in its pinned set.</p>}
+        {content.capabilities.length === 0 && <p>No sector capability links yet. A catalogue entry needs 1-10 links that apply to its pinned set, counting shared capabilities.</p>}
       </div>
 
       <h2>Claims ({content.claims.length})</h2>

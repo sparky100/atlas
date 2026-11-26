@@ -34,18 +34,22 @@ async function signedIn(label: string): Promise<{ id: string; client: Client }> 
   return { id: created.data.user.id, client };
 }
 
-async function map(sector: string, name: string): Promise<string> {
+async function map(sector: string, name: string, version = mapVersion): Promise<string> {
   const id = randomUUID();
   check(await service.from('capability_maps').insert({
-    id, sector, version: mapVersion, status: 'draft', title: name, summary: name,
+    id, sector, version, status: 'draft', title: name, summary: name,
     source_description: 'Integration test capability set.',
   }));
+  const itemId = randomUUID();
   check(await service.from('capability_map_items').insert({
-    id: randomUUID(), map_id: id, code: '1', parent_code: null, name, description: `${name} definition.`, level: 1, item_order: 10,
+    id: itemId, map_id: id, code: '1', parent_code: null, name, description: `${name} definition.`, level: 1, item_order: 10,
   }));
+  itemIds.set(id, itemId);
   check(await service.from('capability_maps').update({ status: 'published', published_at: new Date().toISOString() }).eq('id', id));
   return id;
 }
+
+const itemIds = new Map<string, string>();
 
 const claim = {
   position: 1,
@@ -189,5 +193,98 @@ describe('platform product catalogue, real database', () => {
       title: 'Waiting catalogue', sourceDescription: 'Not ready.', productIds: [productId],
     });
     expect(issues.join(' ')).toContain('waiting for review');
+  });
+  describe('linking by meaning', () => {
+    let sharedId: string;
+    let sharedProductId: string;
+    let sectorProductId: string;
+    const sharedContent = (): CatalogueProductContent => ({
+      code: `test-shared-${suffix}`, product: `Shared product ${suffix}`, vendor: 'Test vendor',
+      summary: 'A product that supports a shared capability.', capabilities: [],
+      generalCapabilities: [{ capabilityId: sharedId, howItSupports: 'Runs the shared capability in every sector' }],
+      claims: [{ ...claim, review: true }],
+    });
+
+    it('aligns two sets to one shared capability and links a product to it once', async () => {
+      sharedId = randomUUID();
+      check(await service.from('reference_capabilities').insert({ id: sharedId, stable_key: `test-shared-${suffix}` }));
+      check(await service.from('reference_capability_revisions').insert({
+        capability_id: sharedId, revision: 1, name: 'Shared capability', definition: 'Same meaning everywhere.',
+        status: 'published', published_at: new Date().toISOString(),
+      }));
+      for (const mapId of [retailMapId, utilityMapId]) {
+        check(await service.from('reference_map_item_links').insert({
+          map_item_id: itemIds.get(mapId), capability_id: sharedId, capability_revision: 1,
+          review_basis: 'Integration test alignment.', mapped_by: admin.id,
+        }));
+      }
+      const saved = await saveCatalogueProduct(admin.client, null, 0, sharedContent());
+      sharedProductId = saved.productId;
+      const detail = await readCatalogueProduct(admin.client, sharedProductId);
+      expect(detail.content.generalCapabilities).toEqual([{ capabilityId: sharedId, howItSupports: 'Runs the shared capability in every sector' }]);
+      expect(detail.content.capabilities).toEqual([]);
+    });
+
+    it('counts and publishes the shared link in every sector that aligns to it', async () => {
+      for (const [sector, name, offset] of [['retail_ecommerce', 'Retail capability', 20], ['utility', 'Utility capability', 21]] as const) {
+        const content: CatalogueDraftContent = {
+          sector, version: catalogueVersion + offset, capabilityMapVersion: mapVersion,
+          title: `${sector} shared catalogue`, sourceDescription: 'Shared link test.', productIds: [sharedProductId],
+        };
+        expect(await validateCatalogueDraft(admin.client, content)).toEqual([]);
+        const draftId = await createCatalogueDraft(admin.client, sector, content.version, null, content);
+        const drafts = await admin.client.from('catalogue_drafts').select('*').eq('id', draftId).single();
+        check(drafts);
+        const publishedId = await publishCatalogueDraft(admin.client, drafts.data as Parameters<typeof publishCatalogueDraft>[1]);
+        const entry = await service.from('catalogue_entries').select('id').eq('catalogue_id', publishedId).single();
+        check(entry);
+        const links = await service.from('catalogue_entry_capabilities').select('capability_code,capability_name,how_it_supports').eq('entry_id', (entry.data as { id: string }).id);
+        check(links);
+        // The pinned set's own wording is used for each sector.
+        expect(links.data).toEqual([{ capability_code: '1', capability_name: name, how_it_supports: 'Runs the shared capability in every sector' }]);
+      }
+    });
+
+    it('refuses an unknown shared capability and a duplicate shared link', async () => {
+      const unknown = { ...sharedContent(), code: `test-unknown-${suffix}`, generalCapabilities: [{ capabilityId: randomUUID(), howItSupports: 'x' }] };
+      await expect(saveCatalogueProduct(admin.client, null, 0, unknown)).rejects.toThrow(/unknown or not published/);
+      const current = await readCatalogueProduct(admin.client, sharedProductId);
+      const duplicate = { ...current.content, generalCapabilities: [...(current.content.generalCapabilities ?? []), ...(current.content.generalCapabilities ?? [])] };
+      await expect(saveCatalogueProduct(admin.client, sharedProductId, current.product.edit_revision, duplicate)).rejects.toThrow();
+    });
+
+    it('keeps a sector link working when the sector publishes a new version of its set', async () => {
+      const content: CatalogueProductContent = {
+        code: `test-sector-${suffix}`, product: `Sector product ${suffix}`, vendor: 'Test vendor',
+        summary: 'A product with one sector link.',
+        capabilities: [{ capabilityMapId: retailMapId, capabilityCode: '1', capabilityName: 'Retail capability', howItSupports: 'Supports retail' }],
+        claims: [{ ...claim, review: true }],
+      };
+      sectorProductId = (await saveCatalogueProduct(admin.client, null, 0, content)).productId;
+      await map('retail_ecommerce', 'Retail capability reworded', mapVersion + 1);
+      const issues = await validateCatalogueDraft(admin.client, {
+        sector: 'retail_ecommerce', version: catalogueVersion + 22, capabilityMapVersion: mapVersion + 1,
+        title: 'Carry-over catalogue', sourceDescription: 'Carry-over test.', productIds: [sectorProductId],
+      });
+      expect(issues).toEqual([]);
+      // A set in another sector does not count a link that belongs to the retail sector.
+      const other = await validateCatalogueDraft(admin.client, {
+        sector: 'utility', version: catalogueVersion + 23, capabilityMapVersion: mapVersion,
+        title: 'Other sector', sourceDescription: 'Other sector test.', productIds: [sectorProductId],
+      });
+      expect(other.join(' ')).toContain('needs 1-10 capability links that apply to this capability set');
+    });
+
+    it('does not let another signed-in user read or write shared links', async () => {
+      const read = await outside.client.from('catalogue_product_general_links').select('product_id');
+      expect(read.error).toBeNull();
+      expect(read.data).toEqual([]);
+      const write = await outside.client.from('catalogue_product_general_links').insert({
+        product_id: sharedProductId, capability_id: sharedId, how_it_supports: 'No.',
+      });
+      expect(write.error).not.toBeNull();
+      const helper = await outside.client.schema('atlas').rpc('catalogue_product_links_in_map', { p_product: sharedProductId, p_map: retailMapId });
+      expect(helper.error).not.toBeNull();
+    });
   });
 });
