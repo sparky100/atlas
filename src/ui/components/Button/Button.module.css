@@ -9,6 +9,8 @@
   font-family: var(--font-sans);
   font-size: var(--text-md-size);
   line-height: var(--text-md-lh);
+  white-space: nowrap;
+  flex-shrink: 0;
   cursor: pointer;
   transition: background-color 120ms ease, border-color 120ms ease;
 }

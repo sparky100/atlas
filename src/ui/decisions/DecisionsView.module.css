@@ -72,6 +72,11 @@
   padding: var(--space-2) var(--space-3);
 }
 
+.rowText {
+  flex: 1 1 0;
+  min-width: 0;
+}
+
 .rowMeta {
   display: flex;
   align-items: center;

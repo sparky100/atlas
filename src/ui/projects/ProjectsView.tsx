@@ -257,7 +257,7 @@ export function ProjectsView({ modelId, orgId, userId, orgSlug, modelSlug, canCr
 function ProjectRowItem({ project, orgSlug, modelSlug }: { project: ProjectRow; orgSlug: string; modelSlug: string }) {
   return (
     <li className={styles.row}>
-      <div>
+      <div className={styles.rowText}>
         <Text as="span" size="lg">
           {project.title}
         </Text>

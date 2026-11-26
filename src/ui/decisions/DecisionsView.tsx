@@ -255,7 +255,7 @@ export function DecisionsView({ modelId, orgId, userId, orgSlug, modelSlug, canC
 function DecisionRowItem({ decision, orgSlug, modelSlug }: { decision: DecisionRow; orgSlug: string; modelSlug: string }) {
   return (
     <li className={styles.row}>
-      <div>
+      <div className={styles.rowText}>
         <Text as="span" size="lg">
           {decision.title}
         </Text>
