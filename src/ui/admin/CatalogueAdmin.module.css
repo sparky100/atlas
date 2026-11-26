@@ -46,3 +46,13 @@
   .controls, .actions, .linkForm, .withdraw { align-items: stretch; flex-direction: column; }
   .controls > *, .actions button, .withdraw button { width: 100%; }
 }
+.itemCard label.checkLine { flex-direction: row; align-items: flex-start; gap: var(--space-2); }
+.itemCard label.checkLine input, .queueClaim label.checkLine input { width: auto; flex: none; margin-top: .2rem; }
+.queue { display: flex; flex-direction: column; gap: var(--space-3); }
+.queueProduct { border: 1px solid var(--border-strong); border-radius: var(--radius-sm); background: var(--surface); padding: var(--space-3); display: flex; flex-direction: column; gap: var(--space-2); }
+.queueProduct > header { display: flex; justify-content: space-between; align-items: baseline; gap: var(--space-2); flex-wrap: wrap; }
+.queueProduct h2 { margin: 0; font-size: var(--text-lg-size, 1.125rem); }
+.queueClaim { border-top: 1px solid var(--border); padding-top: var(--space-2); display: flex; flex-direction: column; gap: var(--space-1); }
+.queueClaim p { margin: 0; overflow-wrap: anywhere; }
+.queueClaim small { color: var(--text-muted); }
+.queueClaim label.checkLine { display: flex; flex-direction: row; align-items: flex-start; gap: var(--space-2); }

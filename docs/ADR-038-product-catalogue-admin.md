@@ -59,3 +59,39 @@ section.
 - The repository JSON loader remains the bulk content path; once a catalogue
   is app-managed, new versions should be published from the platform editor so
   the canonical product library stays authoritative.
+
+## Amendment, 26 November 2026: drafted and reviewed are separate steps
+
+Status: implemented (step 1 of `proposals/PROPOSAL-catalogue-maintenance.md`).
+
+A product claim is **drafted** until someone **reviews** it. Typing a claim no
+longer signs it. `catalogue_product_claims` gains `review_state`
+(`drafted`/`reviewed`), `origin` (`person`/`researcher`/`imported`),
+`drafted_by`, `drafted_by_name`, `drafted_at` and `reviewed_by_user`;
+`reviewed_by` (a name) and `reviewed_at` are now empty until reviewed, and a
+check keeps the two in step. The 20 claims already in the library were reviewed
+before this change and stay reviewed (origin `imported`).
+
+- **Any platform admin can review**, including the person who drafted the
+  claim (Simon, 2026-11-26). There is no separate reviewer list and no
+  second-person rule.
+- **The server records the names.** The editor sends a claim without a
+  reviewer. `review: true` on a claim asks `atlas.save_catalogue_product` to
+  mark it reviewed by the signed-in admin; the function writes the name, the
+  user id and the date. Reviewing is folded into the existing save function so
+  no new function is callable by signed-in users (build rule 9).
+- **A review lasts only while the claim says the same thing.** On save, a claim
+  with an unchanged kind, statement, source and source date keeps its state; a
+  new or changed claim is a new draft by the person saving.
+- **Publication needs every claim reviewed.** `atlas.catalogue_draft_issues`
+  refuses a product with a claim that is not reviewed. The free-text
+  `Pending review` marker is no longer used for products.
+- **Who approved a publication** is the actor on the existing `published`
+  draft event. Product and draft events now carry `actor_name`, filled by a
+  database trigger from the actor's profile (else the email's local part).
+- Names are shown to platform admins only (product editor, `Waiting for
+  review` at `/platform-admin/catalogue/review`). Reader views, exports and
+  packs still never read them (`src/ui/reviewerPrivacy.test.ts`).
+- Published `catalogue_entries`, `catalogue_claims` and saved citations are not
+  touched.
+

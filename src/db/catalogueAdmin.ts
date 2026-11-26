@@ -11,11 +11,15 @@ import {
   type CapabilitySetItem,
   type CapabilitySetOption,
   type CatalogueDraftContent,
+  type CatalogueClaimReview,
   type CatalogueDraftRow,
   type CatalogueProductContent,
   type CatalogueProductRow,
   type CatalogueProductSummary,
   type CatalogueVersionSummary,
+  type ClaimOrigin,
+  type ClaimReviewState,
+  type ClaimWaitingForReview,
 } from '../contracts/catalogueAdmin';
 import type { Client } from './client';
 import { queryInChunks } from './inFilterLimit';
@@ -47,20 +51,28 @@ interface ClaimRow {
   statement: string;
   source_url: string;
   source_date: string;
-  reviewed_by: string;
-  reviewed_at: string;
+  review_state: ClaimReviewState;
+  origin: ClaimOrigin;
+  drafted_by_name: string | null;
+  drafted_at: string;
+  reviewed_by: string | null;
+  reviewed_at: string | null;
 }
+
+const CLAIM_COLUMNS = 'id,product_id,position,kind,statement,source_url,source_date,review_state,origin,drafted_by_name,drafted_at,reviewed_by,reviewed_at';
 
 export interface CatalogueProductDetail {
   product: CatalogueProductRow;
   content: CatalogueProductContent;
+  /** Each saved claim's review record. The editor's own claims carry no reviewer. */
+  claimReviews: CatalogueClaimReview[];
 }
 
 export async function listCatalogueProducts(client: Client): Promise<CatalogueProductSummary[]> {
   const [products, links, claims] = await Promise.all([
     client.from('catalogue_products').select('id,code,product,vendor,summary,edit_revision,created_at,updated_at').order('product'),
     client.from('catalogue_product_capabilities').select('product_id,capability_map_id'),
-    client.from('catalogue_product_claims').select('product_id'),
+    client.from('catalogue_product_claims').select('product_id,review_state'),
   ]);
   if (products.error) throw new Error(`listCatalogueProducts: ${products.error.message}`);
   if (links.error) throw new Error(`listCatalogueProducts: ${links.error.message}`);
@@ -79,8 +91,10 @@ export async function listCatalogueProducts(client: Client): Promise<CataloguePr
     countsByMap.set(row.product_id, byMap);
   }
   const claimCount = new Map<string, number>();
-  for (const row of (claims.data as { product_id: string }[] | null) ?? []) {
+  const waitingCount = new Map<string, number>();
+  for (const row of (claims.data as { product_id: string; review_state: ClaimReviewState }[] | null) ?? []) {
     claimCount.set(row.product_id, (claimCount.get(row.product_id) ?? 0) + 1);
+    if (row.review_state === 'drafted') waitingCount.set(row.product_id, (waitingCount.get(row.product_id) ?? 0) + 1);
   }
 
   return ((products.data as ProductRow[] | null) ?? []).map((row) => ({
@@ -94,6 +108,7 @@ export async function listCatalogueProducts(client: Client): Promise<CataloguePr
     capabilityCount: capabilityCount.get(row.id) ?? 0,
     capabilitySetCount: sets.get(row.id)?.size ?? 0,
     claimCount: claimCount.get(row.id) ?? 0,
+    claimsWaitingForReview: waitingCount.get(row.id) ?? 0,
     capabilityCountsByMap: countsByMap.get(row.id) ?? {},
   }));
 }
@@ -102,7 +117,7 @@ export async function readCatalogueProduct(client: Client, productId: UUID): Pro
   const [product, links, claims] = await Promise.all([
     client.from('catalogue_products').select('id,code,product,vendor,summary,edit_revision,created_at,updated_at').eq('id', productId).maybeSingle(),
     client.from('catalogue_product_capabilities').select('product_id,capability_map_id,capability_code,capability_name,how_it_supports').eq('product_id', productId),
-    client.from('catalogue_product_claims').select('id,product_id,position,kind,statement,source_url,source_date,reviewed_by,reviewed_at')
+    client.from('catalogue_product_claims').select(CLAIM_COLUMNS)
       .eq('product_id', productId).order('position'),
   ]);
   if (product.error) throw new Error(`readCatalogueProduct: ${product.error.message}`);
@@ -128,16 +143,25 @@ export async function readCatalogueProduct(client: Client, productId: UUID): Pro
       statement: claim.statement,
       sourceUrl: claim.source_url,
       sourceDate: claim.source_date,
-      reviewedBy: claim.reviewed_by,
-      reviewedAt: claim.reviewed_at,
     })),
   });
+  const claimReviews: CatalogueClaimReview[] = ((claims.data as ClaimRow[] | null) ?? []).map((claim) => ({
+    claimId: claim.id,
+    position: claim.position,
+    reviewState: claim.review_state,
+    origin: claim.origin,
+    draftedByName: claim.drafted_by_name,
+    draftedAt: claim.drafted_at,
+    reviewedByName: claim.reviewed_by,
+    reviewedAt: claim.reviewed_at,
+  }));
   return {
     product: {
       id: row.id, code: row.code, product: row.product, vendor: row.vendor, summary: row.summary,
       edit_revision: row.edit_revision, created_at: row.created_at, updated_at: row.updated_at,
     },
     content,
+    claimReviews,
   };
 }
 
@@ -146,14 +170,14 @@ export async function saveCatalogueProduct(
   productId: UUID | null,
   expectedRevision: number,
   content: CatalogueProductContent,
-): Promise<{ productId: UUID; revision: number }> {
+): Promise<{ productId: UUID; revision: number; reviewed: number }> {
   const parsed = catalogueProductContentSchema.parse(content);
   // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment -- the project client has untyped RPC results.
   const { data, error } = await client.schema('atlas').rpc('save_catalogue_product', {
     p_id: productId, p_expected_revision: expectedRevision, p_content: parsed,
   });
   if (error) throw new Error(`saveCatalogueProduct: ${error.message}`);
-  const result = data as { productId: UUID; revision: number };
+  const result = data as { productId: UUID; revision: number; reviewed: number };
   return result;
 }
 
@@ -162,6 +186,62 @@ export async function validateCatalogueProduct(client: Client, content: Catalogu
   const { data, error } = await client.schema('atlas').rpc('catalogue_product_issues', { p_content: content });
   if (error) throw new Error(`validateCatalogueProduct: ${error.message}`);
   return data as string[];
+}
+
+/** The most waiting claims the queue loads at once. The screen says so when there are more. */
+export const REVIEW_QUEUE_PAGE = 500;
+
+/**
+ * Every claim still waiting for review, with its product, oldest product name
+ * first. Claims are read first and their products second, in pieces of at most
+ * 50 ids (build rule 8).
+ */
+export async function listClaimsWaitingForReview(client: Client): Promise<{ claims: ClaimWaitingForReview[]; total: number }> {
+  const waiting = await client.from('catalogue_product_claims')
+    .select('id,product_id,position,kind,statement,source_url,source_date,origin,drafted_by_name,drafted_at', { count: 'exact' })
+    .eq('review_state', 'drafted')
+    .order('product_id').order('position')
+    .limit(REVIEW_QUEUE_PAGE);
+  if (waiting.error) throw new Error(`listClaimsWaitingForReview: ${waiting.error.message}`);
+  const rows = (waiting.data as Omit<ClaimRow, 'review_state' | 'reviewed_by' | 'reviewed_at'>[] | null) ?? [];
+  const productIds = [...new Set(rows.map((row) => row.product_id))];
+  const products = await queryInChunks<string, { id: string; product: string; vendor: string }>('listClaimsWaitingForReview', 'id', productIds, (chunk) =>
+    client.from('catalogue_products').select('id,product,vendor').in('id', chunk));
+  const byId = new Map(products.map((product) => [product.id, product]));
+  const claims = rows.map((row) => ({
+    claimId: row.id,
+    productId: row.product_id,
+    productName: byId.get(row.product_id)?.product ?? 'Unknown product',
+    vendor: byId.get(row.product_id)?.vendor ?? '',
+    position: row.position,
+    kind: row.kind,
+    statement: row.statement,
+    sourceUrl: row.source_url,
+    sourceDate: row.source_date,
+    origin: row.origin,
+    draftedByName: row.drafted_by_name,
+    draftedAt: row.drafted_at,
+  }));
+  claims.sort((a, b) => a.productName.localeCompare(b.productName) || a.position - b.position);
+  return { claims, total: waiting.count ?? rows.length };
+}
+
+/**
+ * Mark some of a product's claims reviewed by the signed-in admin. The server
+ * records the name and the date; this only says which claims. It saves the
+ * product as it stands, so an edit someone else made in the meantime is
+ * reported (the revision check) and nothing is overwritten.
+ */
+export async function reviewProductClaims(client: Client, productId: UUID, claimIds: readonly string[]): Promise<number> {
+  const detail = await readCatalogueProduct(client, productId);
+  const positions = new Set(detail.claimReviews.filter((review) => claimIds.includes(review.claimId) && review.reviewState === 'drafted').map((review) => review.position));
+  if (positions.size === 0) return 0;
+  const content: CatalogueProductContent = {
+    ...detail.content,
+    claims: detail.content.claims.map((claim) => (positions.has(claim.position) ? { ...claim, review: true } : claim)),
+  };
+  const result = await saveCatalogueProduct(client, productId, detail.product.edit_revision, content);
+  return result.reviewed;
 }
 
 export async function listCapabilitySets(client: Client): Promise<CapabilitySetOption[]> {

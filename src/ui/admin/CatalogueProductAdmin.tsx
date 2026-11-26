@@ -17,9 +17,8 @@ import { Loading } from '../components/Loading/Loading';
 import { Text } from '../components/Text/Text';
 import { useUnsavedChanges } from '../routes/platformAdmin/unsavedChanges';
 import { supabase } from '../supabaseClient';
-import { emptyProduct, sectorLabel, setLabel } from './catalogueShared';
+import { claimStatusText, emptyProduct, sameClaimText, sectorLabel, setLabel } from './catalogueShared';
 import styles from './CatalogueAdmin.module.css';
-import { useActingAdminName } from './useActingAdminName';
 
 const BASE = '/platform-admin/catalogue';
 const CLAIM_KINDS = ['functional', 'deployment', 'licensing_model', 'support_end', 'integration'] as const;
@@ -33,7 +32,6 @@ const today = () => new Date().toISOString().slice(0, 10);
  */
 export function CatalogueProductAdmin({ productId }: { productId: string | null }) {
   const navigate = useNavigate();
-  const actingAdminName = useActingAdminName();
   const [detail, setDetail] = useState<CatalogueProductDetail | null>(null);
   const [content, setContent] = useState<CatalogueProductContent | null>(null);
   const [sets, setSets] = useState<CapabilitySetOption[]>([]);
@@ -124,28 +122,23 @@ export function CatalogueProductAdmin({ productId }: { productId: string | null 
     if (content === null) return;
     const position = Math.max(0, ...content.claims.map((claim) => claim.position)) + 1;
     updateProduct({ claims: [...content.claims, {
-      position, kind: 'functional', statement: '', sourceUrl: '', sourceDate: today(), reviewedBy: actingAdminName, reviewedAt: today(),
+      position, kind: 'functional', statement: '', sourceUrl: '', sourceDate: today(),
     }] });
   };
-
-  const normalized = (value: CatalogueProductContent): CatalogueProductContent => ({
-    ...value,
-    claims: value.claims.map((claim) => claim.reviewedBy.trim() === '' ? { ...claim, reviewedBy: actingAdminName } : claim),
-  });
 
   const save = () => void run(async () => {
     if (content === null) return;
     const result = await saveCatalogueProduct(supabase, detail?.product.id ?? null,
-      detail?.product.edit_revision ?? 0, normalized(content));
+      detail?.product.edit_revision ?? 0, content);
     const next = await readCatalogueProduct(supabase, result.productId);
     setDetail(next); setContent(next.content); setIssues(null);
-    setNotice(`Product saved (revision ${String(result.revision)}).`);
+    setNotice(`Product saved (revision ${String(result.revision)}).${result.reviewed > 0 ? ` ${String(result.reviewed)} claim${result.reviewed === 1 ? '' : 's'} marked as reviewed by you.` : ''}`);
     if (productId === null) void navigate(`${BASE}/products/${result.productId}`, { replace: true });
   });
 
   const validate = () => void run(async () => {
     if (content === null) return;
-    const found = await validateCatalogueProduct(supabase, normalized(content));
+    const found = await validateCatalogueProduct(supabase, content);
     setIssues(found);
     setNotice(found.length === 0 ? 'Product details are valid. Save before using it in a catalogue.' : 'Resolve the product issues.');
   });
@@ -241,22 +234,37 @@ export function CatalogueProductAdmin({ productId }: { productId: string | null 
       </div>
 
       <h2>Claims ({content.claims.length})</h2>
-      <p>A claim is dated vendor evidence with an HTTPS source. A catalogue entry needs 1-8 claims. The reviewer is recorded automatically and kept internal.</p>
+      <p>A claim is dated vendor evidence with an HTTPS source. A catalogue entry needs 1-8 claims, and every claim must be reviewed before the product can be published. Anyone with admin rights can review, including the person who entered the claim. Names and dates are recorded and shown to platform admins only.</p>
       <div className={styles.cards}>
-        {content.claims.map((claim, index) => (
-          <details className={styles.itemCard} key={index} open={claim.statement.trim() === ''}>
-            <summary>{claim.statement.trim() === '' ? 'New claim' : claim.statement.slice(0, 70)}</summary>
-            <div className={styles.claimGrid}>
-              <label>Position <input type="number" min={1} value={claim.position} onChange={(event) => { updateClaim(index, { position: Number(event.target.value) }); }} /></label>
-              <label>Kind <select value={claim.kind} onChange={(event) => { updateClaim(index, { kind: event.target.value as typeof claim.kind }); }}>{CLAIM_KINDS.map((kind) => <option key={kind} value={kind}>{kind.replaceAll('_', ' ')}</option>)}</select></label>
-              <label>Source date <input type="date" value={claim.sourceDate} onChange={(event) => { updateClaim(index, { sourceDate: event.target.value }); }} /></label>
-              <label>Reviewed on <input type="date" value={claim.reviewedAt} onChange={(event) => { updateClaim(index, { reviewedAt: event.target.value }); }} /></label>
-              <label>Source URL <input type="url" value={claim.sourceUrl} onChange={(event) => { updateClaim(index, { sourceUrl: event.target.value }); }} /></label>
-            </div>
-            <label>Statement <textarea value={claim.statement} onChange={(event) => { updateClaim(index, { statement: event.target.value }); }} /></label>
-            <button type="button" onClick={() => { updateProduct({ claims: content.claims.filter((_, position) => position !== index) }); }} disabled={busy}>Remove claim</button>
-          </details>
-        ))}
+        {content.claims.map((claim, index) => {
+          const saved = detail?.content.claims.find((candidate) => sameClaimText(candidate, claim));
+          const record = saved === undefined ? undefined : detail?.claimReviews.find((review) => review.position === saved.position);
+          const reviewed = record?.reviewState === 'reviewed';
+          const changed = saved === undefined && claim.statement.trim() !== '' && (detail?.content.claims.some((candidate) => candidate.position === claim.position) ?? false);
+          const notSavedText = changed ? 'Changed since it was saved: it will need review again.' : 'Not saved yet. It is saved as a draft until someone reviews it.';
+          return (
+            <details className={styles.itemCard} key={index} open={record === undefined}>
+              <summary>{claim.statement.trim() === '' ? 'New claim' : claim.statement.slice(0, 70)}{reviewed ? ' · reviewed' : ' · needs review'}</summary>
+              <p role="status" data-testid="claim-status">
+                {record === undefined ? notSavedText : claimStatusText(record)}
+              </p>
+              <div className={styles.claimGrid}>
+                <label>Position <input type="number" min={1} value={claim.position} onChange={(event) => { updateClaim(index, { position: Number(event.target.value) }); }} /></label>
+                <label>Kind <select value={claim.kind} onChange={(event) => { updateClaim(index, { kind: event.target.value as typeof claim.kind }); }}>{CLAIM_KINDS.map((kind) => <option key={kind} value={kind}>{kind.replaceAll('_', ' ')}</option>)}</select></label>
+                <label>Source date <input type="date" value={claim.sourceDate} onChange={(event) => { updateClaim(index, { sourceDate: event.target.value }); }} /></label>
+                <label>Source URL <input type="url" value={claim.sourceUrl} onChange={(event) => { updateClaim(index, { sourceUrl: event.target.value }); }} /></label>
+              </div>
+              <label>Statement <textarea value={claim.statement} onChange={(event) => { updateClaim(index, { statement: event.target.value }); }} /></label>
+              {!reviewed && (
+                <label className={styles.checkLine}>
+                  <input type="checkbox" checked={claim.review === true} onChange={(event) => { updateClaim(index, { review: event.target.checked }); }} />{' '}
+                  I have checked this claim against its source: mark it reviewed by me when I save
+                </label>
+              )}
+              <button type="button" onClick={() => { updateProduct({ claims: content.claims.filter((_, position) => position !== index) }); }} disabled={busy}>Remove claim</button>
+            </details>
+          );
+        })}
       </div>
       <div className={styles.actions}>
         <button type="button" onClick={addClaim} disabled={busy}>Add claim</button>

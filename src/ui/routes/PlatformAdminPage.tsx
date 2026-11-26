@@ -10,6 +10,7 @@ import { CapabilitySetsPage } from './platformAdmin/CapabilitySetsPage';
 import { CatalogueDraftPage } from './platformAdmin/CatalogueDraftPage';
 import { CataloguePage } from './platformAdmin/CataloguePage';
 import { CatalogueProductPage } from './platformAdmin/CatalogueProductPage';
+import { CatalogueReviewPage } from './platformAdmin/CatalogueReviewPage';
 import { CatalogueSectorPage } from './platformAdmin/CatalogueSectorPage';
 import { CatalogueSectorsPage } from './platformAdmin/CatalogueSectorsPage';
 import { CatalogueVersionPage } from './platformAdmin/CatalogueVersionPage';
@@ -61,6 +62,7 @@ export function PlatformAdminPage() {
               <Route path="catalogue" element={<CataloguePage />} />
               <Route path="catalogue/products/new" element={<CatalogueProductPage />} />
               <Route path="catalogue/products/:productId" element={<CatalogueProductPage />} />
+              <Route path="catalogue/review" element={<CatalogueReviewPage />} />
               <Route path="catalogue/sectors" element={<CatalogueSectorsPage />} />
               <Route path="catalogue/sectors/:sector" element={<CatalogueSectorPage />} />
               <Route path="catalogue/sectors/:sector/versions/:catalogueId" element={<CatalogueVersionPage />} />

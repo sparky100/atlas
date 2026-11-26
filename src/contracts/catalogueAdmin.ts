@@ -8,7 +8,7 @@
  */
 import { z } from 'zod';
 import { SECTORS } from './capabilityMapContent';
-import { catalogueClaimSchema, containsCataloguePrice } from './productCatalogue';
+import { CATALOGUE_CLAIM_KINDS, catalogueClaimTextSchema, catalogueSourceUrlSchema, containsCataloguePrice } from './productCatalogue';
 
 export const CATALOGUE_PRODUCT_LIMITS = {
   code: 61,
@@ -31,13 +31,46 @@ export const catalogueProductCapabilitySchema = z.object({
 }).strict();
 export type CatalogueProductCapability = z.infer<typeof catalogueProductCapabilitySchema>;
 
+/**
+ * What the editor sends for one claim. There is no reviewer here on purpose:
+ * the server records who drafted a claim and who reviewed it. `review: true`
+ * asks the server to mark the claim reviewed by the person saving; it is
+ * ignored for a claim that is already reviewed and unchanged.
+ */
+export const catalogueProductClaimSchema = z.object({
+  position: z.number().int().positive(),
+  kind: z.enum(CATALOGUE_CLAIM_KINDS),
+  statement: catalogueClaimTextSchema,
+  sourceUrl: catalogueSourceUrlSchema,
+  sourceDate: z.iso.date(),
+  review: z.boolean().optional(),
+}).strict();
+export type CatalogueProductClaim = z.infer<typeof catalogueProductClaimSchema>;
+
+/** Where a claim stands. Drafted and reviewed are different things (rule P4). */
+export type ClaimReviewState = 'drafted' | 'reviewed';
+/** Who wrote a claim: a person in the editor, the Researcher (a later step), or a file. */
+export type ClaimOrigin = 'person' | 'researcher' | 'imported';
+
+/** A saved claim's review record, shown to platform admins only. */
+export interface CatalogueClaimReview {
+  claimId: string;
+  position: number;
+  reviewState: ClaimReviewState;
+  origin: ClaimOrigin;
+  draftedByName: string | null;
+  draftedAt: string;
+  reviewedByName: string | null;
+  reviewedAt: string | null;
+}
+
 export const catalogueProductContentSchema = z.object({
   code: text(CATALOGUE_PRODUCT_LIMITS.code).regex(/^[a-z0-9][a-z0-9-]{1,60}$/, 'Use lowercase letters, numbers and hyphens'),
   product: text(CATALOGUE_PRODUCT_LIMITS.product),
   vendor: text(CATALOGUE_PRODUCT_LIMITS.vendor),
   summary: text(CATALOGUE_PRODUCT_LIMITS.summary),
   capabilities: z.array(catalogueProductCapabilitySchema).max(CATALOGUE_PRODUCT_LIMITS.capabilities),
-  claims: z.array(catalogueClaimSchema).max(CATALOGUE_PRODUCT_LIMITS.claims),
+  claims: z.array(catalogueProductClaimSchema).max(CATALOGUE_PRODUCT_LIMITS.claims),
 }).strict().superRefine((value, ctx) => {
   const links = new Set(value.capabilities.map((link) => `${link.capabilityMapId}\u0000${link.capabilityCode}`));
   if (links.size !== value.capabilities.length) ctx.addIssue({ code: 'custom', message: 'A capability can appear only once for a product' });
@@ -80,6 +113,7 @@ export interface CatalogueProductSummary {
   capabilityCount: number;
   capabilitySetCount: number;
   claimCount: number;
+  claimsWaitingForReview: number;
   capabilityCountsByMap: Record<string, number>;
 }
 
@@ -91,8 +125,28 @@ export interface CatalogueProductClaimRow {
   statement: string;
   source_url: string;
   source_date: string;
-  reviewed_by: string;
-  reviewed_at: string;
+  review_state: ClaimReviewState;
+  origin: ClaimOrigin;
+  drafted_by_name: string | null;
+  drafted_at: string;
+  reviewed_by: string | null;
+  reviewed_at: string | null;
+}
+
+/** One claim in the "Waiting for review" queue, with its product. */
+export interface ClaimWaitingForReview {
+  claimId: string;
+  productId: string;
+  productName: string;
+  vendor: string;
+  position: number;
+  kind: string;
+  statement: string;
+  sourceUrl: string;
+  sourceDate: string;
+  origin: ClaimOrigin;
+  draftedByName: string | null;
+  draftedAt: string;
 }
 
 export interface CatalogueDraftRow {
