@@ -39,7 +39,7 @@ else in this product checks platform-admin status.
    The product catalogue has one row per real product. A product links once to a
    shared capability (the general capabilities, the same in every sector) or to
    a sector capability, and a sector link carries over to that sector's newer
-   capability sets by its code. Sector catalogues are fixed
+   capability sets by its code. The product files under `content/catalogue` were loaded into the library once (as claims waiting for review) and are history now: the loader scripts refuse to write to the live project. Sector catalogues are fixed
    publication snapshots that select products and pin one published set
    (`docs/ADR-038-product-catalogue-admin.md`). Both editors are
    platform-admin-only; ordinary organisation owners cannot reach them.

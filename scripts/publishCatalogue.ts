@@ -11,6 +11,7 @@
  */
 import { createServiceRoleClient } from '../src/db/client';
 import { loadEnv } from '../src/db/env';
+import { assertCatalogueFilesAllowed } from './catalogueFilesGuard';
 import { isCliEntrypoint } from './isCliEntrypoint';
 
 function arg(args: readonly string[], flag: string): string | undefined {
@@ -27,7 +28,9 @@ async function main(): Promise<void> {
     process.exitCode = 1;
     return;
   }
-  const supabase = createServiceRoleClient(loadEnv());
+  const env = loadEnv();
+  assertCatalogueFilesAllowed(env.SUPABASE_URL);
+  const supabase = createServiceRoleClient(env);
   const { data, error } = await supabase.from('product_catalogues').select('id, status').eq('sector', sector).eq('version', version).maybeSingle();
   if (error) throw new Error(error.message);
   const row = data;
