@@ -8,6 +8,7 @@ import { suggestOptions } from './optionSuggestions';
 import { findingLabel } from './findingLabels';
 import { aiMarkLine } from './aiMarks';
 import { useEstateSuggestions } from './useEstateSuggestions';
+import { EstateReading } from './EstateReading';
 import type { UUID } from '../../contracts/delta';
 import { Button } from '../components/Button/Button';
 import { Chip } from '../components/Chip/Chip';
@@ -163,6 +164,8 @@ export function DecisionView({ modelId, decisionId, orgId, orgSlug, modelSlug, r
   const [addingOption, setAddingOption] = useState(false);
   const [researchTarget, setResearchTarget] = useState<{ optionId: UUID; branchId: UUID | null; label: string } | null>(null);
   const [optionTitle, setOptionTitle] = useState('');
+  /** Set only when a starting point was added: what the model records and does not record. Cleared when the person types their own title. */
+  const [optionSummary, setOptionSummary] = useState<string | undefined>(undefined);
   const [optionApproach, setOptionApproach] = useState<OptionApproach | null>(null);
   const [choosing, setChoosing] = useState<{ optionId: UUID | null; branchId: UUID | null } | null>(null);
   const [reasons, setReasons] = useState('');
@@ -755,6 +758,7 @@ export function DecisionView({ modelId, decisionId, orgId, orgSlug, modelSlug, r
                         setAddingOption(true);
                         setOptionTitle(suggestion.title);
                         setOptionApproach(suggestion.approach);
+                        setOptionSummary(suggestion.text);
                       }}
                     >
                       {suggestion.title}
@@ -762,6 +766,7 @@ export function DecisionView({ modelId, decisionId, orgId, orgSlug, modelSlug, r
                     <Text as="span" size="xs" tone="muted">
                       {suggestion.reason}
                     </Text>
+                    <EstateReading reading={suggestion.reading} />
                   </li>
                 ))}
               </ul>
@@ -774,6 +779,7 @@ export function DecisionView({ modelId, decisionId, orgId, orgSlug, modelSlug, r
                 setAddingOption(true);
                 setOptionTitle('');
                 setOptionApproach(null);
+                setOptionSummary(undefined);
               }}
             >
               + Add an option
@@ -797,7 +803,7 @@ export function DecisionView({ modelId, decisionId, orgId, orgSlug, modelSlug, r
                 disabled={optionsState.status === 'adding' || optionTitle.trim().length === 0}
                 onClick={() => {
                   if (!userId) return;
-                  void optionsState.addOption({ decisionId, title: optionTitle, approach: optionApproach, userId }).then((added) => {
+                  void optionsState.addOption({ decisionId, title: optionTitle, approach: optionApproach, ...(optionSummary !== undefined ? { summary: optionSummary } : {}), userId }).then((added) => {
                     if (added) setAddingOption(false);
                   });
                 }}

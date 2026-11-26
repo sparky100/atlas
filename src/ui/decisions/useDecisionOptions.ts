@@ -15,6 +15,8 @@ export interface AddOptionInput {
   title: string;
   /** What kind of option the person said it is; null = not decided yet. */
   approach?: OptionApproach | null;
+  /** What the option is, in words; a starting point passes what Atlas knows and does not know. */
+  summary?: string;
   userId: UUID;
 }
 
@@ -77,7 +79,7 @@ export function useDecisionOptions(
       setError(null);
       setStatus('adding');
       try {
-        const option = await createDecisionOption(supabase, { decisionId: input.decisionId, title: trimmedTitle, approach: input.approach ?? null, createdBy: input.userId });
+        const option = await createDecisionOption(supabase, { decisionId: input.decisionId, title: trimmedTitle, approach: input.approach ?? null, ...(input.summary !== undefined ? { summary: input.summary } : {}), createdBy: input.userId });
         applyCreatedOption(option);
         return true;
       } catch (e) {
