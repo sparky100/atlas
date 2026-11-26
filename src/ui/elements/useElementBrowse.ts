@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import type { Criticality, ElementType, UUID } from '../../contracts/delta';
 import type { ElementsHeadRow, Json, RelationshipsHeadRow } from '../../contracts/rows';
+import { isSystemLike } from '../../contracts/elementKinds';
 import { CRITICALITY_ORDER } from './criticalityTone';
 import { DISPOSITION_ORDER } from './disposition';
 import type { Disposition } from '../../contracts/delta';
@@ -412,7 +413,7 @@ export function useElementBrowse(
         const containers = elements.filter((e) => e.element_type === 'container');
         ids = new Set(findCriticalSystemsWithoutBusinessOwner([...systems, ...containers], ownsEdges).map((e) => e.element_id));
       } else if (filter === 'critical-exposed') {
-        const systems = elements.filter((e) => e.element_type === 'system');
+        const systems = elements.filter(isSystemLike);
         const replacesEdges = await b.getReplacesEdges();
         ids = new Set(findCriticalExposedSystems(systems, new Date(), replacedElementIds(replacesEdges)).map((e) => e.element_id));
       } else if (filter === 'unused-integration-platform') {
@@ -431,7 +432,7 @@ export function useElementBrowse(
         const capabilities = elements.filter((e) => e.element_type === 'capability');
         ids = new Set(findSystemsSupportingEssentialFunctionWithoutTechnicalOwner([...systems, ...containers], capabilities, supportsEdges, ownsEdges).map((e) => e.element_id));
       } else if (filter === 'critical-support-end') {
-        const systems = elements.filter((e) => e.element_type === 'system');
+        const systems = elements.filter(isSystemLike);
         ids = new Set(findCriticalSystemsPastOrNearSupportEnd(systems).map((e) => e.element_id));
       } else if (filter === 'capability-no-supporters') {
         const capabilities = elements.filter((e) => e.element_type === 'capability');

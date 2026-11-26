@@ -203,7 +203,8 @@ export function useArchitectHomeInsights(modelId: UUID, userId: UUID | null): Ar
       const stateOf = (e: ElementsHeadRow) => lifecycleStateOf(e, elementsById, today);
       const liveSystems = systems.filter((e) => stateOf(e) === 'active');
       const liveContainers = containers.filter((e) => stateOf(e) === 'active');
-      const notPlannedSystems = systems.filter((e) => stateOf(e) !== 'planned');
+      // A module carries its own criticality, planned end and support end, so these two findings read systems and modules together (Model rule M2).
+      const notPlannedSystems = [...systems, ...containers].filter((e) => stateOf(e) !== 'planned');
       const liveSupports = supportsEdgesInForce(supportsEdges, elementsById, today);
       const liveUsesAndFlowsTo = edgesInForce(usesAndFlowsToEdges, usesAndFlowsToEndpointsById, today);
 

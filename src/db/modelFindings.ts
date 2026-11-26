@@ -48,11 +48,11 @@ export function computeFindings({ snapshot, facts, retiredByOpenChanges, now, st
   out.set('no-technical-owner', findSystemsWithoutTechnicalOwner(systemsAndModules, owns));
   out.set('ai-agent-no-technical-owner', findAiAgentsActingAloneWithoutTechnicalOwner(systems, owns));
   out.set('critical-no-business-owner', findCriticalSystemsWithoutBusinessOwner(systemsAndModules, owns));
-  out.set('critical-exposed', findCriticalExposedSystems(systems, now, replacedElementIds(replaces)));
+  out.set('critical-exposed', findCriticalExposedSystems(systemsAndModules, now, replacedElementIds(replaces)));
   out.set('unused-integration-platform', findUnusedIntegrationPlatforms(systems, usesAndFlows, containers));
   out.set('unused-integration-interface', findUnusedIntegrationInterfaces(systems, containers, usesAndFlows));
   out.set('essential-no-technical-owner', findSystemsSupportingEssentialFunctionWithoutTechnicalOwner(systemsAndModules, capabilities, supports, owns));
-  out.set('critical-support-end', findCriticalSystemsPastOrNearSupportEnd(systems, now));
+  out.set('critical-support-end', findCriticalSystemsPastOrNearSupportEnd(systemsAndModules, now));
   out.set('capability-no-supporters', findCapabilitiesWithNoSupporters(level1, capabilities, supports, owns));
   if (retiredByOpenChanges !== undefined) {
     out.set('outgoing-no-retiring-change', findOutgoingWithoutRetiringChange(systemsAndModules, retiredByOpenChanges, new Map(elements.map((element) => [element.element_id, element]))));
