@@ -60,4 +60,12 @@ describe('optionDraftActions', () => {
     expect(actions[0]?.product).toBe('Esri ArcGIS Utility Network');
     expect(optionDraftActions('buy', [sys(1, 'Smallworld GIS')], [], ['Network Mapping']).map(optionDraftLabel)).toEqual(['Retire Smallworld GIS and replace it with a new system']);
   });
+
+  it('modules: a module that only supports the capability is not suggested; one the decision names is, as a module', () => {
+    const smallworld = sys(3, 'Smallworld GIS');
+    const utilityNetwork = { ...sys(4, 'Utility Network'), module: true };
+    expect(labels('buy', [], [smallworld, utilityNetwork], ['Network Mapping'])).toEqual(['Retire Smallworld GIS and replace it with a new system']);
+    expect(labels('buy', [utilityNetwork], [smallworld, utilityNetwork], ['Network Mapping'])).toEqual(['Retire the Utility Network module and replace it with a new system']);
+    expect(labels('configure', [utilityNetwork], [], ['Network Mapping'])).toEqual(['Extend the Utility Network module to cover Network Mapping']);
+  });
 });
