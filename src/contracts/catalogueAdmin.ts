@@ -249,3 +249,33 @@ export interface CapabilitySetItem {
   level: number;
   order: number;
 }
+
+/** Step 5a: what a check of one claim source link found. A record only; nothing here changes a claim or a revision. */
+export const SOURCE_CHECK_RESULTS = ['works', 'moved', 'gone', 'could_not_check'] as const;
+export const sourceCheckResultSchema = z.enum(SOURCE_CHECK_RESULTS);
+export type SourceCheckResult = z.infer<typeof sourceCheckResultSchema>;
+
+export const sourceCheckSchema = z.object({
+  url: z.string().min(1).max(2000),
+  result: sourceCheckResultSchema,
+  httpStatus: z.number().int().min(100).max(599).nullable(),
+  finalUrl: z.string().max(2000).nullable(),
+  note: z.string().max(200).nullable(),
+}).strict();
+export type SourceCheckInput = z.infer<typeof sourceCheckSchema>;
+
+/** A saved check, with who ran it (stamped by the server) and when. */
+export interface SourceCheckRow extends SourceCheckInput {
+  checkedAt: string;
+  checkedByName: string | null;
+}
+
+/** The plain words for a check result. */
+export function sourceCheckLabel(result: SourceCheckResult): string {
+  switch (result) {
+    case 'works': return 'Works';
+    case 'moved': return 'Moved';
+    case 'gone': return 'Gone';
+    case 'could_not_check': return 'Could not check';
+  }
+}

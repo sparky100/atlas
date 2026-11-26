@@ -1,3 +1,4 @@
+import { sourceCheckLabel, type SourceCheckRow } from '../../contracts/catalogueAdmin';
 import type { CapabilitySetOption, CatalogueClaimReview, CatalogueProductContent, CatalogueVersionSummary, ClaimOrigin, ProductPublicationLabel, ProductPublicationState } from '../../contracts/catalogueAdmin';
 
 /** The label this admin UI uses everywhere for a sector id. */
@@ -83,3 +84,13 @@ export function entriesNotYetPublished<T extends { vendor: string; product: stri
   const published = new Set(publishedProducts.map((row) => productMatchKey(row.vendor, row.product)));
   return entries.filter((entry) => !published.has(productMatchKey(entry.vendor, entry.product)));
 }
+
+/** What a saved check found, in a sentence an admin can act on. */
+export function sourceCheckSentence(check: SourceCheckRow): string {
+  const status = check.httpStatus === null ? '' : ` (${String(check.httpStatus)})`;
+  const when = `checked ${formatDay(check.checkedAt)}${check.checkedByName === null ? '' : ` by ${check.checkedByName}`}`;
+  if (check.result === 'moved') return `Moved${status}: now leads to ${check.finalUrl ?? 'a different page'}, ${when}`;
+  if (check.result === 'could_not_check') return `Could not check: ${check.note ?? 'no answer'}, ${when}`;
+  return `${sourceCheckLabel(check.result)}${status}, ${when}`;
+}
+

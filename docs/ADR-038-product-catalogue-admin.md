@@ -241,3 +241,29 @@ No migration; screens only.
   and why; the check is on the screen only.
 - **Citations unchanged.** Saved citations to a sector catalogue keep reading
   from the frozen sector tables, withdrawn or not.
+
+## Amendment, 26 November 2026: source-link check (step 5a)
+
+Migration `20261126250000_catalogue_source_checks.sql`; edge function
+`catalogue-link-check`; walkthrough `proposals/WALKTHROUGH-catalogue-step-5a-link-check.md`.
+
+- **Table keyed by link.** `catalogue_source_checks` holds the latest check of
+  each distinct source URL: works, moved, gone or could not check, with the
+  HTTP status, the final address when it moved, who ran it and when. It is
+  keyed by URL because saving a product replaces its claim rows. It is a
+  record only: it never edits a claim, flags a published revision or
+  unpublishes anything.
+- **Who can see and write.** Platform admins only, one policy per action. This
+  is the one library table an admin writes directly rather than through a
+  guarded function; the server stamps who and when (a signed-in person cannot
+  name someone else). No new callable function: the stamping trigger and its
+  helper are not executable through the API.
+- **The function writes nothing.** It confirms the caller is a platform admin
+  with the caller's own session, requests up to 25 links, reads no page body,
+  and returns the results; the browser saves them. The service key is never
+  involved. Only plain public https pages are requested (standard port, no
+  credentials, no IP numbers or local names, the resolved address and every
+  redirect target checked, three redirects at most, eight seconds each). The
+  rules are in `src/tools/catalogueLinkCheck.ts` and tested.
+- **Not here.** The AI claim check, turning failures into review items and the
+  monthly schedule are step 5b.

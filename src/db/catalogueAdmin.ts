@@ -3,6 +3,9 @@
  * reference tables directly: every mutation is one of the guarded RPCs in
  * `20261122120000_catalogue_admin.sql`, which re-check platform-admin status
  * and optimistic revisions. This module only maps rows and calls those RPCs.
+ * One exception, step 5a: the source-link check results (`catalogue_source_checks`)
+ * are plain records that platform admins write directly under row-level
+ * security, with who and when stamped by the server.
  */
 import type { UUID } from '../contracts/delta';
 import {
@@ -22,7 +25,10 @@ import {
   type ClaimReviewState,
   type ClaimWaitingForReview,
   type ProductPublicationState,
+  type SourceCheckInput,
+  type SourceCheckRow,
   productPublicationLabel,
+  sourceCheckSchema,
 } from '../contracts/catalogueAdmin';
 import type { Client } from './client';
 import { queryInChunks } from './inFilterLimit';
@@ -514,4 +520,108 @@ export async function publishCatalogueDraft(client: Client, draft: CatalogueDraf
 export async function withdrawCatalogue(client: Client, catalogueId: UUID, reason: string): Promise<void> {
   const { error } = await client.schema('atlas').rpc('withdraw_catalogue', { p_id: catalogueId, p_reason: reason });
   if (error) throw new Error(`withdrawCatalogue: ${error.message}`);
+}
+
+const SOURCE_PAGE = 1000;
+
+/** Every distinct claim source link in the library, each once however many claims cite it. Read in pages so a large library is not cut off. */
+export async function listDistinctSourceUrls(client: Client): Promise<string[]> {
+  const urls = new Set<string>();
+  for (let from = 0; ; from += SOURCE_PAGE) {
+    const { data, error } = await client.from('catalogue_product_claims')
+      .select('source_url').order('id').range(from, from + SOURCE_PAGE - 1);
+    if (error) throw new Error(`listDistinctSourceUrls: ${error.message}`);
+    const rows = (data as { source_url: string }[] | null) ?? [];
+    for (const row of rows) if (row.source_url.trim() !== '') urls.add(row.source_url.trim());
+    if (rows.length < SOURCE_PAGE) break;
+  }
+  return [...urls];
+}
+
+interface SourceCheckDbRow {
+  url: string;
+  result: SourceCheckInput['result'];
+  http_status: number | null;
+  final_url: string | null;
+  note: string | null;
+  checked_at: string;
+  checked_by_name: string | null;
+}
+
+/** The latest saved check of every link, newest first. */
+export async function listSourceChecks(client: Client): Promise<SourceCheckRow[]> {
+  const rows: SourceCheckDbRow[] = [];
+  for (let from = 0; ; from += SOURCE_PAGE) {
+    const { data, error } = await client.from('catalogue_source_checks')
+      .select('url,result,http_status,final_url,note,checked_at,checked_by_name')
+      .order('checked_at', { ascending: false }).order('url').range(from, from + SOURCE_PAGE - 1);
+    if (error) throw new Error(`listSourceChecks: ${error.message}`);
+    const page = (data as SourceCheckDbRow[] | null) ?? [];
+    rows.push(...page);
+    if (page.length < SOURCE_PAGE) break;
+  }
+  return rows.map((row) => ({
+    url: row.url, result: row.result, httpStatus: row.http_status, finalUrl: row.final_url, note: row.note,
+    checkedAt: row.checked_at, checkedByName: row.checked_by_name,
+  }));
+}
+
+/** Ask the link checker about a few links (at most 25). It writes nothing; the answers are saved by `saveSourceChecks`. */
+export async function checkSourceLinks(client: Client, urls: readonly string[]): Promise<SourceCheckInput[]> {
+  // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment -- untyped Supabase function response
+  const { data, error } = await client.functions.invoke('catalogue-link-check', { body: { urls } });
+  if (error) throw new Error('The link checker is not available right now. If it has not been deployed yet, deploy catalogue-link-check, then try again.');
+  const result = data as { status?: string; message?: string; results?: unknown } | null;
+  if (!result) throw new Error('The link checker gave no answer.');
+  if (result.status === 'error') throw new Error(result.message ?? 'The link check failed.');
+  const parsed = sourceCheckSchema.array().safeParse(result.results);
+  if (!parsed.success) throw new Error('The link checker gave an answer this page does not understand.');
+  return parsed.data;
+}
+
+/** Save results. The server stamps who and when; a later check of the same link replaces the earlier one. */
+export async function saveSourceChecks(client: Client, checks: readonly SourceCheckInput[]): Promise<void> {
+  if (checks.length === 0) return;
+  const { error } = await client.from('catalogue_source_checks').upsert(
+    checks.map((check) => ({ url: check.url, result: check.result, http_status: check.httpStatus, final_url: check.finalUrl, note: check.note })),
+    { onConflict: 'url' },
+  );
+  if (error) throw new Error(`saveSourceChecks: ${error.message}`);
+}
+
+/** A link whose last check was not "works", with the claims that cite it. */
+export interface FlaggedSourceLink {
+  check: SourceCheckRow;
+  claims: { productId: string; productName: string; vendor: string; position: number; statement: string }[];
+}
+
+/**
+ * Links whose latest check found a problem, newest first, each with the claims
+ * citing it. Claims are read in pages and matched here (a long list of links
+ * must not go into one filter, build rule 8); products are then read in pieces
+ * of at most 50.
+ */
+export async function listFlaggedSourceLinks(client: Client, checks: readonly SourceCheckRow[]): Promise<FlaggedSourceLink[]> {
+  const flagged = checks.filter((check) => check.result !== 'works');
+  if (flagged.length === 0) return [];
+  const wanted = new Set(flagged.map((check) => check.url));
+  const matched: { product_id: string; position: number; statement: string; source_url: string }[] = [];
+  for (let from = 0; ; from += SOURCE_PAGE) {
+    const { data, error } = await client.from('catalogue_product_claims')
+      .select('product_id,position,statement,source_url').order('id').range(from, from + SOURCE_PAGE - 1);
+    if (error) throw new Error(`listFlaggedSourceLinks: ${error.message}`);
+    const rows = (data as { product_id: string; position: number; statement: string; source_url: string }[] | null) ?? [];
+    matched.push(...rows.filter((row) => wanted.has(row.source_url.trim())));
+    if (rows.length < SOURCE_PAGE) break;
+  }
+  const productIds = [...new Set(matched.map((row) => row.product_id))];
+  const products = await queryInChunks<string, { id: string; product: string; vendor: string }>('listFlaggedSourceLinks', 'id', productIds, (chunk) =>
+    client.from('catalogue_products').select('id,product,vendor').in('id', chunk));
+  const byId = new Map(products.map((product) => [product.id, product]));
+  return flagged.map((check) => ({
+    check,
+    claims: matched.filter((row) => row.source_url.trim() === check.url)
+      .map((row) => ({ productId: row.product_id, productName: byId.get(row.product_id)?.product ?? 'Unknown product', vendor: byId.get(row.product_id)?.vendor ?? '', position: row.position, statement: row.statement }))
+      .sort((a, b) => a.productName.localeCompare(b.productName) || a.position - b.position),
+  }));
 }
