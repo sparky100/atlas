@@ -1,109 +1,91 @@
 import { useCallback, useEffect, useState } from 'react';
-import { Link, useNavigate } from 'react-router';
-import { SECTORS, type Sector } from '../../contracts/capabilityMapContent';
-import type { CapabilitySetOption, CatalogueDraftContent, CatalogueDraftRow, CatalogueVersionSummary } from '../../contracts/catalogueAdmin';
+import { Link } from 'react-router';
+import { SECTORS } from '../../contracts/capabilityMapContent';
+import type { CatalogueVersionSummary } from '../../contracts/catalogueAdmin';
 import {
-  createCatalogueDraft,
-  listCapabilitySets,
-  listCatalogueDrafts,
-  listCatalogueProductIds,
+  listCatalogueEntries,
   listCatalogueVersions,
+  listPublishedProductNames,
   withdrawCatalogue,
 } from '../../db/catalogueAdmin';
 import { Loading } from '../components/Loading/Loading';
 import { Text } from '../components/Text/Text';
 import { supabase } from '../supabaseClient';
-import { currentCatalogueVersion, sectorLabel } from './catalogueShared';
+import { currentCatalogueVersion, entriesNotYetPublished, sectorLabel } from './catalogueShared';
 import styles from './CatalogueAdmin.module.css';
 
 const BASE = '/platform-admin/catalogue';
 
+interface SectorState {
+  versions: CatalogueVersionSummary[];
+  /** Products of the current version that no published product matches; `null` when that could not be checked (withdrawal stays blocked). */
+  onlyHere: string[] | null;
+  checkError: string;
+}
+
+async function readSectorState(sector: string): Promise<SectorState> {
+  const versions = await listCatalogueVersions(supabase);
+  const current = currentCatalogueVersion(versions, sector);
+  if (current === null) return { versions, onlyHere: [], checkError: '' };
+  try {
+    const [entries, published] = await Promise.all([listCatalogueEntries(supabase, current.id), listPublishedProductNames(supabase)]);
+    return { versions, onlyHere: entriesNotYetPublished(entries, published).map((entry) => entry.product), checkError: '' };
+  } catch (cause) {
+    return { versions, onlyHere: null, checkError: cause instanceof Error ? cause.message : String(cause) };
+  }
+}
+
 /**
- * `/platform-admin/catalogue/sectors/:sector` — one sector's published
- * versions, open draft and withdraw action. Editing a draft happens on the
- * draft's own route.
+ * `/platform-admin/catalogue/sectors/:sector` — one sector's catalogue
+ * history, read-only, and the one action left: withdrawing the current
+ * version. Withdrawing is blocked while any of its products is not yet
+ * published as a product, because users would lose it (step 4b-3).
  */
 export function CatalogueSectorAdmin({ sector }: { sector: string }) {
-  const navigate = useNavigate();
   const validSector = (SECTORS as readonly string[]).includes(sector);
   const [versions, setVersions] = useState<CatalogueVersionSummary[]>([]);
-  const [drafts, setDrafts] = useState<CatalogueDraftRow[]>([]);
-  const [sets, setSets] = useState<CapabilitySetOption[]>([]);
+  const [onlyHere, setOnlyHere] = useState<string[] | null>(null);
   const [withdrawReason, setWithdrawReason] = useState('');
   const [notice, setNotice] = useState('');
   const [loadError, setLoadError] = useState('');
+  const [checkError, setCheckError] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(validSector);
   const [busy, setBusy] = useState(false);
 
-  const refresh = useCallback(async () => {
-    const [nextVersions, nextDrafts] = await Promise.all([listCatalogueVersions(supabase), listCatalogueDrafts(supabase)]);
-    setVersions(nextVersions);
-    setDrafts(nextDrafts);
+  const apply = useCallback((state: SectorState) => {
+    setVersions(state.versions);
+    setOnlyHere(state.onlyHere);
+    setCheckError(state.checkError);
   }, []);
 
   useEffect(() => {
     if (!validSector) return;
-    void (async () => {
-      try {
-        const [nextVersions, nextDrafts, nextSets] = await Promise.all([
-          listCatalogueVersions(supabase),
-          listCatalogueDrafts(supabase),
-          listCapabilitySets(supabase),
-        ]);
-        setVersions(nextVersions);
-        setDrafts(nextDrafts);
-        setSets(nextSets);
-      } catch (cause) {
-        setLoadError(cause instanceof Error ? cause.message : String(cause));
-      } finally {
-        setLoading(false);
-      }
-    })();
-  }, [validSector]);
-
-  const run = async (action: () => Promise<void>) => {
-    setBusy(true); setError(''); setNotice('');
-    try { await action(); } catch (cause) { setError(cause instanceof Error ? cause.message : String(cause)); }
-    finally { setBusy(false); }
-  };
+    void readSectorState(sector)
+      .then(apply)
+      .catch((cause: unknown) => { setLoadError(cause instanceof Error ? cause.message : String(cause)); })
+      .finally(() => { setLoading(false); });
+  }, [validSector, sector, apply]);
 
   const sectorVersions = versions.filter((version) => version.sector === sector).sort((a, b) => b.version - a.version);
   const current = currentCatalogueVersion(versions, sector);
-  const sectorDrafts = drafts.filter((draft) => draft.sector === sector && draft.status === 'draft');
-  const sectorSets = sets.filter((set) => set.sector === sector).sort((a, b) => b.version - a.version);
-  const nextVersion = Math.max(
-    0,
-    ...versions.filter((version) => version.sector === sector).map((version) => version.version),
-    ...drafts.filter((draft) => draft.sector === sector).map((draft) => draft.version),
-  ) + 1;
 
-  const createDraft = () => void run(async () => {
-    const base = current;
-    const baseProducts = base === null ? [] : await listCatalogueProductIds(supabase, base.id);
-    const map = sectorSets.find((set) => set.status === 'published') ?? sectorSets[0];
-    if (!map) throw new Error('Create a capability set for this sector first.');
-    const content: CatalogueDraftContent = {
-      sector: sector as Sector,
-      version: nextVersion,
-      capabilityMapVersion: map.version,
-      title: `${sectorLabel(sector)} product catalogue, version ${String(nextVersion)}`,
-      sourceDescription: base === null
-        ? 'Platform-reviewed product catalogue.'
-        : `Products selected from ${base.title}, version ${String(base.version)}.`,
-      productIds: baseProducts,
-    };
-    const id = await createCatalogueDraft(supabase, sector, nextVersion, base?.id ?? null, content);
-    void navigate(`${BASE}/sectors/${sector}/drafts/${id}`);
-  });
-
-  const withdraw = () => void run(async () => {
-    if (current === null || withdrawReason.trim() === '') return;
-    await withdrawCatalogue(supabase, current.id, withdrawReason.trim());
-    await refresh();
-    setWithdrawReason('');
-    setNotice(`Withdrew ${sectorLabel(current.sector)} v${String(current.version)}.`);
-  });
+  const withdraw = () => {
+    if (current === null || withdrawReason.trim() === '' || onlyHere === null || onlyHere.length > 0) return;
+    setBusy(true); setError(''); setNotice('');
+    void (async () => {
+      try {
+        await withdrawCatalogue(supabase, current.id, withdrawReason.trim());
+        setWithdrawReason('');
+        apply(await readSectorState(sector));
+        setNotice(`Withdrew ${sectorLabel(current.sector)} v${String(current.version)}.`);
+      } catch (cause) {
+        setError(cause instanceof Error ? cause.message : String(cause));
+      } finally {
+        setBusy(false);
+      }
+    })();
+  };
 
   if (!validSector) {
     return (
@@ -123,6 +105,8 @@ export function CatalogueSectorAdmin({ sector }: { sector: string }) {
     );
   }
 
+  const blocked = onlyHere === null || onlyHere.length > 0;
+
   return (
     <div className={styles.page} data-testid="catalogue-sector-admin">
       <Link to={`${BASE}/sectors`} className={styles.backLink}>← Sector catalogues</Link>
@@ -131,25 +115,28 @@ export function CatalogueSectorAdmin({ sector }: { sector: string }) {
         <Text as="p" tone="muted" size="sm">
           {current ? `Current: ${current.title} v${String(current.version)} · published ${current.published_at ? new Date(current.published_at).toLocaleDateString('en-GB') : 'not published'}` : 'No current published catalogue'}
         </Text>
+        <Text as="p" tone="muted" size="sm">Read-only history. Products are maintained and published one at a time under <Link to={BASE}>Products</Link>.</Text>
       </div>
       {error !== '' && <p role="alert" className={styles.error}>{error}</p>}
       {notice !== '' && <p role="status">{notice}</p>}
 
-      <div className={styles.actions}>
-        {current && (
+      {current && (
+        <div className={styles.actions}>
           <Link to={`${BASE}/sectors/${sector}/versions/${current.id}`}>View current products</Link>
-        )}
-        <button type="button" onClick={createDraft} disabled={busy || sectorDrafts.length > 0 || sectorSets.length === 0}>
-          Create v{nextVersion} draft{current ? ' from current' : ''}
-        </button>
-        {sectorDrafts.length > 0 && <span>An open draft already exists. Open it below.</span>}
-        {sectorSets.length === 0 && <span>Create a capability set for this sector before a catalogue draft.</span>}
-      </div>
+        </div>
+      )}
 
-      {current?.withdrawn_at === null && (
-        <div className={styles.withdraw}>
+      {current && (
+        <div className={styles.withdraw} data-testid="sector-withdraw">
+          {checkError !== '' && <p role="alert" className={styles.error}>Could not check which products are published: {checkError}</p>}
+          {onlyHere !== null && onlyHere.length > 0 && (
+            <p data-testid="sector-withdraw-blocked">
+              {onlyHere.length} of this catalogue&rsquo;s products {onlyHere.length === 1 ? 'is' : 'are'} not yet published as {onlyHere.length === 1 ? 'a product' : 'products'}, so users would lose {onlyHere.length === 1 ? 'it' : 'them'} if it were withdrawn: {onlyHere.join(', ')}. Publish {onlyHere.length === 1 ? 'it' : 'them'} under Products first.
+            </p>
+          )}
+          {onlyHere !== null && onlyHere.length === 0 && <p>Every product in this catalogue is published as a product, so it can be withdrawn without users losing any.</p>}
           <label>Withdrawal reason <input value={withdrawReason} onChange={(event) => { setWithdrawReason(event.target.value); }} placeholder="Why this version is no longer current" /></label>
-          <button type="button" onClick={withdraw} disabled={busy || withdrawReason.trim() === ''}>Withdraw current version</button>
+          <button type="button" onClick={withdraw} disabled={busy || blocked || withdrawReason.trim() === ''}>Withdraw current version</button>
         </div>
       )}
 
@@ -168,19 +155,6 @@ export function CatalogueSectorAdmin({ sector }: { sector: string }) {
           {sectorVersions.length === 0 && <p>No versions yet.</p>}
         </div>
       </details>
-
-      <h2>Drafts</h2>
-      {sectorDrafts.length === 0 ? (
-        <p>No open drafts for this sector.</p>
-      ) : (
-        <div className={styles.draftList} aria-label="Catalogue drafts">
-          {sectorDrafts.map((draft) => (
-            <button type="button" className={styles.draftButton} key={draft.id} onClick={() => { void navigate(`${BASE}/sectors/${sector}/drafts/${draft.id}`); }}>
-              {draft.content.title} · v{draft.version} <small>Edited {new Date(draft.updated_at).toLocaleDateString('en-GB')}</small>
-            </button>
-          ))}
-        </div>
-      )}
     </div>
   );
 }

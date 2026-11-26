@@ -7,7 +7,6 @@ import { useAuth } from '../auth/useAuth';
 import { CapabilitySetDraftPage } from './platformAdmin/CapabilitySetDraftPage';
 import { CapabilitySetVersionPage } from './platformAdmin/CapabilitySetVersionPage';
 import { CapabilitySetsPage } from './platformAdmin/CapabilitySetsPage';
-import { CatalogueDraftPage } from './platformAdmin/CatalogueDraftPage';
 import { CataloguePage } from './platformAdmin/CataloguePage';
 import { CatalogueProductPage } from './platformAdmin/CatalogueProductPage';
 import { CatalogueReviewPage } from './platformAdmin/CatalogueReviewPage';
@@ -66,7 +65,6 @@ export function PlatformAdminPage() {
               <Route path="catalogue/sectors" element={<CatalogueSectorsPage />} />
               <Route path="catalogue/sectors/:sector" element={<CatalogueSectorPage />} />
               <Route path="catalogue/sectors/:sector/versions/:catalogueId" element={<CatalogueVersionPage />} />
-              <Route path="catalogue/sectors/:sector/drafts/:draftId" element={<CatalogueDraftPage />} />
               <Route path="sample-models" element={<SampleModelsPage />} />
               <Route path="sample-models/:slug" element={<SampleModelPage />} />
               <Route path="llm-proxy" element={<LlmProxyPage />} />

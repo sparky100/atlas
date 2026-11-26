@@ -224,3 +224,20 @@ Migration `20261126240000_catalogue_cite_product_revisions.sql`.
 - **Who can see what.** A revision that is withdrawn or replaced becomes
   readable to a user only if one of their organisation's options cites it. No
   new callable function; no change to the guarded functions' checks.
+
+## Amendment, 26 November 2026: sector catalogues become read-only history (step 4b-3)
+
+No migration; screens only.
+
+- **Read-only.** Platform admin > Sector catalogues lists versions and their
+  products for reading. The create-draft button, the drafts list and the draft
+  editor route are removed. The database functions for sector drafts stay
+  (tests and loaders use them); removing them is a separate decision.
+- **Withdrawing is checked.** A sector page names the products of its current
+  version that no published product matches (vendor and product name, case
+  ignored) and keeps "Withdraw current version" disabled until none are left,
+  because users would lose them. If the check cannot be read, withdrawal stays
+  disabled. The existing guarded `withdraw_catalogue` still records who, when
+  and why; the check is on the screen only.
+- **Citations unchanged.** Saved citations to a sector catalogue keep reading
+  from the frozen sector tables, withdrawn or not.
