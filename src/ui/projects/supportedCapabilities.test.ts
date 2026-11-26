@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { capabilityIdsSupportedBy, supportedCapabilitiesNotice } from './supportedCapabilities';
+import { capabilityIdsSupportedBy, scopeSystemLikeIds, supportedCapabilitiesNotice } from './supportedCapabilities';
 
 const edge = (type: string, from: string, to: string) => ({ relationship_type: type as 'supports', from_element_id: from, to_element_id: to });
 
@@ -25,5 +25,17 @@ describe('supportedCapabilitiesNotice', () => {
     const text = supportedCapabilitiesNotice('Quote Tool', []);
     expect(text).toContain('no capability link recorded');
     expect(text).toContain('No business use has been ruled in or out');
+  });
+});
+
+describe('scopeSystemLikeIds', () => {
+  it('picks out systems and modules, so a module in scope has its capabilities filled in too (M2)', () => {
+    const scope = [
+      { elementId: 's1', name: 'Billing', elementType: 'system' as const },
+      { elementId: 'm1', name: 'Billing · Invoicing', elementType: 'container' as const },
+      { elementId: 'c1', name: 'Bill customers', elementType: 'capability' as const },
+      { elementId: 'x', name: 'Unknown' },
+    ];
+    expect(scopeSystemLikeIds(scope)).toEqual(['s1', 'm1']);
   });
 });

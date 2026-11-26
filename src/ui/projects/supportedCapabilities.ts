@@ -1,5 +1,7 @@
 import type { UUID } from '../../contracts/delta';
+import { isSystemLikeType } from '../../contracts/elementKinds';
 import type { RelationshipsHeadRow } from '../../contracts/rows';
+import type { ProjectScopeItem } from './projectModel';
 
 /** The capabilities a system supports, from its `supports` links (the system is the source of its own edge). Order of first appearance; each once. */
 export function capabilityIdsSupportedBy(edges: readonly Pick<RelationshipsHeadRow, 'relationship_type' | 'from_element_id' | 'to_element_id'>[], systemId: UUID): UUID[] {
@@ -16,4 +18,9 @@ export function supportedCapabilitiesNotice(systemName: string, capabilityNames:
     return `${systemName} has no capability link recorded, so none could be filled in. Name a capability this project serves, or link the system to one first. No business use has been ruled in or out.`;
   }
   return `Added ${capabilityNames.length === 1 ? 'the capability' : 'the capabilities'} ${systemName} supports: ${capabilityNames.join(', ')}. Remove any this project does not serve.`;
+}
+
+/** The ids in a project's scope that can support a capability: systems and modules (Model rule M2). A capability or an actor in scope has nothing to fill in. */
+export function scopeSystemLikeIds(scope: readonly ProjectScopeItem[]): UUID[] {
+  return scope.filter((s) => s.elementType !== undefined && isSystemLikeType(s.elementType)).map((s) => s.elementId);
 }

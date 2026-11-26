@@ -20,6 +20,7 @@ import type { Client } from './client';
 import type { BranchRow } from './types';
 import { assertInFilterSize } from './inFilterLimit';
 import { selectAll } from './selectAll';
+import { isSystemLikeType } from '../contracts/elementKinds';
 
 /** A bare `commits` row projection, `id`/`depth` only — named (not an inline `selectAll<{...}>` literal) because a multi-field inline object-type generic's own `;` field separators confuse `headTableReads.test.ts`'s text-level statement scanner (SPEC §6.7's checker), which is a real limitation of that checker, not a reason to skip pagination. */
 interface CommitIdRow {
@@ -86,6 +87,7 @@ export async function listDirectorElementHeads(supabase: Client, commitId: UUID)
   const rows = await selectAll<ElementsHeadRow>(query);
   return {
     capabilities: rows.filter((r) => r.element_type === 'capability'),
+    // system-only: this is the list of whole systems; modules are listed separately on the next line.
     systems: rows.filter((r) => r.element_type === 'system'),
     containers: rows.filter((r) => r.element_type === 'container'),
   };
@@ -219,6 +221,29 @@ export async function loadPlannedReplacements(supabase: Client, modelId: UUID): 
   return loadPlannedReplacementsForBranches(supabase, (branchRows as { id: UUID }[]).map((b) => b.id));
 }
 
+/**
+ * Replacements one approved change branch plans, from its own deltas: a new
+ * system or module that supports a capability, on a branch that also retracts
+ * a system or module. A module is an element in its own right (Model rule M2),
+ * so replacing one module with another counts the same as replacing a system.
+ */
+export function findPlannedReplacements(deltas: readonly DeltaRow[], branchId: UUID): PlannedReplacement[] {
+  const createdIds = new Set(deltas.filter((d) => d.kind === 'element_create' && d.element_type !== null && isSystemLikeType(d.element_type)).map((d) => d.subject_id));
+  const retractedIds = new Set(deltas.filter((d) => d.kind === 'element_retract' && d.element_type !== null && isSystemLikeType(d.element_type)).map((d) => d.subject_id));
+  const replacements: PlannedReplacement[] = [];
+  if (retractedIds.size === 0) return replacements;
+  for (const delta of deltas) {
+    if (delta.kind !== 'relationship_create' || delta.relationship_type !== 'supports') continue;
+    const replacementSystemId = delta.from_element_id;
+    const capabilityId = delta.to_element_id;
+    if (!replacementSystemId || !capabilityId || !createdIds.has(replacementSystemId)) continue;
+    for (const exposedSystemId of retractedIds) {
+      replacements.push({ capabilityId, exposedSystemId, replacementSystemId, branchId });
+    }
+  }
+  return replacements;
+}
+
 /** `loadPlannedReplacements` for callers that already hold the model's approved change branches (the director door has every change branch from `listChangeBranches`), so the extra `branches` read is skipped. */
 export async function loadPlannedReplacementsForBranches(supabase: Client, approvedBranchIds: readonly UUID[]): Promise<PlannedReplacement[]> {
   const branches = approvedBranchIds.map((id) => ({ id }));
@@ -233,19 +258,7 @@ export async function loadPlannedReplacementsForBranches(supabase: Client, appro
 
     const deltas = await selectAll<DeltaRow>(supabase.from('deltas').select('*', { count: 'exact' }).in('commit_id', commitIds).order('id'));
 
-    const createdSystemIds = new Set(deltas.filter((d) => d.kind === 'element_create' && d.element_type === 'system').map((d) => d.subject_id));
-    const retractedSystemIds = new Set(deltas.filter((d) => d.kind === 'element_retract' && d.element_type === 'system').map((d) => d.subject_id));
-    if (retractedSystemIds.size === 0) continue;
-
-    for (const delta of deltas) {
-      if (delta.kind !== 'relationship_create' || delta.relationship_type !== 'supports') continue;
-      const replacementSystemId = delta.from_element_id;
-      const capabilityId = delta.to_element_id;
-      if (!replacementSystemId || !capabilityId || !createdSystemIds.has(replacementSystemId)) continue;
-      for (const exposedSystemId of retractedSystemIds) {
-        replacements.push({ capabilityId, exposedSystemId, replacementSystemId, branchId: branch.id });
-      }
-    }
+    replacements.push(...findPlannedReplacements(deltas, branch.id));
   }
   return replacements;
 }

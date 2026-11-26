@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { ElementsHeadRow, RelationshipsHeadRow } from '../contracts/rows';
-import { buildCapabilityTiles, commitsSincePreviousTag, computeExposureTone, deriveModelCounts, groupPlannedReplacementsByCapability, type PlannedReplacement } from './modelHome';
+import { buildCapabilityTiles, commitsSincePreviousTag, computeExposureTone, deriveModelCounts, findPlannedReplacements, groupPlannedReplacementsByCapability, type PlannedReplacement } from './modelHome';
 
 function system(id: string, lifecycleStatus: string | undefined): ElementsHeadRow {
   return {
@@ -324,5 +324,26 @@ describe('deriveModelCounts', () => {
       { kind: 'main' as const, status: 'draft' as const },
     ];
     expect(deriveModelCounts([], [], branches as never).openChanges).toBe(4);
+  });
+});
+
+describe('findPlannedReplacements', () => {
+  const delta = (fields: Record<string, unknown>) => fields as unknown as Parameters<typeof findPlannedReplacements>[0][number];
+  const deltas = (type: 'system' | 'container') => [
+    delta({ kind: 'element_create', element_type: type, subject_id: 'new' }),
+    delta({ kind: 'element_retract', element_type: type, subject_id: 'old' }),
+    delta({ kind: 'relationship_create', relationship_type: 'supports', from_element_id: 'new', to_element_id: 'cap' }),
+  ];
+
+  it('finds a system replaced by another system', () => {
+    expect(findPlannedReplacements(deltas('system'), 'b1')).toEqual([{ capabilityId: 'cap', exposedSystemId: 'old', replacementSystemId: 'new', branchId: 'b1' }]);
+  });
+
+  it('finds a module replaced by another module (M2)', () => {
+    expect(findPlannedReplacements(deltas('container'), 'b1')).toEqual([{ capabilityId: 'cap', exposedSystemId: 'old', replacementSystemId: 'new', branchId: 'b1' }]);
+  });
+
+  it('finds nothing when nothing is retracted', () => {
+    expect(findPlannedReplacements(deltas('system').slice(0, 1).concat(deltas('system').slice(2)), 'b1')).toEqual([]);
   });
 });

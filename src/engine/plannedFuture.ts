@@ -16,6 +16,7 @@ import type { ElementsHeadRow } from '../contracts/rows';
 import { cloneHead, type Head } from './deltas';
 import { lifecycleStateOf } from './elementRead/fitAndExposure';
 import { computeVersionDiff } from './versionDiff';
+import { isSystemLikeType } from '../contracts/elementKinds';
 
 export interface PlannedChange {
   id: UUID;
@@ -50,7 +51,7 @@ function notLiveIds(head: Head, onIso: string): Set<UUID> {
   const now = new Date(`${onIso}T00:00:00Z`);
   const rows = new Map<UUID, ElementsHeadRow>();
   for (const [id, e] of head.elements) {
-    if (e.elementType === 'system' || e.elementType === 'container') rows.set(id, { element_id: id, element_type: e.elementType, name: e.name, parent_id: e.parentId, attributes: e.attributes, exists_delta_id: e.existsDeltaId });
+    if (isSystemLikeType(e.elementType)) rows.set(id, { element_id: id, element_type: e.elementType, name: e.name, parent_id: e.parentId, attributes: e.attributes, exists_delta_id: e.existsDeltaId });
   }
   const gone = new Set<UUID>();
   for (const [id, row] of rows) if (lifecycleStateOf(row, rows, now) !== 'active') gone.add(id);

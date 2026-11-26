@@ -6,7 +6,7 @@ import { listSupportsEdgesForSystems } from '../../db/landscape';
 import { reportError } from '../errors/errorBannerStore';
 import { supabase } from '../supabaseClient';
 import type { ProjectScopeItem } from './projectModel';
-import { capabilityIdsSupportedBy, supportedCapabilitiesNotice } from './supportedCapabilities';
+import { capabilityIdsSupportedBy, scopeSystemLikeIds, supportedCapabilitiesNotice } from './supportedCapabilities';
 
 /**
  * A project can't stand apart from a capability, and a system that supports
@@ -18,7 +18,7 @@ import { capabilityIdsSupportedBy, supportedCapabilitiesNotice } from './support
 export function useSupportedCapabilities(commitId: UUID | null, scope: readonly ProjectScopeItem[], setScope: Dispatch<SetStateAction<ProjectScopeItem[]>>): string[] {
   const resolved = useRef(new Set<UUID>());
   const [notices, setNotices] = useState<Record<string, string>>({});
-  const systemKey = scope.filter((s) => s.elementType === 'system').map((s) => s.elementId).join(',');
+  const systemKey = scopeSystemLikeIds(scope).join(',');
 
   useEffect(() => {
     if (commitId === null || systemKey === '') return;

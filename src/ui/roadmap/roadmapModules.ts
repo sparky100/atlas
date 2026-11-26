@@ -20,6 +20,7 @@
 import type { ElementsHeadRow } from '../../contracts/rows';
 import { effectiveModuleAttributes } from '../elements/moduleAttributes';
 import { moduleDisplayName } from '../elements/moduleDisplayName';
+import { isSystemLikeType } from '../../contracts/elementKinds';
 
 /**
  * Every system and module in `elements`, ready for `groupRoadmapLifecycleBars`.
@@ -31,7 +32,7 @@ import { moduleDisplayName } from '../elements/moduleDisplayName';
 export function systemsAndModulesFor(elements: readonly ElementsHeadRow[]): ElementsHeadRow[] {
   const elementsById = new Map(elements.map((e) => [e.element_id, e]));
   return elements
-    .filter((e) => e.element_type === 'system' || e.element_type === 'container')
+    .filter((e) => isSystemLikeType(e.element_type))
     .map((e) => {
       if (e.element_type !== 'container' || e.parent_id === null) return e;
       const parent = elementsById.get(e.parent_id) ?? null;

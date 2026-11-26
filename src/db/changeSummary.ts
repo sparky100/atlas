@@ -197,9 +197,11 @@ export function summarizeOwnDeltas(ownDeltas: readonly Delta[], asIsHead: Head, 
   /** The system an element stands for in impact terms — itself, or a module's own parent system — with the element's own display name ("Platform · Module" for a module). */
   const owningSystem = (elementId: UUID): { systemId: UUID; system: ElementRow; displayName: string } | null => {
     const el = element(elementId);
+    // system-only: a system is its own owning system; the next branch resolves a module to its platform.
     if (el?.elementType === 'system') return { systemId: elementId, system: el, displayName: el.name };
     if (el?.elementType === 'container' && el.parentId !== null) {
       const parent = element(el.parentId);
+      // system-only: a module's parent must be a platform system.
       if (parent?.elementType !== 'system') return null;
       return { systemId: el.parentId, system: parent, displayName: moduleDisplayName(elementRow(elementId, el), elementRow(el.parentId, parent)) };
     }
@@ -216,6 +218,7 @@ export function summarizeOwnDeltas(ownDeltas: readonly Delta[], asIsHead: Head, 
       const created = entry.deltas.find((d) => d.kind === 'element.create');
       const ownName = created?.kind === 'element.create' ? created.name : null;
       subjects.push({ subjectId, ...entry, name: el ? displayNameOf(subjectId) : (ownName ?? 'An element that no longer exists') });
+      // system-only: a module is handled in its own branch just below, with the platform it sits in.
       if (el?.elementType === 'system') addTouchedReason(subjectId, subjectId, { kind: 'edited', systemName: el.name });
       if (el?.elementType === 'capability') addCapabilityReason(subjectId, { kind: 'direct' }, null);
       if (el?.elementType === 'container') {
