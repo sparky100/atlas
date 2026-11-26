@@ -1,4 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
+import { ProductInModelNote } from './ProductInModelNote';
+import { useModelElementNames } from './useModelElementNames';
 import { productOptionTitle } from './addProductOption';
 import { allStepsDone, applyDesignerEvent, stepSuffix, type DesignerStep } from './designerProgress';
 import type { UUID } from '../../contracts/delta';
@@ -105,6 +107,7 @@ function productSuggestion(product: DesignerCatalogueProduct, draftedAt: string)
  * a visit to another page does not lose them.
  */
 export function DesignerSuggestions({ orgId, userId, modelId, elementId, brief, scope, onChange }: DesignerSuggestionsProps) {
+  const modelElements = useModelElementNames(modelId);
   // What a run cost is the organisation owner's business, not every contributor's (Simon, 2026-11-20).
   const { role } = useMembership(orgId, userId);
   const trial = useDesignerTrial(orgId, 'panel');
@@ -227,7 +230,9 @@ export function DesignerSuggestions({ orgId, userId, modelId, elementId, brief, 
           testId: 'designer-use-product',
           onClick: () => { addProductOption(product); },
         }]}
-      />
+      >
+        <ProductInModelNote productName={product.product} elements={modelElements} />
+      </ResearchResultCard>
     );
   }
 

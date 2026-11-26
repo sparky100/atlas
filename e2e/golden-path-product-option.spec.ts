@@ -219,6 +219,10 @@ test('a product that is already a module of a platform is found and chosen as th
   await goToModelHome(page);
   await addContainerFromHome(page, 'Utility Network', 'Esri ArcGIS Platform');
   await goToModelHome(page);
+  await addSystemFromHome(page, { name: 'Microsoft Platform', description: 'The Microsoft business platform.' });
+  await goToModelHome(page);
+  await addContainerFromHome(page, 'Dynamics 365 Customer Service', 'Microsoft Platform');
+  await goToModelHome(page);
   await addSystemFromHome(page, { name: 'Legacy Quote Tool', description: 'Issues connection quotes.', capabilityName: 'Connection Quotations' });
   await goToModelHome(page);
   await openSearch(page);
@@ -232,6 +236,15 @@ test('a product that is already a module of a platform is found and chosen as th
   await page.getByRole('radio', { name: 'Buy a product', exact: true }).check();
   await page.getByPlaceholder("What's this option? (e.g. Replace with Workday)").fill('Replace with a product');
   await page.getByRole('button', { name: 'Add option' }).click();
+
+  // The products list says which listed product is already in the model, and links to it.
+  const dynamics = page.getByTestId('capability-products').getByRole('listitem').filter({ hasText: 'Microsoft Dynamics 365 Customer Service' }).first();
+  await expect(dynamics.getByTestId('product-in-model')).toContainText('Dynamics 365 Customer Service, a module of Microsoft Platform');
+  await expect(dynamics.getByTestId('product-in-model').getByRole('link')).toHaveAttribute('href', /\/e\//);
+  const salesforce = page.getByTestId('capability-products').getByRole('listitem').filter({ hasText: 'Salesforce Energy and Utilities Cloud' }).first();
+  await expect(salesforce).toBeVisible();
+  await expect(salesforce.getByTestId('product-in-model')).toHaveCount(0);
+
   await optionSurface(page, 'Replace with a product').getByRole('button', { name: 'Work on this option' }).click();
   await expect(page).toHaveURL(/\/changes\//);
   const draftLink = page.getByRole('link', { name: "Draft this option's changes" });

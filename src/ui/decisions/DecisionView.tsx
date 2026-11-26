@@ -921,7 +921,7 @@ export function DecisionView({ modelId, decisionId, orgId, orgSlug, modelSlug, r
       {hasReplaceOrBuildOption && capabilityConcerns.map((capability) => {
         const templateRef = attributesRecord(capability.attributes).templateRef;
         if (typeof templateRef !== 'string') return null;
-        return <CapabilityProducts key={capability.element_id} templateRef={templateRef} title={`Products that can support ${capability.name}`} makeOption={makeProductOption} />;
+        return <CapabilityProducts key={capability.element_id} templateRef={templateRef} title={`Products that can support ${capability.name}`} makeOption={makeProductOption} modelId={modelId} />;
       })}
 
       {(comparisonOptions.length > 0 || scoredOptions.length > 0) && (
