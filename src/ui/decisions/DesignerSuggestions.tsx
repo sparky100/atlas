@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { productOptionTitle } from './addProductOption';
 import { allStepsDone, applyDesignerEvent, stepSuffix, type DesignerStep } from './designerProgress';
 import type { UUID } from '../../contracts/delta';
 import { catalogueRefKeyOf, DESIGNER_SUMMARY_MAX, DESIGNER_TITLE_MAX, DESIGNER_WEIGH_MAX, type DesignerCatalogueProduct, type DesignerWebRef } from '../../contracts/designerOptions';
@@ -78,7 +79,7 @@ function newCards(draft: DesignerDraft, draftedAt: string): SuggestionCard[] {
 
 /** The option a person gets when they pick one reviewed product out of a replacement card. */
 function productSuggestion(product: DesignerCatalogueProduct, draftedAt: string): SuggestionCard {
-  const title = `Use ${product.product}`.slice(0, DESIGNER_TITLE_MAX);
+  const title = productOptionTitle(product);
   const summary = `${product.product} by ${product.vendor}. ${product.howItSupports}`.trim().slice(0, DESIGNER_SUMMARY_MAX);
   return {
     id: crypto.randomUUID(),

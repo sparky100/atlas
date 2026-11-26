@@ -1,6 +1,7 @@
 import type { OptionCatalogueSource, OptionSource } from '../../contracts/optionSource';
 import { CollapsibleSection } from '../components/CollapsibleSection/CollapsibleSection';
 import { Text } from '../components/Text/Text';
+import { MakeProductOption, type MakeProductOptionProps } from './MakeProductOption';
 import styles from './OptionSources.module.css';
 
 function standingText(source: OptionCatalogueSource): string {
@@ -22,7 +23,7 @@ function standingText(source: OptionCatalogueSource): string {
  * catalogue as if it were current. A web page is shown as unreviewed and
  * never carries a reviewer line.
  */
-export function OptionSources({ sources }: { sources: readonly OptionSource[] }) {
+export function OptionSources({ sources, makeOption }: { sources: readonly OptionSource[]; makeOption?: MakeProductOptionProps | undefined }) {
   if (sources.length === 0) return null;
   const hasWeb = sources.some((source) => source.kind === 'web');
   return (
@@ -60,6 +61,13 @@ export function OptionSources({ sources }: { sources: readonly OptionSource[] })
                       </li>
                     ))}
                   </ul>
+                  {makeOption !== undefined && source.standing === 'current' && (
+                    <MakeProductOption
+                      product={{ product: source.product, vendor: source.vendor, summary: source.summary, sector: source.sector, version: source.version, entryCode: source.entryCode }}
+                      optionTitles={makeOption.optionTitles}
+                      onMake={makeOption.onMake}
+                    />
+                  )}
                 </>
               ) : (
                 <>
