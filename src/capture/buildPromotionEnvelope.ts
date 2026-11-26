@@ -273,6 +273,7 @@ export function buildPromotionEnvelope(input: BuildPromotionEnvelopeInput): Buil
       if (subjectId === undefined) throw new BuildPromotionEnvelopeError(seq, `seq ${String(seq)}: internal — 'gone' candidate has no promoted subject id`);
       const existsDeltaId = requireExistsDeltaIdOnTarget(targetHead, 'element', subjectId, seq, `'gone' candidate ${subjectId}`);
       const draftSubjectId = candidate.draftSubjectId ?? subjectId;
+      // system-only: SPEC-capture K-14: a gone system is retired by lifecycle; every other type, a module included, is retracted. Whether a gone module should be retired too is open.
       if (elementType === 'system') {
         const attribute = 'lifecycleStatus';
         const previousDeltaId = targetHead.facts.get(factMapKey(subjectId, attribute))?.deltaId ?? existsDeltaId;

@@ -189,6 +189,7 @@ export function buildCaptureDraftEnvelope(input: BuildCaptureDraftEnvelopeInput)
       const subjectId = requireDraftSubjectId(candidate, "a 'gone' candidate");
       const elementType = candidate.elementType;
       const existsDeltaId = requireExistsDeltaId(mainHead, 'element', subjectId, candidate.seq);
+      // system-only: SPEC-capture K-14: a gone system is retired by lifecycle; every other type, a module included, is retracted. Whether a gone module should be retired too is open.
       if (elementType === 'system') {
         const previousDeltaId = mainHead.facts.get(factMapKey(subjectId, 'lifecycleStatus'))?.deltaId ?? existsDeltaId;
         deltas.push({

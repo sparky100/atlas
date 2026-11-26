@@ -445,6 +445,7 @@ export function useCaptureReviewQueue(modelId: UUID, orgId: UUID, jobId: UUID, u
     const systems: ElementsHeadRow[] = [];
     const containers: ElementsHeadRow[] = [];
     for (const element of mainElementById.values()) {
+      // system-only: the not-in-file check takes systems and modules as two separate lists.
       if (element.element_type === 'system') systems.push(element);
       else if (element.element_type === 'container') containers.push(element);
     }
