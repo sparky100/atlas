@@ -27,6 +27,7 @@ import {
 import { edgeLabel, type ContextGroup } from './contextGrouping';
 import { useRefitOnResize } from '../landscape/useRefitOnResize';
 import styles from './ContextDiagramCanvas.module.css';
+import { isSystemLikeType } from '../../contracts/elementKinds';
 
 export interface ContextDiagramCanvasProps {
   group: ContextGroup;
@@ -115,7 +116,7 @@ function readTokens(el: HTMLElement): CanvasTokens {
 
 /** V1's own "Tone: lifecycle ... only" — a tile's fill tint comes from its own recorded lifecycle status, the same `lifecycleToneFor` mapping `ElementHeader.tsx`'s own status chip already uses; nothing else (criticality, hosting model, exposure) is read here. V3: a container hub or neighbour now gets the same treatment a system already had — `ContainerAttributes` carries its own, uninherited `lifecycleStatus` (a module's own tone was already read this way when nested; a container is never nested any more, so this is the one place left it needs reading directly). An actor carries no `lifecycleStatus` of its own, so this naturally returns no tone for it — the same "silent when the fact doesn't apply" shape `landscapeTileColourFor` uses for its own colour-by modes. */
 function toneColour(element: ElementsHeadRow, tokens: CanvasTokens): string | undefined {
-  if (element.element_type !== 'system' && element.element_type !== 'container') return undefined;
+  if (!isSystemLikeType(element.element_type)) return undefined;
   const status = attributesRecord(element.attributes).lifecycleStatus;
   if (typeof status !== 'string') return undefined;
   const tone = lifecycleToneFor(status);
@@ -419,6 +420,7 @@ export function ContextDiagramCanvas({ group, layoutWidthHint, neighbourContextH
 
         if (showLabels) {
           const glyph = element.element_type === 'actor' ? elementTypeGlyph('actor', attributesRecord(element.attributes).subtype as ActorSubtype | undefined) : elementTypeGlyph(element.element_type);
+          // system-only: the AI-agent mark is a setting of a whole system.
           nodeLabels.push({ glyph, name: displayName, worldX: tile.x, worldY: tile.y + tile.h / 2, maxWidth: tile.w - 30, tileHeight: tile.h, aiAgent: element.element_type === 'system' && usesAi(element) });
         }
       };
@@ -600,7 +602,7 @@ export function ContextDiagramCanvas({ group, layoutWidthHint, neighbourContextH
     const element = elementsById.get(tile.elementId);
     // V3: a container neighbour now has a Context view of its own too, the
     // same as a system — only an actor still has no context page to go to.
-    if (element?.element_type === 'system' || element?.element_type === 'container') void navigate(neighbourContextHref(tile.elementId));
+    if (isSystemLikeType(element?.element_type ?? '')) void navigate(neighbourContextHref(tile.elementId));
     else void navigate(elementHref(tile.elementId));
   }
 

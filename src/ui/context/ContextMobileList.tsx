@@ -11,6 +11,7 @@ import { attributesRecord } from '../elements/attributesRecord';
 import { lifecycleToneFor } from '../elements/lifecycleTone';
 import { edgeLabel, type ContextGroup, type ContextNeighbour } from './contextGrouping';
 import styles from './ContextMobileList.module.css';
+import { isSystemLikeType } from '../../contracts/elementKinds';
 
 export interface ContextMobileListProps {
   group: ContextGroup;
@@ -133,12 +134,13 @@ function NeighbourRow({
   const attrs = attributesRecord(element.attributes);
   const external = attrs.isExternal === true;
   const actorSubtype = element.element_type === 'actor' && typeof attrs.subtype === 'string' ? (attrs.subtype as ActorSubtype) : undefined;
-  const lifecycleStatus = (element.element_type === 'system' || element.element_type === 'container') && typeof attrs.lifecycleStatus === 'string' ? attrs.lifecycleStatus : null;
+  const lifecycleStatus = (isSystemLikeType(element.element_type)) && typeof attrs.lifecycleStatus === 'string' ? attrs.lifecycleStatus : null;
   const lifecycleTone = lifecycleStatus !== null ? lifecycleToneFor(lifecycleStatus) : undefined;
+  // system-only: the AI-agent mark is a setting of a whole system.
   const mark = element.element_type === 'system' ? aiMarkOf(element) : null;
   // Only an actor neighbour has no Context view of its own (S1 item 11a) —
   // a container gets one just like a system does, per V3.
-  const href = element.element_type === 'system' || element.element_type === 'container' ? neighbourContextHref(element.element_id) : elementHref(element.element_id);
+  const href = isSystemLikeType(element.element_type) ? neighbourContextHref(element.element_id) : elementHref(element.element_id);
 
   return (
     <li className={styles.row}>

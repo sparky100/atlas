@@ -799,12 +799,15 @@ export function LandscapeCanvas({
       // by a `const` here does not.
       const drawNode = (elementId: UUID, elementType: 'system' | 'actor', x: number, y: number, extraLaneCount: number | undefined): void => {
         if (!rectIntersects(visible, x, y, NODE_WIDTH, NODE_HEIGHT)) return;
+        // system-only: 'system' here is the canvas node kind (system lane versus actor lane); modules are drawn as system nodes.
         const element = elementType === 'system' ? systemsById.get(elementId) : actorsById.get(elementId);
         if (!element) return;
         const external = attributesRecord(element.attributes).isExternal === true;
         const isHovered = hover?.elementId === elementId;
+        // system-only: 'system' here is the canvas node kind (system lane versus actor lane); modules are drawn as system nodes.
         const nodeDiff = elementType === 'system' ? diffByElementId.get(elementId) : undefined;
         const nodeState = nodeDiff?.state ?? 'unchanged';
+        // system-only: 'system' here is the canvas node kind (system lane versus actor lane); modules are drawn as system nodes.
         const diffColour = diff && elementType === 'system' ? diffBorderColour(nodeState, tokens) : null;
 
         // M1 close-out item 1's own "comments on this view" filter — a node
@@ -814,8 +817,10 @@ export function LandscapeCanvas({
         // Combined multiplicatively with the diff view's own "unchanged"
         // fade above, not replacing it, so a filtered, unchanged node reads
         // fainter still rather than one fade silently overriding the other.
+        // system-only: 'system' here is the canvas node kind (system lane versus actor lane); modules are drawn as system nodes.
         const threadCountsForNode = elementType === 'system' ? threadCounts?.get(elementId) : undefined;
         const hasAnyThread = (threadCountsForNode?.total ?? 0) > 0;
+        // system-only: 'system' here is the canvas node kind (system lane versus actor lane); modules are drawn as system nodes.
         const diffAlpha = diff && elementType === 'system' && nodeState === 'unchanged' ? 0.6 : 1;
         const filterAlpha = commentsOnlyFilter && !hasAnyThread ? 0.25 : 1;
         // V2: "subject plus direct neighbours at full opacity, rest at
@@ -865,8 +870,10 @@ export function LandscapeCanvas({
         const totalCount = threadCountsForNode?.total ?? 0;
         if (showLabels) {
           const glyph = elementType === 'actor' ? elementTypeGlyph('actor', attributesRecord(element.attributes).subtype as ActorSubtype | undefined) : elementTypeGlyph('system');
+          // system-only: 'system' here is the canvas node kind (system lane versus actor lane); modules are drawn as system nodes.
           nodeLabels.push({ glyph, name: element.name, worldX: x, worldY: y, truncateToNarrow: totalCount > 0, aiAgent: elementType === 'system' && usesAi(element) });
         }
+        // system-only: 'system' here is the canvas node kind (system lane versus actor lane); modules are drawn as system nodes.
         if (diff && elementType === 'system' && DIFF_MARKER[nodeState] !== '') {
           const label = nodeState === 'changed' ? `${DIFF_MARKER[nodeState]}${String(nodeDiff?.changedAttributes.length ?? 0)}` : DIFF_MARKER[nodeState];
           diffMarkers.push({ text: label, worldX: x + 4, worldY: y + 4, colour: diffColour ?? tokens.text });
@@ -1142,6 +1149,7 @@ export function LandscapeCanvas({
     // navigates. A hit on any other tile focuses instead of navigating; a
     // miss (empty canvas background) clears focus, same as Escape.
     if (hit) {
+      // system-only: 'system' here is the canvas node kind (system lane versus actor lane); modules are drawn as system nodes.
       if (hit.elementId === focusedElementId) void navigate(hit.elementType === 'system' ? nodeHref(hit.elementId) : actorHref(hit.elementId));
       else onFocusElement?.(hit.elementId);
     } else {
@@ -1213,13 +1221,16 @@ export function LandscapeCanvas({
   // name, for the tooltip text below.
   const hoveredReferenceSystem = hoverReference ? systemsById.get(hoverReference.elementId) : undefined;
 
+  // system-only: 'system' here is the canvas node kind (system lane versus actor lane); modules are drawn as system nodes.
   const hoveredElement = hover ? (hover.elementType === 'system' ? systemsById.get(hover.elementId) : actorsById.get(hover.elementId)) : undefined;
   // §6.3: "Hover on any marker shows the changed attributes" — base -> new isn't shown here (the canvas has no per-field value, only the diff's element-grain summary); the element page's own history is where that detail lives. Actors carry no diff state (diff is system/relationship-grained).
+  // system-only: 'system' here is the canvas node kind (system lane versus actor lane); modules are drawn as system nodes.
   const hoveredDiff = diff && hover?.elementType === 'system' ? diffByElementId.get(hover.elementId) : undefined;
   // Colour-by's own tone is never the only place its value is shown (§8.7)
   // — the tooltip is this canvas's one place to put the label text a Chip
   // would otherwise carry. Computed once here, not inline in the JSX
   // below, so its `string | undefined` result narrows cleanly.
+  // system-only: 'system' here is the canvas node kind (system lane versus actor lane); modules are drawn as system nodes.
   const hoveredColourByLabel = colourBy !== 'none' && hover?.elementType === 'system' && hoveredElement ? landscapeTileColourFor(colourBy, hoveredElement).label : undefined;
 
   // Item 11: the popover's own content — every other level-1 lane the

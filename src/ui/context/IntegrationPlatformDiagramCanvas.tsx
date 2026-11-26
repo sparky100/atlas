@@ -13,6 +13,7 @@ import { NODE_WIDTH } from '../landscape/layout';
 import { allPlatformFlowTilesOf, computeIntegrationPlatformContextLayout, PILL_RUN_WIDTH, type IntegrationPlatformContextLayout, type PlatformFlowEdgeInput, type PlatformFlowTile } from './integrationPlatformContextLayout';
 import { useRefitOnResize } from '../landscape/useRefitOnResize';
 import styles from './IntegrationPlatformDiagramCanvas.module.css';
+import { isSystemLikeType } from '../../contracts/elementKinds';
 
 export interface IntegrationPlatformDiagramCanvasProps {
   hub: ElementsHeadRow;
@@ -77,7 +78,7 @@ function readTokens(el: HTMLElement): CanvasTokens {
 }
 
 function toneColour(element: ElementsHeadRow, tokens: CanvasTokens): string | undefined {
-  if (element.element_type !== 'system' && element.element_type !== 'container') return undefined;
+  if (!isSystemLikeType(element.element_type)) return undefined;
   const status = attributesRecord(element.attributes).lifecycleStatus;
   if (typeof status !== 'string') return undefined;
   const tone = lifecycleToneFor(status);
@@ -448,7 +449,7 @@ export function IntegrationPlatformDiagramCanvas({ hub, sourceIds, targetIds, ed
       return;
     }
     const element = elementsById.get(tile.elementId);
-    void navigate(element?.element_type === 'system' || element?.element_type === 'container' ? neighbourContextHref(tile.elementId) : elementHref(tile.elementId));
+    void navigate(isSystemLikeType(element?.element_type ?? '') ? neighbourContextHref(tile.elementId) : elementHref(tile.elementId));
   }
 
   function zoomBy(factor: number, center?: { x: number; y: number }): void {

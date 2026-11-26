@@ -225,6 +225,7 @@ function SystemRow({
   const external = attrs.isExternal === true;
   const lifecycleStatus = typeof attrs.lifecycleStatus === 'string' ? attrs.lifecycleStatus : null;
   const lifecycleTone = lifecycleStatus !== null ? lifecycleToneFor(lifecycleStatus) : undefined;
+  // system-only: the AI-agent mark is a setting of a whole system.
   const mark = system.element_type === 'system' ? aiMarkOf(system) : null;
   // S1 item 11a: an external actor is now a real member of the External
   // group (`landscapeGroups.ts`'s own `buildGroup` doc comment) — its own

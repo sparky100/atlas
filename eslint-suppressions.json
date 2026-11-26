@@ -129,36 +129,6 @@
       "count": 1
     }
   },
-  "src/ui/context/ContextDiagramCanvas.tsx": {
-    "atlas/no-bare-system-check": {
-      "count": 3
-    }
-  },
-  "src/ui/context/ContextInspectorContent.tsx": {
-    "atlas/no-bare-system-check": {
-      "count": 2
-    }
-  },
-  "src/ui/context/ContextMobileList.tsx": {
-    "atlas/no-bare-system-check": {
-      "count": 3
-    }
-  },
-  "src/ui/context/ContextView.tsx": {
-    "atlas/no-bare-system-check": {
-      "count": 2
-    }
-  },
-  "src/ui/context/IntegrationPlatformDiagramCanvas.tsx": {
-    "atlas/no-bare-system-check": {
-      "count": 2
-    }
-  },
-  "src/ui/context/useElementContext.ts": {
-    "atlas/no-bare-system-check": {
-      "count": 5
-    }
-  },
   "src/ui/decisions/useModelElementNames.ts": {
     "atlas/no-bare-system-check": {
       "count": 1
@@ -180,26 +150,6 @@
     }
   },
   "src/ui/integrations/IntegrationsView.tsx": {
-    "atlas/no-bare-system-check": {
-      "count": 1
-    }
-  },
-  "src/ui/landscape/CapabilityLandscapeList.tsx": {
-    "atlas/no-bare-system-check": {
-      "count": 1
-    }
-  },
-  "src/ui/landscape/LandscapeCanvas.tsx": {
-    "atlas/no-bare-system-check": {
-      "count": 11
-    }
-  },
-  "src/ui/landscape/LandscapeMobileList.tsx": {
-    "atlas/no-bare-system-check": {
-      "count": 1
-    }
-  },
-  "src/ui/landscape/useLandscape.ts": {
     "atlas/no-bare-system-check": {
       "count": 1
     }
