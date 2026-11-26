@@ -106,8 +106,7 @@ describe('catalogue claim checks, real database', () => {
     await expect(dismissClaimCheck(admin.client, { productId, sourceUrl: urlA, statement: statementA })).rejects.toThrow();
 
     // Dismissing while also trying to rewrite the verdict, the person and the time changes none of those.
-    check(await admin.client.from('catalogue_claim_checks').update({ dismissed_at: '2000-01-01T00:00:00Z' }).eq('product_id', productId).eq('source_url', urlB).eq('statement', statementB));
-    check(await admin.client.from('catalogue_claim_checks').update({ verdict: 'cant_tell', quote: null, dismissed_at: '2000-01-01T00:00:00Z', dismissed_by_name: 'Somebody Else' }).eq('product_id', productId).eq('source_url', urlA).eq('statement', statementA));
+    check(await admin.client.from('catalogue_claim_checks').update({ verdict: 'cant_tell', quote: null, dismissed_at: '2000-01-01T00:00:00Z', dismissed_by_name: 'Somebody Else' }).eq('product_id', productId).eq('source_url', urlB).eq('statement', statementB));
     row = (await listClaimChecks(admin.client)).find((candidate) => candidate.productId === productId && candidate.sourceUrl === urlA);
     expect(row?.verdict).toBe('changed');
     const dismissedB = (await listClaimChecks(admin.client)).find((candidate) => candidate.productId === productId && candidate.sourceUrl === urlB);
