@@ -39,6 +39,7 @@ import {
   sourceCheckSchema,
 } from '../contracts/catalogueAdmin';
 import { claimCheckResultSchema, type ClaimCheckResult } from '../tools/catalogueClaimCheck';
+import { proposalKey, type LinkProposal, type ProductLinkRow, type ProposalProduct, type RejectedLinkRow } from '../tools/catalogueLinkProposals';
 import { findResultSchema, foundProductContent, type FindRequest, type FindResult, type FoundProduct } from '../tools/catalogueFindProducts';
 import type { Client } from './client';
 import { queryInChunks } from './inFilterLimit';
@@ -858,4 +859,88 @@ export async function saveFoundProducts(
     }
   }
   return { saved, failed };
+}
+
+/** Everything the link proposals are worked out from: the library's products, every capability link they have, and the pairs a person rejected. Read in pages of 1,000 rows. */
+export async function listLinkProposalInputs(client: Client): Promise<{ products: ProposalProduct[]; links: ProductLinkRow[]; rejected: RejectedLinkRow[] }> {
+  const products: ProposalProduct[] = [];
+  const links: ProductLinkRow[] = [];
+  const page = 1000;
+  for (let from = 0; ; from += page) {
+    const { data, error }: { data: { id: string; product: string; vendor: string }[] | null; error: { message: string } | null } =
+      await client.from('catalogue_products').select('id,product,vendor').order('id').range(from, from + page - 1);
+    if (error) throw new Error(`listLinkProposalInputs: ${error.message}`);
+    products.push(...(data ?? []));
+    if ((data ?? []).length < page) break;
+  }
+  for (let from = 0; ; from += page) {
+    const { data, error }: { data: { product_id: string; capability_map_id: string; capability_code: string; capability_name: string; how_it_supports: string }[] | null; error: { message: string } | null } =
+      await client.from('catalogue_product_capabilities').select('product_id,capability_map_id,capability_code,capability_name,how_it_supports')
+        .order('product_id').order('capability_map_id').order('capability_code').range(from, from + page - 1);
+    if (error) throw new Error(`listLinkProposalInputs: ${error.message}`);
+    for (const row of data ?? []) links.push({ productId: row.product_id, mapId: row.capability_map_id, code: row.capability_code, name: row.capability_name, howItSupports: row.how_it_supports });
+    if ((data ?? []).length < page) break;
+  }
+  const rejected: RejectedLinkRow[] = [];
+  for (let from = 0; ; from += page) {
+    const { data, error }: { data: { product_id: string; capability_map_id: string; capability_code: string; capability_name: string }[] | null; error: { message: string } | null } =
+      await client.from('catalogue_rejected_links').select('product_id,capability_map_id,capability_code,capability_name').order('id').range(from, from + page - 1);
+    if (error) throw new Error(`listLinkProposalInputs: ${error.message}`);
+    for (const row of data ?? []) rejected.push({ productId: row.product_id, mapId: row.capability_map_id, code: row.capability_code, name: row.capability_name });
+    if ((data ?? []).length < page) break;
+  }
+  return { products, links, rejected };
+}
+
+/** Record that proposed links were turned down, with a reason. The server stamps who and when. Nothing in the library changes. */
+export async function rejectLinkProposals(client: Client, mapId: UUID, proposals: readonly LinkProposal[], reason: string): Promise<void> {
+  const trimmed = reason.trim().slice(0, 300);
+  if (trimmed === '') throw new Error('Say briefly why these links are rejected.');
+  const rows = proposals.map((proposal) => ({ product_id: proposal.productId, capability_map_id: mapId, capability_code: proposal.code, capability_name: proposal.name, reason: trimmed }));
+  const { error } = await client.from('catalogue_rejected_links').upsert(rows, { onConflict: 'product_id,capability_map_id,capability_code', ignoreDuplicates: true });
+  if (error) throw new Error(`rejectLinkProposals: ${error.message}`);
+}
+
+/**
+ * Accept proposed links: each product gets the new links as an edit through the
+ * one guarded save function, so the server records who and when, and a published
+ * product shows "published, with changes" until a person republishes it. One save
+ * per product. A product that fails is skipped and named.
+ */
+export async function acceptLinkProposals(
+  client: Client,
+  mapId: UUID,
+  proposals: readonly LinkProposal[],
+): Promise<{ accepted: string[]; failed: { product: string; message: string }[] }> {
+  const byProduct = new Map<string, LinkProposal[]>();
+  for (const proposal of proposals) byProduct.set(proposal.productId, [...(byProduct.get(proposal.productId) ?? []), proposal]);
+  const accepted: string[] = [];
+  const failed: { product: string; message: string }[] = [];
+  for (const [productId, list] of byProduct) {
+    const first = list[0];
+    if (first === undefined) continue;
+    try {
+      const detail = await readCatalogueProduct(client, productId);
+      const have = new Set(detail.content.capabilities.map((link) => `${link.capabilityMapId}\u0000${link.capabilityCode}`));
+      const added = list.filter((proposal) => !have.has(`${mapId}\u0000${proposal.code}`));
+      await saveCatalogueProduct(client, productId, detail.product.edit_revision, {
+        ...detail.content,
+        capabilities: [...detail.content.capabilities, ...added.map((proposal) => ({ capabilityMapId: mapId, capabilityCode: proposal.code, capabilityName: proposal.name, howItSupports: proposal.howItSupports }))],
+      });
+      accepted.push(...list.map((proposal) => proposalKey(productId, proposal.code)));
+    } catch (cause) {
+      failed.push({ product: first.product, message: cause instanceof Error ? cause.message : String(cause) });
+    }
+  }
+  return { accepted, failed };
+}
+
+/** Tokens product discovery has used since midnight UTC, from the run record. */
+export async function findTokensUsedToday(client: Client): Promise<number> {
+  const midnight = new Date();
+  midnight.setUTCHours(0, 0, 0, 0);
+  const { data, error }: { data: { input_tokens: number; output_tokens: number }[] | null; error: { message: string } | null } =
+    await client.from('catalogue_check_runs').select('input_tokens,output_tokens').in('scope', ['find', 'find_set']).gte('started_at', midnight.toISOString()).limit(5000);
+  if (error) throw new Error(`findTokensUsedToday: ${error.message}`);
+  return (data ?? []).reduce((sum, row) => sum + row.input_tokens + row.output_tokens, 0);
 }

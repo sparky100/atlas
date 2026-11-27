@@ -104,6 +104,21 @@ else in this product checks platform-admin status.
    web search switched on for the platform AI account in the provider's console;
    otherwise the screen says so and adds nothing. The model is `CATALOGUE_FIND_MODEL`
    (default Sonnet class).
+   **Find products for a set** (also on Waiting for review) works on a whole
+   published capability set. It shows how many capabilities have a product, then
+   **Proposed links**: links from products already in the library, worked out by
+   rules (no AI): the same code as a capability the product is linked to in
+   another version of the same sector's set, or the same name in any set. Each
+   proposal says why. **Accept** adds the link to the product as an edit (a
+   published product shows "published, with changes" until you republish it);
+   **Reject** needs a reason and is recorded with your name and the date, and the
+   pair is not proposed again. General capabilities (codes 1 to 8) link through
+   their shared identity and are never proposed. Below, **Capabilities with no
+   product** lets you choose up to 10 and press **Find products for these**: the
+   single-capability search above runs on each in turn, with **Stop**, under the
+   same 300,000-token daily limit. A product the search finds that is already in
+   the library becomes a proposed link, not a duplicate. The run appears in
+   **Latest checks**. Nothing is published.
 4. **Withdraw or reinstate a published sample model** at
    `/platform-admin/sample-models`, with each sample's own page at
    `/platform-admin/sample-models/:slug`. A sample is withdrawn

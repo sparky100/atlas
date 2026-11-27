@@ -6,6 +6,7 @@ import { Loading } from '../components/Loading/Loading';
 import { supabase } from '../supabaseClient';
 import { CatalogueClaimChecks } from './CatalogueClaimChecks';
 import { CatalogueFindProducts } from './CatalogueFindProducts';
+import { CatalogueSetProducts } from './CatalogueSetProducts';
 import { CatalogueMonthlyCheck } from './CatalogueMonthlyCheck';
 import { CatalogueSourceLinks } from './CatalogueSourceLinks';
 import { claimDraftedText } from './catalogueShared';
@@ -91,6 +92,7 @@ export function CatalogueReviewQueue() {
       <CatalogueSourceLinks onRunRecorded={recordRun} />
       <CatalogueClaimChecks onRunRecorded={recordRun} />
       <CatalogueFindProducts onRunRecorded={() => { recordRun(); void reload().catch(() => undefined); }} />
+      <CatalogueSetProducts onRunRecorded={recordRun} onChanged={() => { void reload().catch(() => undefined); }} />
       {error !== '' && <p role="alert" className={styles.error}>{error}</p>}
       {notice !== '' && <p role="status">{notice}</p>}
       {error === '' && claims.length === 0 && <p>Nothing is waiting for review. Every claim in the product library has been reviewed.</p>}

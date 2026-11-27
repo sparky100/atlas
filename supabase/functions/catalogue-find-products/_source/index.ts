@@ -99,7 +99,7 @@ async function tokensUsedToday(supabaseUrl: string, serviceRoleKey: string): Pro
   const midnight = new Date();
   midnight.setUTCHours(0, 0, 0, 0);
   try {
-    const res = await fetch(`${supabaseUrl}/rest/v1/catalogue_check_runs?select=input_tokens,output_tokens&scope=eq.find&started_at=gte.${encodeURIComponent(midnight.toISOString())}&limit=5000`, {
+    const res = await fetch(`${supabaseUrl}/rest/v1/catalogue_check_runs?select=input_tokens,output_tokens&scope=in.(find,find_set)&started_at=gte.${encodeURIComponent(midnight.toISOString())}&limit=5000`, {
       headers: { apikey: serviceRoleKey, Authorization: `Bearer ${serviceRoleKey}` },
     });
     if (!res.ok) return null;

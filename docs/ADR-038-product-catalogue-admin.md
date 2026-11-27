@@ -352,3 +352,25 @@ Migration `20261127020000_catalogue_find_products.sql`; edge function
 - **Not here.** Proposing links from products already in the library, and running
   this across a set (step 6b).
 
+## Amendment, 27 November 2026: find products for a set (step 6b)
+
+Migration `20261127030000_catalogue_rejected_links.sql`; walkthrough
+`proposals/WALKTHROUGH-catalogue-step-6b-find-for-set.md`.
+
+- **Proposed links, by rules.** From the library's products and their links, a
+  link to a capability of the chosen set is proposed when the product is linked
+  to the same code in another version of the same sector's set, or to the same
+  name (any case or spacing) in any set. General capabilities (codes 1 to 8) are
+  never proposed; they link through their shared identity. No AI, no new function.
+- **Accept** is an edit through `save_catalogue_product`; the server records who
+  and when. **Reject** writes `catalogue_rejected_links` (product, set, code, name,
+  reason, who, when). Platform admins only, one policy per action, who and when
+  stamped by the server, no update or delete from a browser. A rejection holds for
+  the same name in a later version.
+- **Run over many capabilities.** The browser calls `catalogue-find-products`
+  once per chosen capability (at most 10), recording one run with scope
+  `find_set`. The function's daily limit now counts `find` and `find_set` runs;
+  the browser also stops a run when the day's total would pass the limit.
+- **Not here.** AI-assisted matching of products to capabilities (to be added only
+  if the rules miss too much).
+

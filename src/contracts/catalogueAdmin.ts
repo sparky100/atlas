@@ -329,7 +329,7 @@ export function claimCheckKey(row: { productId: string; sourceUrl: string; state
 /** Step 5b-2: how a catalogue check run ended, and the monthly switch. */
 export const CHECK_RUN_STATUSES = ['running', 'finished', 'stopped', 'limit_reached', 'failed'] as const;
 export type CheckRunStatus = (typeof CHECK_RUN_STATUSES)[number];
-export type CheckRunScope = 'links' | 'claims' | 'both' | 'find';
+export type CheckRunScope = 'links' | 'claims' | 'both' | 'find' | 'find_set';
 
 export interface CheckRunRow {
   id: string;
@@ -370,5 +370,6 @@ export function checkRunScopeLabel(scope: CheckRunScope): string {
     case 'claims': return 'Claims';
     case 'both': return 'Links and claims';
     case 'find': return 'Find products';
+    case 'find_set': return 'Find products for a set';
   }
 }
