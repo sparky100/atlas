@@ -254,12 +254,13 @@ export function CatalogueProductAdmin({ productId }: { productId: string | null 
           </ul>
         </div>
       ) : (
-        <label>Part of{' '}
-          <select value={content.partOfProductId ?? ''} onChange={(event) => { updateProduct({ partOfProductId: event.target.value === '' ? null : event.target.value }); }} data-testid="part-of-select">
+        <div>
+          <label htmlFor="part-of-select">Part of</label>{' '}
+          <select id="part-of-select" value={content.partOfProductId ?? ''} onChange={(event) => { updateProduct({ partOfProductId: event.target.value === '' ? null : event.target.value }); }} data-testid="part-of-select">
             <option value="">Not part of another product</option>
             {platformChoices.map((choice) => <option key={choice.id} value={choice.id}>{choice.product} ({choice.vendor})</option>)}
           </select>
-        </label>
+        </div>
       )}
       {(detail?.components.length ?? 0) === 0 && detail?.partOf != null && content.partOfProductId === detail.partOf.id && (
         <p data-testid="part-of-note">A component of <Link to={`${BASE}/products/${detail.partOf.id}`}>{detail.partOf.product}</Link>.</p>

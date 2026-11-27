@@ -635,7 +635,7 @@ for (const viewport of [{ width: 1280, height: 900 }, { width: 390, height: 844 
     // A loose product is named as a component in the editor, and the choice is saved.
     await page.goto(`/platform-admin/catalogue/products/${looseId}`);
     const select = page.getByTestId('part-of-select');
-    await expect(select.locator('option')).toContainText([`Gridsuite ${suffix} (${vendor})`]);
+    await expect(select.locator('option', { hasText: `Gridsuite ${suffix} (${vendor})` })).toHaveCount(1);
     await expect(select.locator('option', { hasText: `Gridsuite ${suffix} Network` })).toHaveCount(0);
     await select.selectOption(platformId);
     await page.getByRole('button', { name: 'Save product' }).click();
