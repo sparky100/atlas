@@ -165,6 +165,10 @@ export function CatalogueFlaggedLinks({ flagged, onChanged, onClaimsChecked }: {
                         <span key={product.productId}>{index > 0 ? ', ' : ''}<Link to={`/platform-admin/catalogue/products/${product.productId}`}>{product.productName}</Link> ({product.vendor}, {String(product.claims)} claim{product.claims === 1 ? '' : 's'})</span>
                       ))}.
                     </small>
+                    <details>
+                      <summary><small>What the {String(item.claims.length)} claim{item.claims.length === 1 ? '' : 's'} say{item.claims.length === 1 ? 's' : ''}</small></summary>
+                      {item.claims.map((claim) => <small key={`${claim.productId}-${String(claim.position)}`} style={{ display: 'block' }}>{claim.productName}: {claim.statement}</small>)}
+                    </details>
                     {kept && <small>Kept until {formatDay(item.check.hiddenUntil ?? '')}{item.check.hiddenByName === null ? '' : ` by ${item.check.hiddenByName}`}{item.check.hiddenReason === null ? '' : `: ${item.check.hiddenReason}`}.</small>}
                     <div className={styles.rowActions}>
                       {kept ? (
