@@ -39,6 +39,7 @@ import {
   sourceCheckSchema,
 } from '../contracts/catalogueAdmin';
 import { claimCheckResultSchema, type ClaimCheckResult } from '../tools/catalogueClaimCheck';
+import { findResultSchema, foundProductContent, type FindRequest, type FindResult, type FoundProduct } from '../tools/catalogueFindProducts';
 import type { Client } from './client';
 import { queryInChunks } from './inFilterLimit';
 
@@ -378,13 +379,13 @@ export async function listCapabilitySets(client: Client): Promise<CapabilitySetO
 
 export async function listCapabilitySetItems(client: Client, mapId: UUID): Promise<CapabilitySetItem[]> {
   const { data, error } = await client.from('capability_map_items')
-    .select('id,code,name,parent_code,level,item_order')
+    .select('id,code,name,description,parent_code,level,item_order')
     .eq('map_id', mapId)
     .order('level')
     .order('item_order');
   if (error) throw new Error(`listCapabilitySetItems: ${error.message}`);
-  return ((data as { id: string; code: string; name: string; parent_code: string | null; level: number; item_order: number }[] | null) ?? [])
-    .map((item) => ({ id: item.id, code: item.code, name: item.name, parentCode: item.parent_code, level: item.level, order: item.item_order }));
+  return ((data as { id: string; code: string; name: string; description: string | null; parent_code: string | null; level: number; item_order: number }[] | null) ?? [])
+    .map((item) => ({ id: item.id, code: item.code, name: item.name, description: item.description, parentCode: item.parent_code, level: item.level, order: item.item_order }));
 }
 
 export async function listCatalogueVersions(client: Client): Promise<CatalogueVersionSummary[]> {
@@ -761,6 +762,8 @@ interface CheckRunDbRow {
   links_checked: number;
   claims_checked: number;
   flagged: number;
+  searches: number;
+  products_found: number;
   input_tokens: number;
   output_tokens: number;
   note: string | null;
@@ -769,12 +772,12 @@ interface CheckRunDbRow {
 /** The latest check runs, manual and monthly, newest first. */
 export async function listCheckRuns(client: Client, limit = 5): Promise<CheckRunRow[]> {
   const { data, error } = await client.from('catalogue_check_runs')
-    .select('id,kind,scope,status,started_at,finished_at,started_by_name,links_checked,claims_checked,flagged,input_tokens,output_tokens,note')
+    .select('id,kind,scope,status,started_at,finished_at,started_by_name,links_checked,claims_checked,flagged,searches,products_found,input_tokens,output_tokens,note')
     .order('started_at', { ascending: false }).limit(limit);
   if (error) throw new Error(`listCheckRuns: ${error.message}`);
   return ((data as CheckRunDbRow[] | null) ?? []).map((row) => ({
     id: row.id, kind: row.kind, scope: row.scope, status: row.status, startedAt: row.started_at, finishedAt: row.finished_at, startedByName: row.started_by_name,
-    linksChecked: row.links_checked, claimsChecked: row.claims_checked, flagged: row.flagged, tokens: row.input_tokens + row.output_tokens, note: row.note,
+    linksChecked: row.links_checked, claimsChecked: row.claims_checked, flagged: row.flagged, searches: row.searches, productsFound: row.products_found, tokens: row.input_tokens + row.output_tokens, note: row.note,
   }));
 }
 
@@ -791,6 +794,8 @@ export interface CheckRunOutcome {
   linksChecked: number;
   claimsChecked: number;
   flagged: number;
+  searches?: number;
+  productsFound?: number;
   tokens: { input: number; output: number };
   note: string | null;
 }
@@ -799,7 +804,58 @@ export interface CheckRunOutcome {
 export async function finishCheckRun(client: Client, id: string, outcome: CheckRunOutcome): Promise<void> {
   const { error } = await client.from('catalogue_check_runs').update({
     status: outcome.status, links_checked: outcome.linksChecked, claims_checked: outcome.claimsChecked, flagged: outcome.flagged,
+    searches: outcome.searches ?? 0, products_found: outcome.productsFound ?? 0,
     input_tokens: outcome.tokens.input, output_tokens: outcome.tokens.output, note: outcome.note === null ? null : outcome.note.slice(0, 300),
   }).eq('id', id);
   if (error) throw new Error(`finishCheckRun: ${error.message}`);
+}
+
+/** Ask the product finder about one capability. It searches the web and writes nothing; new products are saved by `saveFoundProducts`. */
+export async function findProductsForCapability(client: Client, request: FindRequest): Promise<FindResult> {
+  // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment -- untyped Supabase function response
+  const { data, error } = await client.functions.invoke('catalogue-find-products', { body: request });
+  if (error) throw new Error(await functionErrorMessage(error, 'Finding products is not available right now. If it has not been deployed yet, deploy catalogue-find-products, then try again.'));
+  const result = data as { status?: string; message?: string } | null;
+  if (!result) throw new Error('The product finder gave no answer.');
+  if (result.status === 'error') throw new Error(result.message ?? 'Finding products failed.');
+  const parsed = findResultSchema.safeParse(result);
+  if (!parsed.success) throw new Error('The product finder gave an answer this page does not understand.');
+  return parsed.data;
+}
+
+/** The product codes and the vendor and name of every product in the library, for the check before anything is created (rule I1). */
+export async function listLibraryProductKeys(client: Client): Promise<{ id: string; code: string; vendor: string; product: string }[]> {
+  const { data, error }: { data: { id: string; code: string; vendor: string; product: string }[] | null; error: { message: string } | null } =
+    await client.from('catalogue_products').select('id,code,vendor,product').limit(5000);
+  if (error) throw new Error(`listLibraryProductKeys: ${error.message}`);
+  return data ?? [];
+}
+
+/**
+ * Save each found product as a draft, linked to the capability it was found
+ * for, through the one guarded save function. The server records who saved it
+ * and when; the claims are marked as found by the Researcher. Returns the ids
+ * of the products saved. A product that fails is skipped and named.
+ */
+export async function saveFoundProducts(
+  client: Client,
+  products: readonly FoundProduct[],
+  link: { capabilityMapId: UUID; capabilityCode: string; capabilityName: string },
+  takenCodes: ReadonlySet<string>,
+  today: string,
+): Promise<{ saved: { productId: UUID; product: string; vendor: string }[]; failed: { product: string; message: string }[] }> {
+  const taken = new Set(takenCodes);
+  const saved: { productId: UUID; product: string; vendor: string }[] = [];
+  const failed: { product: string; message: string }[] = [];
+  for (const item of products) {
+    const content = foundProductContent(item, link, taken, today);
+    taken.add(content.code);
+    try {
+      const result = await saveCatalogueProduct(client, null, 0, content);
+      saved.push({ productId: result.productId, product: item.product, vendor: item.vendor });
+    } catch (cause) {
+      failed.push({ product: item.product, message: cause instanceof Error ? cause.message : String(cause) });
+    }
+  }
+  return { saved, failed };
 }

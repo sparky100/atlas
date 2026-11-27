@@ -290,3 +290,96 @@ for (const viewport of [{ width: 1280, height: 800 }, { width: 390, height: 844 
     await expect(section.getByTestId('monthly-check-state')).toContainText(/^Off: switched off by .+ on /);
   });
 }
+
+/**
+ * Step 6a: Find new products. The function answer is faked (a mocked AI shows nothing about AI quality), but everything after it is real:
+ * the library check, saving drafts linked to the capability marked as found by the Researcher, and the run record.
+ */
+for (const viewport of [{ width: 1280, height: 800 }, { width: 390, height: 844 }]) {
+  test(`an admin finds products for a capability and they arrive as drafts at ${String(viewport.width)}`, async ({ page }) => {
+    await page.setViewportSize(viewport);
+    const service = createServiceRoleClient(loadEnv());
+    const suffix = randomUUID().slice(0, 8);
+    const capabilityName = `Find test capability ${suffix}`;
+    const zero = '00000000-0000-0000-0000-000000000000';
+    const mapId = randomUUID();
+    const checked = (result: { error: { message: string } | null }) => { if (result.error) throw new Error(`find-products seed: ${result.error.message}`); };
+    checked(await service.from('capability_maps').insert({ id: mapId, sector: 'utility', version: 700000 + (Number.parseInt(suffix.slice(0, 5), 16) % 90000), status: 'draft', title: `Find test set ${suffix}`, summary: 'Find test set', source_description: 'Playwright seed.' }));
+    checked(await service.from('capability_map_items').insert({ id: randomUUID(), map_id: mapId, code: '1', parent_code: null, name: capabilityName, description: `${capabilityName} definition.`, level: 1, item_order: 10 }));
+    checked(await service.from('capability_maps').update({ status: 'published', published_at: new Date().toISOString() }).eq('id', mapId));
+    checked(await service.from('catalogue_products').insert({ code: `known-${suffix}`, product: `Known product ${suffix}`, vendor: 'Known vendor', summary: 'Already here.', created_by: zero, updated_by: zero }));
+
+    let requestBody = '';
+    await page.route('**/functions/v1/catalogue-find-products', async (route) => {
+      const cors = { 'access-control-allow-origin': '*', 'access-control-allow-headers': '*', 'access-control-allow-methods': 'POST, OPTIONS' };
+      if (route.request().method() === 'OPTIONS') { await route.fulfill({ status: 200, headers: cors, body: 'ok' }); return; }
+      requestBody = route.request().postData() ?? '';
+      const claim = (sentence: string) => [{ kind: 'functional', sourceUrl: 'https://example.test/found', statement: sentence }];
+      await route.fulfill({
+        status: 200, headers: { ...cors, 'content-type': 'application/json' },
+        body: JSON.stringify({
+          status: 'ok', searches: 3, inputTokens: 4000, outputTokens: 600, model: 'test-model', note: null,
+          found: [
+            { product: `New product ${suffix}`, vendor: 'New vendor', summary: 'A product found for the test.', howItSupports: 'It supports the capability.', claims: claim(`New vendor says its product supports ${suffix}.`) },
+            { product: `known PRODUCT ${suffix}`, vendor: 'known vendor', summary: 'Already here.', howItSupports: 'Supports it.', claims: claim('Known vendor says its product is here.') },
+          ],
+          dropped: [{ product: 'Made up', vendor: 'Nobody', reason: 'No sentence from the vendor’s page backed this.' }],
+        }),
+      });
+    });
+
+    await signUpAdmin(page);
+    await page.goto('/platform-admin/catalogue/review');
+    const section = page.getByTestId('find-products');
+    await expect(section.getByRole('heading', { name: 'Find new products' })).toBeVisible();
+    await expect(section.getByRole('button', { name: 'Find products for this capability' })).toBeDisabled();
+    await section.getByLabel('Capability set').selectOption(mapId);
+    await section.getByLabel('Search the capabilities').fill(`test capability ${suffix}`);
+    await section.getByRole('option', { name: new RegExp(capabilityName) }).click();
+    await expect(section.getByTestId('find-products-sends')).toContainText('the capability’s name and definition, the sector, and the word “product”');
+    await section.getByRole('button', { name: 'Find products for this capability' }).click();
+
+    const result = section.getByTestId('find-products-result');
+    await expect(result).toContainText('2 products found, 1 already in the library, 1 added for review. 1 dropped.');
+    await expect(result).toContainText(`New product ${suffix}`);
+    await expect(result).toContainText('found by the Researcher');
+    await expect(result).toContainText('No sentence from the vendor’s page backed this.');
+    await expect(result.getByRole('link', { name: `Known product ${suffix}` })).toBeVisible();
+    // Only the capability, the sector and the word "product" were sent; no organisation data exists here.
+    expect(JSON.parse(requestBody)).toEqual({ capabilityName, capabilityDefinition: `${capabilityName} definition.`, sector: 'utility' });
+    expect(await page.evaluate(() => document.documentElement.scrollWidth > document.documentElement.clientWidth + 1)).toBe(false);
+    await page.screenshot({ path: `test-results/catalogue-find-products-${String(viewport.width)}.png`, fullPage: true });
+
+    // The new product is a draft in the queue, marked as found by the Researcher, and the run is in the history.
+    await expect(page.getByTestId('check-runs')).toContainText('Find products: 3 searches, 1 product found');
+    await expect(page.getByTestId('catalogue-review-queue')).toContainText(`New product ${suffix}`);
+    await expect(page.getByTestId('catalogue-review-queue')).toContainText('Found by the Researcher');
+    await result.getByRole('link', { name: `New product ${suffix}` }).click();
+    await expect(page.getByLabel('Product', { exact: true })).toHaveValue(`New product ${suffix}`);
+  });
+}
+
+test('finding products says so in words when web search is not switched on', async ({ page }) => {
+  await page.setViewportSize({ width: 1280, height: 800 });
+  const service = createServiceRoleClient(loadEnv());
+  const suffix = randomUUID().slice(0, 8);
+  const capabilityName = `Off test capability ${suffix}`;
+  const mapId = randomUUID();
+  const checked = (result: { error: { message: string } | null }) => { if (result.error) throw new Error(`find-products seed: ${result.error.message}`); };
+  checked(await service.from('capability_maps').insert({ id: mapId, sector: 'utility', version: 800000 + (Number.parseInt(suffix.slice(0, 5), 16) % 90000), status: 'draft', title: `Off test set ${suffix}`, summary: 'Off test set', source_description: 'Playwright seed.' }));
+  checked(await service.from('capability_map_items').insert({ id: randomUUID(), map_id: mapId, code: '1', parent_code: null, name: capabilityName, description: 'Definition.', level: 1, item_order: 10 }));
+  checked(await service.from('capability_maps').update({ status: 'published', published_at: new Date().toISOString() }).eq('id', mapId));
+  await page.route('**/functions/v1/catalogue-find-products', async (route) => {
+    const cors = { 'access-control-allow-origin': '*', 'access-control-allow-headers': '*', 'access-control-allow-methods': 'POST, OPTIONS' };
+    if (route.request().method() === 'OPTIONS') { await route.fulfill({ status: 200, headers: cors, body: 'ok' }); return; }
+    await route.fulfill({ status: 503, headers: { ...cors, 'content-type': 'application/json' }, body: JSON.stringify({ status: 'error', code: 'web_search_off', message: 'Web search is not switched on for the platform AI account. Nothing was searched.' }) });
+  });
+  await signUpAdmin(page);
+  await page.goto('/platform-admin/catalogue/review');
+  const section = page.getByTestId('find-products');
+  await section.getByLabel('Capability set').selectOption(mapId);
+  await section.getByRole('option', { name: new RegExp(capabilityName) }).click();
+  await section.getByRole('button', { name: 'Find products for this capability' }).click();
+  await expect(section.getByRole('alert')).toContainText('Web search is not switched on for the platform AI account. Nothing was searched. Nothing was added.');
+  await expect(section.getByTestId('find-products-result')).toHaveCount(0);
+});

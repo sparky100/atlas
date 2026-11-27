@@ -325,3 +325,30 @@ Migration `20261127010000_catalogue_monthly_check.sql`; edge function
   role only) and the job's function are revoked from public, anon and
   authenticated.
 - **Not here.** Finding new products and proposing links (step 6).
+
+## Amendment, 27 November 2026: find new products (step 6a)
+
+Migration `20261127020000_catalogue_find_products.sql`; edge function
+`catalogue-find-products`; walkthrough `proposals/WALKTHROUGH-catalogue-step-6a-find-new-products.md`.
+
+- **The function writes nothing.** A platform admin sends a capability's name and
+  definition and the sector. The platform AI key (Vault, service role) is used with
+  the provider's web search tool (at most 5 searches, 8 products). Every cited
+  page is read under the link-check safety rules and a claim is kept only if its
+  sentence is on the page (the 5b-1 quote rule). A product with no surviving
+  claim is dropped.
+- **The browser saves.** It checks the library by vendor and name (rule I1) and
+  saves new products as drafts through the one guarded `save_catalogue_product`,
+  linked to the capability they were found for. That function now accepts claim
+  origin `researcher` for a claim that is new in the save; kept claims keep their
+  origin. A platform admin could therefore label their own new claim as
+  Researcher-found; that errs toward more scrutiny, and who saved it is always
+  recorded by the server.
+- **Run record.** `catalogue_check_runs` gains scope `find` and counters
+  `searches` and `products_found`. A separate daily limit of 300,000 tokens is
+  counted from these runs (a tab closed before the run is recorded is not counted).
+- **Sent to the provider:** capability name and definition, sector, the word
+  "product". No organisation data (A2).
+- **Not here.** Proposing links from products already in the library, and running
+  this across a set (step 6b).
+
