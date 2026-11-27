@@ -648,3 +648,55 @@ for (const viewport of [{ width: 1280, height: 900 }, { width: 390, height: 844 
     await page.screenshot({ path: `test-results/catalogue-platform-${String(viewport.width)}.png`, fullPage: true });
   });
 }
+
+for (const viewport of [{ width: 1280, height: 900 }, { width: 390, height: 844 }]) {
+  test(`an admin confirms and turns down suggested platforms at ${String(viewport.width)}`, async ({ page }) => {
+    await page.setViewportSize(viewport);
+    const service = createServiceRoleClient(loadEnv());
+    const suffix = randomUUID().slice(0, 8).replace(/[0-9]/g, (digit) => String.fromCharCode(103 + Number(digit)));
+    const zero = '00000000-0000-0000-0000-000000000000';
+    const vendor = `Suggestco ${suffix}`;
+    const make = async (code: string, product: string, productVendor: string): Promise<string> => {
+      const made: { data: { id: string } | null; error: { message: string } | null } = await service.from('catalogue_products').insert({
+        code: `${code}-${suffix}`, product, vendor: productVendor, summary: 'Used by the suggested platforms test.', created_by: zero, updated_by: zero,
+      }).select('id').single();
+      if (made.error || !made.data) throw new Error(`suggestion seed: ${made.error?.message ?? 'no row'}`);
+      return made.data.id;
+    };
+    const one = await make('s1', `Gridworks ${suffix} Network`, vendor);
+    const two = await make('s2', `Gridworks ${suffix} Billing`, vendor);
+    const three = await make('s3', `Fieldkit ${suffix} Mobile`, `${vendor} Two`);
+    const four = await make('s4', `Fieldkit ${suffix} Tablet`, `${vendor} Two`);
+
+    await signUpAdmin(page);
+    await page.goto('/platform-admin/catalogue/review');
+    const panel = page.getByTestId('platform-suggestions');
+    const list = panel.getByTestId('platform-suggestion-list');
+    if (!(await list.evaluate((element) => (element as HTMLDetailsElement).open))) await list.locator(':scope > summary').click();
+    const gridworks = panel.getByTestId('platform-suggestion').filter({ hasText: `Gridworks ${suffix}` });
+    await expect(gridworks).toContainText('Not in the library yet');
+    await gridworks.getByRole('checkbox', { name: `Gridworks ${suffix} Billing` }).uncheck();
+    await gridworks.getByRole('button', { name: new RegExp(`^Make 1 selected part of Gridworks ${suffix}`) }).click();
+    await expect(panel.getByRole('status').filter({ hasText: 'was added as a draft' })).toBeVisible();
+    const platform = await service.from('catalogue_products').select('id,product').eq('vendor', vendor).eq('product', `Gridworks ${suffix}`).single();
+    const platformId = (platform.data as { id: string }).id;
+    const linked = await service.from('catalogue_products').select('id,part_of_product_id').in('id', [one, two]);
+    const byId = new Map((linked.data as { id: string; part_of_product_id: string | null }[]).map((row) => [row.id, row.part_of_product_id]));
+    expect(byId.get(one)).toBe(platformId);
+    expect(byId.get(two)).toBeNull();
+
+    // The other vendor's pair is turned down, and does not come back.
+    const fieldkit = panel.getByTestId('platform-suggestion').filter({ hasText: `Fieldkit ${suffix}` });
+    await expect(fieldkit).toHaveCount(1);
+    await fieldkit.getByRole('button', { name: 'Not a platform: stop suggesting this' }).click();
+    await expect(panel.getByRole('status').filter({ hasText: 'Not suggesting' })).toBeVisible();
+    await page.reload();
+    const again = page.getByTestId('platform-suggestions');
+    await expect(again.getByTestId('platform-suggestion').filter({ hasText: `Gridworks ${suffix}` })).toHaveCount(1);
+    await expect(again.getByTestId('platform-suggestion').filter({ hasText: `Fieldkit ${suffix}` })).toHaveCount(0);
+    const rejected = await service.from('catalogue_rejected_platform_pairs').select('product_id,rejected_by_name').in('product_id', [three, four]);
+    expect((rejected.data as unknown[]).length).toBe(2);
+    expect(await page.evaluate(() => document.documentElement.scrollWidth > document.documentElement.clientWidth + 1)).toBe(false);
+    await page.screenshot({ path: `test-results/catalogue-platform-suggestions-${String(viewport.width)}.png`, fullPage: true });
+  });
+}

@@ -184,7 +184,9 @@ switch (step 4b) published products are not yet shown to users.
 
 ## Platforms and components
 
-A product can be a component of a platform (for example "ArcGIS Utility Network" is part of "ArcGIS"). Open the component, choose the platform under **Part of** and save. One level only: a component has no components, and a platform that has components cannot become a component. The platform's page lists its components, the product list marks both, and a platform and its own component are not offered as possible duplicates. Link capabilities on the components, not on the platform. A platform with components can be published with no capability links of its own, but it still needs its own reviewed claims. If the platform is not in the library yet, add it as a new product first.
+A product can be a component of a platform (for example "ArcGIS Utility Network" is part of "ArcGIS"). Open the component, choose the platform under **Part of** and save. One level only: a component has no components, and a platform that has components cannot become a component. The platform's page lists its components, the product list marks both, and a platform and its own component are not offered as possible duplicates. Link capabilities on the components, not on the platform. A platform with components can be published with no capability links of its own, but it still needs its own reviewed claims. If the platform is not in the library yet, add it as a new product first, or let **Suggested platforms** do it (below).
+
+**Suggested platforms** is on the Waiting for review screen. It lists products by the same vendor whose names start the same way (for example several "Oracle Utilities ..." products) as the components of one platform. Tick the products that really are components and choose "Make N selected part of ...". If the platform is not in the library yet it is added as a draft with no links and no claims, and you describe and source it before publishing. "Not a platform: stop suggesting this" is remembered with your name and the date. Nothing changes until you choose.
 
 ## Viewing a capability set before copying
 

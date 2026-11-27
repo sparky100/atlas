@@ -6,6 +6,7 @@ import { Loading } from '../components/Loading/Loading';
 import { supabase } from '../supabaseClient';
 import { CatalogueClaimChecks } from './CatalogueClaimChecks';
 import { CatalogueDuplicates } from './CatalogueDuplicates';
+import { CataloguePlatformSuggestions } from './CataloguePlatformSuggestions';
 import { CatalogueFindProducts } from './CatalogueFindProducts';
 import { CatalogueSetProducts } from './CatalogueSetProducts';
 import { CatalogueMonthlyCheck } from './CatalogueMonthlyCheck';
@@ -37,6 +38,8 @@ export function CatalogueReviewQueue() {
   const [runsVersion, setRunsVersion] = useState(0);
   const recordRun = useCallback(() => { setRunsVersion((version) => version + 1); }, []);
   const [claimChecksVersion, setClaimChecksVersion] = useState(0);
+  const [duplicatesVersion, setDuplicatesVersion] = useState(0);
+  const [suggestionsVersion, setSuggestionsVersion] = useState(0);
   const [query, setQuery] = useState('');
 
   const reload = useCallback(async () => {
@@ -101,7 +104,8 @@ export function CatalogueReviewQueue() {
       <CatalogueClaimChecks key={claimChecksVersion} onRunRecorded={recordRun} />
       <CatalogueFindProducts onRunRecorded={() => { recordRun(); void reload().catch(() => undefined); }} />
       <CatalogueSetProducts onRunRecorded={recordRun} onChanged={() => { void reload().catch(() => undefined); }} />
-      <CatalogueDuplicates onChanged={() => { void reload().catch(() => undefined); }} />
+      <CatalogueDuplicates key={`duplicates-${String(duplicatesVersion)}`} onChanged={() => { setSuggestionsVersion((version) => version + 1); void reload().catch(() => undefined); }} />
+      <CataloguePlatformSuggestions key={`platforms-${String(suggestionsVersion)}`} onChanged={() => { setDuplicatesVersion((version) => version + 1); void reload().catch(() => undefined); }} />
       {error !== '' && <p role="alert" className={styles.error}>{error}</p>}
       {notice !== '' && <p role="status">{notice}</p>}
       {error === '' && claims.length === 0 && <p>Nothing is waiting for review. Every claim in the product library has been reviewed.</p>}

@@ -420,3 +420,23 @@ Migration `20261127040000_catalogue_link_actions_and_merges.sql`; proposal
   possible duplicate pair.
 - **No new callable function**; the trigger function is revoked from public, anon
   and authenticated.
+
+## Amendment: suggested platforms (2026-11-27)
+
+(proposals/PROPOSAL-catalogue-platforms-and-components.md, step B.)
+
+- **Suggestions are computed, not stored.** `suggestPlatforms` groups a vendor's
+  products by the first word of their name once the vendor's own name is dropped,
+  and names the platform by the words they all share. A group needs two or more
+  products. Products already a component, products that are platforms, and the
+  same product under two names (a duplicate) are left out. Nothing is written until
+  a person confirms.
+- **Confirming** adds a missing platform as a draft with no links and no claims
+  (so it cannot be published until it has a sourced, reviewed description), then
+  sets "part of" on each chosen product through the guarded save. The server
+  records who and when as for any save.
+- **Turning one down** writes `catalogue_rejected_platform_pairs` (product, the
+  words the platform would be named by, who, when). Platform admins only, one
+  policy per action, server-stamped, no update or delete from the browser.
+- **No new callable function**; the stamping trigger is revoked from public, anon
+  and authenticated.

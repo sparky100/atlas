@@ -42,7 +42,8 @@ import {
 } from '../contracts/catalogueAdmin';
 import { claimCheckResultSchema, type ClaimCheckResult } from '../tools/catalogueClaimCheck';
 import { proposalKey, type LinkProposal, type ProductLinkRow, type ProposalProduct, type RejectedLinkRow } from '../tools/catalogueLinkProposals';
-import { findResultSchema, foundProductContent, type FindRequest, type FindResult, type FoundProduct } from '../tools/catalogueFindProducts';
+import { suggestPlatforms, type PlatformSuggestion } from '../tools/cataloguePlatformSuggestions';
+import { findResultSchema, foundProductContent, productCode, type FindRequest, type FindResult, type FoundProduct } from '../tools/catalogueFindProducts';
 import type { Client } from './client';
 import { queryInChunks } from './inFilterLimit';
 
@@ -615,6 +616,69 @@ export async function mergeProducts(client: Client, keptId: UUID, mergedId: UUID
 export async function undoProductMerge(client: Client, mergedId: UUID): Promise<void> {
   const { error } = await client.from('catalogue_product_merges').delete().eq('merged_product_id', mergedId);
   if (error) throw new Error(`undoProductMerge: ${error.message}`);
+}
+
+/** Products that look like components of one platform, minus the pairs a person already turned down. */
+export async function listPlatformSuggestions(client: Client): Promise<PlatformSuggestion[]> {
+  const [products, rejected] = await Promise.all([
+    listCatalogueProducts(client),
+    client.from('catalogue_rejected_platform_pairs').select('product_id,platform_key'),
+  ]);
+  if (rejected.error) throw new Error(`listPlatformSuggestions: ${rejected.error.message}`);
+  const turnedDown = new Set(((rejected.data as { product_id: string; platform_key: string }[] | null) ?? []).map((row) => `${row.product_id}|${row.platform_key}`));
+  return suggestPlatforms(products.map((row) => ({
+    id: row.id, product: row.product, vendor: row.vendor, partOfProductId: row.partOfProductId, componentCount: row.componentCount,
+  })), turnedDown);
+}
+
+/** Say these products are not components of the platform a suggestion named. Nothing in the library changes. */
+export async function rejectPlatformSuggestion(client: Client, platformKey: string, productIds: readonly UUID[]): Promise<void> {
+  if (productIds.length === 0) return;
+  const { error } = await client.from('catalogue_rejected_platform_pairs')
+    .insert(productIds.map((productId) => ({ product_id: productId, platform_key: platformKey })));
+  if (error) throw new Error(`rejectPlatformSuggestion: ${error.message}`);
+}
+
+/**
+ * Make the chosen products components of the suggested platform. When the
+ * platform is not in the library yet it is added first as a draft with no links
+ * and no claims (it needs a sourced description before it can be published).
+ * Each component is saved through the guarded save, so the server records who
+ * and when.
+ */
+export async function acceptPlatformSuggestion(
+  client: Client,
+  suggestion: PlatformSuggestion,
+  productIds: readonly UUID[],
+): Promise<{ platformId: UUID; created: boolean; linked: number }> {
+  if (productIds.length === 0) throw new Error('Choose at least one product.');
+  let platformId = suggestion.platformId;
+  let created = false;
+  if (platformId === null) {
+    const taken = new Set((await listCatalogueProducts(client)).map((row) => row.code));
+    const saved = await saveCatalogueProduct(client, null, 0, {
+      code: productCode(suggestion.vendor, suggestion.platformName, taken),
+      product: suggestion.platformName,
+      vendor: suggestion.vendor,
+      summary: `The platform that groups ${suggestion.vendor}'s ${suggestion.platformName} products. Capabilities are linked on its components. It needs a sourced description before it can be published.`,
+      capabilities: [],
+      claims: [],
+    });
+    platformId = saved.productId;
+    created = true;
+  }
+  let linked = 0;
+  for (const productId of productIds) {
+    const detail = await readCatalogueProduct(client, productId);
+    try {
+      await saveCatalogueProduct(client, productId, detail.product.edit_revision, { ...detail.content, partOfProductId: platformId });
+    } catch (cause) {
+      const reason = cause instanceof Error ? cause.message : String(cause);
+      throw new Error(`${String(linked)} of ${String(productIds.length)} products were linked. ${detail.product.product} could not be: ${reason}`);
+    }
+    linked += 1;
+  }
+  return { platformId, created, linked };
 }
 
 /** Keep a flagged link out of the list for some days, with a short reason. The server stamps who and when. */
