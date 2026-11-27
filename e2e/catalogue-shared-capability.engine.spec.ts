@@ -383,3 +383,94 @@ test('finding products says so in words when web search is not switched on', asy
   await expect(section.getByRole('alert')).toContainText('Web search is not switched on for the platform AI account. Nothing was searched. Nothing was added.');
   await expect(section.getByTestId('find-products-result')).toHaveCount(0);
 });
+
+/**
+ * Step 6b: Find products for a set. Proposals are computed from real library data (no AI); only the search function's answer is faked.
+ * Accepting is a real edit through the guarded save, rejecting is a real record, and the run over capabilities with no product is recorded.
+ */
+for (const viewport of [{ width: 1280, height: 800 }, { width: 390, height: 844 }]) {
+  test(`an admin accepts and rejects proposed links and searches a set's gaps at ${String(viewport.width)}`, async ({ page }) => {
+    await page.setViewportSize(viewport);
+    const service = createServiceRoleClient(loadEnv());
+    const seed = randomUUID().slice(0, 8);
+    // Letters only (a hex tail like 3cad reads as a currency code), and codes of its own so other runs' links never match.
+    const suffix = seed.replace(/[0-9]/g, (digit) => String.fromCharCode(103 + Number(digit)));
+    const group = String(Number.parseInt(seed.slice(0, 6), 16) % 9000 + 1000);
+    const [gapCode, billingCode, meteringCode] = [`9${group}.1`, `9${group}.2`, `9${group}.3`];
+    const zero = '00000000-0000-0000-0000-000000000000';
+    const checked = (result: { error: { message: string } | null }) => { if (result.error) throw new Error(`set-products seed: ${result.error.message}`); };
+    const base = 500000 + (Number.parseInt(seed.slice(0, 5), 16) % 40000);
+    const oldMap = randomUUID();
+    const newMap = randomUUID();
+    for (const [id, version, title] of [[oldMap, base, `Old set ${suffix}`], [newMap, base + 50000, `New set ${suffix}`]] as const) {
+      checked(await service.from('capability_maps').insert({ id, sector: 'utility', version, status: 'draft', title, summary: title, source_description: 'Playwright seed.' }));
+    }
+    checked(await service.from('capability_map_items').insert([
+      { id: randomUUID(), map_id: oldMap, code: billingCode, parent_code: null, name: `Old billing ${suffix}`, description: 'Old.', level: 1, item_order: 10 },
+      { id: randomUUID(), map_id: oldMap, code: meteringCode, parent_code: null, name: `Old metering ${suffix}`, description: 'Old.', level: 1, item_order: 20 },
+      { id: randomUUID(), map_id: newMap, code: gapCode, parent_code: null, name: `Gap capability ${suffix}`, description: `Gap ${suffix} definition.`, level: 1, item_order: 10 },
+      { id: randomUUID(), map_id: newMap, code: billingCode, parent_code: null, name: `New billing ${suffix}`, description: 'New.', level: 1, item_order: 20 },
+      { id: randomUUID(), map_id: newMap, code: meteringCode, parent_code: null, name: `New metering ${suffix}`, description: 'New.', level: 1, item_order: 30 },
+    ]));
+    for (const id of [oldMap, newMap]) checked(await service.from('capability_maps').update({ status: 'published', published_at: new Date().toISOString() }).eq('id', id));
+    const seedProduct = async (name: string, code: string, capabilityName: string): Promise<string> => {
+      const inserted: { data: { id: string } | null; error: { message: string } | null } = await service.from('catalogue_products').insert({
+        code: `${name.toLowerCase()}-${suffix}`, product: `${name} ${suffix}`, vendor: `Vendor ${name} ${suffix}`, summary: 'Seeded for set products.', created_by: zero, updated_by: zero,
+      }).select('id').single();
+      if (inserted.error || !inserted.data) throw new Error(`set-products seed: ${inserted.error?.message ?? 'no row'}`);
+      checked(await service.from('catalogue_product_capabilities').insert({ product_id: inserted.data.id, capability_map_id: oldMap, capability_code: code, capability_name: capabilityName, how_it_supports: 'Supports it.' }));
+      return inserted.data.id;
+    };
+    await seedProduct('Billing', billingCode, `Old billing ${suffix}`);
+    await seedProduct('Metering', meteringCode, `Old metering ${suffix}`);
+
+    await page.route('**/functions/v1/catalogue-find-products', async (route) => {
+      const cors = { 'access-control-allow-origin': '*', 'access-control-allow-headers': '*', 'access-control-allow-methods': 'POST, OPTIONS' };
+      if (route.request().method() === 'OPTIONS') { await route.fulfill({ status: 200, headers: cors, body: 'ok' }); return; }
+      await route.fulfill({
+        status: 200, headers: { ...cors, 'content-type': 'application/json' },
+        body: JSON.stringify({
+          status: 'ok', searches: 2, inputTokens: 3000, outputTokens: 400, model: 'test-model', note: null, dropped: [],
+          found: [{ product: `Gap product ${suffix}`, vendor: 'Gap vendor', summary: 'Found for the gap.', howItSupports: 'It supports the gap.', claims: [{ kind: 'functional', sourceUrl: 'https://example.test/gap', statement: `Gap vendor says its product covers ${suffix}.` }] }],
+        }),
+      });
+    });
+
+    await signUpAdmin(page);
+    await page.goto('/platform-admin/catalogue/review');
+    const section = page.getByTestId('set-products');
+    await section.getByLabel('Capability set').selectOption(newMap);
+    await expect(section.getByTestId('set-products-counts')).toContainText('3 capabilities, 0 with a product, 3 with none, 2 links proposed');
+    const proposals = section.getByTestId('set-products-proposals');
+    await expect(proposals).toContainText(`The same code (${billingCode})`);
+    await expect(proposals).toContainText(`Old billing ${suffix}`);
+    await expect(proposals).toContainText('Proposed by a rule');
+
+    // Accept one: it becomes an edit of the product and leaves the list.
+    await proposals.getByRole('checkbox', { name: new RegExp(`New billing ${suffix}`) }).check();
+    await proposals.getByRole('button', { name: 'Accept 1 selected' }).click();
+    await expect(section.getByRole('status').filter({ hasText: '1 link accepted' })).toBeVisible();
+    await expect(section.getByTestId('set-products-counts')).toContainText('1 with a product');
+    await expect(proposals).not.toContainText(`New billing ${suffix}`);
+
+    // Reject the other with a reason: it needs the reason, then it never returns.
+    await proposals.getByRole('checkbox', { name: new RegExp(`New metering ${suffix}`) }).check();
+    await expect(proposals.getByRole('button', { name: 'Reject 1 selected' })).toBeDisabled();
+    await proposals.getByLabel('Reason for rejecting').fill('Not the same capability');
+    await proposals.getByRole('button', { name: 'Reject 1 selected' }).click();
+    await expect(section.getByRole('status').filter({ hasText: '1 link rejected' })).toBeVisible();
+    await expect(section.getByTestId('set-products-proposals')).toHaveCount(0);
+    await expect(section.getByText('No links to propose.')).toBeVisible();
+
+    // Search the capability with no product: the answer is faked, everything after it is real.
+    const gaps = section.getByTestId('set-products-gaps');
+    await gaps.getByRole('checkbox', { name: new RegExp(`Gap capability ${suffix}`) }).check();
+    await section.getByRole('button', { name: 'Find products for these' }).click();
+    const result = section.getByTestId('set-products-result');
+    await expect(result).toContainText(`Gap capability ${suffix}: 1 found, 0 already in the library, 1 added for review`);
+    await expect(result.getByRole('link', { name: `Gap product ${suffix}` })).toBeVisible();
+    await expect(page.getByTestId('check-runs')).toContainText('Find products for a set: 2 searches, 1 product found');
+    expect(await page.evaluate(() => document.documentElement.scrollWidth > document.documentElement.clientWidth + 1)).toBe(false);
+    await page.screenshot({ path: `test-results/catalogue-set-products-${String(viewport.width)}.png`, fullPage: true });
+  });
+}
