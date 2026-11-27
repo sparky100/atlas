@@ -392,21 +392,25 @@ for (const viewport of [{ width: 1280, height: 800 }, { width: 390, height: 844 
   test(`an admin accepts and rejects proposed links and searches a set's gaps at ${String(viewport.width)}`, async ({ page }) => {
     await page.setViewportSize(viewport);
     const service = createServiceRoleClient(loadEnv());
-    const suffix = randomUUID().slice(0, 8);
+    const seed = randomUUID().slice(0, 8);
+    // Letters only (a hex tail like 3cad reads as a currency code), and codes of its own so other runs' links never match.
+    const suffix = seed.replace(/[0-9]/g, (digit) => String.fromCharCode(103 + Number(digit)));
+    const group = String(Number.parseInt(seed.slice(0, 6), 16) % 9000 + 1000);
+    const [gapCode, billingCode, meteringCode] = [`9${group}.1`, `9${group}.2`, `9${group}.3`];
     const zero = '00000000-0000-0000-0000-000000000000';
     const checked = (result: { error: { message: string } | null }) => { if (result.error) throw new Error(`set-products seed: ${result.error.message}`); };
-    const base = 500000 + (Number.parseInt(suffix.slice(0, 5), 16) % 40000);
+    const base = 500000 + (Number.parseInt(seed.slice(0, 5), 16) % 40000);
     const oldMap = randomUUID();
     const newMap = randomUUID();
     for (const [id, version, title] of [[oldMap, base, `Old set ${suffix}`], [newMap, base + 50000, `New set ${suffix}`]] as const) {
       checked(await service.from('capability_maps').insert({ id, sector: 'utility', version, status: 'draft', title, summary: title, source_description: 'Playwright seed.' }));
     }
     checked(await service.from('capability_map_items').insert([
-      { id: randomUUID(), map_id: oldMap, code: '52', parent_code: null, name: `Old billing ${suffix}`, description: 'Old.', level: 1, item_order: 10 },
-      { id: randomUUID(), map_id: oldMap, code: '53', parent_code: null, name: `Old metering ${suffix}`, description: 'Old.', level: 1, item_order: 20 },
-      { id: randomUUID(), map_id: newMap, code: '51', parent_code: null, name: `Gap capability ${suffix}`, description: `Gap ${suffix} definition.`, level: 1, item_order: 10 },
-      { id: randomUUID(), map_id: newMap, code: '52', parent_code: null, name: `New billing ${suffix}`, description: 'New.', level: 1, item_order: 20 },
-      { id: randomUUID(), map_id: newMap, code: '53', parent_code: null, name: `New metering ${suffix}`, description: 'New.', level: 1, item_order: 30 },
+      { id: randomUUID(), map_id: oldMap, code: billingCode, parent_code: null, name: `Old billing ${suffix}`, description: 'Old.', level: 1, item_order: 10 },
+      { id: randomUUID(), map_id: oldMap, code: meteringCode, parent_code: null, name: `Old metering ${suffix}`, description: 'Old.', level: 1, item_order: 20 },
+      { id: randomUUID(), map_id: newMap, code: gapCode, parent_code: null, name: `Gap capability ${suffix}`, description: `Gap ${suffix} definition.`, level: 1, item_order: 10 },
+      { id: randomUUID(), map_id: newMap, code: billingCode, parent_code: null, name: `New billing ${suffix}`, description: 'New.', level: 1, item_order: 20 },
+      { id: randomUUID(), map_id: newMap, code: meteringCode, parent_code: null, name: `New metering ${suffix}`, description: 'New.', level: 1, item_order: 30 },
     ]));
     for (const id of [oldMap, newMap]) checked(await service.from('capability_maps').update({ status: 'published', published_at: new Date().toISOString() }).eq('id', id));
     const seedProduct = async (name: string, code: string, capabilityName: string): Promise<string> => {
@@ -417,8 +421,8 @@ for (const viewport of [{ width: 1280, height: 800 }, { width: 390, height: 844 
       checked(await service.from('catalogue_product_capabilities').insert({ product_id: inserted.data.id, capability_map_id: oldMap, capability_code: code, capability_name: capabilityName, how_it_supports: 'Supports it.' }));
       return inserted.data.id;
     };
-    await seedProduct('Billing', '52', `Old billing ${suffix}`);
-    await seedProduct('Metering', '53', `Old metering ${suffix}`);
+    await seedProduct('Billing', billingCode, `Old billing ${suffix}`);
+    await seedProduct('Metering', meteringCode, `Old metering ${suffix}`);
 
     await page.route('**/functions/v1/catalogue-find-products', async (route) => {
       const cors = { 'access-control-allow-origin': '*', 'access-control-allow-headers': '*', 'access-control-allow-methods': 'POST, OPTIONS' };
@@ -438,7 +442,7 @@ for (const viewport of [{ width: 1280, height: 800 }, { width: 390, height: 844 
     await section.getByLabel('Capability set').selectOption(newMap);
     await expect(section.getByTestId('set-products-counts')).toContainText('3 capabilities, 0 with a product, 3 with none, 2 links proposed');
     const proposals = section.getByTestId('set-products-proposals');
-    await expect(proposals).toContainText('The same code (52)');
+    await expect(proposals).toContainText(`The same code (${billingCode})`);
     await expect(proposals).toContainText(`Old billing ${suffix}`);
     await expect(proposals).toContainText('Proposed by a rule');
 
