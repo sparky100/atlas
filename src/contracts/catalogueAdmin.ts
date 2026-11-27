@@ -124,6 +124,8 @@ export const catalogueProductContentSchema = z.object({
   product: text(CATALOGUE_PRODUCT_LIMITS.product),
   vendor: text(CATALOGUE_PRODUCT_LIMITS.vendor),
   summary: text(CATALOGUE_PRODUCT_LIMITS.summary),
+  /** The platform this product is a component of. Leave it out to keep what is saved; null clears it. */
+  partOfProductId: z.uuid().nullable().optional(),
   capabilities: z.array(catalogueProductCapabilitySchema).max(CATALOGUE_PRODUCT_LIMITS.capabilities),
   generalCapabilities: z.array(catalogueProductGeneralCapabilitySchema).max(CATALOGUE_PRODUCT_LIMITS.generalCapabilities).optional(),
   claims: z.array(catalogueProductClaimSchema).max(CATALOGUE_PRODUCT_LIMITS.claims),
@@ -156,6 +158,7 @@ export interface CatalogueProductRow {
   product: string;
   vendor: string;
   summary: string;
+  part_of_product_id: string | null;
   edit_revision: number;
   created_at: string;
   updated_at: string;
@@ -177,6 +180,10 @@ export interface CatalogueProductSummary {
   claimsWaitingForReview: number;
   publication: ProductPublicationLabel;
   capabilityCountsByMap: Record<string, number>;
+  /** The platform this product is part of, when it is a component. */
+  partOfProductId: string | null;
+  /** How many components this product has (it is a platform when above zero). */
+  componentCount: number;
 }
 
 export interface CatalogueProductClaimRow {

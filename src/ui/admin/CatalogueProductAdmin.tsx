@@ -12,6 +12,7 @@ import { claimCheckKey } from '../../contracts/catalogueAdmin';
 import {
   listCapabilitySetItems,
   listCapabilitySets,
+  listCatalogueProducts,
   listClaimChecks,
   listGeneralCapabilities,
   listSourceChecks,
@@ -52,6 +53,8 @@ export function CatalogueProductAdmin({ productId }: { productId: string | null 
   const [sharedId, setSharedId] = useState('');
   const [sharedHow, setSharedHow] = useState('');
   const [withdrawReason, setWithdrawReason] = useState('');
+  /** Products that could be this product's platform: only platforms and stand-alone products, never a component. */
+  const [platformChoices, setPlatformChoices] = useState<{ id: string; product: string; vendor: string }[]>([]);
   const [issues, setIssues] = useState<string[] | null>(null);
   const [notice, setNotice] = useState('');
   const [loadError, setLoadError] = useState('');
@@ -77,6 +80,8 @@ export function CatalogueProductAdmin({ productId }: { productId: string | null 
         setContent(nextDetail === null ? emptyProduct() : nextDetail.content);
         // The link checks are extra information: if they cannot be read the editor still works and says nothing about links.
         setSourceChecks(await listSourceChecks(supabase).then((rows) => new Map(rows.map((row) => [row.url, row])), () => null));
+        // Naming a platform is extra: if the list cannot be read the editor still works without the choice.
+        setPlatformChoices(await listCatalogueProducts(supabase).then((rows) => rows.filter((row) => row.partOfProductId === null && row.id !== productId).map((row) => ({ id: row.id, product: row.product, vendor: row.vendor })), () => []));
         setClaimChecks(await listClaimChecks(supabase).then((rows) => new Map(rows.map((row) => [claimCheckKey(row), row])), () => null));
       } catch (cause) {
         setLoadError(cause instanceof Error ? cause.message : String(cause));
@@ -238,6 +243,28 @@ export function CatalogueProductAdmin({ productId }: { productId: string | null 
         <label>Summary <textarea value={content.summary} onChange={(event) => { updateProduct({ summary: event.target.value }); }} /></label>
       </div>
 
+      <h2>Platform and components</h2>
+      {(detail?.components.length ?? 0) > 0 ? (
+        <div data-testid="product-components">
+          <p>This product is a platform. Its components are listed below. Link capabilities on the components, not on the platform.</p>
+          <ul>
+            {detail?.components.map((component) => (
+              <li key={component.id}><Link to={`${BASE}/products/${component.id}`}>{component.product}</Link></li>
+            ))}
+          </ul>
+        </div>
+      ) : (
+        <label>Part of{' '}
+          <select value={content.partOfProductId ?? ''} onChange={(event) => { updateProduct({ partOfProductId: event.target.value === '' ? null : event.target.value }); }} data-testid="part-of-select">
+            <option value="">Not part of another product</option>
+            {platformChoices.map((choice) => <option key={choice.id} value={choice.id}>{choice.product} ({choice.vendor})</option>)}
+          </select>
+        </label>
+      )}
+      {(detail?.components.length ?? 0) === 0 && detail?.partOf != null && content.partOfProductId === detail.partOf.id && (
+        <p data-testid="part-of-note">A component of <Link to={`${BASE}/products/${detail.partOf.id}`}>{detail.partOf.product}</Link>.</p>
+      )}
+
       <h2>Capability links ({content.capabilities.length + (content.generalCapabilities ?? []).length})</h2>
       <p>A shared capability is the same in every sector, so one link covers them all and survives new versions of any set. A sector capability belongs to one sector&apos;s set; it carries over to that sector&apos;s newer versions by its code.</p>
 
@@ -328,7 +355,7 @@ export function CatalogueProductAdmin({ productId }: { productId: string | null 
         const blocked = dirty ? 'Save your changes first.'
           : waiting > 0 ? `${String(waiting)} claim${waiting === 1 ? ' is' : 's are'} waiting for review. Review ${waiting === 1 ? 'it' : 'them'} before publishing.`
           : detail.claimReviews.length === 0 || detail.claimReviews.length > 8 ? 'A published product needs 1 to 8 claims.'
-          : content.capabilities.length + (content.generalCapabilities ?? []).length === 0 ? 'Add at least one capability link before publishing.'
+          : content.capabilities.length + (content.generalCapabilities ?? []).length === 0 && detail.components.length === 0 ? 'Add at least one capability link before publishing, or make this the platform of products that have them.'
           : upToDate ? 'This revision is already published.' : '';
         return (
           <>

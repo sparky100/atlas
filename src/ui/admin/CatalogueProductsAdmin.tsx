@@ -29,12 +29,13 @@ export function CatalogueProductsAdmin() {
   const filtered = useMemo(() => {
     const term = search.trim().toLowerCase();
     const base = readyOnly
-      ? products.filter((product) => product.claimCount > 0 && product.claimsWaitingForReview === 0 && product.capabilityCount + product.sharedCapabilityCount > 0 && product.publication !== 'published')
+      ? products.filter((product) => product.claimCount > 0 && product.claimsWaitingForReview === 0 && (product.capabilityCount + product.sharedCapabilityCount > 0 || product.componentCount > 0) && product.publication !== 'published')
       : products;
     if (term === '') return base;
     return base.filter((product) => `${product.product} ${product.vendor} ${product.code}`.toLowerCase().includes(term));
   }, [products, search, readyOnly]);
 
+  const nameById = useMemo(() => new Map(products.map((product) => [product.id, product.product])), [products]);
   const waiting = products.reduce((sum, product) => sum + product.claimsWaitingForReview, 0);
 
   if (loading) return <Loading />;
@@ -61,6 +62,8 @@ export function CatalogueProductsAdmin() {
             <span>
               <strong>{product.product}</strong>{' '}
               <small>{product.vendor} · {product.code}</small>
+              {product.componentCount > 0 && <small data-testid="platform-tag"> · platform with {String(product.componentCount)} component{product.componentCount === 1 ? '' : 's'}</small>}
+              {product.partOfProductId !== null && <small data-testid="component-tag"> · part of {nameById.get(product.partOfProductId) ?? 'a platform'}</small>}
             </span>
             <span>
               {publicationLabelText(product.publication)} · {product.capabilitySetCount} capability sets · {product.capabilityCount + product.sharedCapabilityCount} links · {product.claimCount} claims{product.claimsWaitingForReview > 0 ? ` (${String(product.claimsWaitingForReview)} to review)` : ''}

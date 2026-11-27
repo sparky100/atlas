@@ -182,6 +182,10 @@ written reason and keeps the revision readable. The products list shows each
 product's state and can show only those ready to publish. Until the reader
 switch (step 4b) published products are not yet shown to users.
 
+## Platforms and components
+
+A product can be a component of a platform (for example "ArcGIS Utility Network" is part of "ArcGIS"). Open the component, choose the platform under **Part of** and save. One level only: a component has no components, and a platform that has components cannot become a component. The platform's page lists its components, the product list marks both, and a platform and its own component are not offered as possible duplicates. Link capabilities on the components, not on the platform. A platform with components can be published with no capability links of its own, but it still needs its own reviewed claims. If the platform is not in the library yet, add it as a new product first.
+
 ## Viewing a capability set before copying
 
 In **Platform admin → Capability sets**, choose a sector and select **View current set** before creating the next draft. The read-only view shows the published version, summary, searchable capability hierarchy and definitions, value-stream stages and their capability links, sources and origin. **Versions for [sector]** also lets you inspect older versions. An older version cannot be copied as a new draft; **Create draft from current** always uses the current published version. Viewing a set changes neither published content nor models previously seeded from it. On a narrow screen, the capability list and selected definition stack as cards.

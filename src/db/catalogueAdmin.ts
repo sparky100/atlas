@@ -52,6 +52,7 @@ interface ProductRow {
   product: string;
   vendor: string;
   summary: string;
+  part_of_product_id: string | null;
   edit_revision: number;
   created_at: string;
   updated_at: string;
@@ -90,6 +91,10 @@ export interface CatalogueProductDetail {
   claimReviews: CatalogueClaimReview[];
   /** The latest published revision, or null when the product has never been published. */
   publication: ProductPublicationState | null;
+  /** The platform this product is part of, with its name. */
+  partOf: { id: string; product: string } | null;
+  /** The products that are part of this one. */
+  components: { id: string; product: string }[];
 }
 
 interface RevisionRow {
@@ -118,7 +123,7 @@ function publicationState(row: RevisionRow, editRevision: number): ProductPublic
 export async function listCatalogueProducts(client: Client): Promise<CatalogueProductSummary[]> {
   const merged = await mergedInto(client);
   const [products, links, claims, shared, revisions] = await Promise.all([
-    client.from('catalogue_products').select('id,code,product,vendor,summary,edit_revision,created_at,updated_at').order('product'),
+    client.from('catalogue_products').select('id,code,product,vendor,summary,part_of_product_id,edit_revision,created_at,updated_at').order('product'),
     client.from('catalogue_product_capabilities').select('product_id,capability_map_id'),
     client.from('catalogue_product_claims').select('product_id,review_state'),
     client.from('catalogue_product_general_links').select('product_id'),
@@ -151,6 +156,10 @@ export async function listCatalogueProducts(client: Client): Promise<CataloguePr
   for (const row of (shared.data as { product_id: string }[] | null) ?? []) {
     sharedCount.set(row.product_id, (sharedCount.get(row.product_id) ?? 0) + 1);
   }
+  const componentCount = new Map<string, number>();
+  for (const row of (products.data as ProductRow[] | null) ?? []) {
+    if (row.part_of_product_id !== null) componentCount.set(row.part_of_product_id, (componentCount.get(row.part_of_product_id) ?? 0) + 1);
+  }
   const claimCount = new Map<string, number>();
   const waitingCount = new Map<string, number>();
   for (const row of (claims.data as { product_id: string; review_state: ClaimReviewState }[] | null) ?? []) {
@@ -173,12 +182,14 @@ export async function listCatalogueProducts(client: Client): Promise<CataloguePr
     claimsWaitingForReview: waitingCount.get(row.id) ?? 0,
     publication: productPublicationLabel((() => { const latest = latestRevision.get(row.id); return latest ? publicationState(latest, row.edit_revision) : null; })()),
     capabilityCountsByMap: countsByMap.get(row.id) ?? {},
+    partOfProductId: row.part_of_product_id,
+    componentCount: componentCount.get(row.id) ?? 0,
   }));
 }
 
 export async function readCatalogueProduct(client: Client, productId: UUID): Promise<CatalogueProductDetail> {
-  const [product, links, claims, shared, revision] = await Promise.all([
-    client.from('catalogue_products').select('id,code,product,vendor,summary,edit_revision,created_at,updated_at').eq('id', productId).maybeSingle(),
+  const [product, links, claims, shared, revision, componentRows] = await Promise.all([
+    client.from('catalogue_products').select('id,code,product,vendor,summary,part_of_product_id,edit_revision,created_at,updated_at').eq('id', productId).maybeSingle(),
     client.from('catalogue_product_capabilities').select('product_id,capability_map_id,capability_code,capability_name,how_it_supports').eq('product_id', productId),
     client.from('catalogue_product_claims').select(CLAIM_COLUMNS)
       .eq('product_id', productId).order('position'),
@@ -187,7 +198,9 @@ export async function readCatalogueProduct(client: Client, productId: UUID): Pro
     client.from('catalogue_product_revisions')
       .select('revision,product_edit_revision,published_by_name,published_at,withdrawn_at,withdrawn_reason,withdrawn_by_name')
       .eq('product_id', productId).order('revision', { ascending: false }).limit(1).maybeSingle(),
+    client.from('catalogue_products').select('id,product').eq('part_of_product_id', productId).order('product'),
   ]);
+  if (componentRows.error) throw new Error(`readCatalogueProduct: ${componentRows.error.message}`);
   if (revision.error) throw new Error(`readCatalogueProduct: ${revision.error.message}`);
   if (product.error) throw new Error(`readCatalogueProduct: ${product.error.message}`);
   if (shared.error) throw new Error(`readCatalogueProduct: ${shared.error.message}`);
@@ -195,12 +208,19 @@ export async function readCatalogueProduct(client: Client, productId: UUID): Pro
   if (claims.error) throw new Error(`readCatalogueProduct: ${claims.error.message}`);
   const row: ProductRow | null = product.data;
   if (!row) throw new Error('readCatalogueProduct: that product is no longer available');
+  let partOf: { id: string; product: string } | null = null;
+  if (row.part_of_product_id !== null) {
+    const parent = await client.from('catalogue_products').select('id,product').eq('id', row.part_of_product_id).maybeSingle();
+    if (parent.error) throw new Error(`readCatalogueProduct: ${parent.error.message}`);
+    partOf = parent.data ?? null;
+  }
 
   const content = catalogueProductContentSchema.parse({
     code: row.code,
     product: row.product,
     vendor: row.vendor,
     summary: row.summary,
+    partOfProductId: row.part_of_product_id,
     capabilities: ((links.data as LinkRow[] | null) ?? []).map((link) => ({
       capabilityMapId: link.capability_map_id,
       capabilityCode: link.capability_code,
@@ -232,11 +252,14 @@ export async function readCatalogueProduct(client: Client, productId: UUID): Pro
   return {
     product: {
       id: row.id, code: row.code, product: row.product, vendor: row.vendor, summary: row.summary,
+      part_of_product_id: row.part_of_product_id,
       edit_revision: row.edit_revision, created_at: row.created_at, updated_at: row.updated_at,
     },
     content,
     claimReviews,
     publication: revision.data ? publicationState(revision.data, row.edit_revision) : null,
+    partOf,
+    components: componentRows.data,
   };
 }
 

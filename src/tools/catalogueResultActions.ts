@@ -21,9 +21,14 @@ export interface DuplicateCandidate {
   how: 'same' | 'contains';
 }
 
-/** Pairs of products by the same vendor whose names are the same or sit inside one another. Pairs already merged are left out by the caller. */
-export function duplicateCandidates(products: readonly { id: string; product: string; vendor: string }[]): DuplicateCandidate[] {
-  const byVendor = new Map<string, { id: string; product: string; vendor: string; key: string }[]>();
+/**
+ * Pairs of products by the same vendor whose names are the same or sit inside
+ * one another. Pairs already merged are left out by the caller. A platform and
+ * one of its own components are never a pair: the name "ArcGIS" sitting inside
+ * "ArcGIS Utility Network" is the point, not a duplicate.
+ */
+export function duplicateCandidates(products: readonly { id: string; product: string; vendor: string; partOfProductId?: string | null }[]): DuplicateCandidate[] {
+  const byVendor = new Map<string, { id: string; product: string; vendor: string; partOfProductId?: string | null; key: string }[]>();
   for (const product of products) {
     const key = vendorKey(product.vendor);
     byVendor.set(key, [...(byVendor.get(key) ?? []), { ...product, key: productNameKey(product.vendor, product.product) }]);
@@ -35,6 +40,7 @@ export function duplicateCandidates(products: readonly { id: string; product: st
         const a = group[i];
         const b = group[j];
         if (a === undefined || b === undefined) continue;
+        if (a.partOfProductId === b.id || b.partOfProductId === a.id) continue;
         const same = a.key === b.key;
         if (same || containsWords(a.key, b.key) || containsWords(b.key, a.key)) {
           out.push({ a: { id: a.id, product: a.product, vendor: a.vendor }, b: { id: b.id, product: b.product, vendor: b.vendor }, how: same ? 'same' : 'contains' });
