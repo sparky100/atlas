@@ -279,13 +279,14 @@ for (const viewport of [{ width: 1280, height: 800 }, { width: 390, height: 844 
 
     // Switch it on: it says who and when. Switch it off again: that is recorded too.
     const box = section.getByRole('checkbox', { name: /every month/ });
-    if (await box.isChecked()) await box.uncheck();
+    // The box follows the saved switch, so it changes after the save, not on the click: click it and wait for the words.
+    if (await box.isChecked()) await box.click();
     await expect(section.getByTestId('monthly-check-state')).toContainText(/^Off/);
-    await box.check();
+    await box.click();
     await expect(section.getByTestId('monthly-check-state')).toContainText(/^On: switched on by .+ on /);
     expect(await page.evaluate(() => document.documentElement.scrollWidth > document.documentElement.clientWidth + 1)).toBe(false);
     await page.screenshot({ path: `test-results/catalogue-monthly-check-${String(viewport.width)}.png`, fullPage: true });
-    await box.uncheck();
+    await box.click();
     await expect(section.getByTestId('monthly-check-state')).toContainText(/^Off: switched off by .+ on /);
   });
 }
