@@ -24,6 +24,8 @@ function Entry({ entry, makeOption, modelElements }: { entry: CitableCatalogueEn
       <Text as="h3" size="md">
         {entry.product} <Text as="span" size="sm" tone="muted">by {entry.vendor}</Text>
       </Text>
+      {entry.platform?.partOf != null && <Text as="p" size="sm" tone="muted" data-testid="product-part-of">Part of {entry.platform.partOf}.</Text>}
+      {(entry.platform?.components.length ?? 0) > 0 && <Text as="p" size="sm" tone="muted" data-testid="product-components">A platform. Components: {entry.platform?.components.join(', ')}.</Text>}
       <Text as="p">{entry.summary}</Text>
       <ProductInModelNote productName={entry.product} elements={modelElements} />
       <Text as="p" size="sm" tone="muted">{entry.howItSupports}</Text>

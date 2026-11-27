@@ -150,6 +150,8 @@ export interface CatalogueEntry {
  */
 export interface CitableCatalogueEntry extends CatalogueEntry {
   citation: { sector: string; version: number };
+  /** Where a published product sits, as recorded when it was published. Absent for a sector catalogue entry. */
+  platform?: { partOf: string | null; components: string[] };
 }
 
 /** The sector name a citation to a published product revision carries. Not a sector. */
@@ -375,6 +377,7 @@ export async function listCurrentCatalogueEntriesForCapability(client: Client, m
     id: p.revisionId, code: p.code, product: p.product, vendor: p.vendor, summary: p.summary, howItSupports: p.howItSupports,
     claims: p.claims.map((c) => ({ statement: c.statement, kind: c.kind, sourceUrl: c.sourceUrl, sourceDate: c.sourceDate, reviewedBy: c.reviewedBy, reviewedAt: c.reviewedAt })),
     citation: { sector: PRODUCT_CITATION_SECTOR, version: p.revision },
+    platform: { partOf: p.partOf, components: p.components },
   })), sector);
 }
 

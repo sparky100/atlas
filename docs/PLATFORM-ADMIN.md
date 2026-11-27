@@ -188,6 +188,8 @@ A product can be a component of a platform (for example "ArcGIS Utility Network"
 
 **Suggested platforms** is on the Waiting for review screen. It lists products by the same vendor whose names start the same way (for example several "Oracle Utilities ..." products) as the components of one platform. Tick the products that really are components and choose "Make N selected part of ...". If the platform is not in the library yet it is added as a draft with no links and no claims, and you describe and source it before publishing. "Not a platform: stop suggesting this" is remembered with your name and the date. Nothing changes until you choose.
 
+A published version records its platform, and a platform's published version records its components, by name, as they were when it was published. Only published products are named. So publish a platform after its components, or publish a component again after its platform, for "Part of ..." and "Components: ..." to show on capability pages.
+
 ## Viewing a capability set before copying
 
 In **Platform admin → Capability sets**, choose a sector and select **View current set** before creating the next draft. The read-only view shows the published version, summary, searchable capability hierarchy and definitions, value-stream stages and their capability links, sources and origin. **Versions for [sector]** also lets you inspect older versions. An older version cannot be copied as a new draft; **Create draft from current** always uses the current published version. Viewing a set changes neither published content nor models previously seeded from it. On a narrow screen, the capability list and selected definition stack as cards.
