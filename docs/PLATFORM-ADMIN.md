@@ -252,3 +252,5 @@ anyone else's.
 See `supabase/migrations/20260917030000_platform_admin.sql` and
 `20260921020000_platform_llm_provider.sql`'s own module comments for the
 full SQL and reasoning.
+
+**Find and platforms.** When a found product's source page says it is part of a larger platform, the draft is saved as a component of that platform. A platform that is not in the library is added as a draft with no description yet; write and source its description before publishing it.

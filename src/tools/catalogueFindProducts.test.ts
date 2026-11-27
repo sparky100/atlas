@@ -64,6 +64,29 @@ describe('verifyCandidates', () => {
   });
 });
 
+describe('verifyCandidates, platform', () => {
+  const PLATFORM_PAGE = `${PAGE} Meter Hub is a module of the Acme Grid platform.`;
+  it('keeps the platform only when a cited page names it', async () => {
+    const sourceUrl = 'https://acme.example/hub';
+    const named = await verifyCandidates([candidate({ platform: 'Acme Grid' })], deps({ [sourceUrl]: PLATFORM_PAGE }));
+    expect(named.found[0]?.platform).toBe('Acme Grid');
+    const guessed = await verifyCandidates([candidate({ platform: 'Acme Grid' })], deps({ [sourceUrl]: PAGE }));
+    expect(guessed.found[0]?.platform).toBeNull();
+  });
+  it('drops a platform that is the product itself, and keeps none when there is none', async () => {
+    const same = await verifyCandidates([candidate({ platform: 'Acme Meter Hub' })], deps({ 'https://acme.example/hub': PAGE }));
+    expect(same.found[0]?.platform).toBeNull();
+    const none = await verifyCandidates([candidate()], deps({ 'https://acme.example/hub': PAGE }));
+    expect(none.found[0]?.platform).toBeNull();
+  });
+  it('reads the platform from the model answer and ignores a bad one', () => {
+    const raw = (platform: unknown) => JSON.stringify({ products: [{ ...candidate(), platform }] });
+    expect(parseFindAnswer(raw('Acme Grid'))?.[0]?.platform).toBe('Acme Grid');
+    expect(parseFindAnswer(raw(null))?.[0]?.platform).toBeNull();
+    expect(parseFindAnswer(raw(42))?.[0]?.platform).toBeNull();
+  });
+});
+
 describe('splitByLibrary', () => {
   it('matches vendor and name regardless of case and spacing, and does not repeat a product', () => {
     const library = [{ id: 'p1', vendor: 'ACME', product: 'Meter  Hub' }];

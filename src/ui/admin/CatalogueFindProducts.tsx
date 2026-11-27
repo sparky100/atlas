@@ -12,7 +12,8 @@ interface Outcome {
   searched: number;
   found: number;
   existing: { productId: string; product: string; vendor: string }[];
-  saved: { productId: string; product: string; vendor: string }[];
+  saved: { productId: string; product: string; vendor: string; platform: string | null }[];
+  platformsCreated: string[];
   failed: { product: string; message: string }[];
   dropped: { product: string; vendor: string; reason: string }[];
   note: string | null;
@@ -87,12 +88,12 @@ export function CatalogueFindProducts({ onRunRecorded }: { onRunRecorded?: () =>
         const library = await listLibraryProductKeys(supabase);
         const split = splitByLibrary(result.found, library.map((row) => ({ id: row.id, vendor: row.vendor, product: row.product })));
         const today = new Date().toISOString().slice(0, 10);
-        const saving = await saveFoundProducts(supabase, split.added, { capabilityMapId: set.id, capabilityCode: picked.code, capabilityName: picked.name }, new Set(library.map((row) => row.code)), today);
+        const saving = await saveFoundProducts(supabase, split.added, { capabilityMapId: set.id, capabilityCode: picked.code, capabilityName: picked.name }, library, today);
         savedCount = saving.saved.length;
         setOutcome({
           capability: picked.name, searched: result.searches, found: result.found.length,
           existing: split.existing.map((row) => ({ productId: row.productId, product: row.product, vendor: row.vendor })),
-          saved: saving.saved, failed: saving.failed, dropped: result.dropped, note: result.note ?? null,
+          saved: saving.saved, platformsCreated: saving.platformsCreated, failed: saving.failed, dropped: result.dropped, note: result.note ?? null,
         });
         if (saving.failed.length > 0) note = `${String(saving.failed.length)} could not be saved.`;
       }
@@ -167,7 +168,7 @@ export function CatalogueFindProducts({ onRunRecorded }: { onRunRecorded?: () =>
             ? <p>No new products found for {outcome.capability}.{outcome.note === null ? '' : ` ${outcome.note}`}</p>
             : (
               <p>
-                {String(outcome.found)} product{outcome.found === 1 ? '' : 's'} found, {String(outcome.existing.length)} already in the library, {String(outcome.saved.length)} added for review.
+                {String(outcome.found)} product{outcome.found === 1 ? '' : 's'} found, {String(outcome.existing.length)} already in the library, {String(outcome.saved.length)} added for review.{outcome.platformsCreated.length > 0 ? ` Platform${outcome.platformsCreated.length === 1 ? '' : 's'} added as a draft with no description yet: ${outcome.platformsCreated.join(', ')}.` : ''}
                 {outcome.dropped.length > 0 ? ` ${String(outcome.dropped.length)} dropped.` : ''}
               </p>
             )}
@@ -177,7 +178,7 @@ export function CatalogueFindProducts({ onRunRecorded }: { onRunRecorded?: () =>
               <ul>
                 {outcome.saved.map((row) => (
                   <li key={row.productId}>
-                    <Link to={`/platform-admin/catalogue/products/${row.productId}`}>{row.product}</Link> ({row.vendor}). Draft, found by the Researcher on {today}. Its claims are in the list below, waiting for review.
+                    <Link to={`/platform-admin/catalogue/products/${row.productId}`}>{row.product}</Link> ({row.vendor}){row.platform === null ? '' : `, part of ${row.platform}`}. Draft, found by the Researcher on {today}. Its claims are in the list below, waiting for review.
                   </li>
                 ))}
               </ul>

@@ -458,3 +458,21 @@ Migration `20261127040000_catalogue_link_actions_and_merges.sql`; proposal
   callable through the API.
 - Capability pages and decision product lists show "Part of X" and "Components:
   ...". The Designer's context is unchanged in this step.
+
+## Amendment: Find and the set search propose a platform (2026-11-27)
+
+Step C2 of platforms and components.
+
+- The Researcher may name, for a found product, the larger platform it is a
+  module of. The name is kept only when a page the product's claims cite
+  contains it, and never when it is the product's own name. Otherwise it is
+  dropped, so the search never guesses a platform.
+- Saving a found product reuses the library product of that vendor and name as
+  its platform, or makes a draft platform with no links and no claims (as in
+  suggested platforms) once per run. The platform's description is a person's
+  to write and source; it cannot be published until then.
+- Products already in the library are never changed by a search. If the named
+  platform is itself a component, or is one of the same run's new products, the
+  product is saved on its own.
+- No schema change. The function only adds an optional `platform` field to its
+  answer; the browser accepts answers without it.
