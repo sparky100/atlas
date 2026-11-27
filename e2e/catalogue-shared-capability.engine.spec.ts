@@ -198,7 +198,7 @@ for (const viewport of [{ width: 1280, height: 800 }, { width: 390, height: 844 
     const flagged = page.getByTestId('source-links-flagged');
     // Closed by default, with the counts showing; the group opens on demand.
     await expect(page.getByTestId('source-links-counts')).toContainText('Gone');
-    await page.getByTestId('source-links-group-gone').locator('summary').click();
+    await page.getByTestId('source-links-group-gone').locator(':scope > summary').click();
     await expect(flagged).toContainText(goneUrl);
     await expect(flagged).toContainText('The site answered 404.');
     await expect(flagged).toContainText('The vendor describes a page that has gone.');
@@ -518,7 +518,7 @@ for (const viewport of [{ width: 1280, height: 800 }, { width: 390, height: 844 
     await expect(counts).toContainText('Gone');
     const moved = page.getByTestId('source-links-group-moved');
     await expect(moved.getByText(movedUrl)).toBeHidden();
-    await moved.locator('summary').click();
+    await moved.locator(':scope > summary').click();
     const row = moved.getByTestId('source-link-row').filter({ hasText: movedUrl });
     await expect(row).toContainText('(same site)');
     expect(await page.evaluate(() => document.documentElement.scrollWidth > document.documentElement.clientWidth + 1)).toBe(false);
@@ -530,7 +530,7 @@ for (const viewport of [{ width: 1280, height: 800 }, { width: 390, height: 844 
 
     // Keep the gone link for now: it leaves the list, with who and why recorded, and can be brought back.
     const gone = page.getByTestId('source-links-group-gone');
-    await gone.locator('summary').click();
+    await gone.locator(':scope > summary').click();
     await gone.getByTestId('source-link-row').filter({ hasText: goneUrl }).getByRole('button', { name: 'Keep for now' }).click();
     await expect(page.getByRole('status').filter({ hasText: 'Kept for 30 days' })).toBeVisible();
     await expect(counts).toContainText('1 kept for now');
@@ -539,7 +539,7 @@ for (const viewport of [{ width: 1280, height: 800 }, { width: 390, height: 844 
     expect(keptRow.hidden_until).not.toBeNull();
     expect(keptRow.hidden_by_name).toBeTruthy();
     await page.getByLabel('Show kept links').check();
-    await page.getByTestId('source-links-group-gone').locator('summary').click();
+    await page.getByTestId('source-links-group-gone').locator(':scope > summary').click();
     await expect(page.getByTestId('source-link-row').filter({ hasText: goneUrl })).toContainText('Kept until');
     await page.getByTestId('source-link-row').filter({ hasText: goneUrl }).getByRole('button', { name: 'Bring back' }).click();
     await expect(page.getByRole('status').filter({ hasText: 'Brought back into the list' })).toBeVisible();
