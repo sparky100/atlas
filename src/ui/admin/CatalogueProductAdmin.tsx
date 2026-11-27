@@ -254,8 +254,8 @@ export function CatalogueProductAdmin({ productId }: { productId: string | null 
           </ul>
         </div>
       ) : (
-        <div>
-          <label htmlFor="part-of-select">Part of</label>{' '}
+        <div className={styles.partOf}>
+          <label htmlFor="part-of-select">Part of</label>
           <select id="part-of-select" value={content.partOfProductId ?? ''} onChange={(event) => { updateProduct({ partOfProductId: event.target.value === '' ? null : event.target.value }); }} data-testid="part-of-select">
             <option value="">Not part of another product</option>
             {platformChoices.map((choice) => <option key={choice.id} value={choice.id}>{choice.product} ({choice.vendor})</option>)}
