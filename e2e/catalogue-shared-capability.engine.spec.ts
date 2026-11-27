@@ -539,7 +539,9 @@ for (const viewport of [{ width: 1280, height: 800 }, { width: 390, height: 844 
     expect(keptRow.hidden_until).not.toBeNull();
     expect(keptRow.hidden_by_name).toBeTruthy();
     await page.getByLabel('Show kept links').check();
-    await page.getByTestId('source-links-group-gone').locator(':scope > summary').click();
+    const goneGroup = page.getByTestId('source-links-group-gone');
+    await expect(goneGroup).toBeAttached();
+    if (!(await goneGroup.evaluate((element) => (element as HTMLDetailsElement).open))) await goneGroup.locator(':scope > summary').click();
     await expect(page.getByTestId('source-link-row').filter({ hasText: goneUrl })).toContainText('Kept until');
     await page.getByTestId('source-link-row').filter({ hasText: goneUrl }).getByRole('button', { name: 'Bring back' }).click();
     await expect(page.getByRole('status').filter({ hasText: 'Brought back into the list' })).toBeVisible();
