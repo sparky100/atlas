@@ -19,6 +19,7 @@ import { PlatformAdminNav } from './platformAdmin/PlatformAdminNav';
 import { SampleModelPage } from './platformAdmin/SampleModelPage';
 import { SampleModelsPage } from './platformAdmin/SampleModelsPage';
 import { UnsavedChangesProvider } from './platformAdmin/unsavedChanges';
+import navStyles from '../components/ModelNav/ModelNav.module.css';
 import styles from './PlatformAdminPage.module.css';
 
 /**
@@ -47,32 +48,34 @@ export function PlatformAdminPage() {
   return (
     <div>
       <AppHeader />
-      <main className={styles.main}>
-        {loading && <Loading />}
-        {!loading && !isPlatformAdmin && <EmptyState>You don&apos;t have access to this page.</EmptyState>}
-        {!loading && isPlatformAdmin && (
-          <UnsavedChangesProvider>
+      {loading && <main className={styles.main}><Loading /></main>}
+      {!loading && !isPlatformAdmin && <main className={styles.main}><EmptyState>You don&apos;t have access to this page.</EmptyState></main>}
+      {!loading && isPlatformAdmin && (
+        <UnsavedChangesProvider>
+          <div className={navStyles.body}>
             <PlatformAdminNav />
-            <Routes>
-              <Route index element={<OverviewPage />} />
-              <Route path="capability-sets" element={<CapabilitySetsPage />} />
-              <Route path="capability-sets/versions/:mapId" element={<CapabilitySetVersionPage />} />
-              <Route path="capability-sets/drafts/:draftId" element={<CapabilitySetDraftPage />} />
-              <Route path="catalogue" element={<CataloguePage />} />
-              <Route path="catalogue/products/new" element={<CatalogueProductPage />} />
-              <Route path="catalogue/products/:productId" element={<CatalogueProductPage />} />
-              <Route path="catalogue/review" element={<CatalogueReviewPage />} />
-              <Route path="catalogue/sectors" element={<CatalogueSectorsPage />} />
-              <Route path="catalogue/sectors/:sector" element={<CatalogueSectorPage />} />
-              <Route path="catalogue/sectors/:sector/versions/:catalogueId" element={<CatalogueVersionPage />} />
-              <Route path="sample-models" element={<SampleModelsPage />} />
-              <Route path="sample-models/:slug" element={<SampleModelPage />} />
-              <Route path="llm-proxy" element={<LlmProxyPage />} />
-              <Route path="*" element={<Navigate to="/platform-admin" replace />} />
-            </Routes>
-          </UnsavedChangesProvider>
-        )}
-      </main>
+            <main className={styles.main}>
+              <Routes>
+                <Route index element={<OverviewPage />} />
+                <Route path="capability-sets" element={<CapabilitySetsPage />} />
+                <Route path="capability-sets/versions/:mapId" element={<CapabilitySetVersionPage />} />
+                <Route path="capability-sets/drafts/:draftId" element={<CapabilitySetDraftPage />} />
+                <Route path="catalogue" element={<CataloguePage />} />
+                <Route path="catalogue/products/new" element={<CatalogueProductPage />} />
+                <Route path="catalogue/products/:productId" element={<CatalogueProductPage />} />
+                <Route path="catalogue/review" element={<CatalogueReviewPage />} />
+                <Route path="catalogue/sectors" element={<CatalogueSectorsPage />} />
+                <Route path="catalogue/sectors/:sector" element={<CatalogueSectorPage />} />
+                <Route path="catalogue/sectors/:sector/versions/:catalogueId" element={<CatalogueVersionPage />} />
+                <Route path="sample-models" element={<SampleModelsPage />} />
+                <Route path="sample-models/:slug" element={<SampleModelPage />} />
+                <Route path="llm-proxy" element={<LlmProxyPage />} />
+                <Route path="*" element={<Navigate to="/platform-admin" replace />} />
+              </Routes>
+            </main>
+          </div>
+        </UnsavedChangesProvider>
+      )}
     </div>
   );
 }
