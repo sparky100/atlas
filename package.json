@@ -58,6 +58,8 @@
     "functions:bundle:catalogue-link-check": "tsx scripts/bundleCatalogueLinkCheckFunction.ts",
     "functions:bundle:catalogue-claim-check": "tsx scripts/bundleCatalogueClaimCheckFunction.ts",
     "functions:deploy:catalogue-claim-check": "pnpm functions:bundle:catalogue-claim-check && supabase functions deploy catalogue-claim-check --use-api",
+    "functions:bundle:catalogue-monthly-check": "tsx scripts/bundleCatalogueMonthlyCheckFunction.ts",
+    "functions:deploy:catalogue-monthly-check": "pnpm functions:bundle:catalogue-monthly-check && supabase functions deploy catalogue-monthly-check --use-api --no-verify-jwt",
     "functions:deploy:catalogue-link-check": "pnpm functions:bundle:catalogue-link-check && supabase functions deploy catalogue-link-check --use-api",
     "functions:bundle:review-agent": "tsx scripts/bundleReviewAgentFunction.ts",
     "functions:deploy:review-agent": "pnpm functions:bundle:review-agent && supabase functions deploy review-agent --use-api",

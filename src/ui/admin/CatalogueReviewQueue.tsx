@@ -5,6 +5,7 @@ import { listClaimsWaitingForReview, REVIEW_QUEUE_PAGE, reviewProductClaims } fr
 import { Loading } from '../components/Loading/Loading';
 import { supabase } from '../supabaseClient';
 import { CatalogueClaimChecks } from './CatalogueClaimChecks';
+import { CatalogueMonthlyCheck } from './CatalogueMonthlyCheck';
 import { CatalogueSourceLinks } from './CatalogueSourceLinks';
 import { claimDraftedText } from './catalogueShared';
 import styles from './CatalogueAdmin.module.css';
@@ -30,6 +31,8 @@ export function CatalogueReviewQueue() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
+  const [runsVersion, setRunsVersion] = useState(0);
+  const recordRun = useCallback(() => { setRunsVersion((version) => version + 1); }, []);
 
   const reload = useCallback(async () => {
     const result = await listClaimsWaitingForReview(supabase);
@@ -83,8 +86,9 @@ export function CatalogueReviewQueue() {
 
   return (
     <div className={styles.page} data-testid="catalogue-review-queue">
-      <CatalogueSourceLinks />
-      <CatalogueClaimChecks />
+      <CatalogueMonthlyCheck refreshKey={runsVersion} />
+      <CatalogueSourceLinks onRunRecorded={recordRun} />
+      <CatalogueClaimChecks onRunRecorded={recordRun} />
       {error !== '' && <p role="alert" className={styles.error}>{error}</p>}
       {notice !== '' && <p role="status">{notice}</p>}
       {error === '' && claims.length === 0 && <p>Nothing is waiting for review. Every claim in the product library has been reviewed.</p>}

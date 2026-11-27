@@ -426,3 +426,8 @@ enabled = true
 # not a Supabase JWT, so the platform must not demand one. The function checks the key itself.
 [functions.api]
 verify_jwt = false
+
+# Monthly catalogue check (docs/ADR-038): called by the database's monthly job, not by a signed-in person,
+# so there is no Supabase JWT. The function proves the caller with a secret held only in Vault.
+[functions.catalogue-monthly-check]
+verify_jwt = false

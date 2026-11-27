@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Link } from 'react-router';
 import { sourceCheckLabel, type SourceCheckRow } from '../../contracts/catalogueAdmin';
-import { checkSourceLinks, listDistinctSourceUrls, listFlaggedSourceLinks, listSourceChecks, saveSourceChecks, type FlaggedSourceLink } from '../../db/catalogueAdmin';
+import { checkSourceLinks, finishCheckRun, listDistinctSourceUrls, listFlaggedSourceLinks, listSourceChecks, saveSourceChecks, startCheckRun, type FlaggedSourceLink } from '../../db/catalogueAdmin';
 import { LINK_CHECK_MAX_URLS } from '../../tools/catalogueLinkCheck';
 import { supabase } from '../supabaseClient';
 import { formatDay, sourceCheckSentence } from './catalogueShared';
@@ -13,7 +13,7 @@ import styles from './CatalogueAdmin.module.css';
  * back as it goes, and lists every link that is not working so a person can fix
  * or replace the source. It never changes a claim or unpublishes anything.
  */
-export function CatalogueSourceLinks() {
+export function CatalogueSourceLinks({ onRunRecorded }: { onRunRecorded?: () => void } = {}) {
   const [urls, setUrls] = useState<string[]>([]);
   const [checks, setChecks] = useState<SourceCheckRow[]>([]);
   const [flagged, setFlagged] = useState<FlaggedSourceLink[]>([]);
@@ -52,20 +52,30 @@ export function CatalogueSourceLinks() {
     stopRequested.current = false;
     setRunning(true); setError(''); setNotice('');
     let done = 0;
+    let notOk = 0;
+    let outcome: 'finished' | 'stopped' | 'failed' = 'finished';
+    // The run record is best effort: a failure to record it never stops or hides the check itself.
+    const runId = await startCheckRun(supabase, 'links').catch(() => null);
     setProgress({ done, total: urls.length });
     try {
       for (let from = 0; from < urls.length; from += LINK_CHECK_MAX_URLS) {
-        if (stopped()) { setNotice(`Stopped after ${String(done)} of ${String(urls.length)} links. The results so far are saved.`); break; }
+        if (stopped()) { outcome = 'stopped'; setNotice(`Stopped after ${String(done)} of ${String(urls.length)} links. The results so far are saved.`); break; }
         const batch = urls.slice(from, from + LINK_CHECK_MAX_URLS);
         const results = await checkSourceLinks(supabase, batch);
         await saveSourceChecks(supabase, results);
+        notOk += results.filter((result) => result.result !== 'works').length;
         done += batch.length;
         setProgress({ done, total: urls.length });
       }
       if (!stopped()) setNotice(`Checked ${String(urls.length)} links.`);
     } catch (cause) {
+      outcome = 'failed';
       setError(`${cause instanceof Error ? cause.message : String(cause)} ${done > 0 ? `The ${String(done)} links checked before this are saved.` : 'Nothing was saved.'}`);
     } finally {
+      if (runId !== null) {
+        await finishCheckRun(supabase, runId, { status: outcome, linksChecked: done, claimsChecked: 0, flagged: notOk, tokens: { input: 0, output: 0 }, note: null }).catch(() => undefined);
+        onRunRecorded?.();
+      }
       try {
         const nextChecks = await listSourceChecks(supabase);
         setChecks(nextChecks);

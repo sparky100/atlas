@@ -72,6 +72,22 @@ else in this product checks platform-admin status.
    limit (1,000,000; re-checks are not counted until saved). It needs the
    `catalogue-claim-check` function deployed
    (`pnpm functions:deploy:catalogue-claim-check`) and the platform AI key set.
+   Above both, **Monthly check** has a switch, **Check source links and claims
+   every month**, which starts off. Switching it on or off records your name
+   and the date. While it is on, a database job calls the
+   `catalogue-monthly-check` function on days 1 to 3 of each month, every 30
+   minutes from 03:00 to 05:30 UTC. Each call checks a batch of 20 claims that
+   have no check from the last 25 days: links first, then the claims, with the
+   same quote rule and the same daily token limit as the buttons. Results are
+   saved as "Monthly check (switched on by <your name>)". **Latest checks**
+   lists the last five runs, by a person or by the monthly job, with links and
+   claims checked, how many need a look, and tokens used. It only flags.
+   One-off setup after the function is deployed
+   (`pnpm functions:deploy:catalogue-monthly-check`, which turns off the
+   Supabase sign-in check because the caller is the database job): store the
+   function's address in Vault as `catalogue:schedule_url`. Until it is set, or
+   while the switch is off, the job does nothing. The shared secret is created
+   by the migration inside the database and is never shown.
 4. **Withdraw or reinstate a published sample model** at
    `/platform-admin/sample-models`, with each sample's own page at
    `/platform-admin/sample-models/:slug`. A sample is withdrawn

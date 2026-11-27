@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Link } from 'react-router';
 import { claimCheckKey, claimCheckVerdictLabel, type ClaimCheckRow, type ClaimForCheck, type SourceCheckRow } from '../../contracts/catalogueAdmin';
-import { checkClaims, dismissClaimCheck, listClaimChecks, listClaimsForCheck, listSourceChecks, saveClaimChecks } from '../../db/catalogueAdmin';
+import { checkClaims, dismissClaimCheck, finishCheckRun, listClaimChecks, listClaimsForCheck, listSourceChecks, saveClaimChecks, startCheckRun } from '../../db/catalogueAdmin';
 import { CLAIM_CHECK_MAX_CLAIMS } from '../../tools/catalogueClaimCheck';
 import { supabase } from '../supabaseClient';
 import { formatDay } from './catalogueShared';
@@ -15,7 +15,7 @@ import styles from './CatalogueAdmin.module.css';
  * flags: it never edits a claim or unpublishes anything, and every result says
  * it was checked by the AI.
  */
-export function CatalogueClaimChecks() {
+export function CatalogueClaimChecks({ onRunRecorded }: { onRunRecorded?: () => void } = {}) {
   const [claims, setClaims] = useState<ClaimForCheck[]>([]);
   const [checks, setChecks] = useState<ClaimCheckRow[]>([]);
   const [linkChecks, setLinkChecks] = useState<SourceCheckRow[]>([]);
@@ -67,20 +67,35 @@ export function CatalogueClaimChecks() {
     setRunning(true); setError(''); setNotice('');
     const queue = view.due;
     let done = 0;
+    let flagged = 0;
+    const tokens = { input: 0, output: 0 };
+    let outcome: 'finished' | 'stopped' | 'failed' = 'finished';
+    let runNote: string | null = null;
+    // The run record is best effort: a failure to record it never stops or hides the check itself.
+    const runId = await startCheckRun(supabase, 'claims').catch(() => null);
     setProgress({ done, total: queue.length });
     try {
       for (let from = 0; from < queue.length; from += CLAIM_CHECK_MAX_CLAIMS) {
-        if (stopped()) { setNotice(`Stopped after ${String(done)} of ${String(queue.length)} claims. The results so far are saved.`); break; }
+        if (stopped()) { outcome = 'stopped'; setNotice(`Stopped after ${String(done)} of ${String(queue.length)} claims. The results so far are saved.`); break; }
         const batch = queue.slice(from, from + CLAIM_CHECK_MAX_CLAIMS);
         const results = await checkClaims(supabase, batch);
         await saveClaimChecks(supabase, results);
+        flagged += results.filter((result) => result.verdict !== 'supported').length;
+        tokens.input += results.reduce((sum, result) => sum + result.inputTokens, 0);
+        tokens.output += results.reduce((sum, result) => sum + result.outputTokens, 0);
         done += batch.length;
         setProgress({ done, total: queue.length });
       }
       if (!stopped()) setNotice(`Checked ${String(queue.length)} claims.`);
     } catch (cause) {
+      outcome = 'failed';
+      runNote = cause instanceof Error ? cause.message : String(cause);
       setError(`${cause instanceof Error ? cause.message : String(cause)} ${done > 0 ? `The ${String(done)} claims checked before this are saved.` : 'Nothing was saved.'}`);
     } finally {
+      if (runId !== null) {
+        await finishCheckRun(supabase, runId, { status: outcome, linksChecked: 0, claimsChecked: done, flagged, tokens, note: runNote }).catch(() => undefined);
+        onRunRecorded?.();
+      }
       try { await reload(); } catch (cause) { setError((previous) => `${previous} ${cause instanceof Error ? cause.message : String(cause)}`.trim()); }
       setRunning(false);
       setProgress(null);
