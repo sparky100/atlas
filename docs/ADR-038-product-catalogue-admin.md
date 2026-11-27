@@ -440,3 +440,21 @@ Migration `20261127040000_catalogue_link_actions_and_merges.sql`; proposal
   policy per action, server-stamped, no update or delete from the browser.
 - **No new callable function**; the stamping trigger is revoked from public, anon
   and authenticated.
+
+## Amendment: published versions record the platform (2026-11-27)
+
+(proposals/WALKTHROUGH-catalogue-platforms-step-C.md, step C1.)
+
+- `catalogue_product_revisions.part_of_name` and `component_names` are written
+  when a version is published, and frozen with it. A component's version names
+  its platform, and a platform's version names its components, as they were at
+  that moment.
+- Only products that are themselves published (newest version, not withdrawn)
+  are named, so a draft product's name is never visible to users. The result is
+  that publication order matters: publish the platform after its components, or
+  publish the component again after the platform, for the names to appear.
+- Signed-in users read the two columns like the rest of a published version
+  (names only). `atlas.catalogue_product_is_published` is a helper that is not
+  callable through the API.
+- Capability pages and decision product lists show "Part of X" and "Components:
+  ...". The Designer's context is unchanged in this step.

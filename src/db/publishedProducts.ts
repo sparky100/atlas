@@ -31,6 +31,10 @@ export interface PublishedProduct {
   approvedByName: string | null;
   approvedAt: string;
   claims: PublishedProductClaim[];
+  /** The platform this product was part of when it was published, when that platform was itself published. */
+  partOf: string | null;
+  /** The published components this platform had when it was published. */
+  components: string[];
 }
 
 /** The general capabilities that published map items for this sector and code are aligned to. */
@@ -70,8 +74,8 @@ export async function listPublishedProductsForCapability(client: Client, match: 
   const revisionIds = [...howByRevision.keys()];
   if (revisionIds.length === 0) return [];
   // Row security keeps only each product's newest, not-withdrawn revision.
-  const revisions = await queryInChunks<string, { id: string; product_id: string; revision: number; code: string; product: string; vendor: string; summary: string; published_by_name: string | null; published_at: string }>('listPublishedProductsForCapability', 'id', revisionIds, (chunk) =>
-    client.from('catalogue_product_revisions').select('id, product_id, revision, code, product, vendor, summary, published_by_name, published_at').in('id', chunk));
+  const revisions = await queryInChunks<string, { id: string; product_id: string; revision: number; code: string; product: string; vendor: string; summary: string; published_by_name: string | null; published_at: string; part_of_name: string | null; component_names: string[] }>('listPublishedProductsForCapability', 'id', revisionIds, (chunk) =>
+    client.from('catalogue_product_revisions').select('id, product_id, revision, code, product, vendor, summary, published_by_name, published_at, part_of_name, component_names').in('id', chunk));
   const claimRows = await queryInChunks<string, { revision_id: string; position: number; statement: string; kind: PublishedProductClaim['kind']; source_url: string; source_date: string; reviewed_by: string; reviewed_at: string; origin: PublishedProductClaim['origin'] }>('listPublishedProductsForCapability', 'revision_id', revisions.map((r) => r.id), (chunk) =>
     client.from('catalogue_product_revision_claims').select('revision_id, position, statement, kind, source_url, source_date, reviewed_by, reviewed_at, origin').in('revision_id', chunk).order('position', { ascending: true }));
   const claimsByRevision = new Map<string, PublishedProductClaim[]>();
@@ -84,7 +88,7 @@ export async function listPublishedProductsForCapability(client: Client, match: 
     .map((r) => ({
       revisionId: r.id, productId: r.product_id, revision: r.revision, code: r.code, product: r.product, vendor: r.vendor, summary: r.summary,
       howItSupports: howByRevision.get(r.id) ?? '', approvedByName: r.published_by_name, approvedAt: r.published_at,
-      claims: claimsByRevision.get(r.id) ?? [],
+      claims: claimsByRevision.get(r.id) ?? [], partOf: r.part_of_name, components: r.component_names,
     }))
     .sort((a, b) => a.product.localeCompare(b.product));
 }
