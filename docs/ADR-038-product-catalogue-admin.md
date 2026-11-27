@@ -476,3 +476,17 @@ Step C2 of platforms and components.
   product is saved on its own.
 - No schema change. The function only adds an optional `platform` field to its
   answer; the browser accepts answers without it.
+
+## Amendment: find the components of a platform (2026-11-27)
+
+- A saved product that is not itself a component has a "Find components"
+  button. It sends only the platform's name and vendor to the same function
+  (`catalogue-find-products`), as a second kind of request.
+- The Researcher is asked for the vendor's own list of the platform's modules.
+  Every answer is treated as being about the given platform; a module is kept
+  only when a cited page has a quoted sentence and names the platform.
+- Each kept module that is not already in the library is saved as a draft
+  component of the platform, with no capability links (a visible gap, M4) and
+  claims marked as found by the Researcher. Modules already in the library are
+  shown and left as they are.
+- No schema change. The run is recorded like any other find run.

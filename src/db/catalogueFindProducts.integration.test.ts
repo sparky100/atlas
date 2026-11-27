@@ -9,7 +9,7 @@ import { randomUUID } from 'node:crypto';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { createServiceRoleClient, createSupabaseClient, type Client } from './client';
 import { loadEnv } from './env';
-import { finishCheckRun, listCheckRuns, readCatalogueProduct, saveFoundProducts, startCheckRun } from './catalogueAdmin';
+import { finishCheckRun, listCheckRuns, readCatalogueProduct, saveFoundComponents, saveFoundProducts, startCheckRun } from './catalogueAdmin';
 import { saveCatalogueProduct } from './catalogueAdmin';
 import type { FoundProduct } from '../tools/catalogueFindProducts';
 
@@ -133,6 +133,24 @@ describe('catalogue find products, real database', () => {
     expect(low.saved[0]?.platform).toBeNull();
     const detail = await readCatalogueProduct(admin.client, low.saved[0]?.productId ?? '');
     expect(detail.content.partOfProductId ?? null).toBeNull();
+  });
+
+  it('saves found modules as draft components of a platform, with no capability links', async () => {
+    const vendor = `Compvendor ${suffix}`;
+    const platformSaved = await saveFoundProducts(admin.client, [{ ...found, product: `Compplat ${suffix}`, vendor }], link(), [], '2026-11-27');
+    const platformId = platformSaved.saved[0]?.productId ?? '';
+    savedIds.push(platformId);
+    const part = (name: string): FoundProduct => ({ ...found, product: `Compplat ${suffix} ${name}`, vendor, platform: `Compplat ${suffix}` });
+    const result = await saveFoundComponents(admin.client, platformId, [part('Alpha'), part('Beta')], [], '2026-11-27');
+    expect(result.failed).toEqual([]);
+    expect(result.saved).toHaveLength(2);
+    for (const row of result.saved) savedIds.push(row.productId);
+    const alpha = await readCatalogueProduct(admin.client, result.saved[0]?.productId ?? '');
+    expect(alpha.content.partOfProductId).toBe(platformId);
+    expect(alpha.content.capabilities).toEqual([]);
+    expect(alpha.claimReviews[0]).toMatchObject({ origin: 'researcher', reviewState: 'drafted' });
+    const platformDetail = await readCatalogueProduct(admin.client, platformId);
+    expect(platformDetail.components.map((c) => c.product).sort()).toEqual([`Compplat ${suffix} Alpha`, `Compplat ${suffix} Beta`]);
   });
 
   it('refuses a signed-in user who is not a platform admin', async () => {

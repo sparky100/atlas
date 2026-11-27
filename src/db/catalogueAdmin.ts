@@ -43,7 +43,7 @@ import {
 import { claimCheckResultSchema, type ClaimCheckResult } from '../tools/catalogueClaimCheck';
 import { proposalKey, type LinkProposal, type ProductLinkRow, type ProposalProduct, type RejectedLinkRow } from '../tools/catalogueLinkProposals';
 import { suggestPlatforms, type PlatformSuggestion } from '../tools/cataloguePlatformSuggestions';
-import { findResultSchema, foundProductContent, nameMatchKey, productCode, type FindRequest, type FindResult, type FoundProduct } from '../tools/catalogueFindProducts';
+import { findResultSchema, foundComponentContent, foundProductContent, nameMatchKey, type FindComponentsRequest, productCode, type FindRequest, type FindResult, type FoundProduct } from '../tools/catalogueFindProducts';
 import type { Client } from './client';
 import { queryInChunks } from './inFilterLimit';
 
@@ -1031,6 +1031,48 @@ export async function findProductsForCapability(client: Client, request: FindReq
   const parsed = findResultSchema.safeParse(result);
   if (!parsed.success) throw new Error('The product finder gave an answer this page does not understand.');
   return parsed.data;
+}
+
+/** Ask the product finder for the modules of one platform. It searches the web and writes nothing; new modules are saved by `saveFoundComponents`. */
+export async function findComponentsOfPlatform(client: Client, request: FindComponentsRequest): Promise<FindResult> {
+  // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment -- untyped Supabase function response
+  const { data, error } = await client.functions.invoke('catalogue-find-products', { body: request });
+  if (error) throw new Error(await functionErrorMessage(error, 'Finding components is not available right now. If it has not been deployed yet, deploy catalogue-find-products, then try again.'));
+  const result = data as { status?: string; message?: string } | null;
+  if (!result) throw new Error('The product finder gave no answer.');
+  if (result.status === 'error') throw new Error(result.message ?? 'Finding components failed.');
+  const parsed = findResultSchema.safeParse(result);
+  if (!parsed.success) throw new Error('The product finder gave an answer this page does not understand.');
+  return parsed.data;
+}
+
+/**
+ * Save each found module as a draft component of the platform, with no
+ * capability links (that gap stays visible), through the one guarded save
+ * function. The server records who saved it and when; the claims are marked as
+ * found by the Researcher. A module that fails is skipped and named.
+ */
+export async function saveFoundComponents(
+  client: Client,
+  platformId: UUID,
+  products: readonly FoundProduct[],
+  library: readonly { code: string }[],
+  today: string,
+): Promise<{ saved: { productId: UUID; product: string; vendor: string }[]; failed: { product: string; message: string }[] }> {
+  const taken = new Set(library.map((row) => row.code));
+  const saved: { productId: UUID; product: string; vendor: string }[] = [];
+  const failed: { product: string; message: string }[] = [];
+  for (const item of products) {
+    const content = foundComponentContent(item, platformId, taken, today);
+    taken.add(content.code);
+    try {
+      const result = await saveCatalogueProduct(client, null, 0, content);
+      saved.push({ productId: result.productId, product: item.product, vendor: item.vendor });
+    } catch (cause) {
+      failed.push({ product: item.product, message: cause instanceof Error ? cause.message : String(cause) });
+    }
+  }
+  return { saved, failed };
 }
 
 /** The product codes and the vendor and name of every product in the library, for the check before anything is created (rule I1). */
