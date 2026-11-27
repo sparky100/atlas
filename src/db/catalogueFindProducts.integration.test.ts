@@ -63,7 +63,7 @@ describe('catalogue find products, real database', () => {
   });
 
   it('saves a found product as a draft linked to the capability, with claims marked as found by the Researcher', async () => {
-    const result = await saveFoundProducts(admin.client, [found], link(), new Set(), '2026-11-27');
+    const result = await saveFoundProducts(admin.client, [found], link(), [], '2026-11-27');
     expect(result.failed).toEqual([]);
     const first = result.saved[0];
     if (!first) throw new Error('nothing saved');
@@ -91,8 +91,52 @@ describe('catalogue find products, real database', () => {
     expect(after.claimReviews.map((review) => review.origin).sort()).toEqual(['person', 'researcher']);
   });
 
+  it('saves a found component with its platform: one draft platform is made once and reused, a platform already in the library is reused', async () => {
+    const vendor = `Platvendor ${suffix}`;
+    const platform = `Platfam ${suffix}`;
+    const part = (name: string): FoundProduct => ({ ...found, product: `${platform} ${name}`, vendor, platform });
+    const first = await saveFoundProducts(admin.client, [part('Alpha'), part('Beta')], link(), [], '2026-11-27');
+    expect(first.failed).toEqual([]);
+    expect(first.platformsCreated).toEqual([platform]);
+    const ids = first.saved.map((row) => row.productId);
+    savedIds.push(...ids);
+    const alpha = await readCatalogueProduct(admin.client, ids[0] ?? '');
+    const beta = await readCatalogueProduct(admin.client, ids[1] ?? '');
+    expect(alpha.partOf?.product).toBe(platform);
+    expect(beta.content.partOfProductId).toBe(alpha.content.partOfProductId);
+    // The platform is a draft with no links and no claims.
+    const platformDetail = await readCatalogueProduct(admin.client, alpha.content.partOfProductId ?? '');
+    expect(platformDetail.content.capabilities).toEqual([]);
+    expect(platformDetail.content.claims).toEqual([]);
+    expect(platformDetail.publication).toBeNull();
+    savedIds.push(platformDetail.product.id);
+    // A later search finds a third component: the existing platform is reused, none is created.
+    const again = await saveFoundProducts(admin.client, [part('Gamma')], link(), [{ id: platformDetail.product.id, code: platformDetail.product.code, vendor, product: platform }], '2026-11-27');
+    expect(again.platformsCreated).toEqual([]);
+    const gamma = await readCatalogueProduct(admin.client, again.saved[0]?.productId ?? '');
+    savedIds.push(again.saved[0]?.productId ?? '');
+    expect(gamma.content.partOfProductId).toBe(platformDetail.product.id);
+  });
+
+  it('saves the product on its own when the named platform is itself a component', async () => {
+    const vendor = `Nestvendor ${suffix}`;
+    const top = await saveFoundProducts(admin.client, [{ ...found, product: `Nesttop ${suffix}`, vendor }], link(), [], '2026-11-27');
+    const topId = top.saved[0]?.productId ?? '';
+    savedIds.push(topId);
+    const mid = await saveFoundProducts(admin.client, [{ ...found, product: `Nestmid ${suffix}`, vendor, platform: `Nesttop ${suffix}` }], link(), [{ id: topId, code: 'x', vendor, product: `Nesttop ${suffix}` }], '2026-11-27');
+    expect(mid.failed).toEqual([]);
+    savedIds.push(mid.saved[0]?.productId ?? '');
+    // Nestmid is now a component of Nesttop. A product naming Nestmid as its platform cannot nest one more level.
+    const low = await saveFoundProducts(admin.client, [{ ...found, product: `Nestlow ${suffix}`, vendor, platform: `Nestmid ${suffix}` }], link(), [{ id: mid.saved[0]?.productId ?? '', code: 'y', vendor, product: `Nestmid ${suffix}` }], '2026-11-27');
+    expect(low.failed).toEqual([]);
+    savedIds.push(low.saved[0]?.productId ?? '');
+    expect(low.saved[0]?.platform).toBeNull();
+    const detail = await readCatalogueProduct(admin.client, low.saved[0]?.productId ?? '');
+    expect(detail.content.partOfProductId ?? null).toBeNull();
+  });
+
   it('refuses a signed-in user who is not a platform admin', async () => {
-    const result = await saveFoundProducts(outside.client, [{ ...found, product: `Other ${suffix}` }], link(), new Set(), '2026-11-27');
+    const result = await saveFoundProducts(outside.client, [{ ...found, product: `Other ${suffix}` }], link(), [], '2026-11-27');
     expect(result.saved).toEqual([]);
     expect(result.failed).toHaveLength(1);
     await expect(startCheckRun(outside.client, 'find')).rejects.toThrow();

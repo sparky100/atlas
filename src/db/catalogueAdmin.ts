@@ -43,7 +43,7 @@ import {
 import { claimCheckResultSchema, type ClaimCheckResult } from '../tools/catalogueClaimCheck';
 import { proposalKey, type LinkProposal, type ProductLinkRow, type ProposalProduct, type RejectedLinkRow } from '../tools/catalogueLinkProposals';
 import { suggestPlatforms, type PlatformSuggestion } from '../tools/cataloguePlatformSuggestions';
-import { findResultSchema, foundProductContent, productCode, type FindRequest, type FindResult, type FoundProduct } from '../tools/catalogueFindProducts';
+import { findResultSchema, foundProductContent, nameMatchKey, productCode, type FindRequest, type FindResult, type FoundProduct } from '../tools/catalogueFindProducts';
 import type { Client } from './client';
 import { queryInChunks } from './inFilterLimit';
 
@@ -646,6 +646,19 @@ export async function rejectPlatformSuggestion(client: Client, platformKey: stri
  * Each component is saved through the guarded save, so the server records who
  * and when.
  */
+/** A draft platform with no links and no claims: its components carry the capabilities, and it needs a sourced description before it can be published. */
+async function createDraftPlatform(client: Client, vendor: string, name: string, taken: ReadonlySet<string>): Promise<UUID> {
+  const saved = await saveCatalogueProduct(client, null, 0, {
+    code: productCode(vendor, name, taken),
+    product: name,
+    vendor,
+    summary: `The platform that groups ${vendor}'s ${name} products. Capabilities are linked on its components. It needs a sourced description before it can be published.`,
+    capabilities: [],
+    claims: [],
+  });
+  return saved.productId;
+}
+
 export async function acceptPlatformSuggestion(
   client: Client,
   suggestion: PlatformSuggestion,
@@ -656,15 +669,7 @@ export async function acceptPlatformSuggestion(
   let created = false;
   if (platformId === null) {
     const taken = new Set((await listCatalogueProducts(client)).map((row) => row.code));
-    const saved = await saveCatalogueProduct(client, null, 0, {
-      code: productCode(suggestion.vendor, suggestion.platformName, taken),
-      product: suggestion.platformName,
-      vendor: suggestion.vendor,
-      summary: `The platform that groups ${suggestion.vendor}'s ${suggestion.platformName} products. Capabilities are linked on its components. It needs a sourced description before it can be published.`,
-      capabilities: [],
-      claims: [],
-    });
-    platformId = saved.productId;
+    platformId = await createDraftPlatform(client, suggestion.vendor, suggestion.platformName, taken);
     created = true;
   }
   let linked = 0;
@@ -1048,23 +1053,55 @@ export async function saveFoundProducts(
   client: Client,
   products: readonly FoundProduct[],
   link: { capabilityMapId: UUID; capabilityCode: string; capabilityName: string },
-  takenCodes: ReadonlySet<string>,
+  library: readonly { id: string; code: string; vendor: string; product: string }[],
   today: string,
-): Promise<{ saved: { productId: UUID; product: string; vendor: string }[]; failed: { product: string; message: string }[] }> {
-  const taken = new Set(takenCodes);
-  const saved: { productId: UUID; product: string; vendor: string }[] = [];
+): Promise<{ saved: { productId: UUID; product: string; vendor: string; platform: string | null }[]; failed: { product: string; message: string }[]; platformsCreated: string[] }> {
+  const taken = new Set(library.map((row) => row.code));
+  const saved: { productId: UUID; product: string; vendor: string; platform: string | null }[] = [];
   const failed: { product: string; message: string }[] = [];
+  const platformsCreated: string[] = [];
+  const platformIds = new Map<string, UUID>();
+  const foundKeys = new Set(products.map((item) => nameMatchKey(item.vendor, item.product)));
   for (const item of products) {
-    const content = foundProductContent(item, link, taken, today);
+    // A platform the page named: reuse the library product of that name, or make a draft. Never when the platform is itself one of these new products.
+    let platformId: UUID | undefined;
+    const platformName = (item.platform ?? '').trim();
+    if (platformName !== '') {
+      const key = nameMatchKey(item.vendor, platformName);
+      platformId = platformIds.get(key);
+      if (platformId === undefined && !foundKeys.has(key)) {
+        const existing = library.find((row) => nameMatchKey(row.vendor, row.product) === key);
+        try {
+          if (existing !== undefined) platformId = existing.id;
+          else {
+            platformId = await createDraftPlatform(client, item.vendor, platformName, taken);
+            platformsCreated.push(platformName);
+          }
+          platformIds.set(key, platformId);
+          taken.add(productCode(item.vendor, platformName, taken));
+        } catch {
+          platformId = undefined;
+        }
+      }
+    }
+    const content = foundProductContent(item, link, taken, today, platformId);
     taken.add(content.code);
     try {
-      const result = await saveCatalogueProduct(client, null, 0, content);
-      saved.push({ productId: result.productId, product: item.product, vendor: item.vendor });
+      let result;
+      try {
+        result = await saveCatalogueProduct(client, null, 0, content);
+      } catch (cause) {
+        // The library's own product is itself a component, so it cannot be a platform. Save the product on its own.
+        if (platformId === undefined) throw cause;
+        platformId = undefined;
+        result = await saveCatalogueProduct(client, null, 0, foundProductContent(item, link, taken, today));
+      }
+      saved.push({ productId: result.productId, product: item.product, vendor: item.vendor, platform: platformId === undefined ? null : platformName });
     } catch (cause) {
       failed.push({ product: item.product, message: cause instanceof Error ? cause.message : String(cause) });
     }
   }
-  return { saved, failed };
+  return { saved, failed, platformsCreated };
 }
 
 /** Everything the link proposals are worked out from: the library's products, every capability link they have, and the pairs a person rejected. Read in pages of 1,000 rows. */

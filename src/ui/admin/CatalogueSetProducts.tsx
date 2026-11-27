@@ -173,7 +173,7 @@ export function CatalogueSetProducts({ onRunRecorded, onChanged }: { onRunRecord
           tokens.input += result.inputTokens; tokens.output += result.outputTokens; searches += result.searches;
           const library = await listLibraryProductKeys(supabase);
           const split = splitByLibrary(result.found, library.map((row) => ({ id: row.id, vendor: row.vendor, product: row.product })));
-          const saving = await saveFoundProducts(supabase, split.added, { capabilityMapId: set.id, capabilityCode: capability.code, capabilityName: capability.name }, new Set(library.map((row) => row.code)), new Date().toISOString().slice(0, 10));
+          const saving = await saveFoundProducts(supabase, split.added, { capabilityMapId: set.id, capabilityCode: capability.code, capabilityName: capability.name }, library, new Date().toISOString().slice(0, 10));
           savedTotal += saving.saved.length;
           for (const row of split.existing) {
             const proposal = proposalFromFound(row, capability, set, links, rejected);
