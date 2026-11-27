@@ -254,3 +254,5 @@ See `supabase/migrations/20260917030000_platform_admin.sql` and
 full SQL and reasoning.
 
 **Find and platforms.** When a found product's source page says it is part of a larger platform, the draft is saved as a component of that platform. A platform that is not in the library is added as a draft with no description yet; write and source its description before publishing it.
+
+**Find components.** On a platform's product page, "Find components of X" searches the public web for the vendor's list of its modules. Modules whose source page quotes a sentence and names the platform are added as draft components with no capability links; link them and review their claims before publishing. Modules already in the library are left as they are.

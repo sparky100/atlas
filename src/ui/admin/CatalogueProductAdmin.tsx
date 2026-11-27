@@ -27,6 +27,7 @@ import { Loading } from '../components/Loading/Loading';
 import { Text } from '../components/Text/Text';
 import { useUnsavedChanges } from '../routes/platformAdmin/unsavedChanges';
 import { supabase } from '../supabaseClient';
+import { CatalogueFindComponents } from './CatalogueFindComponents';
 import { claimCheckSentence, claimStatusText, emptyProduct, isGeneralCapabilityCode, publicationStatusText, sameClaimText, sectorLabel, setLabel, sourceCheckSentence } from './catalogueShared';
 import styles from './CatalogueAdmin.module.css';
 
@@ -264,6 +265,14 @@ export function CatalogueProductAdmin({ productId }: { productId: string | null 
       )}
       {(detail?.components.length ?? 0) === 0 && detail?.partOf != null && content.partOfProductId === detail.partOf.id && (
         <p data-testid="part-of-note">A component of <Link to={`${BASE}/products/${detail.partOf.id}`}>{detail.partOf.product}</Link>.</p>
+      )}
+
+      {detail !== null && detail.partOf === null && (
+        <CatalogueFindComponents
+          platform={{ id: detail.product.id, product: detail.product.product, vendor: detail.product.vendor }}
+          disabled={dirty || busy}
+          onChanged={() => { void readCatalogueProduct(supabase, detail.product.id).then((next) => { setDetail(next); setContent(next.content); }, () => undefined); }}
+        />
       )}
 
       <h2>Capability links ({content.capabilities.length + (content.generalCapabilities ?? []).length})</h2>

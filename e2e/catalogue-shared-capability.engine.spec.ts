@@ -362,6 +362,60 @@ for (const viewport of [{ width: 1280, height: 800 }, { width: 390, height: 844 
   });
 }
 
+/**
+ * Find components of a platform. The function answer is faked (a mocked AI shows nothing about AI quality); the library check,
+ * saving components as drafts under the platform with no capability links, and the run record are real.
+ */
+for (const viewport of [{ width: 1280, height: 800 }, { width: 390, height: 844 }]) {
+  test(`an admin finds the components of a platform and they arrive as drafts under it at ${String(viewport.width)}`, async ({ page }) => {
+    await page.setViewportSize(viewport);
+    const service = createServiceRoleClient(loadEnv());
+    const tag = randomUUID().replace(/[^a-f]/g, '').padEnd(6, 'q').slice(0, 6) + (viewport.width === 1280 ? 'big' : 'small');
+    const vendor = `Compvend ${tag}`;
+    const platformName = `Compplat ${tag}`;
+    const zero = '00000000-0000-0000-0000-000000000000';
+    const inserted: { data: { id: string } | null; error: { message: string } | null } = await service.from('catalogue_products').insert({ code: `compplat-${tag.toLowerCase()}`, product: platformName, vendor, summary: 'A platform.', created_by: zero, updated_by: zero }).select('id').single();
+    if (inserted.error || !inserted.data) throw new Error(`components seed: ${inserted.error?.message ?? 'no row'}`);
+    const platformId = inserted.data.id;
+
+    let requestBody = '';
+    await page.route('**/functions/v1/catalogue-find-products', async (route) => {
+      const cors = { 'access-control-allow-origin': '*', 'access-control-allow-headers': '*', 'access-control-allow-methods': 'POST, OPTIONS' };
+      if (route.request().method() === 'OPTIONS') { await route.fulfill({ status: 200, headers: cors, body: 'ok' }); return; }
+      requestBody = route.request().postData() ?? '';
+      const claim = (sentence: string) => [{ kind: 'functional', sourceUrl: 'https://example.test/modules', statement: sentence }];
+      await route.fulfill({
+        status: 200, headers: { ...cors, 'content-type': 'application/json' },
+        body: JSON.stringify({
+          status: 'ok', searches: 2, inputTokens: 3000, outputTokens: 500, model: 'test-model', note: null,
+          found: [
+            { product: `${platformName} Alpha`, vendor, summary: 'A module.', howItSupports: 'Does the first thing.', platform: platformName, claims: claim(`${vendor} lists Alpha as a module of ${platformName}.`) },
+            { product: `${platformName} Beta`, vendor, summary: 'Another module.', howItSupports: 'Does the second thing.', platform: platformName, claims: claim(`${vendor} lists Beta as a module of ${platformName}.`) },
+          ],
+          dropped: [{ product: 'Made up', vendor: 'Nobody', reason: 'The cited page does not name the platform.' }],
+        }),
+      });
+    });
+
+    await signUpAdmin(page);
+    await page.goto(`/platform-admin/catalogue/products/${platformId}`);
+    const section = page.getByTestId('find-components');
+    await expect(section.getByRole('button', { name: `Find components of ${platformName}` })).toBeEnabled();
+    await section.getByRole('button', { name: `Find components of ${platformName}` }).click();
+    const outcome = section.getByTestId('find-components-outcome');
+    await expect(outcome).toContainText('2 modules found, 0 already in the library, 2 added as drafts. 1 dropped');
+    await expect(outcome).toContainText('no capability links yet');
+    expect(JSON.parse(requestBody)).toEqual({ platformName, vendor });
+    // The platform page now lists its components, and the new drafts wait for review.
+    await expect(page.getByTestId('product-components')).toContainText(`${platformName} Alpha`);
+    await expect(page.getByTestId('product-components')).toContainText(`${platformName} Beta`);
+    expect(await page.evaluate(() => document.documentElement.scrollWidth > document.documentElement.clientWidth + 1)).toBe(false);
+    await page.screenshot({ path: `test-results/catalogue-find-components-${String(viewport.width)}.png`, fullPage: true });
+    await outcome.getByRole('link', { name: `${platformName} Alpha` }).click();
+    await expect(page.getByTestId('part-of-note')).toContainText(platformName);
+  });
+}
+
 test('finding products says so in words when web search is not switched on', async ({ page }) => {
   await page.setViewportSize({ width: 1280, height: 800 });
   const service = createServiceRoleClient(loadEnv());

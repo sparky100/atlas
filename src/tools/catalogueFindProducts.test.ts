@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { PageResponse } from './catalogueClaimCheck';
-import { parseFindAnswer, productCode, splitByLibrary, verifyCandidates, type Candidate } from './catalogueFindProducts';
+import { asComponentsOf, foundComponentContent, keepComponents, parseFindAnswer, productCode, splitByLibrary, verifyCandidates, type Candidate } from './catalogueFindProducts';
 
 const PAGE = 'Acme Meter Hub collects and validates half-hourly smart meter reads from every supplier. It runs as a hosted service.';
 
@@ -84,6 +84,27 @@ describe('verifyCandidates, platform', () => {
     expect(parseFindAnswer(raw('Acme Grid'))?.[0]?.platform).toBe('Acme Grid');
     expect(parseFindAnswer(raw(null))?.[0]?.platform).toBeNull();
     expect(parseFindAnswer(raw(42))?.[0]?.platform).toBeNull();
+  });
+});
+
+describe('find components of a platform', () => {
+  const PAGE_BOTH = `${PAGE} Meter Hub is a module of the Acme Grid platform.`;
+  it('treats every answer as being about the given platform, whatever the model wrote', () => {
+    expect(asComponentsOf([candidate({ platform: 'Other' }), candidate({ platform: null })], 'Acme Grid').map((c) => c.platform)).toEqual(['Acme Grid', 'Acme Grid']);
+  });
+  it('keeps only modules whose page names the platform and says why the others are dropped', async () => {
+    const named = await verifyCandidates(asComponentsOf([candidate()], 'Acme Grid'), deps({ 'https://acme.example/hub': PAGE_BOTH }));
+    expect(keepComponents(named).found).toHaveLength(1);
+    const unnamed = await verifyCandidates(asComponentsOf([candidate()], 'Acme Grid'), deps({ 'https://acme.example/hub': PAGE }));
+    const kept = keepComponents(unnamed);
+    expect(kept.found).toHaveLength(0);
+    expect(kept.dropped[0]?.reason).toContain('does not name the platform');
+  });
+  it('makes a draft component with no capability links, part of the platform, marked as found by the Researcher', () => {
+    const content = foundComponentContent({ product: 'Meter Hub', vendor: 'Acme', summary: 'S.', howItSupports: 'H.', platform: 'Acme Grid', claims: [{ kind: 'functional', sourceUrl: 'https://acme.example/hub', statement: 'Acme Meter Hub is a module.' }] }, 'platform-id', new Set(), '2026-11-27');
+    expect(content.capabilities).toEqual([]);
+    expect(content.partOfProductId).toBe('platform-id');
+    expect(content.claims[0]?.origin).toBe('researcher');
   });
 });
 

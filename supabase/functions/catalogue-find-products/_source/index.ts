@@ -23,7 +23,7 @@ import { corsHeaders } from '../../_shared/cors.ts';
 import type { PageResponse } from '../../../../src/tools/catalogueClaimCheck.ts';
 import {
   FIND_DAILY_TOKEN_LIMIT, FIND_DEFAULT_MODEL, FIND_MAX_SEARCHES, FIND_SYSTEM, FIND_WEB_SEARCH_TOOL,
-  findRequestSchema, findUserMessage, parseFindAnswer, verifyCandidates,
+  FIND_COMPONENTS_SYSTEM, asComponentsOf, findComponentsRequestSchema, findComponentsUserMessage, findRequestSchema, findUserMessage, keepComponents, parseFindAnswer, verifyCandidates,
 } from '../../../../src/tools/catalogueFindProducts.ts';
 
 const ANTHROPIC_API_URL = 'https://api.anthropic.com/v1/messages';
@@ -122,7 +122,7 @@ interface ProviderReply {
 class WebSearchOff extends Error {}
 
 /** Ask the model to search and answer, continuing a paused turn a few times. */
-async function search(apiKey: string, model: string, user: string): Promise<{ text: string; inputTokens: number; outputTokens: number; searches: number }> {
+async function search(apiKey: string, model: string, system: string, user: string): Promise<{ text: string; inputTokens: number; outputTokens: number; searches: number }> {
   const messages: { role: string; content: unknown }[] = [{ role: 'user', content: user }];
   let inputTokens = 0;
   let outputTokens = 0;
@@ -132,7 +132,7 @@ async function search(apiKey: string, model: string, user: string): Promise<{ te
       method: 'POST',
       headers: { 'content-type': 'application/json', 'x-api-key': apiKey, 'anthropic-version': ANTHROPIC_VERSION },
       body: JSON.stringify({
-        model, max_tokens: 8000, system: FIND_SYSTEM, messages,
+        model, max_tokens: 8000, system, messages,
         tools: [{ type: FIND_WEB_SEARCH_TOOL, name: 'web_search', max_uses: FIND_MAX_SEARCHES }],
         output_config: { effort: 'low' },
       }),
@@ -172,8 +172,13 @@ Deno.serve(async (req: Request) => {
 
   let body: unknown;
   try { body = await req.json(); } catch { return jsonResponse({ status: 'error', message: 'Invalid JSON.' }, 400); }
-  const parsed = findRequestSchema.safeParse(body);
-  if (!parsed.success) return jsonResponse({ status: 'error', message: 'Send the capability name, its definition and the sector.' }, 400);
+  const parsedCapability = findRequestSchema.safeParse(body);
+  const parsedComponents = parsedCapability.success ? null : findComponentsRequestSchema.safeParse(body);
+  const capabilityRequest = parsedCapability.success ? parsedCapability.data : null;
+  const componentsRequest = parsedComponents?.success === true ? parsedComponents.data : null;
+  if (capabilityRequest === null && componentsRequest === null) {
+    return jsonResponse({ status: 'error', message: 'Send the capability name, its definition and the sector, or a platform name and its vendor.' }, 400);
+  }
 
   // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment -- Deno runtime, no shared type-checking with src/.
   const supabase = createClient(supabaseUrl, supabaseAnonKey, { global: { headers: { Authorization: authHeader } } });
@@ -195,7 +200,9 @@ Deno.serve(async (req: Request) => {
     const model = Deno.env.get('CATALOGUE_FIND_MODEL') || FIND_DEFAULT_MODEL;
     let answer: Awaited<ReturnType<typeof search>>;
     try {
-      answer = await search(apiKey, model, findUserMessage(parsed.data));
+      answer = capabilityRequest !== null
+        ? await search(apiKey, model, FIND_SYSTEM, findUserMessage(capabilityRequest))
+        : await search(apiKey, model, FIND_COMPONENTS_SYSTEM, findComponentsUserMessage(componentsRequest as NonNullable<typeof componentsRequest>));
     } catch (cause) {
       if (cause instanceof WebSearchOff) return jsonResponse({ status: 'error', code: 'web_search_off', message: 'Web search is not switched on for the platform AI account. Nothing was searched.' }, 503);
       return jsonResponse({ status: 'error', message: 'The AI could not be reached, so no products were found.' }, 502);
@@ -204,7 +211,10 @@ Deno.serve(async (req: Request) => {
     if (candidates === null) {
       return jsonResponse({ status: 'ok', found: [], dropped: [], searches: answer.searches, inputTokens: answer.inputTokens, outputTokens: answer.outputTokens, model, note: "The AI's answer could not be read." }, 200);
     }
-    const { found, dropped } = await verifyCandidates(candidates, { resolve: resolveHost, getPage });
+    const verified = componentsRequest === null
+      ? await verifyCandidates(candidates, { resolve: resolveHost, getPage })
+      : keepComponents(await verifyCandidates(asComponentsOf(candidates, componentsRequest.platformName), { resolve: resolveHost, getPage }));
+    const { found, dropped } = verified;
     return jsonResponse({ status: 'ok', found, dropped, searches: answer.searches, inputTokens: answer.inputTokens, outputTokens: answer.outputTokens, model, note: null }, 200);
   } catch {
     return jsonResponse({ status: 'error', message: 'Finding products failed.' }, 500);
