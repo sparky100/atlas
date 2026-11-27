@@ -594,3 +594,57 @@ for (const viewport of [{ width: 1280, height: 800 }, { width: 390, height: 844 
     await page.screenshot({ path: `test-results/catalogue-duplicates-${String(viewport.width)}.png`, fullPage: true });
   });
 }
+
+for (const viewport of [{ width: 1280, height: 900 }, { width: 390, height: 844 }]) {
+  test(`an admin names a platform for a product and sees its components at ${String(viewport.width)}`, async ({ page }) => {
+    await page.setViewportSize(viewport);
+    const service = createServiceRoleClient(loadEnv());
+    const suffix = randomUUID().slice(0, 8).replace(/[0-9]/g, (digit) => String.fromCharCode(103 + Number(digit)));
+    const zero = '00000000-0000-0000-0000-000000000000';
+    const vendor = `Platvendor ${suffix}`;
+    const make = async (code: string, product: string, partOf: string | null): Promise<string> => {
+      const made: { data: { id: string } | null; error: { message: string } | null } = await service.from('catalogue_products').insert({
+        code: `${code}-${suffix}`, product, vendor, summary: 'Used by the platform test.', part_of_product_id: partOf, created_by: zero, updated_by: zero,
+      }).select('id').single();
+      if (made.error || !made.data) throw new Error(`platform seed: ${made.error?.message ?? 'no row'}`);
+      return made.data.id;
+    };
+    const platformId = await make('plat', `Gridsuite ${suffix}`, null);
+    const knownPart = await make('known', `Gridsuite ${suffix} Network`, platformId);
+    const looseId = await make('loose', `Gridsuite ${suffix} Billing`, null);
+
+    await signUpAdmin(page);
+    // The platform and its own component are not offered as a possible duplicate; the loose product is.
+    await page.goto('/platform-admin/catalogue/review');
+    await page.getByTestId('duplicates').getByTestId('duplicate-pairs').locator('summary').click();
+    const pairs = page.getByTestId('duplicate-pair').filter({ hasText: vendor });
+    await expect(pairs.filter({ hasText: `Gridsuite ${suffix} Billing` })).toHaveCount(1);
+    await expect(pairs.filter({ hasText: `Gridsuite ${suffix} Network` })).toHaveCount(0);
+
+    // The product list says which is the platform and which is a component.
+    await page.goto('/platform-admin/catalogue');
+    await page.getByLabel('Find a product').fill(suffix);
+    await expect(page.getByTestId('platform-tag')).toContainText('platform with 1 component');
+    await expect(page.getByTestId('component-tag')).toContainText(`part of Gridsuite ${suffix}`);
+
+    // The platform page lists its components and offers no "Part of" choice.
+    await page.goto(`/platform-admin/catalogue/products/${platformId}`);
+    await expect(page.getByTestId('product-components')).toContainText(`Gridsuite ${suffix} Network`);
+    await expect(page.getByTestId('part-of-select')).toHaveCount(0);
+
+    // A loose product is named as a component in the editor, and the choice is saved.
+    await page.goto(`/platform-admin/catalogue/products/${looseId}`);
+    const select = page.getByTestId('part-of-select');
+    await expect(select.locator('option', { hasText: `Gridsuite ${suffix} (${vendor})` })).toHaveCount(1);
+    await expect(select.locator('option', { hasText: `Gridsuite ${suffix} Network` })).toHaveCount(0);
+    await select.selectOption(platformId);
+    await page.getByRole('button', { name: 'Save product' }).click();
+    await expect(page.getByRole('status').filter({ hasText: 'Product saved' })).toBeVisible();
+    await expect(page.getByTestId('part-of-note')).toContainText(`Gridsuite ${suffix}`);
+    const saved = await service.from('catalogue_products').select('part_of_product_id').eq('id', looseId).single();
+    expect((saved.data as { part_of_product_id: string | null }).part_of_product_id).toBe(platformId);
+    expect(knownPart).not.toBe(looseId);
+    expect(await page.evaluate(() => document.documentElement.scrollWidth > document.documentElement.clientWidth + 1)).toBe(false);
+    await page.screenshot({ path: `test-results/catalogue-platform-${String(viewport.width)}.png`, fullPage: true });
+  });
+}

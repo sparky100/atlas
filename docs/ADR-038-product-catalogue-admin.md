@@ -400,3 +400,23 @@ Migration `20261127040000_catalogue_link_actions_and_merges.sql`; proposal
   without the vendor's own name in front as the same product.
 - **No new callable function**; both triggers are revoked from public, anon and
   authenticated.
+
+## Amendment: platforms and components (2026-11-27)
+
+(proposals/PROPOSAL-catalogue-platforms-and-components.md, step A.)
+
+- **Part of.** `catalogue_products.part_of_product_id` points at another library
+  product. One level only: a trigger refuses a product that is part of itself, a
+  component of a component, and a platform that has components becoming a
+  component. Delete is restricted. No new element type: a platform is a product in
+  the library, and capability links stay on its components (model rule M3).
+- **Saving.** `save_catalogue_product` sets it. A save that does not mention
+  `partOfProductId` leaves it as it was; null clears it, so older callers cannot
+  clear it by accident.
+- **Publishing.** A platform with at least one component may be published with no
+  capability links of its own. It still needs its own sourced, reviewed claims.
+  Published revisions do not yet record the component list (step C).
+- **Duplicates.** A platform and one of its own components are not offered as a
+  possible duplicate pair.
+- **No new callable function**; the trigger function is revoked from public, anon
+  and authenticated.

@@ -74,3 +74,15 @@
   .rowActions { flex-direction: column; }
   .rowActions button, .replaceForm button { width: 100%; }
 }
+
+/* The "Part of" choice lists product and vendor names, which can be long: keep it inside the page on a phone. */
+.partOf {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  max-width: 100%;
+}
+.partOf select {
+  max-width: 100%;
+  min-width: 0;
+}

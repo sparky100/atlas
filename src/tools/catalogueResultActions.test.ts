@@ -54,6 +54,17 @@ describe('possible duplicates', () => {
     expect(pairs).toHaveLength(1);
     expect(pairs[0]?.how).toBe('contains');
   });
+  it('does not list a platform and its own component as a pair', () => {
+    const pairs = duplicateCandidates([
+      { id: '1', product: 'ArcGIS', vendor: 'Esri' },
+      { id: '2', product: 'ArcGIS Utility Network', vendor: 'Esri', partOfProductId: '1' },
+    ]);
+    expect(pairs).toEqual([]);
+    expect(duplicateCandidates([
+      { id: '1', product: 'ArcGIS', vendor: 'Esri' },
+      { id: '2', product: 'ArcGIS Utility Network', vendor: 'Esri' },
+    ])).toHaveLength(1);
+  });
   it('lets Find products see the prefixed name as the product already in the library', () => {
     const split = splitByLibrary([{ vendor: 'Esri', product: 'ArcGIS Utility Network' }], [{ id: 'lib', vendor: 'Esri', product: 'Esri ArcGIS Utility Network' }]);
     expect(split.existing).toEqual([{ vendor: 'Esri', product: 'ArcGIS Utility Network', productId: 'lib' }]);
