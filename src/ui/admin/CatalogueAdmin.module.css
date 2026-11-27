@@ -56,3 +56,21 @@
 .queueClaim p { margin: 0; overflow-wrap: anywhere; }
 .queueClaim small { color: var(--text-muted); }
 .queueClaim label.checkLine { display: flex; flex-direction: row; align-items: flex-start; gap: var(--space-2); }
+
+/* Collapsed results: groups of flagged links and duplicate pairs, one short row each. */
+.group { border: 1px solid var(--border-strong); border-radius: var(--radius-sm); background: var(--surface); }
+.group > summary { cursor: pointer; padding: var(--space-3); font-weight: 600; min-height: 44px; display: flex; align-items: center; }
+.group[open] > summary { border-bottom: 1px solid var(--border); }
+.groupBody { padding: var(--space-3); display: flex; flex-direction: column; gap: var(--space-3); }
+.resultRow { border-top: 1px solid var(--border); padding-top: var(--space-2); display: flex; flex-direction: column; gap: var(--space-1); }
+.resultRow:first-child { border-top: 0; padding-top: 0; }
+.resultRow p, .resultRow small { margin: 0; overflow-wrap: anywhere; }
+.resultRow small { color: var(--text-muted); }
+.rowActions { display: flex; flex-wrap: wrap; gap: var(--space-2); }
+.rowActions button, .groupBody > .rowActions button { min-height: 44px; }
+.replaceForm { display: flex; flex-wrap: wrap; gap: var(--space-2); align-items: end; }
+.replaceForm input { flex: 1 1 16rem; min-width: 0; }
+@media (max-width: 40rem) {
+  .rowActions { flex-direction: column; }
+  .rowActions button, .replaceForm button { width: 100%; }
+}

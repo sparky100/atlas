@@ -77,12 +77,16 @@ for (const viewport of [{ width: 1280, height: 800 }, { width: 390, height: 844 
     // The same claim shows in the queue, reached from the admin navigation, and is reviewed from there.
     await page.getByRole('link', { name: 'Waiting for review' }).click();
     await expect(page.getByRole('heading', { name: 'Waiting for review' })).toBeVisible();
-    const section = page.getByRole('region', { name: `Review test ${suffix}` });
+    const section = page.getByTestId('review-product').filter({ hasText: `Review test ${suffix}` });
+    await expect(page.getByTestId('review-counts')).toContainText('on');
+    // Each product is a closed card showing its name and how many claims wait; opening it shows the claims.
+    await expect(section.getByText('changed test product')).toBeHidden();
+    await section.locator('summary').click();
     await expect(section.getByText('changed test product')).toBeVisible();
     await expect(section.getByRole('link', { name: 'Open the source' })).toHaveAttribute('href', 'https://example.test/review');
-    await section.getByRole('button', { name: 'Mark all 1 as reviewed by me' }).click();
+    await section.getByRole('button', { name: 'Mark as reviewed by me' }).click();
     await expect(page.getByText(/marked as reviewed by you/)).toBeVisible();
-    await expect(page.getByRole('region', { name: `Review test ${suffix}` })).toHaveCount(0);
+    await expect(page.getByTestId('review-product').filter({ hasText: `Review test ${suffix}` })).toHaveCount(0);
     await page.screenshot({ path: `test-results/catalogue-review-${String(viewport.width)}.png`, fullPage: true });
   });
 }

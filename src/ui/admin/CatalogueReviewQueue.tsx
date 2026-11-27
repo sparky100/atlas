@@ -5,6 +5,7 @@ import { listClaimsWaitingForReview, REVIEW_QUEUE_PAGE, reviewProductClaims } fr
 import { Loading } from '../components/Loading/Loading';
 import { supabase } from '../supabaseClient';
 import { CatalogueClaimChecks } from './CatalogueClaimChecks';
+import { CatalogueDuplicates } from './CatalogueDuplicates';
 import { CatalogueFindProducts } from './CatalogueFindProducts';
 import { CatalogueSetProducts } from './CatalogueSetProducts';
 import { CatalogueMonthlyCheck } from './CatalogueMonthlyCheck';
@@ -35,6 +36,8 @@ export function CatalogueReviewQueue() {
   const [notice, setNotice] = useState('');
   const [runsVersion, setRunsVersion] = useState(0);
   const recordRun = useCallback(() => { setRunsVersion((version) => version + 1); }, []);
+  const [claimChecksVersion, setClaimChecksVersion] = useState(0);
+  const [query, setQuery] = useState('');
 
   const reload = useCallback(async () => {
     const result = await listClaimsWaitingForReview(supabase);
@@ -59,6 +62,11 @@ export function CatalogueReviewQueue() {
     }
     return [...byProduct.values()];
   }, [claims]);
+
+  const shown = useMemo(() => {
+    const needle = query.trim().toLowerCase();
+    return needle === '' ? groups : groups.filter((group) => `${group.productName} ${group.vendor}`.toLowerCase().includes(needle));
+  }, [groups, query]);
 
   const toggle = (claimId: string, on: boolean) => {
     setChosen((current) => {
@@ -89,47 +97,64 @@ export function CatalogueReviewQueue() {
   return (
     <div className={styles.page} data-testid="catalogue-review-queue">
       <CatalogueMonthlyCheck refreshKey={runsVersion} />
-      <CatalogueSourceLinks onRunRecorded={recordRun} />
-      <CatalogueClaimChecks onRunRecorded={recordRun} />
+      <CatalogueSourceLinks onRunRecorded={recordRun} onClaimsChecked={() => { setClaimChecksVersion((version) => version + 1); }} />
+      <CatalogueClaimChecks key={claimChecksVersion} onRunRecorded={recordRun} />
       <CatalogueFindProducts onRunRecorded={() => { recordRun(); void reload().catch(() => undefined); }} />
       <CatalogueSetProducts onRunRecorded={recordRun} onChanged={() => { void reload().catch(() => undefined); }} />
+      <CatalogueDuplicates onChanged={() => { void reload().catch(() => undefined); }} />
       {error !== '' && <p role="alert" className={styles.error}>{error}</p>}
       {notice !== '' && <p role="status">{notice}</p>}
       {error === '' && claims.length === 0 && <p>Nothing is waiting for review. Every claim in the product library has been reviewed.</p>}
       {total > REVIEW_QUEUE_PAGE && <p role="status">Showing the first {String(REVIEW_QUEUE_PAGE)} of {String(total)} claims waiting. Review these and the rest will appear.</p>}
+      {claims.length > 0 && (
+        <div className={styles.controls}>
+          <p data-testid="review-counts">
+            {String(claims.length)} claim{claims.length === 1 ? '' : 's'} on {String(groups.length)} product{groups.length === 1 ? '' : 's'}:
+            {' '}{([{ origin: 'imported', label: 'loaded from a file' }, { origin: 'researcher', label: 'found by the Researcher' }, { origin: 'person', label: 'entered by a person' }] as const)
+              .map(({ origin, label }) => ({ label, count: claims.filter((claim) => claim.origin === origin).length }))
+              .filter((row) => row.count > 0).map((row) => `${String(row.count)} ${row.label}`).join(', ')}.
+          </p>
+          <label>Search products or vendors
+            <input type="search" value={query} onChange={(event) => { setQuery(event.target.value); }} />
+          </label>
+        </div>
+      )}
       <div className={styles.queue}>
-        {groups.map((group) => {
+        {shown.map((group) => {
           const picked = group.claims.filter((claim) => chosen.has(claim.claimId)).map((claim) => claim.claimId);
           return (
-            <section key={group.productId} className={styles.queueProduct} aria-label={group.productName}>
-              <header>
-                <h2>{group.productName} <small>{group.vendor}</small></h2>
+            <details key={`${group.productId}-${query === '' ? 'closed' : 'open'}`} className={styles.group} open={query !== ''} aria-label={group.productName} data-testid="review-product">
+              <summary>{group.productName}&nbsp;<small>{group.vendor} · {String(group.claims.length)} claim{group.claims.length === 1 ? '' : 's'}</small></summary>
+              <div className={styles.groupBody}>
                 <Link to={`/platform-admin/catalogue/products/${group.productId}`}>Open product</Link>
-              </header>
-              {group.claims.map((claim) => (
-                <div key={claim.claimId} className={styles.queueClaim}>
-                  <label className={styles.checkLine}>
-                    <input type="checkbox" checked={chosen.has(claim.claimId)} onChange={(event) => { toggle(claim.claimId, event.target.checked); }} disabled={busy} />
-                    <span>
-                      <strong>{claim.kind.replaceAll('_', ' ')}</strong>: {claim.statement}
-                    </span>
-                  </label>
-                  <small>
-                    <a href={claim.sourceUrl} target="_blank" rel="noopener noreferrer">Open the source</a> · source dated {claim.sourceDate} · {claimDraftedText(claim.origin, claim.draftedByName, claim.draftedAt)}
-                  </small>
+                {group.claims.map((claim) => (
+                  <div key={claim.claimId} className={styles.queueClaim}>
+                    <label className={styles.checkLine}>
+                      <input type="checkbox" checked={chosen.has(claim.claimId)} onChange={(event) => { toggle(claim.claimId, event.target.checked); }} disabled={busy} />
+                      <span>
+                        <strong>{claim.kind.replaceAll('_', ' ')}</strong>: {claim.statement}
+                      </span>
+                    </label>
+                    <small>
+                      <a href={claim.sourceUrl} target="_blank" rel="noopener noreferrer">Open the source</a> · source dated {claim.sourceDate} · {claimDraftedText(claim.origin, claim.draftedByName, claim.draftedAt)}
+                    </small>
+                  </div>
+                ))}
+                <div className={styles.actions}>
+                  {group.claims.length > 1 && (
+                    <button type="button" disabled={busy || picked.length === 0} onClick={() => { void review(group, picked); }}>
+                      Mark {String(picked.length)} selected as reviewed by me
+                    </button>
+                  )}
+                  <button type="button" disabled={busy} onClick={() => { void review(group, group.claims.map((claim) => claim.claimId)); }}>
+                    {group.claims.length === 1 ? 'Mark as reviewed by me' : `Mark all ${String(group.claims.length)} as reviewed by me`}
+                  </button>
                 </div>
-              ))}
-              <div className={styles.actions}>
-                <button type="button" disabled={busy || picked.length === 0} onClick={() => { void review(group, picked); }}>
-                  Mark {String(picked.length)} selected as reviewed by me
-                </button>
-                <button type="button" disabled={busy} onClick={() => { void review(group, group.claims.map((claim) => claim.claimId)); }}>
-                  Mark all {String(group.claims.length)} as reviewed by me
-                </button>
               </div>
-            </section>
+            </details>
           );
         })}
+        {claims.length > 0 && shown.length === 0 && <p>No product matches that search.</p>}
       </div>
     </div>
   );

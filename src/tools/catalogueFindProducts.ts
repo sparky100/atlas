@@ -11,6 +11,7 @@
  */
 import { z } from 'zod';
 import { CATALOGUE_CLAIM_KINDS, containsCataloguePrice } from '../contracts/productCatalogue';
+import { productNameKey, vendorKey } from './catalogueNameKey';
 import type { CatalogueProductContent } from '../contracts/catalogueAdmin';
 import { fetchPageText, quoteIsOnPage, type ClaimCheckDeps } from './catalogueClaimCheck';
 
@@ -129,10 +130,10 @@ export async function verifyCandidates(
 }
 
 function matchKey(vendor: string, product: string): string {
-  return `${vendor.trim().toLowerCase().replace(/\s+/g, ' ')}\u0000${product.trim().toLowerCase().replace(/\s+/g, ' ')}`;
+  return `${vendorKey(vendor)}\u0000${productNameKey(vendor, product)}`;
 }
 
-/** Split found products into those already in the library (same vendor and product name, any case or spacing) and new ones (rule I1). */
+/** Split found products into those already in the library (same vendor and product name, any case or spacing, and with or without the vendor's name in front of the product name) and new ones (rule I1). */
 export function splitByLibrary<T extends { vendor: string; product: string }>(
   found: readonly T[],
   library: readonly { id: string; vendor: string; product: string }[],

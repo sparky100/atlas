@@ -272,6 +272,19 @@ export type SourceCheckInput = z.infer<typeof sourceCheckSchema>;
 export interface SourceCheckRow extends SourceCheckInput {
   checkedAt: string;
   checkedByName: string | null;
+  /** Set when a person chose to keep this link out of the list until this date (the server stamps who and when). */
+  hiddenUntil: string | null;
+  hiddenByName: string | null;
+  hiddenReason: string | null;
+}
+
+/** A product merged into another: the record only. The merged product is kept. */
+export interface ProductMergeRow {
+  mergedProductId: string;
+  keptProductId: string;
+  reason: string | null;
+  mergedByName: string | null;
+  mergedAt: string;
 }
 
 /** The plain words for a check result. */

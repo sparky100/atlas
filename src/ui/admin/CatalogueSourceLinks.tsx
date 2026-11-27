@@ -1,10 +1,10 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { Link } from 'react-router';
-import { sourceCheckLabel, type SourceCheckRow } from '../../contracts/catalogueAdmin';
+import { type SourceCheckRow } from '../../contracts/catalogueAdmin';
 import { checkSourceLinks, finishCheckRun, listDistinctSourceUrls, listFlaggedSourceLinks, listSourceChecks, saveSourceChecks, startCheckRun, type FlaggedSourceLink } from '../../db/catalogueAdmin';
 import { LINK_CHECK_MAX_URLS } from '../../tools/catalogueLinkCheck';
 import { supabase } from '../supabaseClient';
-import { formatDay, sourceCheckSentence } from './catalogueShared';
+import { CatalogueFlaggedLinks } from './CatalogueFlaggedLinks';
+import { formatDay } from './catalogueShared';
 import styles from './CatalogueAdmin.module.css';
 
 /**
@@ -13,7 +13,7 @@ import styles from './CatalogueAdmin.module.css';
  * back as it goes, and lists every link that is not working so a person can fix
  * or replace the source. It never changes a claim or unpublishes anything.
  */
-export function CatalogueSourceLinks({ onRunRecorded }: { onRunRecorded?: () => void } = {}) {
+export function CatalogueSourceLinks({ onRunRecorded, onClaimsChecked }: { onRunRecorded?: () => void; onClaimsChecked?: () => void } = {}) {
   const [urls, setUrls] = useState<string[]>([]);
   const [checks, setChecks] = useState<SourceCheckRow[]>([]);
   const [flagged, setFlagged] = useState<FlaggedSourceLink[]>([]);
@@ -47,6 +47,12 @@ export function CatalogueSourceLinks({ onRunRecorded }: { onRunRecorded?: () => 
     const latest = current.reduce<SourceCheckRow | null>((best, check) => (best === null || check.checkedAt > best.checkedAt ? check : best), null);
     return { checked: current.length, latest };
   }, [urls, checks]);
+
+  const refresh = async () => {
+    const nextChecks = await listSourceChecks(supabase);
+    setChecks(nextChecks);
+    setFlagged(await listFlaggedSourceLinks(supabase, nextChecks));
+  };
 
   const run = async () => {
     stopRequested.current = false;
@@ -112,22 +118,7 @@ export function CatalogueSourceLinks({ onRunRecorded }: { onRunRecorded?: () => 
       {notice !== '' && <p role="status">{notice}</p>}
       {error !== '' && <p role="alert" className={styles.error}>{error}</p>}
       {!loading && loadError === '' && summary.latest !== null && flagged.length === 0 && <p>Every checked link works.</p>}
-      {flagged.length > 0 && (
-        <div data-testid="source-links-flagged">
-          <h3>Source links to look at ({flagged.length})</h3>
-          {flagged.map((item) => (
-            <div key={item.check.url} className={styles.queueClaim}>
-              <p><strong>{sourceCheckLabel(item.check.result)}</strong>: <a href={item.check.url} target="_blank" rel="noopener noreferrer">{item.check.url}</a></p>
-              <small>{sourceCheckSentence(item.check)}</small>
-              {item.claims.map((claim) => (
-                <small key={`${claim.productId}-${String(claim.position)}`}>
-                  <Link to={`/platform-admin/catalogue/products/${claim.productId}`}>{claim.productName}</Link> ({claim.vendor}): {claim.statement}
-                </small>
-              ))}
-            </div>
-          ))}
-        </div>
-      )}
+      {flagged.length > 0 && <CatalogueFlaggedLinks flagged={flagged} onChanged={refresh} onClaimsChecked={onClaimsChecked} />}
     </section>
   );
 }

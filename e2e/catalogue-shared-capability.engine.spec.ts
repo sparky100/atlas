@@ -196,8 +196,11 @@ for (const viewport of [{ width: 1280, height: 800 }, { width: 390, height: 844 
     await expect(page.getByTestId('source-links-summary')).toContainText('links checked');
     await expect(page.getByRole('button', { name: 'Check source links' })).toBeEnabled();
     const flagged = page.getByTestId('source-links-flagged');
+    // Closed by default, with the counts showing; the group opens on demand.
+    await expect(page.getByTestId('source-links-counts')).toContainText('Gone');
+    await page.getByTestId('source-links-group-gone').locator('summary').click();
     await expect(flagged).toContainText(goneUrl);
-    await expect(flagged).toContainText('Gone (404)');
+    await expect(flagged).toContainText('The site answered 404.');
     await expect(flagged).toContainText('The vendor describes a page that has gone.');
     await expect(flagged).not.toContainText(worksUrl);
     expect(await page.evaluate(() => document.documentElement.scrollWidth > document.documentElement.clientWidth + 1)).toBe(false);
@@ -472,5 +475,120 @@ for (const viewport of [{ width: 1280, height: 800 }, { width: 390, height: 844 
     await expect(page.getByTestId('check-runs')).toContainText('Find products for a set: 2 searches, 1 product found');
     expect(await page.evaluate(() => document.documentElement.scrollWidth > document.documentElement.clientWidth + 1)).toBe(false);
     await page.screenshot({ path: `test-results/catalogue-set-products-${String(viewport.width)}.png`, fullPage: true });
+  });
+}
+
+/** Results presentation: a moved link can be pointed at its new address, a gone link kept for now, each recorded with a name; groups are closed until opened. */
+for (const viewport of [{ width: 1280, height: 800 }, { width: 390, height: 844 }]) {
+  test(`an admin acts on moved and gone source links at ${String(viewport.width)}`, async ({ page }) => {
+    await page.setViewportSize(viewport);
+    const service = createServiceRoleClient(loadEnv());
+    const seed = randomUUID().slice(0, 8);
+    const suffix = seed.replace(/[0-9]/g, (digit) => String.fromCharCode(103 + Number(digit)));
+    const zero = '00000000-0000-0000-0000-000000000000';
+    const checked = (result: { error: { message: string } | null }) => { if (result.error) throw new Error(`link actions seed: ${result.error.message}`); };
+    const inserted: { data: { id: string } | null; error: { message: string } | null } = await service.from('catalogue_products').insert({
+      code: `link-actions-${suffix}`, product: `Link actions product ${suffix}`, vendor: `Link vendor ${suffix}`, summary: 'Used to act on source links.', created_by: zero, updated_by: zero,
+    }).select('id').single();
+    if (inserted.error || !inserted.data) throw new Error(`link actions seed: ${inserted.error?.message ?? 'no row'}`);
+    const productId = inserted.data.id;
+    const movedUrl = `https://example.test/${suffix}/old/page`;
+    const newUrl = `https://example.test/${suffix}/new/page`;
+    const goneUrl = `https://example.test/gone-${suffix}`;
+    checked(await service.from('catalogue_product_claims').insert([
+      { product_id: productId, position: 1, kind: 'functional', statement: 'The vendor describes a page that moved.', source_url: movedUrl, source_date: '2026-11-01' },
+      { product_id: productId, position: 2, kind: 'deployment', statement: 'The vendor describes a page that has gone.', source_url: goneUrl, source_date: '2026-11-01' },
+    ]));
+    checked(await service.from('catalogue_source_checks').insert([
+      { url: movedUrl, result: 'moved', http_status: 200, final_url: newUrl, checked_by: zero },
+      { url: goneUrl, result: 'gone', http_status: 404, checked_by: zero },
+    ]));
+    // The link checker is faked so the new address is checked as working; every save after it is real.
+    await page.route('**/functions/v1/catalogue-link-check', async (route) => {
+      const cors = { 'access-control-allow-origin': '*', 'access-control-allow-headers': '*', 'access-control-allow-methods': 'POST, OPTIONS' };
+      if (route.request().method() === 'OPTIONS') { await route.fulfill({ status: 200, headers: cors, body: 'ok' }); return; }
+      const urls = (JSON.parse(route.request().postData() ?? '{}') as { urls?: string[] }).urls ?? [];
+      await route.fulfill({ status: 200, headers: { ...cors, 'content-type': 'application/json' }, body: JSON.stringify({ status: 'ok', results: urls.map((url) => ({ url, result: 'works', httpStatus: 200, finalUrl: null, note: null })) }) });
+    });
+
+    await signUpAdmin(page);
+    await page.goto('/platform-admin/catalogue/review');
+    const counts = page.getByTestId('source-links-counts');
+    await expect(counts).toContainText('Moved');
+    await expect(counts).toContainText('Gone');
+    const moved = page.getByTestId('source-links-group-moved');
+    await expect(moved.getByText(movedUrl)).toBeHidden();
+    await moved.locator('summary').click();
+    const row = moved.getByTestId('source-link-row').filter({ hasText: movedUrl });
+    await expect(row).toContainText('(same site)');
+    expect(await page.evaluate(() => document.documentElement.scrollWidth > document.documentElement.clientWidth + 1)).toBe(false);
+    await row.getByRole('button', { name: 'Use the new address', exact: true }).click();
+    await expect(page.getByRole('status').filter({ hasText: 'Pointed 1 product at the new address' })).toBeVisible();
+    const claim = await service.from('catalogue_product_claims').select('source_url').eq('product_id', productId).eq('position', 1).single();
+    expect((claim.data as { source_url: string }).source_url).toBe(newUrl);
+    await expect(page.getByTestId('source-link-row').filter({ hasText: movedUrl })).toHaveCount(0);
+
+    // Keep the gone link for now: it leaves the list, with who and why recorded, and can be brought back.
+    const gone = page.getByTestId('source-links-group-gone');
+    await gone.locator('summary').click();
+    await gone.getByTestId('source-link-row').filter({ hasText: goneUrl }).getByRole('button', { name: 'Keep for now' }).click();
+    await expect(page.getByRole('status').filter({ hasText: 'Kept for 30 days' })).toBeVisible();
+    await expect(counts).toContainText('1 kept for now');
+    const kept = await service.from('catalogue_source_checks').select('hidden_until,hidden_by_name,hidden_reason').eq('url', goneUrl).single();
+    const keptRow = kept.data as { hidden_until: string | null; hidden_by_name: string | null; hidden_reason: string | null };
+    expect(keptRow.hidden_until).not.toBeNull();
+    expect(keptRow.hidden_by_name).toBeTruthy();
+    await page.getByLabel('Show kept links').check();
+    await page.getByTestId('source-links-group-gone').locator('summary').click();
+    await expect(page.getByTestId('source-link-row').filter({ hasText: goneUrl })).toContainText('Kept until');
+    await page.getByTestId('source-link-row').filter({ hasText: goneUrl }).getByRole('button', { name: 'Bring back' }).click();
+    await expect(page.getByRole('status').filter({ hasText: 'Brought back into the list' })).toBeVisible();
+    await page.screenshot({ path: `test-results/catalogue-link-actions-${String(viewport.width)}.png`, fullPage: true });
+  });
+}
+
+/** Results presentation: the same product under two names is listed as a possible duplicate, merged into the one a person keeps, recorded, and the merge can be undone. */
+for (const viewport of [{ width: 1280, height: 800 }, { width: 390, height: 844 }]) {
+  test(`an admin merges a duplicate product and undoes it at ${String(viewport.width)}`, async ({ page }) => {
+    await page.setViewportSize(viewport);
+    const service = createServiceRoleClient(loadEnv());
+    const suffix = randomUUID().slice(0, 8).replace(/[0-9]/g, (digit) => String.fromCharCode(103 + Number(digit)));
+    const zero = '00000000-0000-0000-0000-000000000000';
+    const checked = (result: { error: { message: string } | null }) => { if (result.error) throw new Error(`duplicates seed: ${result.error.message}`); };
+    const make = async (code: string, product: string): Promise<string> => {
+      const made: { data: { id: string } | null; error: { message: string } | null } = await service.from('catalogue_products').insert({
+        code: `${code}-${suffix}`, product, vendor: `Dupvendor ${suffix}`, summary: 'Used to merge duplicates.', created_by: zero, updated_by: zero,
+      }).select('id').single();
+      if (made.error || !made.data) throw new Error(`duplicates seed: ${made.error?.message ?? 'no row'}`);
+      return made.data.id;
+    };
+    const keptId = await make('dup-kept', `Network manager ${suffix}`);
+    const mergedId = await make('dup-merged', `Dupvendor ${suffix} Network manager ${suffix}`);
+    checked(await service.from('catalogue_product_claims').insert({ product_id: mergedId, position: 1, kind: 'functional', statement: 'The vendor describes the second copy of this product.', source_url: 'https://example.test/second-copy', source_date: '2026-11-01' }));
+
+    await signUpAdmin(page);
+    await page.goto('/platform-admin/catalogue/review');
+    const duplicates = page.getByTestId('duplicates');
+    await duplicates.getByTestId('duplicate-pairs').locator('summary').click();
+    const pair = duplicates.getByTestId('duplicate-pair').filter({ hasText: `Dupvendor ${suffix}` });
+    await expect(pair).toContainText('The same name once the vendor’s name is left out');
+    await pair.getByRole('button', { name: new RegExp(`^Keep Network manager ${suffix}, merge`) }).click();
+    await expect(pair).toContainText('can be restored');
+    await pair.getByRole('button', { name: 'Merge', exact: true }).click();
+    await expect(duplicates.getByRole('status').filter({ hasText: 'Merged.' })).toBeVisible();
+    expect(await page.evaluate(() => document.documentElement.scrollWidth > document.documentElement.clientWidth + 1)).toBe(false);
+
+    const record = await service.from('catalogue_product_merges').select('kept_product_id,merged_by_name').eq('merged_product_id', mergedId).single();
+    expect((record.data as { kept_product_id: string; merged_by_name: string | null }).kept_product_id).toBe(keptId);
+    expect((record.data as { merged_by_name: string | null }).merged_by_name).toBeTruthy();
+    const carried = await service.from('catalogue_product_claims').select('statement').eq('product_id', keptId);
+    expect((carried.data as { statement: string }[]).map((claim) => claim.statement)).toEqual(['The vendor describes the second copy of this product.']);
+
+    await duplicates.getByTestId('merged-products').locator('summary').click();
+    await duplicates.getByTestId('merged-row').filter({ hasText: `Dupvendor ${suffix}` }).getByRole('button', { name: 'Undo merge' }).click();
+    await expect(duplicates.getByRole('status').filter({ hasText: 'is back in the lists' })).toBeVisible();
+    const after = await service.from('catalogue_product_merges').select('merged_product_id').eq('merged_product_id', mergedId);
+    expect(after.data ?? []).toEqual([]);
+    await page.screenshot({ path: `test-results/catalogue-duplicates-${String(viewport.width)}.png`, fullPage: true });
   });
 }
