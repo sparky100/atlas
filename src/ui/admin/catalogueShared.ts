@@ -106,6 +106,10 @@ export function claimCheckSentence(check: ClaimCheckRow | undefined): string {
 
 /** One line for a run in the history: what it covered and what it found. */
 export function checkRunSentence(run: CheckRunRow): string {
+  if (run.scope === 'find') {
+    const used = run.tokens > 0 ? `, ${run.tokens.toLocaleString('en-GB')} AI tokens` : '';
+    return `Find products: ${String(run.searches)} search${run.searches === 1 ? '' : 'es'}, ${String(run.productsFound)} product${run.productsFound === 1 ? '' : 's'} found${used}.`;
+  }
   const parts: string[] = [];
   if (run.scope !== 'claims') parts.push(`${String(run.linksChecked)} link${run.linksChecked === 1 ? '' : 's'}`);
   if (run.scope !== 'links') parts.push(`${String(run.claimsChecked)} claim${run.claimsChecked === 1 ? '' : 's'}`);

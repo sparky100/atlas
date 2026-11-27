@@ -88,6 +88,22 @@ else in this product checks platform-admin status.
    function's address in Vault as `catalogue:schedule_url`. Until it is set, or
    while the switch is off, the job does nothing. The shared secret is created
    by the migration inside the database and is never shown.
+   **Find new products** (also on Waiting for review) finds products for one
+   capability. Choose a published capability set, search for and pick a
+   capability, and press **Find products for this capability**. The platform AI
+   searches the public web (at most 5 searches, 8 products) and must quote one
+   sentence from the vendor's page for every claim; the quote is verified against
+   the page, and a product with no verified claim is dropped. Products already in
+   the library (same vendor and name) are shown and not duplicated. New ones are
+   saved as drafts linked to that capability, with claims marked "Found by the
+   Researcher" and dated today; nothing is published. Only the capability's name
+   and definition, the sector and the word "product" are sent to the provider.
+   A separate daily limit of 300,000 tokens applies, and every run appears in
+   **Latest checks**. It needs the `catalogue-find-products` function deployed
+   (`pnpm functions:deploy:catalogue-find-products`), the platform AI key set, and
+   web search switched on for the platform AI account in the provider's console;
+   otherwise the screen says so and adds nothing. The model is `CATALOGUE_FIND_MODEL`
+   (default Sonnet class).
 4. **Withdraw or reinstate a published sample model** at
    `/platform-admin/sample-models`, with each sample's own page at
    `/platform-admin/sample-models/:slug`. A sample is withdrawn

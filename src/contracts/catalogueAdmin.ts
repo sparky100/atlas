@@ -65,6 +65,8 @@ export const catalogueProductClaimSchema = z.object({
   sourceUrl: catalogueSourceUrlSchema,
   sourceDate: z.iso.date(),
   review: z.boolean().optional(),
+  /** Only "researcher" is honoured, and only for a claim that is new in the save: the claim is then marked as found by the Researcher. */
+  origin: z.literal('researcher').optional(),
 }).strict();
 export type CatalogueProductClaim = z.infer<typeof catalogueProductClaimSchema>;
 
@@ -248,6 +250,8 @@ export interface CapabilitySetItem {
   parentCode: string | null;
   level: number;
   order: number;
+  /** The capability's definition, when its set has one. */
+  description?: string | null;
 }
 
 /** Step 5a: what a check of one claim source link found. A record only; nothing here changes a claim or a revision. */
@@ -325,7 +329,7 @@ export function claimCheckKey(row: { productId: string; sourceUrl: string; state
 /** Step 5b-2: how a catalogue check run ended, and the monthly switch. */
 export const CHECK_RUN_STATUSES = ['running', 'finished', 'stopped', 'limit_reached', 'failed'] as const;
 export type CheckRunStatus = (typeof CHECK_RUN_STATUSES)[number];
-export type CheckRunScope = 'links' | 'claims' | 'both';
+export type CheckRunScope = 'links' | 'claims' | 'both' | 'find';
 
 export interface CheckRunRow {
   id: string;
@@ -338,6 +342,8 @@ export interface CheckRunRow {
   linksChecked: number;
   claimsChecked: number;
   flagged: number;
+  searches: number;
+  productsFound: number;
   tokens: number;
   note: string | null;
 }
@@ -363,5 +369,6 @@ export function checkRunScopeLabel(scope: CheckRunScope): string {
     case 'links': return 'Source links';
     case 'claims': return 'Claims';
     case 'both': return 'Links and claims';
+    case 'find': return 'Find products';
   }
 }
