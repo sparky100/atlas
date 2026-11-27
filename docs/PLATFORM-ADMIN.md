@@ -60,6 +60,20 @@ else in this product checks platform-admin status.
    never edits a claim or unpublishes a product. It needs the
    `catalogue-link-check` function deployed (`pnpm functions:deploy:catalogue-link-check`);
    until then the screen says the checker is not available.
+   Links that are not working are grouped as **Moved**, **Gone** and **Could not
+   check**, each closed until you open it, with counts and a search box. For a
+   **Moved** link you can **Use the new address** (the claims that cite it are
+   edited through the guarded save, recorded with your name; the product shows
+   "published, with changes" and its claims need review again), **Keep the old
+   address** (hides it for 90 days), or **Check the claims against it** (the AI
+   reads the new page; results appear under Claims). One button accepts all the
+   moved links that stay on the same site in one go; a move to a different site or
+   a different part of the site is only offered one at a time. For a **Gone** link
+   you can **Check again**, **Replace the address** (the new address is checked and
+   must work) or **Keep for now** (hides it for 30 days); **Could not check** has
+   **Check again** and **Keep for now**. A kept link shows who kept it and when, can
+   be brought back, and returns to the list by itself when the date passes or the
+   next check finds something different.
    Below it, **Claims against their sources** has **Check claims against their
    sources**: the AI reads each claim's page and says whether it is still
    supported, has changed, or it can't tell. It must quote a sentence from the
@@ -119,6 +133,16 @@ else in this product checks platform-admin status.
    same 300,000-token daily limit. A product the search finds that is already in
    the library becomes a proposed link, not a duplicate. The run appears in
    **Latest checks**. Nothing is published.
+   **Possible duplicates** (also on Waiting for review) lists products by the same
+   vendor whose names are the same once the vendor's name is left out ("Esri
+   ArcGIS Utility Network" and "ArcGIS Utility Network") or sit inside one another.
+   You choose which to keep; the other is **merged** into it: the links and claims
+   the kept product lacks are added to it (claims as new drafts to review), the
+   merge is recorded with your name and the date, and the merged product is left out
+   of the lists but kept. A published product must be withdrawn before it is merged,
+   and **Undo merge** brings the product back (what was added stays). Find products
+   treats the same name with or without the vendor's name in front as already in the
+   library.
 4. **Withdraw or reinstate a published sample model** at
    `/platform-admin/sample-models`, with each sample's own page at
    `/platform-admin/sample-models/:slug`. A sample is withdrawn

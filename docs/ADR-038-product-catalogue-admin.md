@@ -374,3 +374,29 @@ Migration `20261127030000_catalogue_rejected_links.sql`; walkthrough
 - **Not here.** AI-assisted matching of products to capabilities (to be added only
   if the rules miss too much).
 
+## Amendment, 27 November 2026: collapsed results, link actions and duplicate merge
+
+Migration `20261127040000_catalogue_link_actions_and_merges.sql`; proposal
+`proposals/PROPOSAL-catalogue-results-presentation.md`.
+
+- **Kept links.** `catalogue_source_checks` gains `hidden_until`, `hidden_by`,
+  `hidden_by_name`, `hidden_reason`. The stamping trigger sets who and when
+  whenever the date changes, ignores a forged name, and lifts the hide when a new
+  check finds a different result. Nothing about a claim or revision changes.
+- **Use the new address / replace the address** edit the cited claims through
+  `save_catalogue_product`, so the server records who and when, a published
+  product shows "published, with changes", and the edited claims need review again.
+- **Merges.** `catalogue_product_merges` (merged product, kept product, reason, who,
+  when). Platform admins only, one policy per action (select, insert, delete),
+  stamped by the server, no update. A product that others were merged into cannot be
+  merged away and a merged product cannot be merged into. Merging adds the kept
+  product's missing links and claims through the guarded save first (claims as new
+  drafts), then records the merge; a published product to be merged must be
+  withdrawn first. Merged products are left out of the product list, the review
+  queue, the link and claim checks and the link proposals by the browser; they still
+  count as "already in the library", under the product they were merged into, when
+  products are found. Undo deletes the record; what was added stays.
+- **Matching.** Find products and the set search treat a product name with or
+  without the vendor's own name in front as the same product.
+- **No new callable function**; both triggers are revoked from public, anon and
+  authenticated.

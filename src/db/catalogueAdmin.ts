@@ -10,6 +10,7 @@
  * switch (step 5b-2, `catalogue_check_runs`, `catalogue_check_schedule`).
  */
 import type { UUID } from '../contracts/delta';
+import { addDays, mergeProductContent } from '../tools/catalogueResultActions';
 import {
   catalogueDraftContentSchema,
   catalogueProductContentSchema,
@@ -30,6 +31,7 @@ import {
   type ClaimOrigin,
   type ClaimReviewState,
   type ClaimWaitingForReview,
+  type ProductMergeRow,
   type ProductPublicationState,
   type ClaimCheckRow,
   type ClaimForCheck,
@@ -114,6 +116,7 @@ function publicationState(row: RevisionRow, editRevision: number): ProductPublic
 }
 
 export async function listCatalogueProducts(client: Client): Promise<CatalogueProductSummary[]> {
+  const merged = await mergedInto(client);
   const [products, links, claims, shared, revisions] = await Promise.all([
     client.from('catalogue_products').select('id,code,product,vendor,summary,edit_revision,created_at,updated_at').order('product'),
     client.from('catalogue_product_capabilities').select('product_id,capability_map_id'),
@@ -155,7 +158,7 @@ export async function listCatalogueProducts(client: Client): Promise<CataloguePr
     if (row.review_state === 'drafted') waitingCount.set(row.product_id, (waitingCount.get(row.product_id) ?? 0) + 1);
   }
 
-  return ((products.data as ProductRow[] | null) ?? []).map((row) => ({
+  return ((products.data as ProductRow[] | null) ?? []).filter((row) => !merged.has(row.id)).map((row) => ({
     id: row.id,
     code: row.code,
     product: row.product,
@@ -293,7 +296,9 @@ export async function listClaimsWaitingForReview(client: Client): Promise<{ clai
     .order('product_id').order('position')
     .limit(REVIEW_QUEUE_PAGE);
   if (waiting.error) throw new Error(`listClaimsWaitingForReview: ${waiting.error.message}`);
-  const rows = (waiting.data as Omit<ClaimRow, 'review_state' | 'reviewed_by' | 'reviewed_at'>[] | null) ?? [];
+  const merged = await mergedInto(client);
+  const allRows = (waiting.data as Omit<ClaimRow, 'review_state' | 'reviewed_by' | 'reviewed_at'>[] | null) ?? [];
+  const rows = allRows.filter((row) => !merged.has(row.product_id));
   const productIds = [...new Set(rows.map((row) => row.product_id))];
   const products = await queryInChunks<string, { id: string; product: string; vendor: string }>('listClaimsWaitingForReview', 'id', productIds, (chunk) =>
     client.from('catalogue_products').select('id,product,vendor').in('id', chunk));
@@ -313,7 +318,7 @@ export async function listClaimsWaitingForReview(client: Client): Promise<{ clai
     draftedAt: row.drafted_at,
   }));
   claims.sort((a, b) => a.productName.localeCompare(b.productName) || a.position - b.position);
-  return { claims, total: waiting.count ?? rows.length };
+  return { claims, total: Math.max(rows.length, (waiting.count ?? allRows.length) - (allRows.length - rows.length)) };
 }
 
 /**
@@ -533,17 +538,122 @@ export async function withdrawCatalogue(client: Client, catalogueId: UUID, reaso
   if (error) throw new Error(`withdrawCatalogue: ${error.message}`);
 }
 
+interface MergeDbRow { merged_product_id: string; kept_product_id: string; reason: string | null; merged_by_name: string | null; merged_at: string }
+
+/** Every product merged into another, newest first. The merged products are kept as records and left out of lists. */
+export async function listProductMerges(client: Client): Promise<ProductMergeRow[]> {
+  const { data, error }: { data: MergeDbRow[] | null; error: { message: string } | null } =
+    await client.from('catalogue_product_merges').select('merged_product_id,kept_product_id,reason,merged_by_name,merged_at').order('merged_at', { ascending: false }).limit(5000);
+  if (error) throw new Error(`listProductMerges: ${error.message}`);
+  return (data ?? []).map((row) => ({ mergedProductId: row.merged_product_id, keptProductId: row.kept_product_id, reason: row.reason, mergedByName: row.merged_by_name, mergedAt: row.merged_at }));
+}
+
+/** Merged products with their names, for the list of merges that can be undone. */
+export async function listMergedProducts(client: Client): Promise<(ProductMergeRow & { mergedName: string; keptName: string; vendor: string })[]> {
+  const merges = await listProductMerges(client);
+  const ids = [...new Set(merges.flatMap((row) => [row.mergedProductId, row.keptProductId]))];
+  const products = await queryInChunks<string, { id: string; product: string; vendor: string }>('listMergedProducts', 'id', ids, (chunk) =>
+    client.from('catalogue_products').select('id,product,vendor').in('id', chunk));
+  const byId = new Map(products.map((product) => [product.id, product]));
+  return merges.map((row) => ({ ...row, mergedName: byId.get(row.mergedProductId)?.product ?? 'Unknown product', keptName: byId.get(row.keptProductId)?.product ?? 'Unknown product', vendor: byId.get(row.mergedProductId)?.vendor ?? '' }));
+}
+
+/** Merged product id to the product it was merged into. */
+async function mergedInto(client: Client): Promise<Map<string, string>> {
+  return new Map((await listProductMerges(client)).map((row) => [row.mergedProductId, row.keptProductId]));
+}
+
+/**
+ * Merge one product into another: everything the kept product lacks (capability
+ * links, shared links, claims as new drafts) is added to it through the guarded
+ * save, then the merge is recorded with who and when. The merged product is
+ * kept, not deleted, and "undo" simply lifts the record. A merged product that
+ * is published must be withdrawn first.
+ */
+export async function mergeProducts(client: Client, keptId: UUID, mergedId: UUID, reason: string): Promise<{ addedLinks: number; addedSharedLinks: number; addedClaims: number }> {
+  if (keptId === mergedId) throw new Error('Choose two different products.');
+  const existing = await listProductMerges(client);
+  if (existing.some((row) => row.mergedProductId === keptId || row.keptProductId === mergedId)) {
+    throw new Error('Keep the product that was kept before, and do not merge a product other products were merged into.');
+  }
+  const [kept, merged] = await Promise.all([readCatalogueProduct(client, keptId), readCatalogueProduct(client, mergedId)]);
+  if (merged.publication !== null && merged.publication.withdrawnAt === null) {
+    throw new Error(`${merged.product.product} is published. Withdraw it first, then merge.`);
+  }
+  const result = mergeProductContent(kept.content, merged.content);
+  if ('error' in result) throw new Error(result.error);
+  await saveCatalogueProduct(client, keptId, kept.product.edit_revision, result.content);
+  const { error } = await client.from('catalogue_product_merges').insert({ merged_product_id: mergedId, kept_product_id: keptId, reason: reason.trim() === '' ? null : reason.trim().slice(0, 300) });
+  if (error) throw new Error(`The links and claims were added to ${kept.product.product}, but the merge could not be recorded: ${error.message}`);
+  return { addedLinks: result.addedLinks, addedSharedLinks: result.addedSharedLinks, addedClaims: result.addedClaims };
+}
+
+/** Undo a merge: the product comes back into the lists. What was added to the kept product stays there, to edit like anything else. */
+export async function undoProductMerge(client: Client, mergedId: UUID): Promise<void> {
+  const { error } = await client.from('catalogue_product_merges').delete().eq('merged_product_id', mergedId);
+  if (error) throw new Error(`undoProductMerge: ${error.message}`);
+}
+
+/** Keep a flagged link out of the list for some days, with a short reason. The server stamps who and when. */
+export async function keepSourceLink(client: Client, url: string, days: number, reason: string): Promise<void> {
+  const { error } = await client.from('catalogue_source_checks')
+    .update({ hidden_until: addDays(new Date(), days), hidden_reason: reason.trim().slice(0, 200) }).eq('url', url);
+  if (error) throw new Error(`keepSourceLink: ${error.message}`);
+}
+
+/** Bring a kept link back into the list. */
+export async function unkeepSourceLink(client: Client, url: string): Promise<void> {
+  const { error } = await client.from('catalogue_source_checks').update({ hidden_until: null }).eq('url', url);
+  if (error) throw new Error(`unkeepSourceLink: ${error.message}`);
+}
+
+/** Check one link again and save the answer. */
+export async function recheckSourceLink(client: Client, url: string): Promise<SourceCheckInput | undefined> {
+  const results = await checkSourceLinks(client, [url]);
+  await saveSourceChecks(client, results);
+  return results[0];
+}
+
+/**
+ * Point the claims of some products that cite `oldUrl` at `newUrl`, as an edit
+ * through the guarded save (so the server records who and when, and a published
+ * product shows "published, with changes"). One save per product; a product
+ * that fails is skipped and named. The new address is then checked.
+ */
+export async function replaceClaimSource(
+  client: Client,
+  oldUrl: string,
+  newUrl: string,
+  products: readonly { productId: UUID; productName: string }[],
+): Promise<{ changed: string[]; failed: { product: string; message: string }[] }> {
+  const changed: string[] = [];
+  const failed: { product: string; message: string }[] = [];
+  for (const { productId, productName } of products) {
+    try {
+      const detail = await readCatalogueProduct(client, productId);
+      const claims = detail.content.claims.map((claim) => (claim.sourceUrl.trim() === oldUrl ? { ...claim, sourceUrl: newUrl } : claim));
+      await saveCatalogueProduct(client, productId, detail.product.edit_revision, { ...detail.content, claims });
+      changed.push(productName);
+    } catch (cause) {
+      failed.push({ product: productName, message: cause instanceof Error ? cause.message : String(cause) });
+    }
+  }
+  if (changed.length > 0) await recheckSourceLink(client, newUrl).catch(() => undefined);
+  return { changed, failed };
+}
+
 const SOURCE_PAGE = 1000;
 
 /** Every distinct claim source link in the library, each once however many claims cite it. Read in pages so a large library is not cut off. */
 export async function listDistinctSourceUrls(client: Client): Promise<string[]> {
+  const merged = await mergedInto(client);
   const urls = new Set<string>();
   for (let from = 0; ; from += SOURCE_PAGE) {
     const { data, error } = await client.from('catalogue_product_claims')
-      .select('source_url').order('id').range(from, from + SOURCE_PAGE - 1);
+      .select('product_id,source_url').order('id').range(from, from + SOURCE_PAGE - 1);
     if (error) throw new Error(`listDistinctSourceUrls: ${error.message}`);
-    const rows = (data as { source_url: string }[] | null) ?? [];
-    for (const row of rows) if (row.source_url.trim() !== '') urls.add(row.source_url.trim());
+    const rows = (data as { product_id: string; source_url: string }[] | null) ?? [];
+    for (const row of rows) if (row.source_url.trim() !== '' && !merged.has(row.product_id)) urls.add(row.source_url.trim());
     if (rows.length < SOURCE_PAGE) break;
   }
   return [...urls];
@@ -557,6 +667,9 @@ interface SourceCheckDbRow {
   note: string | null;
   checked_at: string;
   checked_by_name: string | null;
+  hidden_until: string | null;
+  hidden_by_name: string | null;
+  hidden_reason: string | null;
 }
 
 /** The latest saved check of every link, newest first. */
@@ -564,7 +677,7 @@ export async function listSourceChecks(client: Client): Promise<SourceCheckRow[]
   const rows: SourceCheckDbRow[] = [];
   for (let from = 0; ; from += SOURCE_PAGE) {
     const { data, error } = await client.from('catalogue_source_checks')
-      .select('url,result,http_status,final_url,note,checked_at,checked_by_name')
+      .select('url,result,http_status,final_url,note,checked_at,checked_by_name,hidden_until,hidden_by_name,hidden_reason')
       .order('checked_at', { ascending: false }).order('url').range(from, from + SOURCE_PAGE - 1);
     if (error) throw new Error(`listSourceChecks: ${error.message}`);
     const page = (data as SourceCheckDbRow[] | null) ?? [];
@@ -574,6 +687,7 @@ export async function listSourceChecks(client: Client): Promise<SourceCheckRow[]
   return rows.map((row) => ({
     url: row.url, result: row.result, httpStatus: row.http_status, finalUrl: row.final_url, note: row.note,
     checkedAt: row.checked_at, checkedByName: row.checked_by_name,
+    hiddenUntil: row.hidden_until, hiddenByName: row.hidden_by_name, hiddenReason: row.hidden_reason,
   }));
 }
 
@@ -616,25 +730,27 @@ export async function listFlaggedSourceLinks(client: Client, checks: readonly So
   const flagged = checks.filter((check) => check.result !== 'works');
   if (flagged.length === 0) return [];
   const wanted = new Set(flagged.map((check) => check.url));
+  const merged = await mergedInto(client);
   const matched: { product_id: string; position: number; statement: string; source_url: string }[] = [];
   for (let from = 0; ; from += SOURCE_PAGE) {
     const { data, error } = await client.from('catalogue_product_claims')
       .select('product_id,position,statement,source_url').order('id').range(from, from + SOURCE_PAGE - 1);
     if (error) throw new Error(`listFlaggedSourceLinks: ${error.message}`);
     const rows = (data as { product_id: string; position: number; statement: string; source_url: string }[] | null) ?? [];
-    matched.push(...rows.filter((row) => wanted.has(row.source_url.trim())));
+    matched.push(...rows.filter((row) => wanted.has(row.source_url.trim()) && !merged.has(row.product_id)));
     if (rows.length < SOURCE_PAGE) break;
   }
   const productIds = [...new Set(matched.map((row) => row.product_id))];
   const products = await queryInChunks<string, { id: string; product: string; vendor: string }>('listFlaggedSourceLinks', 'id', productIds, (chunk) =>
     client.from('catalogue_products').select('id,product,vendor').in('id', chunk));
   const byId = new Map(products.map((product) => [product.id, product]));
+  // A link no claim cites any more (its claims were pointed elsewhere, or their product was merged away) has nothing left to look at.
   return flagged.map((check) => ({
     check,
     claims: matched.filter((row) => row.source_url.trim() === check.url)
       .map((row) => ({ productId: row.product_id, productName: byId.get(row.product_id)?.product ?? 'Unknown product', vendor: byId.get(row.product_id)?.vendor ?? '', position: row.position, statement: row.statement }))
       .sort((a, b) => a.productName.localeCompare(b.productName) || a.position - b.position),
-  }));
+  })).filter((item) => item.claims.length > 0);
 }
 
 /** The function's own sentence when it sent one (a daily limit, a missing key), instead of a generic message. */
@@ -649,13 +765,14 @@ async function functionErrorMessage(error: unknown, fallback: string): Promise<s
 
 /** Every claim with its product, for the claim check. Claims are read in pages and products in pieces of at most 50 (build rule 8). */
 export async function listClaimsForCheck(client: Client): Promise<ClaimForCheck[]> {
+  const merged = await mergedInto(client);
   const rows: { product_id: string; statement: string; source_url: string }[] = [];
   for (let from = 0; ; from += SOURCE_PAGE) {
     const { data, error } = await client.from('catalogue_product_claims')
       .select('product_id,statement,source_url').order('id').range(from, from + SOURCE_PAGE - 1);
     if (error) throw new Error(`listClaimsForCheck: ${error.message}`);
     const page = (data as { product_id: string; statement: string; source_url: string }[] | null) ?? [];
-    rows.push(...page);
+    rows.push(...page.filter((row) => !merged.has(row.product_id)));
     if (page.length < SOURCE_PAGE) break;
   }
   const productIds = [...new Set(rows.map((row) => row.product_id))];
@@ -829,7 +946,9 @@ export async function listLibraryProductKeys(client: Client): Promise<{ id: stri
   const { data, error }: { data: { id: string; code: string; vendor: string; product: string }[] | null; error: { message: string } | null } =
     await client.from('catalogue_products').select('id,code,vendor,product').limit(5000);
   if (error) throw new Error(`listLibraryProductKeys: ${error.message}`);
-  return data ?? [];
+  // A merged product still counts as in the library, under the product it was merged into, so finding it again offers that one.
+  const merged = await mergedInto(client);
+  return (data ?? []).map((row) => ({ ...row, id: merged.get(row.id) ?? row.id }));
 }
 
 /**
@@ -865,12 +984,13 @@ export async function saveFoundProducts(
 export async function listLinkProposalInputs(client: Client): Promise<{ products: ProposalProduct[]; links: ProductLinkRow[]; rejected: RejectedLinkRow[] }> {
   const products: ProposalProduct[] = [];
   const links: ProductLinkRow[] = [];
+  const merged = await mergedInto(client);
   const page = 1000;
   for (let from = 0; ; from += page) {
     const { data, error }: { data: { id: string; product: string; vendor: string }[] | null; error: { message: string } | null } =
       await client.from('catalogue_products').select('id,product,vendor').order('id').range(from, from + page - 1);
     if (error) throw new Error(`listLinkProposalInputs: ${error.message}`);
-    products.push(...(data ?? []));
+    products.push(...(data ?? []).filter((row) => !merged.has(row.id)));
     if ((data ?? []).length < page) break;
   }
   for (let from = 0; ; from += page) {
@@ -878,7 +998,7 @@ export async function listLinkProposalInputs(client: Client): Promise<{ products
       await client.from('catalogue_product_capabilities').select('product_id,capability_map_id,capability_code,capability_name,how_it_supports')
         .order('product_id').order('capability_map_id').order('capability_code').range(from, from + page - 1);
     if (error) throw new Error(`listLinkProposalInputs: ${error.message}`);
-    for (const row of data ?? []) links.push({ productId: row.product_id, mapId: row.capability_map_id, code: row.capability_code, name: row.capability_name, howItSupports: row.how_it_supports });
+    for (const row of (data ?? []).filter((link) => !merged.has(link.product_id))) links.push({ productId: row.product_id, mapId: row.capability_map_id, code: row.capability_code, name: row.capability_name, howItSupports: row.how_it_supports });
     if ((data ?? []).length < page) break;
   }
   const rejected: RejectedLinkRow[] = [];
