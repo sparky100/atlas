@@ -14,8 +14,10 @@ import type { LinkProposal } from '../tools/catalogueLinkProposals';
 
 const env = loadEnv();
 const service = createServiceRoleClient(env);
-const suffix = randomUUID().slice(0, 8);
-const mapVersion = 950000 + (Number.parseInt(suffix.slice(0, 5), 16) % 40000);
+const seed = randomUUID().slice(0, 8);
+// Letters only: a hex tail such as "3cad" reads as a currency code to the no-prices rule and flakes the save.
+const suffix = seed.replace(/[0-9]/g, (digit) => String.fromCharCode(103 + Number(digit)));
+const mapVersion = 950000 + (Number.parseInt(seed.slice(0, 5), 16) % 40000);
 
 function check(result: { error: { message: string } | null }): void {
   if (result.error) throw new Error(result.error.message);
