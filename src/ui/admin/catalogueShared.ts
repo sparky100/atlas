@@ -1,5 +1,5 @@
-import { claimCheckVerdictLabel, sourceCheckLabel, type ClaimCheckRow, type SourceCheckRow } from '../../contracts/catalogueAdmin';
-import type { CapabilitySetOption, CatalogueClaimReview, CatalogueProductContent, CatalogueVersionSummary, ClaimOrigin, ProductPublicationLabel, ProductPublicationState } from '../../contracts/catalogueAdmin';
+import { checkRunScopeLabel, claimCheckVerdictLabel, sourceCheckLabel, type ClaimCheckRow, type SourceCheckRow } from '../../contracts/catalogueAdmin';
+import type { CapabilitySetOption, CheckRunRow, CatalogueClaimReview, CatalogueProductContent, CatalogueVersionSummary, ClaimOrigin, ProductPublicationLabel, ProductPublicationState } from '../../contracts/catalogueAdmin';
 
 /** The label this admin UI uses everywhere for a sector id. */
 export function sectorLabel(sector: string): string {
@@ -102,4 +102,14 @@ export function claimCheckSentence(check: ClaimCheckRow | undefined): string {
   const looked = check.dismissedAt === null ? '' : ` Looked at and kept by ${check.dismissedByName ?? 'a platform admin'} on ${formatDay(check.dismissedAt)}.`;
   const quote = check.quote === null ? '' : ` The page says: “${check.quote}”.`;
   return `Source check: ${claimCheckVerdictLabel(check.verdict)}, ${by}.${quote}${check.note === null ? '' : ` ${check.note}`}${looked}`;
+}
+
+/** One line for a run in the history: what it covered and what it found. */
+export function checkRunSentence(run: CheckRunRow): string {
+  const parts: string[] = [];
+  if (run.scope !== 'claims') parts.push(`${String(run.linksChecked)} link${run.linksChecked === 1 ? '' : 's'}`);
+  if (run.scope !== 'links') parts.push(`${String(run.claimsChecked)} claim${run.claimsChecked === 1 ? '' : 's'}`);
+  const found = run.scope === 'links' ? `${String(run.flagged)} not working` : `${String(run.flagged)} need a look`;
+  const tokens = run.tokens > 0 ? `, ${run.tokens.toLocaleString('en-GB')} AI tokens` : '';
+  return `${checkRunScopeLabel(run.scope)}: ${parts.join(' and ')} checked, ${found}${tokens}.`;
 }

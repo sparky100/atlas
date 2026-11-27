@@ -257,3 +257,36 @@ for (const viewport of [{ width: 1280, height: 800 }, { width: 390, height: 844 
     await expect(page.getByTestId('claim-ai-check').first()).toContainText('Looked at and kept by');
   });
 }
+
+/** Step 5b-2: the Monthly check section shows the switch (stamped with who changed it) and the latest runs, monthly and manual. */
+for (const viewport of [{ width: 1280, height: 800 }, { width: 390, height: 844 }]) {
+  test(`the monthly check switch and the run history work at ${String(viewport.width)}`, async ({ page }) => {
+    await page.setViewportSize(viewport);
+    const service = createServiceRoleClient(loadEnv());
+    const zero = '00000000-0000-0000-0000-000000000000';
+    const inserted: { data: { id: string } | null; error: { message: string } | null } = await service.from('catalogue_check_runs').insert({
+      kind: 'monthly', scope: 'both', status: 'finished', started_by: zero, started_by_name: 'Monthly check (switched on by Test Admin)', links_checked: 12, claims_checked: 9, flagged: 3, input_tokens: 8000, output_tokens: 400,
+    }).select('id').single();
+    if (inserted.error) throw new Error(`monthly-check seed: ${inserted.error.message}`);
+
+    await signUpAdmin(page);
+    await page.goto('/platform-admin/catalogue/review');
+    const section = page.getByTestId('monthly-check');
+    await expect(section.getByRole('heading', { name: 'Monthly check' })).toBeVisible();
+    await expect(section.getByTestId('check-runs')).toContainText('Monthly check');
+    await expect(section.getByTestId('check-runs')).toContainText('3 need a look');
+    await expect(section.getByTestId('check-runs')).toContainText('8,400 AI tokens');
+
+    // Switch it on: it says who and when. Switch it off again: that is recorded too.
+    const box = section.getByRole('checkbox', { name: /every month/ });
+    // The box follows the saved switch, so it changes after the save, not on the click: click it and wait for the words.
+    if (await box.isChecked()) await box.click();
+    await expect(section.getByTestId('monthly-check-state')).toContainText(/^Off/);
+    await box.click();
+    await expect(section.getByTestId('monthly-check-state')).toContainText(/^On: switched on by .+ on /);
+    expect(await page.evaluate(() => document.documentElement.scrollWidth > document.documentElement.clientWidth + 1)).toBe(false);
+    await page.screenshot({ path: `test-results/catalogue-monthly-check-${String(viewport.width)}.png`, fullPage: true });
+    await box.click();
+    await expect(section.getByTestId('monthly-check-state')).toContainText(/^Off: switched off by .+ on /);
+  });
+}

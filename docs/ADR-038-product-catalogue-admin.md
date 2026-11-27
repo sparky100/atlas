@@ -293,3 +293,35 @@ Migration `20261126260000_catalogue_claim_checks.sql`; edge function
   browser saves results under admin RLS.
 - **Not here.** The monthly schedule and run record (5b-2) and finding new
   products (step 6).
+
+## Amendment, 27 November 2026: monthly check and run record (step 5b-2)
+
+Migration `20261127010000_catalogue_monthly_check.sql`; edge function
+`catalogue-monthly-check`; walkthrough `proposals/WALKTHROUGH-catalogue-step-5b-2-monthly-check.md`.
+
+- **A switch, off by default.** `catalogue_check_schedule` holds one row.
+  Platform admins can change only `enabled`; the server stamps who and when.
+- **A run record.** `catalogue_check_runs` has one row per run, manual or
+  monthly: scope, status, counts, tokens, who started it. Browsers write only
+  manual runs (column grants and policies); the monthly function writes its own.
+  No cost figure is stored (M7).
+- **The job.** pg_cron calls `atlas.run_monthly_catalogue_check()` on days 1 to
+  3, every 30 minutes from 03:00 to 05:30 UTC. It does nothing while the switch
+  is off or the function's address (Vault `catalogue:schedule_url`, set by
+  hand, never in the repository) is unset. It posts through `pg_net`
+  (installed in the `extensions` schema) with a secret the migration generates
+  inside the database into Vault (`catalogue:schedule_secret`).
+- **The function.** No Supabase sign-in (`verify_jwt = false`): the caller is
+  the job, proved by the secret, compared without stopping at the first
+  difference. Each call takes a batch of 20 claims with no check from the last
+  25 days, checks their links, then reads the claims with the platform AI key
+  (same quote rule, same daily limit as the buttons, shared with manual runs)
+  and saves under "Monthly check (switched on by <name>)". A claim whose link
+  is gone is saved as "can't tell" without reading it, so it counts as checked.
+  A day with no key or no allowance leaves one run record, not one per call.
+- **What it cannot do.** It writes only the source-check, claim-check and run
+  tables; it never edits a claim, flags a published revision or unpublishes.
+- **No new callable function.** The stamping triggers, the secret reader (service
+  role only) and the job's function are revoked from public, anon and
+  authenticated.
+- **Not here.** Finding new products and proposing links (step 6).

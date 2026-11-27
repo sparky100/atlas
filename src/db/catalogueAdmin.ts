@@ -6,7 +6,8 @@
  * One exception, steps 5a and 5b-1: the source-link and claim check results
  * (`catalogue_source_checks`, `catalogue_claim_checks`) are plain records that
  * platform admins write directly under row-level security, with who and when
- * stamped by the server.
+ * stamped by the server. The same goes for the run record and the monthly
+ * switch (step 5b-2, `catalogue_check_runs`, `catalogue_check_schedule`).
  */
 import type { UUID } from '../contracts/delta';
 import {
@@ -22,6 +23,10 @@ import {
   type CatalogueProductSummary,
   type GeneralCapabilityOption,
   type CatalogueVersionSummary,
+  type CheckRunRow,
+  type CheckRunScope,
+  type CheckRunStatus,
+  type CheckSchedule,
   type ClaimOrigin,
   type ClaimReviewState,
   type ClaimWaitingForReview,
@@ -728,4 +733,73 @@ export async function dismissClaimCheck(client: Client, check: Pick<ClaimCheckRo
     .select('product_id');
   if (error) throw new Error(`dismissClaimCheck: ${error.message}`);
   if (((data as unknown[] | null) ?? []).length === 0) throw new Error('That check was replaced or already cleared. Reload the page.');
+}
+
+/** The monthly check's switch: on or off, and who last changed it. */
+export async function getCheckSchedule(client: Client): Promise<CheckSchedule> {
+  const { data: row, error }: { data: { enabled: boolean; switched_by_name: string | null; switched_at: string | null } | null; error: { message: string } | null } =
+    await client.from('catalogue_check_schedule').select('enabled,switched_by_name,switched_at').maybeSingle();
+  if (error) throw new Error(`getCheckSchedule: ${error.message}`);
+  return { enabled: row?.enabled ?? false, switchedByName: row?.switched_by_name ?? null, switchedAt: row?.switched_at ?? null };
+}
+
+/** Switch the monthly check on or off. The server records who and when. */
+export async function setCheckSchedule(client: Client, enabled: boolean): Promise<void> {
+  const { data, error } = await client.from('catalogue_check_schedule').update({ enabled }).eq('id', true).select('id');
+  if (error) throw new Error(`setCheckSchedule: ${error.message}`);
+  if (((data as unknown[] | null) ?? []).length === 0) throw new Error('setCheckSchedule: the switch could not be changed. Only platform admins can change it.');
+}
+
+interface CheckRunDbRow {
+  id: string;
+  kind: 'manual' | 'monthly';
+  scope: CheckRunScope;
+  status: CheckRunStatus;
+  started_at: string;
+  finished_at: string | null;
+  started_by_name: string | null;
+  links_checked: number;
+  claims_checked: number;
+  flagged: number;
+  input_tokens: number;
+  output_tokens: number;
+  note: string | null;
+}
+
+/** The latest check runs, manual and monthly, newest first. */
+export async function listCheckRuns(client: Client, limit = 5): Promise<CheckRunRow[]> {
+  const { data, error } = await client.from('catalogue_check_runs')
+    .select('id,kind,scope,status,started_at,finished_at,started_by_name,links_checked,claims_checked,flagged,input_tokens,output_tokens,note')
+    .order('started_at', { ascending: false }).limit(limit);
+  if (error) throw new Error(`listCheckRuns: ${error.message}`);
+  return ((data as CheckRunDbRow[] | null) ?? []).map((row) => ({
+    id: row.id, kind: row.kind, scope: row.scope, status: row.status, startedAt: row.started_at, finishedAt: row.finished_at, startedByName: row.started_by_name,
+    linksChecked: row.links_checked, claimsChecked: row.claims_checked, flagged: row.flagged, tokens: row.input_tokens + row.output_tokens, note: row.note,
+  }));
+}
+
+/** Record that a person started a check. The server stamps who and when. */
+export async function startCheckRun(client: Client, scope: CheckRunScope): Promise<string> {
+  const { data, error }: { data: { id: string } | null; error: { message: string } | null } =
+    await client.from('catalogue_check_runs').insert({ kind: 'manual', scope }).select('id').single();
+  if (error || data === null) throw new Error(`startCheckRun: ${error?.message ?? 'no row came back'}`);
+  return data.id;
+}
+
+export interface CheckRunOutcome {
+  status: CheckRunStatus;
+  linksChecked: number;
+  claimsChecked: number;
+  flagged: number;
+  tokens: { input: number; output: number };
+  note: string | null;
+}
+
+/** Record how a check ended. The server stamps the end time. */
+export async function finishCheckRun(client: Client, id: string, outcome: CheckRunOutcome): Promise<void> {
+  const { error } = await client.from('catalogue_check_runs').update({
+    status: outcome.status, links_checked: outcome.linksChecked, claims_checked: outcome.claimsChecked, flagged: outcome.flagged,
+    input_tokens: outcome.tokens.input, output_tokens: outcome.tokens.output, note: outcome.note === null ? null : outcome.note.slice(0, 300),
+  }).eq('id', id);
+  if (error) throw new Error(`finishCheckRun: ${error.message}`);
 }

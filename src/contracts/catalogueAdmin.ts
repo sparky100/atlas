@@ -321,3 +321,47 @@ export function claimCheckVerdictLabel(verdict: ClaimCheckVerdict): string {
 export function claimCheckKey(row: { productId: string; sourceUrl: string; statement: string }): string {
   return `${row.productId}\u0000${row.sourceUrl.trim()}\u0000${row.statement}`;
 }
+
+/** Step 5b-2: how a catalogue check run ended, and the monthly switch. */
+export const CHECK_RUN_STATUSES = ['running', 'finished', 'stopped', 'limit_reached', 'failed'] as const;
+export type CheckRunStatus = (typeof CHECK_RUN_STATUSES)[number];
+export type CheckRunScope = 'links' | 'claims' | 'both';
+
+export interface CheckRunRow {
+  id: string;
+  kind: 'manual' | 'monthly';
+  scope: CheckRunScope;
+  status: CheckRunStatus;
+  startedAt: string;
+  finishedAt: string | null;
+  startedByName: string | null;
+  linksChecked: number;
+  claimsChecked: number;
+  flagged: number;
+  tokens: number;
+  note: string | null;
+}
+
+export interface CheckSchedule {
+  enabled: boolean;
+  switchedByName: string | null;
+  switchedAt: string | null;
+}
+
+export function checkRunStatusLabel(status: CheckRunStatus): string {
+  switch (status) {
+    case 'running': return 'Running';
+    case 'finished': return 'Finished';
+    case 'stopped': return 'Stopped';
+    case 'limit_reached': return 'Stopped at the daily limit';
+    case 'failed': return 'Did not finish';
+  }
+}
+
+export function checkRunScopeLabel(scope: CheckRunScope): string {
+  switch (scope) {
+    case 'links': return 'Source links';
+    case 'claims': return 'Claims';
+    case 'both': return 'Links and claims';
+  }
+}
