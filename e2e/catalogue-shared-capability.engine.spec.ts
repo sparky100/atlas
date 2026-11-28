@@ -302,7 +302,7 @@ for (const viewport of [{ width: 1280, height: 800 }, { width: 390, height: 844 
       const reason = 'The AI provider refused the key (status 401).';
       await route.fulfill({
         status: 200, headers: { ...cors, 'content-type': 'application/json' },
-        body: JSON.stringify({ status: 'ok', results: body.claims.map((claim) => ({ ...claim, verdict: 'cant_tell', quote: null, note: `Not checked. ${reason}`, model: null, inputTokens: 0, outputTokens: 0, aiError: reason })) }),
+        body: JSON.stringify({ status: 'ok', results: body.claims.map((claim) => ({ productId: claim.productId, sourceUrl: claim.sourceUrl, statement: claim.statement, verdict: 'cant_tell', quote: null, note: `Not checked. ${reason}`, model: null, inputTokens: 0, outputTokens: 0, aiError: reason })) }),
       });
     });
 
