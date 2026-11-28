@@ -5,9 +5,9 @@ import { addPlatform, listCatalogueProducts } from '../../db/catalogueAdmin';
 import { LinkButton } from '../components/Button/LinkButton';
 import { Loading } from '../components/Loading/Loading';
 import { supabase } from '../supabaseClient';
+import { errorText } from './adminErrorText';
 import { publicationLabelText } from './catalogueShared';
 import styles from './CatalogueAdmin.module.css';
-import { errorText } from './adminErrorText';
 
 /**
  * `/platform-admin/catalogue` — the product library list. Editing is on the
@@ -65,7 +65,7 @@ export function CatalogueProductsAdmin() {
           void addPlatform(supabase, platformVendor, platformName)
             // A platform already in the library is opened, not copied (rule I1), and its search starts there.
             .then((result) => navigate(`/platform-admin/catalogue/products/${result.platformId}`, { state: { findComponents: true } }))
-            .catch((cause: unknown) => { setError(cause instanceof Error ? cause.message : String(cause)); })
+            .catch((cause: unknown) => { setError(errorText(cause)); })
             .finally(() => { setAdding(false); });
         }}>
           <label>Platform name <input value={platformName} onChange={(event) => { setPlatformName(event.target.value); }} placeholder="SAP S/4HANA Utilities" /></label>
