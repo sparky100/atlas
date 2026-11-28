@@ -412,10 +412,13 @@ for (const viewport of [{ width: 1280, height: 800 }, { width: 390, height: 844 
 
     // The new product is a draft in the queue, marked as found by the Researcher, and the run is in the history.
     await expect(page.getByTestId('check-runs')).toContainText('Find products: 3 searches, 1 product found');
-    await expect(page.getByTestId('catalogue-review-queue')).toContainText(`New product ${suffix}`);
-    await expect(page.getByTestId('catalogue-review-queue')).toContainText('Found by the Researcher');
     await result.getByRole('link', { name: `New product ${suffix}` }).click();
     await expect(page.getByLabel('Product', { exact: true })).toHaveValue(`New product ${suffix}`);
+    // The queue lives on Waiting for review, not on Find and check.
+    await page.getByRole('link', { name: 'Waiting for review' }).click();
+    await openSection(page, 'claims');
+    await expect(page.getByTestId('catalogue-review-queue')).toContainText(`New product ${suffix}`);
+    await expect(page.getByTestId('catalogue-review-queue')).toContainText('Found by the Researcher');
   });
 }
 
