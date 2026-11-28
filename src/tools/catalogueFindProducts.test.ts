@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { PageResponse } from './catalogueClaimCheck';
-import { asComponentsOf, foundComponentContent, keepComponents, parseFindAnswer, productCode, splitByLibrary, verifyCandidates, type Candidate } from './catalogueFindProducts';
+import { FIND_MAX_COMPONENTS, FIND_COMPONENTS_SYSTEM, findComponentsRequestSchema, findComponentsUserMessage, asComponentsOf, foundComponentContent, keepComponents, parseFindAnswer, productCode, splitByLibrary, verifyCandidates, type Candidate } from './catalogueFindProducts';
 
 const PAGE = 'Acme Meter Hub collects and validates half-hourly smart meter reads from every supplier. It runs as a hosted service.';
 
@@ -37,6 +37,23 @@ describe('parseFindAnswer', () => {
     const parsed = parseFindAnswer(JSON.stringify({ products: many }));
     expect(parsed).toHaveLength(8);
     expect(parsed?.[0]?.claims[0]?.kind).toBe('functional');
+  });
+});
+
+describe('a components search', () => {
+  it('allows a longer list than a capability search', () => {
+    const many = Array.from({ length: 30 }, (_, i) => candidate({ product: `M${String(i)}` }));
+    expect(parseFindAnswer(JSON.stringify({ products: many }), FIND_MAX_COMPONENTS)).toHaveLength(FIND_MAX_COMPONENTS);
+    expect(FIND_COMPONENTS_SYSTEM).toContain(`At most ${String(FIND_MAX_COMPONENTS)} modules`);
+  });
+  it('names the modules already known, so a repeat looks for others', () => {
+    const request = findComponentsRequestSchema.parse({ platformName: 'SAP S/4HANA', vendor: 'SAP', alreadyKnown: ['SAP FICO', 'SAP MM'] });
+    expect(findComponentsUserMessage(request)).toContain('do not list these again: SAP FICO; SAP MM');
+    expect(findComponentsUserMessage({ platformName: 'X', vendor: 'Y' })).not.toContain('Already found');
+  });
+  it('bounds the known-names list', () => {
+    const names = Array.from({ length: 61 }, (_, i) => `M${String(i)}`);
+    expect(findComponentsRequestSchema.safeParse({ platformName: 'X', vendor: 'Y', alreadyKnown: names }).success).toBe(false);
   });
 });
 

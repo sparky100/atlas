@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router';
 import { findComponentsOfPlatform, finishCheckRun, listLibraryProductKeys, saveFoundComponents, startCheckRun } from '../../db/catalogueAdmin';
-import { nameMatchKey, splitByLibrary, type FindResult } from '../../tools/catalogueFindProducts';
+import { FIND_MAX_KNOWN_NAMES, nameMatchKey, splitByLibrary, type FindResult } from '../../tools/catalogueFindProducts';
 import { supabase } from '../supabaseClient';
 import styles from './CatalogueAdmin.module.css';
 import { errorText } from './adminErrorText';
@@ -26,7 +26,7 @@ interface Outcome {
  * links yet. Modules already in the library are shown and left as they are.
  * Nothing is published. Only the platform's name and vendor are sent.
  */
-export function CatalogueFindComponents({ platform, disabled, onChanged, autoRun = false }: { platform: { id: string; product: string; vendor: string }; disabled: boolean; onChanged: () => void; autoRun?: boolean }) {
+export function CatalogueFindComponents({ platform, knownComponents = [], disabled, onChanged, autoRun = false }: { platform: { id: string; product: string; vendor: string }; knownComponents?: string[]; disabled: boolean; onChanged: () => void; autoRun?: boolean }) {
   const [running, setRunning] = useState(false);
   const [error, setError] = useState('');
   const [outcome, setOutcome] = useState<Outcome | null>(null);
@@ -39,7 +39,7 @@ export function CatalogueFindComponents({ platform, disabled, onChanged, autoRun
     let result: FindResult | null = null;
     let savedCount = 0;
     try {
-      result = await findComponentsOfPlatform(supabase, { platformName: platform.product, vendor: platform.vendor });
+      result = await findComponentsOfPlatform(supabase, { platformName: platform.product, vendor: platform.vendor, alreadyKnown: knownComponents.slice(0, FIND_MAX_KNOWN_NAMES) });
       const library = await listLibraryProductKeys(supabase);
       const split = splitByLibrary(result.found, library.map((row) => ({ id: row.id, vendor: row.vendor, product: row.product })));
       // The platform's own name is not one of its components.
@@ -80,10 +80,10 @@ export function CatalogueFindComponents({ platform, disabled, onChanged, autoRun
   return (
     <div data-testid="find-components">
       <p>
-        The Researcher can search the public web for the modules of {platform.product}. Only modules whose source page names {platform.product} are kept. Each is added as a draft component with no capability links yet, for a person to review. Nothing is published.
+        The Researcher can search the public web for the modules of {platform.product}. A repeat search skips the components it already has. Only modules whose source page names {platform.product} are kept. Each is added as a draft component with no capability links yet, for a person to review. Nothing is published.
       </p>
       <button type="button" onClick={() => void run()} disabled={running || disabled}>
-        {running ? 'Searching…' : `Find components of ${platform.product}`}
+        {running ? 'Searching…' : knownComponents.length > 0 ? `Search again for more components of ${platform.product}` : `Find components of ${platform.product}`}
       </button>
       {disabled && <p role="status">Save this product first.</p>}
       {error !== '' && <p role="alert" className={styles.error}>{error}</p>}

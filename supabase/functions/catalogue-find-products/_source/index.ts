@@ -22,7 +22,7 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.115.0';
 import { corsHeaders } from '../../_shared/cors.ts';
 import type { PageResponse } from '../../../../src/tools/catalogueClaimCheck.ts';
 import {
-  FIND_DAILY_TOKEN_LIMIT, FIND_DEFAULT_MODEL, FIND_MAX_SEARCHES, FIND_SYSTEM, FIND_WEB_SEARCH_TOOL,
+  FIND_DAILY_TOKEN_LIMIT, FIND_DEFAULT_MODEL, FIND_MAX_COMPONENTS, FIND_MAX_COMPONENT_SEARCHES, FIND_MAX_SEARCHES, FIND_SYSTEM, FIND_WEB_SEARCH_TOOL,
   FIND_COMPONENTS_SYSTEM, asComponentsOf, findComponentsRequestSchema, findComponentsUserMessage, findRequestSchema, findUserMessage, keepComponents, parseFindAnswer, verifyCandidates,
 } from '../../../../src/tools/catalogueFindProducts.ts';
 
@@ -122,7 +122,7 @@ interface ProviderReply {
 class WebSearchOff extends Error {}
 
 /** Ask the model to search and answer, continuing a paused turn a few times. */
-async function search(apiKey: string, model: string, system: string, user: string): Promise<{ text: string; inputTokens: number; outputTokens: number; searches: number }> {
+async function search(apiKey: string, model: string, system: string, user: string, limits: { searches: number; maxTokens: number } = { searches: FIND_MAX_SEARCHES, maxTokens: 8000 }): Promise<{ text: string; inputTokens: number; outputTokens: number; searches: number }> {
   const messages: { role: string; content: unknown }[] = [{ role: 'user', content: user }];
   let inputTokens = 0;
   let outputTokens = 0;
@@ -132,8 +132,8 @@ async function search(apiKey: string, model: string, system: string, user: strin
       method: 'POST',
       headers: { 'content-type': 'application/json', 'x-api-key': apiKey, 'anthropic-version': ANTHROPIC_VERSION },
       body: JSON.stringify({
-        model, max_tokens: 8000, system, messages,
-        tools: [{ type: FIND_WEB_SEARCH_TOOL, name: 'web_search', max_uses: FIND_MAX_SEARCHES }],
+        model, max_tokens: limits.maxTokens, system, messages,
+        tools: [{ type: FIND_WEB_SEARCH_TOOL, name: 'web_search', max_uses: limits.searches }],
         output_config: { effort: 'low' },
       }),
     });
@@ -202,12 +202,12 @@ Deno.serve(async (req: Request) => {
     try {
       answer = capabilityRequest !== null
         ? await search(apiKey, model, FIND_SYSTEM, findUserMessage(capabilityRequest))
-        : await search(apiKey, model, FIND_COMPONENTS_SYSTEM, findComponentsUserMessage(componentsRequest as NonNullable<typeof componentsRequest>));
+        : await search(apiKey, model, FIND_COMPONENTS_SYSTEM, findComponentsUserMessage(componentsRequest as NonNullable<typeof componentsRequest>), { searches: FIND_MAX_COMPONENT_SEARCHES, maxTokens: 16000 });
     } catch (cause) {
       if (cause instanceof WebSearchOff) return jsonResponse({ status: 'error', code: 'web_search_off', message: 'Web search is not switched on for the platform AI account. Nothing was searched.' }, 503);
       return jsonResponse({ status: 'error', message: 'The AI could not be reached, so no products were found.' }, 502);
     }
-    const candidates = parseFindAnswer(answer.text);
+    const candidates = parseFindAnswer(answer.text, componentsRequest === null ? undefined : FIND_MAX_COMPONENTS);
     if (candidates === null) {
       return jsonResponse({ status: 'ok', found: [], dropped: [], searches: answer.searches, inputTokens: answer.inputTokens, outputTokens: answer.outputTokens, model, note: "The AI's answer could not be read." }, 200);
     }
