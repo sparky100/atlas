@@ -49,7 +49,6 @@ export function CatalogueMonthlyCheck({ refreshKey }: { refreshKey: number }) {
     <section className={styles.panel} aria-label="Monthly check" data-testid="monthly-check">
       <div className={styles.panelHeader}>
         <div>
-          <h2>Monthly check</h2>
           {loading ? <p>Loading…</p> : schedule === null ? null : (
             <>
               <label className={styles.checkLine}>

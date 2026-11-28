@@ -21,7 +21,7 @@ function describe(product: CatalogueProductSummary): string {
  * are added to the kept product (claims as new drafts to review) and the merge
  * is recorded with who and when. Nothing is deleted, and a merge can be undone.
  */
-export function CatalogueDuplicates({ onChanged }: { onChanged?: () => void } = {}) {
+export function CatalogueDuplicates({ onChanged, onCount }: { onChanged?: () => void; onCount?: (count: number, hasRecord: boolean) => void } = {}) {
   const [products, setProducts] = useState<CatalogueProductSummary[]>([]);
   const [merged, setMerged] = useState<MergedRow[]>([]);
   const [loading, setLoading] = useState(true);
@@ -45,6 +45,11 @@ export function CatalogueDuplicates({ onChanged }: { onChanged?: () => void } = 
 
   const byId = useMemo(() => new Map(products.map((product) => [product.id, product])), [products]);
   const pairs = useMemo(() => duplicateCandidates(products), [products]);
+
+  // The section header shows how many pairs are waiting; merged products stay reachable, so say when there is a record.
+  useEffect(() => {
+    if (!loading) onCount?.(pairs.length, merged.length > 0);
+  }, [loading, pairs.length, merged.length, onCount]);
 
   const act = async (work: () => Promise<string>) => {
     setBusy(true); setError(''); setNotice('');
@@ -71,13 +76,11 @@ export function CatalogueDuplicates({ onChanged }: { onChanged?: () => void } = 
 
   return (
     <section className={styles.panel} aria-label="Possible duplicates" data-testid="duplicates">
-      <h2>Possible duplicates ({String(pairs.length)})</h2>
       {notice !== '' && <p role="status">{notice}</p>}
       {error !== '' && <p role="alert" className={styles.error}>{error}</p>}
       {pairs.length === 0 && <p>No products look like the same product under two names.</p>}
       {pairs.length > 0 && (
-        <details className={styles.group} data-testid="duplicate-pairs">
-          <summary>{String(pairs.length)} pair{pairs.length === 1 ? '' : 's'} to look at</summary>
+        <div className={styles.pairList} data-testid="duplicate-pairs">
           <div className={styles.groupBody}>
             {pairs.map((pair) => {
               const a = byId.get(pair.a.id);
@@ -106,7 +109,7 @@ export function CatalogueDuplicates({ onChanged }: { onChanged?: () => void } = 
               );
             })}
           </div>
-        </details>
+        </div>
       )}
       {merged.length > 0 && (
         <details className={styles.group} data-testid="merged-products">

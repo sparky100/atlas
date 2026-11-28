@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { type SourceCheckRow } from '../../contracts/catalogueAdmin';
 import { checkSourceLinks, finishCheckRun, listDistinctSourceUrls, listFlaggedSourceLinks, listSourceChecks, saveSourceChecks, startCheckRun, type FlaggedSourceLink } from '../../db/catalogueAdmin';
 import { LINK_CHECK_MAX_URLS } from '../../tools/catalogueLinkCheck';
+import { isKept } from '../../tools/catalogueResultActions';
 import { supabase } from '../supabaseClient';
 import { CatalogueFlaggedLinks } from './CatalogueFlaggedLinks';
 import { formatDay } from './catalogueShared';
@@ -13,7 +14,7 @@ import styles from './CatalogueAdmin.module.css';
  * back as it goes, and lists every link that is not working so a person can fix
  * or replace the source. It never changes a claim or unpublishes anything.
  */
-export function CatalogueSourceLinks({ onRunRecorded, onClaimsChecked }: { onRunRecorded?: () => void; onClaimsChecked?: () => void } = {}) {
+export function CatalogueSourceLinks({ part, onRunRecorded, onClaimsChecked, onCount }: { part: 'run' | 'look-at'; onRunRecorded?: () => void; onClaimsChecked?: () => void; onCount?: (count: number) => void }) {
   const [urls, setUrls] = useState<string[]>([]);
   const [checks, setChecks] = useState<SourceCheckRow[]>([]);
   const [flagged, setFlagged] = useState<FlaggedSourceLink[]>([]);
@@ -47,6 +48,14 @@ export function CatalogueSourceLinks({ onRunRecorded, onClaimsChecked }: { onRun
     const latest = current.reduce<SourceCheckRow | null>((best, check) => (best === null || check.checkedAt > best.checkedAt ? check : best), null);
     return { checked: current.length, latest };
   }, [urls, checks]);
+
+  const openCount = useMemo(() => {
+    const now = new Date();
+    return flagged.filter((item) => !isKept(item.check.hiddenUntil, now)).length;
+  }, [flagged]);
+  useEffect(() => {
+    if (!loading && loadError === '') onCount?.(openCount);
+  }, [loading, loadError, openCount, onCount]);
 
   const refresh = async () => {
     const nextChecks = await listSourceChecks(supabase);
@@ -94,11 +103,22 @@ export function CatalogueSourceLinks({ onRunRecorded, onClaimsChecked }: { onRun
     }
   };
 
+  // The links that are not working: a list to decide on, on Waiting for review.
+  if (part === 'look-at') {
+    return (
+      <section aria-label="Source links to look at" data-testid="source-links-look-at">
+        {loading ? <p>Loading…</p> : loadError !== '' ? <p role="alert" className={styles.error}>{loadError}</p> : null}
+        {!loading && loadError === '' && summary.latest !== null && flagged.length === 0 && <p>Every checked link works.</p>}
+        {flagged.length > 0 && <CatalogueFlaggedLinks flagged={flagged} onChanged={refresh} onClaimsChecked={onClaimsChecked} />}
+      </section>
+    );
+  }
+
+  // The tool: run the link check and say how far it got, on Find and check.
   return (
     <section className={styles.panel} aria-label="Source links" data-testid="source-links">
       <div className={styles.panelHeader}>
         <div>
-          <h2>Source links</h2>
           {loading ? <p>Loading…</p> : loadError !== '' ? (
             <p role="alert" className={styles.error}>{loadError}</p>
           ) : (
@@ -117,8 +137,6 @@ export function CatalogueSourceLinks({ onRunRecorded, onClaimsChecked }: { onRun
       {progress !== null && <p role="status">Checked {String(progress.done)} of {String(progress.total)}</p>}
       {notice !== '' && <p role="status">{notice}</p>}
       {error !== '' && <p role="alert" className={styles.error}>{error}</p>}
-      {!loading && loadError === '' && summary.latest !== null && flagged.length === 0 && <p>Every checked link works.</p>}
-      {flagged.length > 0 && <CatalogueFlaggedLinks flagged={flagged} onChanged={refresh} onClaimsChecked={onClaimsChecked} />}
     </section>
   );
 }

@@ -49,7 +49,7 @@ for (const viewport of [{ width: 1280, height: 800 }, { width: 390, height: 844 
 
     if (viewport.width > 768) {
       // Desktop: every area is on the rail, under captions, and only the current one is marked.
-      for (const name of ['Capability sets', 'Products', 'Waiting for review', 'Sector catalogues', 'Sample models', 'LLM proxy']) {
+      for (const name of ['Capability sets', 'Products', 'Waiting for review', 'Find and check', 'Sector catalogues', 'Sample models', 'LLM proxy']) {
         await expect(nav.getByRole('link', { name: new RegExp(name) })).toBeVisible();
       }
       await expect(nav.getByText('Product library')).toBeVisible();
@@ -59,9 +59,10 @@ for (const viewport of [{ width: 1280, height: 800 }, { width: 390, height: 844 
       await expect(nav.getByRole('link', { name: /Sector catalogues/ })).not.toHaveAttribute('aria-current', 'page');
       await expect(nav.getByRole('link', { name: /Waiting for review/ })).toContainText(/\d+ claims? waiting/);
     } else {
-      // Phone: three areas and More on the bar; the rest in the More sheet.
+      // Phone: four areas and More on the bar; the rest in the More sheet.
       await expect(nav.getByRole('link', { name: 'Products' })).toBeVisible();
       await expect(nav.getByRole('link', { name: /Waiting for review/ })).toContainText(/\d+ claims? waiting/);
+      await expect(nav.getByRole('link', { name: /Find/ })).toBeVisible();
       await expect(nav.getByRole('link', { name: 'Capability sets' })).toBeHidden();
       await nav.getByRole('button', { name: /^More/ }).click();
       const sheet = page.getByRole('region', { name: 'More sections' });

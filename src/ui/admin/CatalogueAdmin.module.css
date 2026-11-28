@@ -86,3 +86,19 @@
   max-width: 100%;
   min-width: 0;
 }
+
+/* Waiting for review and Find and check: one section pattern for every block. */
+.sections { display: flex; flex-direction: column; gap: var(--space-2); }
+.chips { display: flex; flex-wrap: wrap; gap: var(--space-2); margin: 0; padding: 0; list-style: none; }
+.chips li { border: 1px solid var(--border-strong); border-radius: var(--radius-sm); background: var(--surface); padding: var(--space-1) var(--space-2); font-size: var(--text-sm-size); }
+.section { border: 1px solid var(--border-strong); border-radius: var(--radius-sm); background: var(--surface); }
+.section > summary { cursor: pointer; padding: var(--space-3); min-height: 44px; display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2); }
+.section[open] > summary { border-bottom: 1px solid var(--border); }
+.sectionTitle { font-weight: 600; }
+.sectionCount { background: var(--surface-raised); border: 1px solid var(--border); border-radius: 999px; padding: 0 var(--space-2); font-size: var(--text-xs-size); }
+.sectionHint { flex-basis: 100%; color: var(--text-muted); font-size: var(--text-sm-size); }
+.sectionEmpty { opacity: 0.8; }
+.sectionEmpty .sectionCount { color: var(--text-muted); }
+.sectionBody { padding: var(--space-3); display: flex; flex-direction: column; gap: var(--space-3); }
+.sectionBody > section { margin: 0; }
+.pairList { display: block; }

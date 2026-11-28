@@ -55,7 +55,6 @@ export function CatalogueFlaggedLinks({ flagged, onChanged, onClaimsChecked }: {
 
   const keptCount = flagged.filter((item) => isKept(item.check.hiddenUntil, now)).length;
   const counts = GROUPS.map((group) => ({ ...group, count: flagged.filter((item) => item.check.result === group.result && !isKept(item.check.hiddenUntil, now)).length }));
-  const open = flagged.length - keptCount;
 
   const act = async (key: string, work: () => Promise<string>) => {
     setBusy(key); setError(''); setNotice('');
@@ -117,7 +116,6 @@ export function CatalogueFlaggedLinks({ flagged, onChanged, onClaimsChecked }: {
 
   return (
     <div data-testid="source-links-flagged">
-      <h3>Source links to look at ({open})</h3>
       <p data-testid="source-links-counts">
         {counts.filter((group) => group.count > 0).map((group) => `${group.title} ${String(group.count)}`).join(', ') || 'Nothing is waiting.'}
         {keptCount > 0 ? `. ${String(keptCount)} kept for now.` : ''}

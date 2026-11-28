@@ -508,3 +508,16 @@ call to the AI had failed, and the reason was thrown away.
 - Early rows with the note "The AI could not be reached." are ignored when
   listing and when choosing monthly work, so those claims count as unchecked
   and a re-run replaces them. No schema change and no data was deleted.
+
+## Amendment, 28 November 2026: Waiting for review split in two
+
+Waiting for review had grown to seven panels, mixing tools that run (buttons,
+progress, results) with lists a person decides on, with the review queue itself
+last and a different collapse pattern in each panel. It is now two pages with
+one pattern (`ReviewSection`): Waiting for review holds five decision blocks
+(claims to review, claims to look at, source links to look at, possible
+duplicates, suggested platforms) with a count each; Find and check holds the
+tools (monthly check, check links and claims, find products, find products for
+a set). The first block with something waiting opens, and an empty block is
+dimmed and still opens, so a result message or the merged-products record stays
+reachable. No schema, function or permission change.
