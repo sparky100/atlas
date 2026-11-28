@@ -7,6 +7,7 @@ import { Loading } from '../components/Loading/Loading';
 import { supabase } from '../supabaseClient';
 import { publicationLabelText } from './catalogueShared';
 import styles from './CatalogueAdmin.module.css';
+import { errorText } from './adminErrorText';
 
 /**
  * `/platform-admin/catalogue` — the product library list. Editing is on the
@@ -22,7 +23,7 @@ export function CatalogueProductsAdmin() {
   useEffect(() => {
     void listCatalogueProducts(supabase)
       .then(setProducts)
-      .catch((cause: unknown) => { setError(cause instanceof Error ? cause.message : String(cause)); })
+      .catch((cause: unknown) => { setError(errorText(cause)); })
       .finally(() => { setLoading(false); });
   }, []);
 

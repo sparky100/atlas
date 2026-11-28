@@ -14,6 +14,7 @@ import { splitByLibrary } from '../../tools/catalogueFindProducts';
 import { supabase } from '../supabaseClient';
 import { setLabel } from './catalogueShared';
 import styles from './CatalogueAdmin.module.css';
+import { errorText } from './adminErrorText';
 
 interface CapabilityResult {
   code: string;
@@ -64,7 +65,7 @@ export function CatalogueSetProducts({ onRunRecorded, onChanged }: { onRunRecord
         setSets(published);
         setSetId(published[0]?.id ?? '');
       })
-      .catch((cause: unknown) => { setError(cause instanceof Error ? cause.message : String(cause)); })
+      .catch((cause: unknown) => { setError(errorText(cause)); })
       .finally(() => { setLoading(false); });
   }, []);
 
@@ -76,7 +77,7 @@ export function CatalogueSetProducts({ onRunRecorded, onChanged }: { onRunRecord
         if (!current) return;
         setItems(nextItems); setProducts(inputs.products); setLinks(inputs.links); setRejected(inputs.rejected);
       })
-      .catch((cause: unknown) => { if (current) setError(cause instanceof Error ? cause.message : String(cause)); });
+      .catch((cause: unknown) => { if (current) setError(errorText(cause)); });
     return () => { current = false; };
   }, [setId, reloadKey]);
 
@@ -124,7 +125,7 @@ export function CatalogueSetProducts({ onRunRecorded, onChanged }: { onRunRecord
       setNotice(`${String(result.accepted.length)} link${result.accepted.length === 1 ? '' : 's'} accepted and added to the products as edits. Published products show “published, with changes” until you republish them.${result.failed.length > 0 ? ` ${result.failed.map((row) => `${row.product}: ${row.message}`).join(' ')}` : ''}`);
       refresh();
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : String(cause));
+      setError(errorText(cause));
     } finally {
       setBusy(false);
     }
@@ -140,7 +141,7 @@ export function CatalogueSetProducts({ onRunRecorded, onChanged }: { onRunRecord
       setNotice(`${String(chosenLinks.length)} link${chosenLinks.length === 1 ? '' : 's'} rejected. They will not be proposed again.`);
       refresh();
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : String(cause));
+      setError(errorText(cause));
     } finally {
       setBusy(false);
     }
@@ -181,7 +182,7 @@ export function CatalogueSetProducts({ onRunRecorded, onChanged }: { onRunRecord
           }
           out.push({ code: capability.code, name: capability.name, found: result.found.length, added: saving.saved, existing: split.existing.map((row) => ({ productId: row.productId, product: row.product, vendor: row.vendor })), dropped: result.dropped.length, error: saving.failed.length > 0 ? `${String(saving.failed.length)} could not be saved.` : null });
         } catch (cause) {
-          const message = cause instanceof Error ? cause.message : String(cause);
+          const message = errorText(cause);
           out.push({ code: capability.code, name: capability.name, found: 0, added: [], existing: [], dropped: 0, error: message });
           if (message.includes('daily AI limit')) { status = 'limit_reached'; note = message; break; }
           if (message.includes('Web search is not switched on') || message.includes('no platform AI key')) { status = 'failed'; note = message; break; }
@@ -196,7 +197,7 @@ export function CatalogueSetProducts({ onRunRecorded, onChanged }: { onRunRecord
       else setNotice(note);
     } catch (cause) {
       status = 'failed';
-      note = cause instanceof Error ? cause.message : String(cause);
+      note = errorText(cause);
       setError(`${note} What was found so far is saved.`);
     } finally {
       if (runId !== null) {

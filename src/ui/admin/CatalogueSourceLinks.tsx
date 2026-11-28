@@ -7,6 +7,7 @@ import { supabase } from '../supabaseClient';
 import { CatalogueFlaggedLinks } from './CatalogueFlaggedLinks';
 import { formatDay } from './catalogueShared';
 import styles from './CatalogueAdmin.module.css';
+import { errorText } from './adminErrorText';
 
 /**
  * The "Source links" section of Waiting for review (step 5a). It asks the link
@@ -35,7 +36,7 @@ export function CatalogueSourceLinks({ part, onRunRecorded, onClaimsChecked, onC
         setChecks(nextChecks);
         setFlagged(await listFlaggedSourceLinks(supabase, nextChecks));
       } catch (cause) {
-        setLoadError(cause instanceof Error ? cause.message : String(cause));
+        setLoadError(errorText(cause));
       } finally {
         setLoading(false);
       }
@@ -85,7 +86,7 @@ export function CatalogueSourceLinks({ part, onRunRecorded, onClaimsChecked, onC
       if (!stopped()) setNotice(`Checked ${String(urls.length)} links.`);
     } catch (cause) {
       outcome = 'failed';
-      setError(`${cause instanceof Error ? cause.message : String(cause)} ${done > 0 ? `The ${String(done)} links checked before this are saved.` : 'Nothing was saved.'}`);
+      setError(`${errorText(cause)} ${done > 0 ? `The ${String(done)} links checked before this are saved.` : 'Nothing was saved.'}`);
     } finally {
       if (runId !== null) {
         await finishCheckRun(supabase, runId, { status: outcome, linksChecked: done, claimsChecked: 0, flagged: notOk, tokens: { input: 0, output: 0 }, note: null }).catch(() => undefined);
@@ -96,7 +97,7 @@ export function CatalogueSourceLinks({ part, onRunRecorded, onClaimsChecked, onC
         setChecks(nextChecks);
         setFlagged(await listFlaggedSourceLinks(supabase, nextChecks));
       } catch (cause) {
-        setError((previous) => `${previous} ${cause instanceof Error ? cause.message : String(cause)}`.trim());
+        setError((previous) => `${previous} ${errorText(cause)}`.trim());
       }
       setRunning(false);
       setProgress(null);

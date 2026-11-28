@@ -4,6 +4,7 @@ import { findComponentsOfPlatform, finishCheckRun, listLibraryProductKeys, saveF
 import { nameMatchKey, splitByLibrary, type FindResult } from '../../tools/catalogueFindProducts';
 import { supabase } from '../supabaseClient';
 import styles from './CatalogueAdmin.module.css';
+import { errorText } from './adminErrorText';
 
 const BASE = '/platform-admin/catalogue';
 
@@ -54,7 +55,7 @@ export function CatalogueFindComponents({ platform, disabled, onChanged }: { pla
       if (saving.failed.length > 0) note = `${String(saving.failed.length)} could not be saved.`;
       if (savedCount > 0) onChanged();
     } catch (cause) {
-      const message = cause instanceof Error ? cause.message : String(cause);
+      const message = errorText(cause);
       status = message.includes('daily AI limit') ? 'limit_reached' : 'failed';
       note = message;
       setError(`${message} Nothing was added.`);

@@ -7,6 +7,7 @@ import { Text } from '../components/Text/Text';
 import { supabase } from '../supabaseClient';
 import { sectorLabel } from './catalogueShared';
 import styles from './CatalogueAdmin.module.css';
+import { errorText } from './adminErrorText';
 
 const BASE = '/platform-admin/catalogue';
 
@@ -31,7 +32,7 @@ export function CatalogueVersionAdmin({ catalogueId, sector }: { catalogueId: st
         setVersion(found);
         setEntries(await listCatalogueEntries(supabase, catalogueId));
       } catch (cause) {
-        setLoadError(cause instanceof Error ? cause.message : String(cause));
+        setLoadError(errorText(cause));
       } finally {
         setLoading(false);
       }

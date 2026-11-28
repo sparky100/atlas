@@ -6,6 +6,7 @@ import { FIND_DAILY_TOKEN_LIMIT, FIND_MAX_PRODUCTS, FIND_MAX_SEARCHES, splitByLi
 import { supabase } from '../supabaseClient';
 import { formatDay, sectorLabel, setLabel } from './catalogueShared';
 import styles from './CatalogueAdmin.module.css';
+import { errorText } from './adminErrorText';
 
 interface Outcome {
   capability: string;
@@ -49,7 +50,7 @@ export function CatalogueFindProducts({ onRunRecorded }: { onRunRecorded?: () =>
         setSets(published);
         setSetId(published[0]?.id ?? '');
       })
-      .catch((cause: unknown) => { setError(cause instanceof Error ? cause.message : String(cause)); })
+      .catch((cause: unknown) => { setError(errorText(cause)); })
       .finally(() => { setLoading(false); });
   }, []);
 
@@ -58,7 +59,7 @@ export function CatalogueFindProducts({ onRunRecorded }: { onRunRecorded?: () =>
     let current = true;
     void listCapabilitySetItems(supabase, setId)
       .then((next) => { if (current) setItems(next); })
-      .catch((cause: unknown) => { if (current) setError(cause instanceof Error ? cause.message : String(cause)); });
+      .catch((cause: unknown) => { if (current) setError(errorText(cause)); });
     return () => { current = false; };
   }, [setId]);
 
@@ -98,7 +99,7 @@ export function CatalogueFindProducts({ onRunRecorded }: { onRunRecorded?: () =>
         if (saving.failed.length > 0) note = `${String(saving.failed.length)} could not be saved.`;
       }
     } catch (cause) {
-      const message = cause instanceof Error ? cause.message : String(cause);
+      const message = errorText(cause);
       status = message.includes('daily AI limit') ? 'limit_reached' : 'failed';
       note = message;
       setError(`${message} Nothing was added.`);

@@ -6,6 +6,7 @@ import { checksToSave, CLAIM_CHECK_MAX_CLAIMS } from '../../tools/catalogueClaim
 import { supabase } from '../supabaseClient';
 import { formatDay } from './catalogueShared';
 import styles from './CatalogueAdmin.module.css';
+import { errorText } from './adminErrorText';
 
 /**
  * The "Claims" section of Waiting for review (step 5b-1). It asks the claim
@@ -38,7 +39,7 @@ export function CatalogueClaimChecks({ part, onRunRecorded, onCount }: { part: '
         setChecks(nextChecks);
         setLinkChecks(nextLinks);
       } catch (cause) {
-        setLoadError(cause instanceof Error ? cause.message : String(cause));
+        setLoadError(errorText(cause));
       } finally {
         setLoading(false);
       }
@@ -107,14 +108,14 @@ export function CatalogueClaimChecks({ part, onRunRecorded, onCount }: { part: '
       if (!stopped() && outcome === 'finished') setNotice(`Checked ${String(done)} of ${String(queue.length)} claims.${done < queue.length ? ' The rest could not be checked by the AI this time and are still waiting.' : ''}`);
     } catch (cause) {
       outcome = 'failed';
-      runNote = cause instanceof Error ? cause.message : String(cause);
-      setError(`${cause instanceof Error ? cause.message : String(cause)} ${done > 0 ? `The ${String(done)} claims checked before this are saved.` : 'Nothing was saved.'}`);
+      runNote = errorText(cause);
+      setError(`${errorText(cause)} ${done > 0 ? `The ${String(done)} claims checked before this are saved.` : 'Nothing was saved.'}`);
     } finally {
       if (runId !== null) {
         await finishCheckRun(supabase, runId, { status: outcome, linksChecked: 0, claimsChecked: done, flagged, tokens, note: runNote }).catch(() => undefined);
         onRunRecorded?.();
       }
-      try { await reload(); } catch (cause) { setError((previous) => `${previous} ${cause instanceof Error ? cause.message : String(cause)}`.trim()); }
+      try { await reload(); } catch (cause) { setError((previous) => `${previous} ${errorText(cause)}`.trim()); }
       setRunning(false);
       setProgress(null);
     }
@@ -127,7 +128,7 @@ export function CatalogueClaimChecks({ part, onRunRecorded, onCount }: { part: '
       await reload();
       setNotice('Recorded: you looked and the claim stands.');
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : String(cause));
+      setError(errorText(cause));
       await reload().catch(() => undefined);
     } finally {
       setClearing(null);

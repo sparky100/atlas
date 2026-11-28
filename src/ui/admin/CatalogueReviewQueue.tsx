@@ -12,6 +12,7 @@ import { ReviewSection } from './ReviewSection';
 import { useReviewSections } from './useReviewSections';
 import { claimDraftedText } from './catalogueShared';
 import styles from './CatalogueAdmin.module.css';
+import { errorText } from './adminErrorText';
 
 interface ProductGroup {
   productId: string;
@@ -61,7 +62,7 @@ export function CatalogueReviewQueue() {
   useEffect(() => {
     void listClaimsWaitingForReview(supabase)
       .then((result) => { setClaims(result.claims); setTotal(result.total); })
-      .catch((cause: unknown) => { setError(cause instanceof Error ? cause.message : String(cause)); })
+      .catch((cause: unknown) => { setError(errorText(cause)); })
       .finally(() => { setLoading(false); });
   }, []);
 
@@ -101,7 +102,7 @@ export function CatalogueReviewQueue() {
         ? `Nothing changed for ${group.productName}: those claims were already reviewed or edited.`
         : `${String(count)} claim${count === 1 ? '' : 's'} for ${group.productName} marked as reviewed by you.`);
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : String(cause));
+      setError(errorText(cause));
       await reload().catch(() => undefined);
     } finally {
       setBusy(false);
