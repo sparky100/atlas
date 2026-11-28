@@ -213,7 +213,6 @@ export function CatalogueSetProducts({ onRunRecorded, onChanged }: { onRunRecord
     <section className={styles.panel} aria-label="Find products for a set" data-testid="set-products">
       <div className={styles.panelHeader}>
         <div>
-          <h2>Find products for a set</h2>
           <p>
             Choose a published capability set. Links are proposed from products already in the library, and you can search for products for capabilities that have none. Nothing goes live until a person reviews and publishes.
           </p>

@@ -40,6 +40,15 @@ async function signUpAdmin(page: Page): Promise<void> {
   await page.reload();
 }
 
+/** Waits for the page to settle, then opens a block on Waiting for review or Find and check if it is not already open. */
+async function openSection(page: Page, id: string): Promise<void> {
+  await expect(page.locator('[data-ready="true"], [data-testid="catalogue-tools"]').first()).toBeVisible();
+  const section = page.getByTestId(`section-${id}`);
+  await expect(section).toBeVisible();
+  if ((await section.getAttribute('open')) === null) await section.locator(':scope > summary').click();
+  await expect(section).toHaveAttribute('open', '');
+}
+
 async function seedAlignedSet(suffix: string): Promise<string> {
   const service = createServiceRoleClient(loadEnv());
   const mapId = randomUUID();
@@ -192,9 +201,13 @@ for (const viewport of [{ width: 1280, height: 800 }, { width: 390, height: 844 
     ]));
 
     await signUpAdmin(page);
-    await page.goto('/platform-admin/catalogue/review');
+    // The tool says how far the check got; the list of what is wrong is on Waiting for review.
+    await page.goto('/platform-admin/catalogue/tools');
+    await openSection(page, 'checks');
     await expect(page.getByTestId('source-links-summary')).toContainText('links checked');
     await expect(page.getByRole('button', { name: 'Check source links' })).toBeEnabled();
+    await page.goto('/platform-admin/catalogue/review');
+    await openSection(page, 'links');
     const flagged = page.getByTestId('source-links-flagged');
     // Closed by default, with the counts showing; the group opens on demand.
     await expect(page.getByTestId('source-links-counts')).toContainText('Gone');
@@ -235,9 +248,12 @@ for (const viewport of [{ width: 1280, height: 800 }, { width: 390, height: 844 
     checked(await service.from('catalogue_claim_checks').insert({ product_id: productId, source_url: sourceUrl, statement, verdict: 'changed', quote, note: 'The page now says the feature is gone.', model: 'test-model', input_tokens: 10, output_tokens: 5, checked_by: zero }));
 
     await signUpAdmin(page);
-    await page.goto('/platform-admin/catalogue/review');
+    await page.goto('/platform-admin/catalogue/tools');
+    await openSection(page, 'checks');
     await expect(page.getByTestId('claim-checks-summary')).toBeVisible();
     await expect(page.getByRole('button', { name: /Check claims against their sources/ })).toBeVisible();
+    await page.goto('/platform-admin/catalogue/review');
+    await openSection(page, 'look-at');
     const flagged = page.getByTestId('claim-checks-flagged');
     await expect(flagged).toContainText(statement);
     await expect(flagged.getByTestId('claim-check-quote')).toContainText(quote);
@@ -253,6 +269,7 @@ for (const viewport of [{ width: 1280, height: 800 }, { width: 390, height: 844 
 
     // A person looks and keeps it: it leaves the list and the editor records who.
     await page.goto('/platform-admin/catalogue/review');
+    await openSection(page, 'look-at');
     await page.getByTestId('claim-checks-flagged').getByRole('button', { name: 'I looked: it still stands' }).click();
     await expect(page.getByTestId('claim-checks-flagged')).toHaveCount(0);
     await page.goto(`/platform-admin/catalogue/products/${productId}`);
@@ -285,12 +302,13 @@ for (const viewport of [{ width: 1280, height: 800 }, { width: 390, height: 844 
       const reason = 'The AI provider refused the key (status 401).';
       await route.fulfill({
         status: 200, headers: { ...cors, 'content-type': 'application/json' },
-        body: JSON.stringify({ status: 'ok', results: body.claims.map((claim) => ({ ...claim, verdict: 'cant_tell', quote: null, note: `Not checked. ${reason}`, model: null, inputTokens: 0, outputTokens: 0, aiError: reason })) }),
+        body: JSON.stringify({ status: 'ok', results: body.claims.map((claim) => ({ productId: claim.productId, sourceUrl: claim.sourceUrl, statement: claim.statement, verdict: 'cant_tell', quote: null, note: `Not checked. ${reason}`, model: null, inputTokens: 0, outputTokens: 0, aiError: reason })) }),
       });
     });
 
     await signUpAdmin(page);
-    await page.goto('/platform-admin/catalogue/review');
+    await page.goto('/platform-admin/catalogue/tools');
+    await openSection(page, 'checks');
     await page.getByRole('button', { name: /Check claims against their sources/ }).click();
     await expect(page.getByTestId('claim-checks').getByRole('alert')).toContainText('The AI provider refused the key (status 401).');
     await expect(page.getByTestId('claim-checks').getByRole('alert')).toContainText('No claims were marked as checked');
@@ -310,9 +328,10 @@ for (const viewport of [{ width: 1280, height: 800 }, { width: 390, height: 844 
     if (inserted.error) throw new Error(`monthly-check seed: ${inserted.error.message}`);
 
     await signUpAdmin(page);
-    await page.goto('/platform-admin/catalogue/review');
+    await page.goto('/platform-admin/catalogue/tools');
+    await openSection(page, 'monthly');
     const section = page.getByTestId('monthly-check');
-    await expect(section.getByRole('heading', { name: 'Monthly check' })).toBeVisible();
+    await expect(page.getByTestId('section-monthly')).toContainText('Monthly check');
     await expect(section.getByTestId('check-runs')).toContainText('Monthly check');
     await expect(section.getByTestId('check-runs')).toContainText('3 need a look');
     await expect(section.getByTestId('check-runs')).toContainText('8,400 AI tokens');
@@ -369,9 +388,10 @@ for (const viewport of [{ width: 1280, height: 800 }, { width: 390, height: 844 
     });
 
     await signUpAdmin(page);
-    await page.goto('/platform-admin/catalogue/review');
+    await page.goto('/platform-admin/catalogue/tools');
+    await openSection(page, 'find-products');
     const section = page.getByTestId('find-products');
-    await expect(section.getByRole('heading', { name: 'Find new products' })).toBeVisible();
+    await expect(page.getByTestId('section-find-products')).toContainText('Find new products');
     await expect(section.getByRole('button', { name: 'Find products for this capability' })).toBeDisabled();
     await section.getByLabel('Capability set').selectOption(mapId);
     await section.getByLabel('Search the capabilities').fill(`test capability ${suffix}`);
@@ -469,7 +489,8 @@ test('finding products says so in words when web search is not switched on', asy
     await route.fulfill({ status: 503, headers: { ...cors, 'content-type': 'application/json' }, body: JSON.stringify({ status: 'error', code: 'web_search_off', message: 'Web search is not switched on for the platform AI account. Nothing was searched.' }) });
   });
   await signUpAdmin(page);
-  await page.goto('/platform-admin/catalogue/review');
+  await page.goto('/platform-admin/catalogue/tools');
+  await openSection(page, 'find-products');
   const section = page.getByTestId('find-products');
   await section.getByLabel('Capability set').selectOption(mapId);
   await section.getByRole('option', { name: new RegExp(capabilityName) }).click();
@@ -531,7 +552,8 @@ for (const viewport of [{ width: 1280, height: 800 }, { width: 390, height: 844 
     });
 
     await signUpAdmin(page);
-    await page.goto('/platform-admin/catalogue/review');
+    await page.goto('/platform-admin/catalogue/tools');
+    await openSection(page, 'set-products');
     const section = page.getByTestId('set-products');
     await section.getByLabel('Capability set').selectOption(newMap);
     await expect(section.getByTestId('set-products-counts')).toContainText('3 capabilities, 0 with a product, 3 with none, 2 links proposed');
@@ -604,6 +626,7 @@ for (const viewport of [{ width: 1280, height: 800 }, { width: 390, height: 844 
 
     await signUpAdmin(page);
     await page.goto('/platform-admin/catalogue/review');
+    await openSection(page, 'links');
     const counts = page.getByTestId('source-links-counts');
     await expect(counts).toContainText('Moved');
     await expect(counts).toContainText('Gone');
@@ -661,8 +684,8 @@ for (const viewport of [{ width: 1280, height: 800 }, { width: 390, height: 844 
 
     await signUpAdmin(page);
     await page.goto('/platform-admin/catalogue/review');
+    await openSection(page, 'duplicates');
     const duplicates = page.getByTestId('duplicates');
-    await duplicates.getByTestId('duplicate-pairs').locator('summary').click();
     const pair = duplicates.getByTestId('duplicate-pair').filter({ hasText: `Dupvendor ${suffix}` });
     await expect(pair).toContainText('The same name once the vendor’s name is left out');
     await pair.getByRole('button', { name: new RegExp(`^Keep Network manager ${suffix}, merge`) }).click();
@@ -707,7 +730,7 @@ for (const viewport of [{ width: 1280, height: 900 }, { width: 390, height: 844 
     await signUpAdmin(page);
     // The platform and its own component are not offered as a possible duplicate; the loose product is.
     await page.goto('/platform-admin/catalogue/review');
-    await page.getByTestId('duplicates').getByTestId('duplicate-pairs').locator('summary').click();
+    await openSection(page, 'duplicates');
     const pairs = page.getByTestId('duplicate-pair').filter({ hasText: vendor });
     await expect(pairs.filter({ hasText: `Gridsuite ${suffix} Billing` })).toHaveCount(1);
     await expect(pairs.filter({ hasText: `Gridsuite ${suffix} Network` })).toHaveCount(0);
@@ -761,9 +784,8 @@ for (const viewport of [{ width: 1280, height: 900 }, { width: 390, height: 844 
 
     await signUpAdmin(page);
     await page.goto('/platform-admin/catalogue/review');
+    await openSection(page, 'platforms');
     const panel = page.getByTestId('platform-suggestions');
-    const list = panel.getByTestId('platform-suggestion-list');
-    if (!(await list.evaluate((element) => (element as HTMLDetailsElement).open))) await list.locator(':scope > summary').click();
     const gridworks = panel.getByTestId('platform-suggestion').filter({ hasText: `Gridworks ${suffix}` });
     await expect(gridworks).toContainText('Not in the library yet');
     await gridworks.getByRole('checkbox', { name: `Gridworks ${suffix} Billing` }).uncheck();
@@ -782,6 +804,7 @@ for (const viewport of [{ width: 1280, height: 900 }, { width: 390, height: 844 
     await fieldkit.getByRole('button', { name: 'Not a platform: stop suggesting this' }).click();
     await expect(panel.getByRole('status').filter({ hasText: 'Not suggesting' })).toBeVisible();
     await page.reload();
+    await openSection(page, 'platforms');
     const again = page.getByTestId('platform-suggestions');
     await expect(again.getByTestId('platform-suggestion').filter({ hasText: `Gridworks ${suffix}` })).toHaveCount(1);
     await expect(again.getByTestId('platform-suggestion').filter({ hasText: `Fieldkit ${suffix}` })).toHaveCount(0);

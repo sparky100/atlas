@@ -15,7 +15,7 @@ import styles from './CatalogueAdmin.module.css';
  * flags: it never edits a claim or unpublishes anything, and every result says
  * it was checked by the AI.
  */
-export function CatalogueClaimChecks({ onRunRecorded }: { onRunRecorded?: () => void } = {}) {
+export function CatalogueClaimChecks({ part, onRunRecorded, onCount }: { part: 'run' | 'look-at'; onRunRecorded?: () => void; onCount?: (count: number) => void }) {
   const [claims, setClaims] = useState<ClaimForCheck[]>([]);
   const [checks, setChecks] = useState<ClaimCheckRow[]>([]);
   const [linkChecks, setLinkChecks] = useState<SourceCheckRow[]>([]);
@@ -61,6 +61,10 @@ export function CatalogueClaimChecks({ onRunRecorded }: { onRunRecorded?: () => 
       .sort((a, b) => b.check.checkedAt.localeCompare(a.check.checkedAt));
     return { checked: checked.length, latest, due, toLookAt };
   }, [claims, checks, linkChecks, checkAgain]);
+
+  useEffect(() => {
+    if (!loading && loadError === '') onCount?.(view.toLookAt.length);
+  }, [loading, loadError, view.toLookAt.length, onCount]);
 
   const reload = async () => {
     setChecks(await listClaimChecks(supabase));
@@ -130,11 +134,47 @@ export function CatalogueClaimChecks({ onRunRecorded }: { onRunRecorded?: () => 
     }
   };
 
+  const flaggedList = view.toLookAt.length > 0 && (
+    <div data-testid="claim-checks-flagged">
+      {view.toLookAt.map(({ claim, check }) => (
+        <div key={claimCheckKey(check)} className={styles.queueClaim}>
+          <p>
+            <strong>{check.model === null ? 'Not checked' : claimCheckVerdictLabel(check.verdict)}</strong>: {claim.statement}
+          </p>
+          <small>
+            <Link to={`/platform-admin/catalogue/products/${claim.productId}`}>{claim.product}</Link> ({claim.vendor}) · <a href={claim.sourceUrl} target="_blank" rel="noopener noreferrer">open the source</a>
+          </small>
+          {check.quote !== null && <small data-testid="claim-check-quote">The page says: “{check.quote}”</small>}
+          {check.note !== null && <small>{check.note}</small>}
+          <small>{check.model === null
+            ? `No check was completed (${formatDay(check.checkedAt)}). Nothing was decided about this claim.`
+            : `Checked by the AI (${check.model}), ${formatDay(check.checkedAt)}. Not checked by a person.`}</small>
+          <div className={styles.actions}>
+            <button type="button" onClick={() => { void clear(check); }} disabled={clearing !== null || running}>I looked: it still stands</button>
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+
+  // The claims the checker could not confirm: a list to decide on, on Waiting for review.
+  if (part === 'look-at') {
+    return (
+      <section aria-label="Claims to look at" data-testid="claim-checks-look-at">
+        {loading ? <p>Loading…</p> : loadError !== '' ? <p role="alert" className={styles.error}>{loadError}</p> : null}
+        {notice !== '' && <p role="status">{notice}</p>}
+        {error !== '' && <p role="alert" className={styles.error}>{error}</p>}
+        {!loading && loadError === '' && view.latest !== null && view.toLookAt.length === 0 && <p>Every checked claim still matches its source, or has been looked at.</p>}
+        {flaggedList}
+      </section>
+    );
+  }
+
+  // The tool: run the check and say how far it got, on Find and check.
   return (
     <section className={styles.panel} aria-label="Claim checks" data-testid="claim-checks">
       <div className={styles.panelHeader}>
         <div>
-          <h2>Claims against their sources</h2>
           {loading ? <p>Loading…</p> : loadError !== '' ? (
             <p role="alert" className={styles.error}>{loadError}</p>
           ) : (
@@ -158,30 +198,6 @@ export function CatalogueClaimChecks({ onRunRecorded }: { onRunRecorded?: () => 
       {progress !== null && <p role="status">Checked {String(progress.done)} of {String(progress.total)}</p>}
       {notice !== '' && <p role="status">{notice}</p>}
       {error !== '' && <p role="alert" className={styles.error}>{error}</p>}
-      {!loading && loadError === '' && view.latest !== null && view.toLookAt.length === 0 && <p>Every checked claim still matches its source, or has been looked at.</p>}
-      {view.toLookAt.length > 0 && (
-        <div data-testid="claim-checks-flagged">
-          <h3>Claims to look at ({view.toLookAt.length})</h3>
-          {view.toLookAt.map(({ claim, check }) => (
-            <div key={claimCheckKey(check)} className={styles.queueClaim}>
-              <p>
-                <strong>{check.model === null ? 'Not checked' : claimCheckVerdictLabel(check.verdict)}</strong>: {claim.statement}
-              </p>
-              <small>
-                <Link to={`/platform-admin/catalogue/products/${claim.productId}`}>{claim.product}</Link> ({claim.vendor}) · <a href={claim.sourceUrl} target="_blank" rel="noopener noreferrer">open the source</a>
-              </small>
-              {check.quote !== null && <small data-testid="claim-check-quote">The page says: “{check.quote}”</small>}
-              {check.note !== null && <small>{check.note}</small>}
-              <small>{check.model === null
-                ? `No check was completed (${formatDay(check.checkedAt)}). Nothing was decided about this claim.`
-                : `Checked by the AI (${check.model}), ${formatDay(check.checkedAt)}. Not checked by a person.`}</small>
-              <div className={styles.actions}>
-                <button type="button" onClick={() => { void clear(check); }} disabled={clearing !== null || running}>I looked: it still stands</button>
-              </div>
-            </div>
-          ))}
-        </div>
-      )}
     </section>
   );
 }

@@ -1,4 +1,4 @@
-import { ClipboardCheck, Ellipsis, Grid, History, Home, Monitor, Package, Sparkles, type LucideIcon } from 'lucide-react';
+import { ClipboardCheck, Ellipsis, Grid, History, Home, Monitor, Package, Search, Sparkles, type LucideIcon } from 'lucide-react';
 import { useEffect, useId, useRef, useState } from 'react';
 import { Link, useLocation } from 'react-router';
 import { Text } from '../../components/Text/Text';
@@ -8,7 +8,7 @@ import navStyles from '../../components/ModelNav/ModelNav.module.css';
 import { useUnsavedChangesGuard } from './unsavedChanges';
 import styles from './PlatformAdminNav.module.css';
 
-type SectionId = 'overview' | 'capability-sets' | 'products' | 'review' | 'sectors' | 'sample-models' | 'llm-proxy';
+type SectionId = 'overview' | 'capability-sets' | 'products' | 'review' | 'tools' | 'sectors' | 'sample-models' | 'llm-proxy';
 
 interface Section {
   id: SectionId;
@@ -27,6 +27,7 @@ const SECTIONS: Record<SectionId, Section> = {
   'capability-sets': { id: 'capability-sets', to: '/platform-admin/capability-sets', label: 'Capability sets', icon: Grid, match: (pathname) => pathname === '/platform-admin/capability-sets' || pathname.startsWith('/platform-admin/capability-sets/') },
   products: { id: 'products', to: '/platform-admin/catalogue', label: 'Products', icon: Package, match: (pathname) => pathname === '/platform-admin/catalogue' || pathname.startsWith('/platform-admin/catalogue/products') },
   review: { id: 'review', to: '/platform-admin/catalogue/review', label: 'Waiting for review', shortLabel: 'Review', icon: ClipboardCheck, match: (pathname) => pathname.startsWith('/platform-admin/catalogue/review') },
+  tools: { id: 'tools', to: '/platform-admin/catalogue/tools', label: 'Find and check', shortLabel: 'Find', icon: Search, match: (pathname) => pathname.startsWith('/platform-admin/catalogue/tools') },
   sectors: { id: 'sectors', to: '/platform-admin/catalogue/sectors', label: 'Sector catalogues', icon: History, tag: 'History', match: (pathname) => pathname.startsWith('/platform-admin/catalogue/sectors') },
   'sample-models': { id: 'sample-models', to: '/platform-admin/sample-models', label: 'Sample models', icon: Monitor, match: (pathname) => pathname.startsWith('/platform-admin/sample-models') },
   'llm-proxy': { id: 'llm-proxy', to: '/platform-admin/llm-proxy', label: 'LLM proxy', icon: Sparkles, match: (pathname) => pathname.startsWith('/platform-admin/llm-proxy') },
@@ -36,12 +37,12 @@ const SECTIONS: Record<SectionId, Section> = {
 const GROUPS: { caption: string | null; ids: SectionId[] }[] = [
   { caption: null, ids: ['overview'] },
   { caption: 'Reference data', ids: ['capability-sets'] },
-  { caption: 'Product library', ids: ['products', 'review', 'sectors'] },
+  { caption: 'Product library', ids: ['products', 'review', 'tools', 'sectors'] },
   { caption: 'Platform', ids: ['sample-models', 'llm-proxy'] },
 ];
 
 /** On a phone these show in the bottom bar; every other section is one tap further, in the More sheet. */
-const BAR_IDS: readonly SectionId[] = ['overview', 'products', 'review'];
+const BAR_IDS: readonly SectionId[] = ['overview', 'products', 'review', 'tools'];
 
 /**
  * The platform-admin section's own navigation. It reuses the model navigation's

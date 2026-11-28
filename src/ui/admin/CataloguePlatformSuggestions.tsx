@@ -15,7 +15,7 @@ const suggestionKey = (suggestion: PlatformSuggestion) => `${suggestion.vendor}|
  * is not in the library yet it is added as a draft with no links or claims.
  * Turning a suggestion down is remembered, with who and when.
  */
-export function CataloguePlatformSuggestions({ onChanged }: { onChanged?: () => void } = {}) {
+export function CataloguePlatformSuggestions({ onChanged, onCount }: { onChanged?: () => void; onCount?: (count: number) => void } = {}) {
   const [suggestions, setSuggestions] = useState<PlatformSuggestion[]>([]);
   const [skipped, setSkipped] = useState<Set<string>>(new Set());
   const [loading, setLoading] = useState(true);
@@ -33,6 +33,10 @@ export function CataloguePlatformSuggestions({ onChanged }: { onChanged?: () => 
       .catch((cause: unknown) => { setError(cause instanceof Error ? cause.message : String(cause)); })
       .finally(() => { setLoading(false); });
   }, []);
+
+  useEffect(() => {
+    if (!loading) onCount?.(suggestions.length);
+  }, [loading, suggestions.length, onCount]);
 
   const act = async (work: () => Promise<string>) => {
     setBusy(true); setError(''); setNotice('');
@@ -61,13 +65,11 @@ export function CataloguePlatformSuggestions({ onChanged }: { onChanged?: () => 
 
   return (
     <section className={styles.panel} aria-label="Suggested platforms" data-testid="platform-suggestions">
-      <h2>Suggested platforms ({String(suggestions.length)})</h2>
       <p>Products by the same vendor that look like parts of one platform. Tick the ones that really are components and confirm. Nothing changes until you do.</p>
       {notice !== '' && <p role="status">{notice}</p>}
       {error !== '' && <p role="alert" className={styles.error}>{error}</p>}
       {suggestions.length > 0 && (
-        <details className={styles.group} data-testid="platform-suggestion-list">
-          <summary>{String(suggestions.length)} suggestion{suggestions.length === 1 ? '' : 's'} to look at</summary>
+        <div className={styles.pairList} data-testid="platform-suggestion-list">
           <div className={styles.groupBody}>
             {suggestions.map((suggestion) => {
               const chosen = suggestion.components.filter((component) => !skipped.has(component.id));
@@ -115,7 +117,7 @@ export function CataloguePlatformSuggestions({ onChanged }: { onChanged?: () => 
               );
             })}
           </div>
-        </details>
+        </div>
       )}
     </section>
   );

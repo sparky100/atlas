@@ -120,7 +120,6 @@ export function CatalogueFindProducts({ onRunRecorded }: { onRunRecorded?: () =>
     <section className={styles.panel} aria-label="Find new products" data-testid="find-products">
       <div className={styles.panelHeader}>
         <div>
-          <h2>Find new products</h2>
           <p>
             Choose a capability from a published set. The Researcher searches the public web for products that support it. Nothing goes live: every product it adds is a draft that a person reviews and publishes.
           </p>

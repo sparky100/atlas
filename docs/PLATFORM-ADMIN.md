@@ -51,6 +51,18 @@ else in this product checks platform-admin status.
    drafted and who reviewed each claim, with dates, and who published a
    catalogue version, and a product cannot be published while any of its claims
    is waiting for review.
+   **Two pages, one pattern (28 November 2026).** **Waiting for review** holds
+   only what needs a person to decide, in five blocks: Claims to review, Claims
+   to look at, Source links to look at, Possible duplicates and Suggested
+   platforms. **Find and check** (`/platform-admin/catalogue/tools`, in the
+   Product library group) holds the tools that run and report: Monthly check,
+   Check source links and claims, Find new products and Find products for a
+   set. Every block has the same header (title, how many are waiting, one line
+   on what to do) and opens and closes the same way; the first block with
+   something waiting opens, and a block with nothing waiting is dimmed and still
+   opens. Where this text says "the same screen" or "also on Waiting for
+   review" below for a tool, read Find and check; the lists of what to look at
+   stay on Waiting for review.
    The same screen has a **Source links** section: **Check source links**
    requests each distinct claim source link once (public https pages only, no
    AI) and saves the result, with the date and your name, as **Works**,
@@ -106,7 +118,7 @@ else in this product checks platform-admin status.
    function's address in Vault as `catalogue:schedule_url`. Until it is set, or
    while the switch is off, the job does nothing. The shared secret is created
    by the migration inside the database and is never shown.
-   **Find new products** (also on Waiting for review) finds products for one
+   **Find new products** (on Find and check) finds products for one
    capability. Choose a published capability set, search for and pick a
    capability, and press **Find products for this capability**. The platform AI
    searches the public web (at most 5 searches, 8 products) and must quote one
@@ -122,7 +134,7 @@ else in this product checks platform-admin status.
    web search switched on for the platform AI account in the provider's console;
    otherwise the screen says so and adds nothing. The model is `CATALOGUE_FIND_MODEL`
    (default Sonnet class).
-   **Find products for a set** (also on Waiting for review) works on a whole
+   **Find products for a set** (on Find and check) works on a whole
    published capability set. It shows how many capabilities have a product, then
    **Proposed links**: links from products already in the library, worked out by
    rules (no AI): the same code as a capability the product is linked to in
@@ -190,7 +202,7 @@ switch (step 4b) published products are not yet shown to users.
 
 A product can be a component of a platform (for example "ArcGIS Utility Network" is part of "ArcGIS"). Open the component, choose the platform under **Part of** and save. One level only: a component has no components, and a platform that has components cannot become a component. The platform's page lists its components, the product list marks both, and a platform and its own component are not offered as possible duplicates. Link capabilities on the components, not on the platform. A platform with components can be published with no capability links of its own, but it still needs its own reviewed claims. If the platform is not in the library yet, add it as a new product first, or let **Suggested platforms** do it (below).
 
-**Suggested platforms** is on the Waiting for review screen. It lists products by the same vendor whose names start the same way (for example several "Oracle Utilities ..." products) as the components of one platform. Tick the products that really are components and choose "Make N selected part of ...". If the platform is not in the library yet it is added as a draft with no links and no claims, and you describe and source it before publishing. "Not a platform: stop suggesting this" is remembered with your name and the date. Nothing changes until you choose.
+**Suggested platforms** is a block on the Waiting for review screen. It lists products by the same vendor whose names start the same way (for example several "Oracle Utilities ..." products) as the components of one platform. Tick the products that really are components and choose "Make N selected part of ...". If the platform is not in the library yet it is added as a draft with no links and no claims, and you describe and source it before publishing. "Not a platform: stop suggesting this" is remembered with your name and the date. Nothing changes until you choose.
 
 A published version records its platform, and a platform's published version records its components, by name, as they were when it was published. Only published products are named. So publish a platform after its components, or publish a component again after its platform, for "Part of ..." and "Components: ..." to show on capability pages.
 

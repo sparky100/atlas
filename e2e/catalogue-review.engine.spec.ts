@@ -77,6 +77,11 @@ for (const viewport of [{ width: 1280, height: 800 }, { width: 390, height: 844 
     // The same claim shows in the queue, reached from the admin navigation, and is reviewed from there.
     await page.getByRole('link', { name: 'Waiting for review' }).click();
     await expect(page.getByRole('heading', { name: 'Waiting for review' })).toBeVisible();
+    // The page settles first; the first block with something waiting opens (claims come first), and is opened here if not.
+    await expect(page.getByTestId('catalogue-review-queue')).toHaveAttribute('data-ready', 'true');
+    const claimsBlock = page.getByTestId('section-claims');
+    if ((await claimsBlock.getAttribute('open')) === null) await claimsBlock.locator(':scope > summary').click();
+    await expect(page.getByTestId('review-totals')).toContainText('to review');
     const section = page.getByTestId('review-product').filter({ hasText: `Review test ${suffix}` });
     await expect(page.getByTestId('review-counts')).toContainText('on');
     // Each product is a closed card showing its name and how many claims wait; opening it shows the claims.
