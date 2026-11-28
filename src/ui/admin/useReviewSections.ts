@@ -20,5 +20,12 @@ export function useReviewSections(ids: readonly string[], options: { openFirst?:
   const toggle = useCallback((id: string, open: boolean) => {
     setOpened((current) => (current[id] === open ? current : { ...current, [id]: open }));
   }, []);
-  return { counts, ready, isOpen, setCount, toggle };
+  /** Open one block and bring it into view (used by the counts at the top of the page). */
+  const jumpTo = useCallback((id: string) => {
+    setOpened((current) => ({ ...current, [id]: true }));
+    window.setTimeout(() => {
+      document.querySelector(`[data-testid="section-${id}"]`)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }, 0);
+  }, []);
+  return { counts, ready, isOpen, setCount, toggle, jumpTo };
 }

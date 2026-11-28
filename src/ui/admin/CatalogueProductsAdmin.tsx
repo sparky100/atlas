@@ -45,7 +45,7 @@ export function CatalogueProductsAdmin() {
       {error !== '' && <p role="alert" className={styles.error}>{error}</p>}
       <div className={styles.controls}>
         <label>Find a product <input value={search} onChange={(event) => { setSearch(event.target.value); }} placeholder="Name, vendor or code" /></label>
-        <label><input type="checkbox" checked={readyOnly} onChange={(event) => { setReadyOnly(event.target.checked); }} /> Ready to publish</label>
+        <label className={styles.checkLine}><input type="checkbox" checked={readyOnly} onChange={(event) => { setReadyOnly(event.target.checked); }} /> Ready to publish</label>
         <span>{String(filtered.length)} shown</span>
         <LinkButton variant="secondary" to="/platform-admin/catalogue/products/new">New product</LinkButton>
       </div>

@@ -159,7 +159,7 @@ export async function listCatalogueProducts(client: Client): Promise<CataloguePr
   }
   const componentCount = new Map<string, number>();
   for (const row of (products.data as ProductRow[] | null) ?? []) {
-    if (row.part_of_product_id !== null) componentCount.set(row.part_of_product_id, (componentCount.get(row.part_of_product_id) ?? 0) + 1);
+    if (row.part_of_product_id !== null && !merged.has(row.id)) componentCount.set(row.part_of_product_id, (componentCount.get(row.part_of_product_id) ?? 0) + 1);
   }
   const claimCount = new Map<string, number>();
   const waitingCount = new Map<string, number>();
@@ -202,6 +202,7 @@ export async function readCatalogueProduct(client: Client, productId: UUID): Pro
     client.from('catalogue_products').select('id,product').eq('part_of_product_id', productId).order('product'),
   ]);
   if (componentRows.error) throw new Error(`readCatalogueProduct: ${componentRows.error.message}`);
+  const mergedIds = new Set((await listProductMerges(client)).map((merge) => merge.mergedProductId));
   if (revision.error) throw new Error(`readCatalogueProduct: ${revision.error.message}`);
   if (product.error) throw new Error(`readCatalogueProduct: ${product.error.message}`);
   if (shared.error) throw new Error(`readCatalogueProduct: ${shared.error.message}`);
@@ -260,7 +261,8 @@ export async function readCatalogueProduct(client: Client, productId: UUID): Pro
     claimReviews,
     publication: revision.data ? publicationState(revision.data, row.edit_revision) : null,
     partOf,
-    components: componentRows.data,
+    // A product merged into another is a record, not a component, so it is left out here as it is in the list.
+    components: componentRows.data.filter((component: { id: string }) => !mergedIds.has(component.id)),
   };
 }
 

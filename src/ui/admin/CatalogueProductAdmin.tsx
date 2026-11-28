@@ -217,6 +217,18 @@ export function CatalogueProductAdmin({ productId }: { productId: string | null 
     );
   }
 
+  const linkCount = content.capabilities.length + (content.generalCapabilities ?? []).length;
+  const waiting = detail?.claimReviews.filter((review) => review.reviewState !== 'reviewed').length ?? 0;
+  const published = detail?.publication?.withdrawnAt === null;
+  const upToDate = published && detail.publication?.unpublishedChanges === false;
+  const blocked = detail === null ? ''
+    : dirty ? 'Save your changes first.'
+    : waiting > 0 ? `${String(waiting)} claim${waiting === 1 ? ' is' : 's are'} waiting for review. Review ${waiting === 1 ? 'it' : 'them'} before publishing.`
+    : detail.claimReviews.length === 0 || detail.claimReviews.length > 8 ? 'A published product needs 1 to 8 claims.'
+    : linkCount === 0 && detail.components.length === 0 ? 'Add at least one capability link before publishing, or make this the platform of products that have them.'
+    : upToDate ? 'This revision is already published.' : '';
+  const claimTotal = detail?.claimReviews.length ?? 0;
+
   return (
     <div className={styles.page} data-testid="catalogue-product-admin">
       <Link to={BASE} className={styles.backLink} onClick={leave}>← Product catalogue</Link>
@@ -229,9 +241,20 @@ export function CatalogueProductAdmin({ productId }: { productId: string | null 
         </Text>
       </div>
 
-      <div className={[styles.actions, styles.stickyActions].filter(Boolean).join(' ')}>
+      <div className={styles.statusPanel} data-testid="product-status">
+        {detail === null ? <p>Not saved yet. Save the product to see where it stands.</p> : (
+          <dl>
+            <div><dt>Publication</dt><dd data-testid="status-publication">{publicationStatusText(detail.publication)}</dd></div>
+            <div><dt>Claims</dt><dd data-testid="status-claims">{claimTotal === 0 ? 'No claims yet' : `${String(claimTotal - waiting)} of ${String(claimTotal)} reviewed${waiting > 0 ? `, ${String(waiting)} waiting for review` : ''}`}</dd></div>
+            <div><dt>Capabilities</dt><dd data-testid="status-links">{detail.components.length > 0 ? `A platform with ${String(detail.components.length)} component${detail.components.length === 1 ? '' : 's'}. Capabilities are linked on its components.` : linkCount === 0 ? 'No capability linked yet' : `Linked to ${String(linkCount)} capabilit${linkCount === 1 ? 'y' : 'ies'}`}</dd></div>
+            <div><dt>Next</dt><dd data-testid="status-next">{blocked !== '' ? <a href="#publication-section">{blocked}</a> : 'Ready to publish.'}</dd></div>
+          </dl>
+        )}
+      </div>
+
+      <div className={[styles.actions, styles.stickyActions, styles.actionsRow].join(' ')}>
         <button type="button" onClick={save} disabled={busy || !dirty}>Save product</button>
-        <button type="button" onClick={validate} disabled={busy}>Validate product</button>
+        <button type="button" onClick={validate} disabled={busy}>Check it’s ready</button>
       </div>
       {dirty && <p role="status">Unsaved edits. Save before leaving this product.</p>}
       {error !== '' && <p role="alert" className={styles.error}>{error}</p>}
@@ -356,17 +379,9 @@ export function CatalogueProductAdmin({ productId }: { productId: string | null 
         {content.capabilities.length === 0 && <p>No sector capability links yet. A catalogue entry needs 1-10 links that apply to its pinned set, counting shared capabilities.</p>}
       </div>
 
-      <h2>Publication</h2>
+      <h2 id="publication-section">Publication</h2>
       <p data-testid="publication-status">{publicationStatusText(detail?.publication ?? null)}</p>
       {detail !== null && (() => {
-        const waiting = detail.claimReviews.filter((review) => review.reviewState !== 'reviewed').length;
-        const published = detail.publication !== null && detail.publication.withdrawnAt === null;
-        const upToDate = published && detail.publication?.unpublishedChanges === false;
-        const blocked = dirty ? 'Save your changes first.'
-          : waiting > 0 ? `${String(waiting)} claim${waiting === 1 ? ' is' : 's are'} waiting for review. Review ${waiting === 1 ? 'it' : 'them'} before publishing.`
-          : detail.claimReviews.length === 0 || detail.claimReviews.length > 8 ? 'A published product needs 1 to 8 claims.'
-          : content.capabilities.length + (content.generalCapabilities ?? []).length === 0 && detail.components.length === 0 ? 'Add at least one capability link before publishing, or make this the platform of products that have them.'
-          : upToDate ? 'This revision is already published.' : '';
         return (
           <>
             {blocked !== '' && <p role="status" data-testid="publish-blocked">{blocked}</p>}

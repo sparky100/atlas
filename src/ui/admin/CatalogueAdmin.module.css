@@ -46,6 +46,8 @@
   .controls, .actions, .linkForm, .withdraw { align-items: stretch; flex-direction: column; }
   .controls > *, .actions button, .withdraw button { width: 100%; }
 }
+.controls label.checkLine { flex-direction: row; align-items: center; gap: var(--space-2); min-height: 44px; }
+.controls label.checkLine input { width: auto; flex: none; }
 .itemCard label.checkLine { flex-direction: row; align-items: flex-start; gap: var(--space-2); }
 .itemCard label.checkLine input, .queueClaim label.checkLine input { width: auto; flex: none; margin-top: .2rem; }
 .queue { display: flex; flex-direction: column; gap: var(--space-3); }
@@ -90,9 +92,13 @@
 /* Waiting for review and Find and check: one section pattern for every block. */
 .sections { display: flex; flex-direction: column; gap: var(--space-2); }
 .chips { display: flex; flex-wrap: wrap; gap: var(--space-2); margin: 0; padding: 0; list-style: none; }
-.chips li { border: 1px solid var(--border-strong); border-radius: var(--radius-sm); background: var(--surface); padding: var(--space-1) var(--space-2); font-size: var(--text-sm-size); }
+.chips li { margin: 0; }
+.chipButton { border: 1px solid var(--border-strong); border-radius: var(--radius-sm); background: var(--surface); padding: var(--space-1) var(--space-2); font: inherit; font-size: var(--text-sm-size); min-height: 44px; cursor: pointer; color: inherit; }
+.chipButton:hover { background: var(--surface-raised); }
 .section { border: 1px solid var(--border-strong); border-radius: var(--radius-sm); background: var(--surface); }
 .section > summary { cursor: pointer; padding: var(--space-3); min-height: 44px; display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2); }
+.section > summary::before { content: '\25B6'; font-size: 0.7em; color: var(--text-muted); transition: transform 0.15s; }
+.section[open] > summary::before { transform: rotate(90deg); }
 .section[open] > summary { border-bottom: 1px solid var(--border); }
 .sectionTitle { font-weight: 600; }
 .sectionCount { background: var(--surface-raised); border: 1px solid var(--border); border-radius: 999px; padding: 0 var(--space-2); font-size: var(--text-xs-size); }
@@ -102,3 +108,11 @@
 .sectionBody { padding: var(--space-3); display: flex; flex-direction: column; gap: var(--space-3); }
 .sectionBody > section { margin: 0; }
 .pairList { display: block; }
+
+.statusPanel { border: 1px solid var(--border-strong); border-radius: var(--radius-sm); background: var(--surface); padding: var(--space-3); }
+.statusPanel p { margin: 0; }
+.statusPanel dl { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 14rem), 1fr)); gap: var(--space-2) var(--space-3); margin: 0; }
+.statusPanel dt { color: var(--text-muted); font-size: var(--text-sm-size); }
+.statusPanel dd { margin: 0; font-weight: 600; }
+.actionsRow { flex-direction: row !important; align-items: center; }
+.actionsRow button { width: auto !important; flex: 1 1 0; min-height: 44px; }

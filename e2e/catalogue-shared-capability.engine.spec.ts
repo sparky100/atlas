@@ -131,6 +131,9 @@ for (const viewport of [{ width: 1280, height: 800 }, { width: 390, height: 844 
 
     // Not reviewed yet: publishing is blocked and says why.
     await expect(page.getByTestId('publication-status')).toContainText('Not published');
+    // The same state is at the top of the page, so no scrolling is needed to see where the product stands.
+    await expect(page.getByTestId('status-publication')).toContainText('Not published');
+    await expect(page.getByTestId('status-claims')).toContainText('waiting for review');
     await expect(page.getByTestId('publish-blocked')).toContainText('waiting for review');
     await expect(page.getByRole('button', { name: 'Publish product' })).toBeDisabled();
 
@@ -141,6 +144,7 @@ for (const viewport of [{ width: 1280, height: 800 }, { width: 390, height: 844 
     await expect(page.getByTestId('claim-status')).toContainText('Reviewed by');
     await page.getByRole('button', { name: 'Publish product' }).click();
     await expect(page.getByTestId('publication-status')).toContainText('Published, revision 1, approved by');
+    await expect(page.getByTestId('status-publication')).toContainText('Published, revision 1');
 
     // Editing leaves the published revision as it was.
     await page.getByLabel('Summary').fill('A product used to check publication, edited.');
@@ -412,10 +416,13 @@ for (const viewport of [{ width: 1280, height: 800 }, { width: 390, height: 844 
 
     // The new product is a draft in the queue, marked as found by the Researcher, and the run is in the history.
     await expect(page.getByTestId('check-runs')).toContainText('Find products: 3 searches, 1 product found');
-    await expect(page.getByTestId('catalogue-review-queue')).toContainText(`New product ${suffix}`);
-    await expect(page.getByTestId('catalogue-review-queue')).toContainText('Found by the Researcher');
     await result.getByRole('link', { name: `New product ${suffix}` }).click();
     await expect(page.getByLabel('Product', { exact: true })).toHaveValue(`New product ${suffix}`);
+    // The queue lives on Waiting for review, not on Find and check.
+    await page.getByRole('link', { name: 'Waiting for review' }).click();
+    await openSection(page, 'claims');
+    await expect(page.getByTestId('catalogue-review-queue')).toContainText(`New product ${suffix}`);
+    await expect(page.getByTestId('catalogue-review-queue')).toContainText('Found by the Researcher');
   });
 }
 
