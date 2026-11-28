@@ -44,6 +44,8 @@ describe('a components search', () => {
   it('allows a longer list than a capability search', () => {
     const many = Array.from({ length: 30 }, (_, i) => candidate({ product: `M${String(i)}` }));
     expect(parseFindAnswer(JSON.stringify({ products: many }), FIND_MAX_COMPONENTS)).toHaveLength(FIND_MAX_COMPONENTS);
+    expect(FIND_COMPONENTS_SYSTEM).not.toContain('${');
+    expect(FIND_COMPONENTS_SYSTEM).toContain('at most 10 searches');
     expect(FIND_COMPONENTS_SYSTEM).toContain(`At most ${String(FIND_MAX_COMPONENTS)} modules`);
   });
   it('names the modules already known, so a repeat looks for others', () => {
