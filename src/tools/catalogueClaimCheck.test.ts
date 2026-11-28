@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
-  checkClaim, claimCheckRequestSchema, decideVerdict, fetchPageText, pageText, parseModelAnswer, quoteIsOnPage,
+  aiFailureReason, checkClaim, checksToSave, claimCheckRequestSchema, decideVerdict, fetchPageText, pageText, parseModelAnswer, quoteIsOnPage,
   type ClaimCheckDeps, type ClaimToCheck, type PageResponse,
 } from './catalogueClaimCheck';
 
@@ -96,14 +96,28 @@ describe('checkClaim', () => {
     expect(d.asked[0]).toContain('<page>');
     expect(d.asked[0]).toContain(claim.statement);
   });
-  it("says can't tell, without asking the model, when the page cannot be read", async () => {
+  it("says it was not checked, without asking the model, when the page cannot be read", async () => {
     const d = deps({ pages: { [claim.sourceUrl]: 'throw' } });
-    expect(await checkClaim(claim, d)).toMatchObject({ verdict: 'cant_tell', model: null, inputTokens: 0 });
+    const result = await checkClaim(claim, d);
+    expect(result).toMatchObject({ verdict: 'cant_tell', model: null, inputTokens: 0 });
+    expect(result.note).toMatch(/^Not checked\. /);
+    expect(result.aiError ?? null).toBeNull();
     expect(d.asked).toEqual([]);
   });
-  it("says can't tell when the model cannot be reached", async () => {
-    const d = deps({ askModel: () => Promise.reject(new Error('down')) });
-    expect(await checkClaim(claim, d)).toMatchObject({ verdict: 'cant_tell', note: 'The AI could not be reached.' });
+  it('reports a failed call to the AI as not checked, with the reason, and never as a checked result', async () => {
+    const refused = await checkClaim(claim, deps({ askModel: () => Promise.reject(new Error('provider 401')) }));
+    expect(refused).toMatchObject({ model: null, inputTokens: 0, aiError: 'The AI provider refused the key (status 401).' });
+    expect(refused.note).toBe('Not checked. The AI provider refused the key (status 401).');
+    expect(checksToSave([refused])).toEqual([]);
+    const supported = await checkClaim(claim, deps());
+    expect(checksToSave([refused, supported])).toEqual([supported]);
+  });
+  it('names the likely cause for each kind of provider failure', () => {
+    expect(aiFailureReason(new Error('provider 404'))).toContain('does not know the model');
+    expect(aiFailureReason(new Error('provider 429'))).toContain('rate limit');
+    expect(aiFailureReason(new Error('provider 529'))).toContain('had a problem');
+    expect(aiFailureReason(new Error('provider 400'))).toContain('rejected the request');
+    expect(aiFailureReason(new Error('socket closed'))).toBe('The call to the AI provider did not complete.');
   });
 });
 

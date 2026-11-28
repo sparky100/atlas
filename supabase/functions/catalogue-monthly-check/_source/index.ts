@@ -20,7 +20,7 @@
  * functions:bundle:catalogue-monthly-check` bundles this plus its `src/` imports
  * into the generated, git-ignored `supabase/functions/catalogue-monthly-check/index.ts`.
  */
-import { checkClaim, CLAIM_CHECK_DAILY_TOKEN_LIMIT, CLAIM_CHECK_DEFAULT_MODEL, type ClaimCheckDeps, type ClaimCheckResult, type PageResponse } from '../../../../src/tools/catalogueClaimCheck.ts';
+import { checkClaim, checksToSave, CLAIM_CHECK_DAILY_TOKEN_LIMIT, CLAIM_CHECK_DEFAULT_MODEL, type ClaimCheckDeps, type ClaimCheckResult, type PageResponse } from '../../../../src/tools/catalogueClaimCheck.ts';
 import { checkLink, type LinkCheckResult } from '../../../../src/tools/catalogueLinkCheck.ts';
 import {
   addBatch, claimsWithGoneLink, linksToCheck, MONTHLY_RUN_OPEN_HOURS, MONTHLY_SECRET_HEADER, monthlyActorName, monthlyClaimKey, outstandingClaims,
@@ -161,7 +161,7 @@ Deno.serve(async (req: Request) => {
     const [claimRows, products, claimChecks, linkChecks] = await Promise.all([
       allRows<{ product_id: string; statement: string; source_url: string }>(db, 'catalogue_product_claims?select=product_id,statement,source_url&order=id'),
       allRows<{ id: string; product: string; vendor: string }>(db, 'catalogue_products?select=id,product,vendor&order=id'),
-      allRows<{ product_id: string; source_url: string; statement: string; checked_at: string }>(db, 'catalogue_claim_checks?select=product_id,source_url,statement,checked_at&order=product_id'),
+      allRows<{ product_id: string; source_url: string; statement: string; checked_at: string; note: string | null }>(db, 'catalogue_claim_checks?select=product_id,source_url,statement,checked_at,note&order=product_id'),
       allRows<{ url: string; checked_at: string }>(db, 'catalogue_source_checks?select=url,checked_at&order=url'),
     ]);
     const productById = new Map(products.map((product) => [product.id, product]));
@@ -169,7 +169,7 @@ Deno.serve(async (req: Request) => {
       const product = productById.get(row.product_id);
       return product === undefined ? [] : [{ productId: row.product_id, product: product.product, vendor: product.vendor, sourceUrl: row.source_url.trim(), statement: row.statement }];
     });
-    const { batch, remaining } = outstandingClaims(claims, claimChecks.map((c) => ({ productId: c.product_id, sourceUrl: c.source_url, statement: c.statement, checkedAt: c.checked_at })), now);
+    const { batch, remaining } = outstandingClaims(claims, claimChecks.filter((c) => c.note !== 'The AI could not be reached.').map((c) => ({ productId: c.product_id, sourceUrl: c.source_url, statement: c.statement, checkedAt: c.checked_at })), now);
 
     // A run left open for too long did not finish; mark it, so one pass is one open run.
     const openSince = new Date(now.getTime() - MONTHLY_RUN_OPEN_HOURS * 3_600_000).toISOString();
@@ -253,11 +253,21 @@ Deno.serve(async (req: Request) => {
         },
       };
       const results: ClaimCheckResult[] = await mapLimit(batch, 5, (claim) => (gone.has(monthlyClaimKey(claim)) ? Promise.resolve(skippedClaimResult(claim)) : checkClaim(claim, deps)));
-      await db.send('POST', 'catalogue_claim_checks?on_conflict=product_id,source_url,statement', results.map((result) => ({
-        product_id: result.productId, source_url: result.sourceUrl, statement: result.statement, verdict: result.verdict, quote: result.quote, note: result.note,
-        model: result.model, input_tokens: result.inputTokens, output_tokens: result.outputTokens, ...actor,
-      })), true);
-      counters = addBatch(counters, links, results);
+      // A failed call to the AI is not a check: it is not saved, so the claim stays due.
+      const saved = checksToSave(results);
+      if (saved.length > 0) {
+        await db.send('POST', 'catalogue_claim_checks?on_conflict=product_id,source_url,statement', saved.map((result) => ({
+          product_id: result.productId, source_url: result.sourceUrl, statement: result.statement, verdict: result.verdict, quote: result.quote, note: result.note,
+          model: result.model, input_tokens: result.inputTokens, output_tokens: result.outputTokens, ...actor,
+        })), true);
+      }
+      const aiFailure = results.find((result) => result.aiError !== undefined && result.aiError !== null)?.aiError ?? null;
+      if (aiFailure !== null && saved.length === 0 && results.length > 0) {
+        counters = addBatch(counters, links, []);
+        await finishRun('failed', `${aiFailure} No claims were marked as checked.`.slice(0, 200));
+        return jsonResponse({ status: 'ai_failed', reason: aiFailure }, 200);
+      }
+      counters = addBatch(counters, links, saved);
       await finishRun(remaining === 0 ? 'finished' : 'running', null);
       return jsonResponse({ status: 'ok', checked: results.length, remaining }, 200);
     } catch {

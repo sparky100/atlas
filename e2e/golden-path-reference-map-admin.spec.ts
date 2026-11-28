@@ -41,6 +41,9 @@ test('a platform admin can draft and edit a capability set from Home', async ({ 
   await page.getByRole('button', { name: 'Account menu' }).click();
   await page.getByRole('link', { name: 'Platform admin' }).click();
   await expect(page.getByRole('heading', { name: 'Platform admin' })).toBeVisible();
+  // On a phone Capability sets is in the More sheet; on a desktop it is on the rail.
+  const more = page.getByRole('button', { name: /^More/ });
+  if (await more.isVisible()) await more.click();
   await page.getByRole('link', { name: 'Capability sets' }).click();
   await expect(page.getByRole('heading', { name: 'Capability sets', exact: true })).toBeVisible();
   const list = page.getByTestId('capability-sets-admin');

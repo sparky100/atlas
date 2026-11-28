@@ -45,6 +45,8 @@ export const claimCheckResultSchema = z.object({
   model: z.string().max(80).nullable(),
   inputTokens: z.number().int().min(0),
   outputTokens: z.number().int().min(0),
+  /** Set when the call to the AI failed. Such a result is not a check: it is never saved, so the claim stays unchecked. */
+  aiError: z.string().max(200).nullable().optional(),
 }).strict();
 export type ClaimCheckResult = z.infer<typeof claimCheckResultSchema>;
 
@@ -119,10 +121,10 @@ const clip = (text: string, max: number) => text.slice(0, max);
 
 /** The verdict to record: "supported" and "changed" need a quote that is really on the page. */
 export function decideVerdict(answer: { verdict: ClaimVerdict; quote: string | null } | null, text: string): { verdict: ClaimVerdict; quote: string | null; note: string | null } {
-  if (answer === null) return { verdict: 'cant_tell', quote: null, note: "The AI's answer could not be read." };
+  if (answer === null) return { verdict: 'cant_tell', quote: null, note: "The AI answered, but its answer could not be read, so the claim could not be confirmed." };
   if (answer.verdict === 'cant_tell') return { verdict: 'cant_tell', quote: null, note: 'The page does not say enough to tell.' };
   if (answer.quote === null || !quoteIsOnPage(answer.quote, text)) {
-    return { verdict: 'cant_tell', quote: null, note: "The AI's quoted sentence was not found on the page." };
+    return { verdict: 'cant_tell', quote: null, note: "The AI answered, but the sentence it quoted is not on the page, so the claim could not be confirmed." };
   }
   return { verdict: answer.verdict, quote: clip(answer.quote, 600), note: null };
 }
@@ -190,12 +192,30 @@ export async function fetchPageText(raw: string, deps: Pick<ClaimCheckDeps, 'res
 export async function checkClaim(claim: ClaimToCheck, deps: ClaimCheckDeps): Promise<ClaimCheckResult> {
   const base = { productId: claim.productId, sourceUrl: claim.sourceUrl, statement: claim.statement };
   const page = await fetchPageText(claim.sourceUrl, deps);
-  if (!page.ok) return { ...base, verdict: 'cant_tell', quote: null, note: clip(page.reason, 200), model: null, inputTokens: 0, outputTokens: 0 };
+  if (!page.ok) return { ...base, verdict: 'cant_tell', quote: null, note: clip(`Not checked. ${page.reason}`, 200), model: null, inputTokens: 0, outputTokens: 0 };
   try {
     const answer = await deps.askModel(CLAIM_CHECK_SYSTEM, claimCheckUserMessage(claim, page.text));
     const decided = decideVerdict(parseModelAnswer(answer.text), page.text);
     return { ...base, ...decided, model: deps.model, inputTokens: answer.inputTokens, outputTokens: answer.outputTokens };
-  } catch {
-    return { ...base, verdict: 'cant_tell', quote: null, note: 'The AI could not be reached.', model: deps.model, inputTokens: 0, outputTokens: 0 };
+  } catch (cause) {
+    const reason = aiFailureReason(cause);
+    return { ...base, verdict: 'cant_tell', quote: null, note: clip(`Not checked. ${reason}`, 200), model: null, inputTokens: 0, outputTokens: 0, aiError: reason };
   }
+}
+
+/** Why a call to the AI failed, in plain words, without anything secret. `provider 401` is what the functions throw for a refused call. */
+export function aiFailureReason(cause: unknown): string {
+  const status = /provider (\d{3})/.exec(cause instanceof Error ? cause.message : '')?.[1];
+  if (status === undefined) return 'The call to the AI provider did not complete.';
+  const code = Number(status);
+  if (code === 401 || code === 403) return `The AI provider refused the key (status ${status}).`;
+  if (code === 404) return `The AI provider does not know the model (status ${status}).`;
+  if (code === 429) return `The AI provider is busy: rate limit (status ${status}).`;
+  if (code >= 500) return `The AI provider had a problem (status ${status}).`;
+  return `The AI provider rejected the request (status ${status}).`;
+}
+
+/** Only real checks are saved: a failed call to the AI means the claim was not checked. */
+export function checksToSave(results: readonly ClaimCheckResult[]): ClaimCheckResult[] {
+  return results.filter((result) => result.aiError === undefined || result.aiError === null);
 }

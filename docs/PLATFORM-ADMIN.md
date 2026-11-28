@@ -81,7 +81,11 @@ else in this product checks platform-admin status.
    the answer is saved as "Can't tell", never "Still supported". Claims that
    changed or can't be told are listed under **Claims to look at**, marked as
    checked by the AI and not by a person; **I looked: it still stands** records
-   your name and the date. The check only flags: it never edits a claim or
+   your name and the date. A claim that could not be checked is never shown
+   as checked: if the page could not be read it is listed as **Not checked**
+   with the reason, and if the call to the AI failed (for example the key was
+   refused) nothing is saved, the run stops after a batch that all failed, and
+   the page says why. Those claims stay waiting for a check. The check only flags: it never edits a claim or
    unpublishes a product, and it uses the platform AI key with a daily token
    limit (1,000,000; re-checks are not counted until saved). It needs the
    `catalogue-claim-check` function deployed

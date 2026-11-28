@@ -892,6 +892,8 @@ interface ClaimCheckDbRow {
 }
 
 /** The latest saved claim check of every claim, newest first. */
+const LEGACY_AI_FAILURE_NOTE = 'The AI could not be reached.';
+
 export async function listClaimChecks(client: Client): Promise<ClaimCheckRow[]> {
   const rows: ClaimCheckDbRow[] = [];
   for (let from = 0; ; from += SOURCE_PAGE) {
@@ -903,7 +905,8 @@ export async function listClaimChecks(client: Client): Promise<ClaimCheckRow[]> 
     rows.push(...page);
     if (page.length < SOURCE_PAGE) break;
   }
-  return rows.map((row) => ({
+  // Early runs saved a failed call to the AI as a check. That was not a check, so it is left out and the claim counts as unchecked.
+  return rows.filter((row) => row.note !== LEGACY_AI_FAILURE_NOTE).map((row) => ({
     productId: row.product_id, sourceUrl: row.source_url, statement: row.statement, verdict: row.verdict, quote: row.quote, note: row.note, model: row.model,
     checkedAt: row.checked_at, checkedByName: row.checked_by_name, dismissedAt: row.dismissed_at, dismissedByName: row.dismissed_by_name,
   }));
