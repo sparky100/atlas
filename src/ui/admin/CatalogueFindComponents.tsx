@@ -1,22 +1,13 @@
 import { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router';
-import { findComponentsOfPlatform, finishCheckRun, listLibraryProductKeys, saveFoundComponents, startCheckRun } from '../../db/catalogueAdmin';
-import { FIND_MAX_KNOWN_NAMES, nameMatchKey, splitByLibrary, type FindResult } from '../../tools/catalogueFindProducts';
+import { findAndSaveComponents, type ComponentSearchOutcome } from '../../db/catalogueAdmin';
 import { supabase } from '../supabaseClient';
 import styles from './CatalogueAdmin.module.css';
 import { errorText } from './adminErrorText';
 
 const BASE = '/platform-admin/catalogue';
 
-interface Outcome {
-  searched: number;
-  found: number;
-  existing: { productId: string; product: string }[];
-  saved: { productId: string; product: string }[];
-  failed: { product: string; message: string }[];
-  dropped: number;
-  note: string | null;
-}
+type Outcome = ComponentSearchOutcome;
 
 /**
  * "Find components" on a saved product that is not itself a component. One
@@ -33,39 +24,12 @@ export function CatalogueFindComponents({ platform, knownComponents = [], disabl
 
   const run = async () => {
     setRunning(true); setError(''); setOutcome(null);
-    const runId = await startCheckRun(supabase, 'find').catch(() => null);
-    let status: 'finished' | 'failed' | 'limit_reached' = 'finished';
-    let note: string | null = null;
-    let result: FindResult | null = null;
-    let savedCount = 0;
     try {
-      result = await findComponentsOfPlatform(supabase, { platformName: platform.product, vendor: platform.vendor, alreadyKnown: knownComponents.slice(0, FIND_MAX_KNOWN_NAMES) });
-      const library = await listLibraryProductKeys(supabase);
-      const split = splitByLibrary(result.found, library.map((row) => ({ id: row.id, vendor: row.vendor, product: row.product })));
-      // The platform's own name is not one of its components.
-      const platformKey = nameMatchKey(platform.vendor, platform.product);
-      const added = split.added.filter((item) => nameMatchKey(item.vendor, item.product) !== platformKey);
-      const saving = await saveFoundComponents(supabase, platform.id, added, library, new Date().toISOString().slice(0, 10));
-      savedCount = saving.saved.length;
-      setOutcome({
-        searched: result.searches, found: result.found.length,
-        existing: split.existing.filter((row) => row.productId !== platform.id).map((row) => ({ productId: row.productId, product: row.product })),
-        saved: saving.saved, failed: saving.failed, dropped: result.dropped.length, note: result.note ?? null,
-      });
-      if (saving.failed.length > 0) note = `${String(saving.failed.length)} could not be saved.`;
-      if (savedCount > 0) onChanged();
+      setOutcome(await findAndSaveComponents(supabase, platform, knownComponents, new Date().toISOString().slice(0, 10)));
+      onChanged();
     } catch (cause) {
-      const message = errorText(cause);
-      status = message.includes('daily AI limit') ? 'limit_reached' : 'failed';
-      note = message;
-      setError(`${message} Nothing was added.`);
+      setError(`${errorText(cause)} Nothing was added.`);
     } finally {
-      if (runId !== null) {
-        await finishCheckRun(supabase, runId, {
-          status, linksChecked: 0, claimsChecked: 0, flagged: 0, searches: result?.searches ?? 0, productsFound: savedCount,
-          tokens: { input: result?.inputTokens ?? 0, output: result?.outputTokens ?? 0 }, note,
-        }).catch(() => undefined);
-      }
       setRunning(false);
     }
   };

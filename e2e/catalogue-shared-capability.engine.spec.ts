@@ -427,6 +427,76 @@ for (const viewport of [{ width: 1280, height: 800 }, { width: 390, height: 844 
 }
 
 /**
+ * Find the main platforms for a sector. The function answer is faked (a mocked AI shows nothing about AI quality); the sector-only request,
+ * the library check, the tick list, saving each ticked platform as a draft and searching its modules are real.
+ */
+for (const viewport of [{ width: 1280, height: 800 }, { width: 390, height: 844 }]) {
+  test(`an admin finds a sector's platforms, ticks some and their modules arrive as drafts at ${String(viewport.width)}`, async ({ page }) => {
+    await page.setViewportSize(viewport);
+    const service = createServiceRoleClient(loadEnv());
+    const suffix = randomUUID().replace(/[^a-f]/g, '').padEnd(6, 'q').slice(0, 6) + (viewport.width === 1280 ? 'big' : 'small');
+    const zero = '00000000-0000-0000-0000-000000000000';
+    const mapId = randomUUID();
+    const checked = (result: { error: { message: string } | null }) => { if (result.error) throw new Error(`find-platforms seed: ${result.error.message}`); };
+    checked(await service.from('capability_maps').insert({ id: mapId, sector: 'utility', version: 600000 + (Number.parseInt(randomUUID().slice(0, 5), 16) % 90000), status: 'draft', title: `Platforms test set ${suffix}`, summary: 'Platforms test set', source_description: 'Playwright seed.' }));
+    checked(await service.from('capability_map_items').insert({ id: randomUUID(), map_id: mapId, code: '1', parent_code: null, name: `Platforms test capability ${suffix}`, description: 'Definition.', level: 1, item_order: 10 }));
+    checked(await service.from('capability_maps').update({ status: 'published', published_at: new Date().toISOString() }).eq('id', mapId));
+    checked(await service.from('catalogue_products').insert({ code: `have-${suffix}`, product: `Have platform ${suffix}`, vendor: `Havevend ${suffix}`, summary: 'Already here.', created_by: zero, updated_by: zero }));
+
+    const bodies: unknown[] = [];
+    await page.route('**/functions/v1/catalogue-find-products', async (route) => {
+      const cors = { 'access-control-allow-origin': '*', 'access-control-allow-headers': '*', 'access-control-allow-methods': 'POST, OPTIONS' };
+      if (route.request().method() === 'OPTIONS') { await route.fulfill({ status: 200, headers: cors, body: 'ok' }); return; }
+      const body = JSON.parse(route.request().postData() ?? '{}') as { sector?: string; platformName?: string; vendor?: string };
+      bodies.push(body);
+      const claim = (sentence: string) => [{ kind: 'functional', sourceUrl: 'https://example.test/found', statement: sentence }];
+      const found = body.platformName === undefined
+        ? [
+          { product: `Pick platform ${suffix}`, vendor: `Pickvend ${suffix}`, summary: 'A platform to pick.', howItSupports: 'Runs things.', claims: claim(`Pickvend ${suffix} sells Pick platform for utilities.`) },
+          { product: `Skip platform ${suffix}`, vendor: `Skipvend ${suffix}`, summary: 'A platform to skip.', howItSupports: 'Runs other things.', claims: claim(`Skipvend ${suffix} sells Skip platform for utilities.`) },
+          { product: `have PLATFORM ${suffix}`, vendor: `havevend ${suffix}`, summary: 'Already here.', howItSupports: 'Runs.', claims: claim(`Havevend ${suffix} sells Have platform.`) },
+        ]
+        : [{ product: `${body.platformName ?? ''} Module`, vendor: body.vendor ?? '', summary: 'A module.', howItSupports: 'Does a thing.', platform: body.platformName, claims: claim(`${body.vendor ?? ''} lists Module as part of ${body.platformName ?? ''}.`) }];
+      await route.fulfill({
+        status: 200, headers: { ...cors, 'content-type': 'application/json' },
+        body: JSON.stringify({ status: 'ok', searches: 2, inputTokens: 2000, outputTokens: 400, model: 'test-model', note: null, found, dropped: [] }),
+      });
+    });
+
+    await signUpAdmin(page);
+    await page.goto('/platform-admin/catalogue/tools');
+    await openSection(page, 'find-platforms');
+    const section = page.getByTestId('find-platforms');
+    await section.getByLabel('Sector').selectOption('utility');
+    await expect(section.getByTestId('find-platforms-sends')).toContainText('the sector name and the word “platform”');
+    await section.getByRole('button', { name: /Find the main platforms for utility/ }).click();
+
+    const offered = section.getByTestId('find-platforms-offered');
+    await expect(offered).toContainText(`Pick platform ${suffix}`);
+    await expect(offered).toContainText(`Skip platform ${suffix}`);
+    // A platform already in the library is not offered again (rule I1).
+    await expect(offered).not.toContainText(`have PLATFORM ${suffix}`);
+    await expect(section).toContainText('Already in the library and not offered again');
+    // Only the sector name was sent.
+    expect(bodies[0]).toEqual({ sector: 'utility' });
+    await expect(section.getByRole('button', { name: /^Add 0 and find/ })).toBeDisabled();
+
+    await offered.getByRole('checkbox').first().check();
+    await section.getByRole('button', { name: /^Add 1 and find their components/ }).click();
+    const done = section.getByTestId('find-platforms-done');
+    await expect(done).toContainText('1 module added as drafts');
+    expect(await page.evaluate(() => document.documentElement.scrollWidth > document.documentElement.clientWidth + 1)).toBe(false);
+    await page.screenshot({ path: `test-results/catalogue-find-platforms-${String(viewport.width)}.png`, fullPage: true });
+
+    // The platform and its module are saved as drafts; the unticked platform was not saved.
+    await done.getByRole('link').first().click();
+    await expect(page.getByTestId('product-components')).toContainText('Module');
+    const skipped = await service.from('catalogue_products').select('id').eq('vendor', `Skipvend ${suffix}`);
+    expect(skipped.data ?? []).toHaveLength(0);
+  });
+}
+
+/**
  * Find components of a platform. The function answer is faked (a mocked AI shows nothing about AI quality); the library check,
  * saving components as drafts under the platform with no capability links, and the run record are real.
  */

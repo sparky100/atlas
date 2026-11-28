@@ -195,6 +195,8 @@ changes. **Publish product** is offered when every claim is reviewed, the
 product has 1 to 8 claims and at least one capability link. A platform needs no claims of its own, because claims sit on its components; it publishes once at least one component is published. Publishing freezes a
 
 **Add a platform** (on the Product catalogue page) takes a name and a vendor. It searches the library first and opens the platform if it is already there (no second copy); otherwise it adds a draft platform with no links and no claims, and the Researcher's "Find components" search starts on the platform's page by itself. Each component is a draft with its claims waiting for review.
+
+**Find the main platforms for a sector** (Find and check) starts from the sector instead of one platform. Pick a published sector; the Researcher searches for the main platforms organisations in it run, each backed by a quoted sentence on a public page. Platforms already in the library are named and not offered again. You tick the ones to add; each is saved as a draft platform and its components are searched for, one platform at a time, with a Stop button. Only the sector name is sent to the AI. The daily AI limit applies; if it is reached the run says how many platforms were done and the rest can continue the next day. "Search again for more components" on a platform's page repeats the component search, skipping the modules it already has, up to 20 modules per search.
 revision; editing afterwards never changes it. **Withdraw from users** needs a
 written reason and keeps the revision readable. The products list shows each
 product's state and can show only those ready to publish. Until the reader

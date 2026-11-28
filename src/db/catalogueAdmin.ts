@@ -43,7 +43,7 @@ import {
 import { claimCheckResultSchema, type ClaimCheckResult } from '../tools/catalogueClaimCheck';
 import { proposalKey, type LinkProposal, type ProductLinkRow, type ProposalProduct, type RejectedLinkRow } from '../tools/catalogueLinkProposals';
 import { suggestPlatforms, type PlatformSuggestion } from '../tools/cataloguePlatformSuggestions';
-import { findResultSchema, foundComponentContent, foundProductContent, nameMatchKey, type FindComponentsRequest, productCode, type FindRequest, type FindResult, type FoundProduct } from '../tools/catalogueFindProducts';
+import { findResultSchema, foundComponentContent, foundProductContent, nameMatchKey, type FindComponentsRequest, type FindPlatformsRequest, splitByLibrary, productCode, type FindRequest, type FindResult, type FoundProduct } from '../tools/catalogueFindProducts';
 import type { Client } from './client';
 import { queryInChunks } from './inFilterLimit';
 
@@ -1067,6 +1067,76 @@ export async function findComponentsOfPlatform(client: Client, request: FindComp
   const parsed = findResultSchema.safeParse(result);
   if (!parsed.success) throw new Error('The product finder gave an answer this page does not understand.');
   return parsed.data;
+}
+
+/** Ask the product finder for the main platforms of one sector. It searches the web and writes nothing; the admin picks which to add. */
+export async function findPlatformsForSector(client: Client, request: FindPlatformsRequest): Promise<FindResult> {
+  // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment -- untyped Supabase function response
+  const { data, error } = await client.functions.invoke('catalogue-find-products', { body: request });
+  if (error) throw new Error(await functionErrorMessage(error, 'Finding platforms is not available right now. If it has not been deployed yet, deploy catalogue-find-products, then try again.'));
+  const result = data as { status?: string; message?: string } | null;
+  if (!result) throw new Error('The product finder gave no answer.');
+  if (result.status === 'error') throw new Error(result.message ?? 'Finding platforms failed.');
+  const parsed = findResultSchema.safeParse(result);
+  if (!parsed.success) throw new Error('The product finder gave an answer this page does not understand.');
+  return parsed.data;
+}
+
+export interface ComponentSearchOutcome {
+  searched: number;
+  found: number;
+  existing: { productId: string; product: string }[];
+  saved: { productId: string; product: string }[];
+  failed: { product: string; message: string }[];
+  dropped: number;
+  note: string | null;
+}
+
+/**
+ * One platform's component search, end to end: search (skipping the modules it
+ * already has), keep what is not yet in the library, save each as a draft
+ * component, and record the run so the daily limit counts it. A failure is
+ * recorded and rethrown; nothing is half-saved silently.
+ */
+export async function findAndSaveComponents(
+  client: Client,
+  platform: { id: string; product: string; vendor: string },
+  knownComponents: readonly string[],
+  today: string,
+): Promise<ComponentSearchOutcome> {
+  const runId = await startCheckRun(client, 'find').catch(() => null);
+  let status: CheckRunStatus = 'finished';
+  let note: string | null = null;
+  let result: FindResult | null = null;
+  let savedCount = 0;
+  try {
+    result = await findComponentsOfPlatform(client, { platformName: platform.product, vendor: platform.vendor, alreadyKnown: knownComponents.slice(0, 60) });
+    const library = await listLibraryProductKeys(client);
+    const split = splitByLibrary(result.found, library.map((row) => ({ id: row.id, vendor: row.vendor, product: row.product })));
+    // The platform's own name is not one of its components.
+    const platformKey = nameMatchKey(platform.vendor, platform.product);
+    const added = split.added.filter((item) => nameMatchKey(item.vendor, item.product) !== platformKey);
+    const saving = await saveFoundComponents(client, platform.id, added, library, today);
+    savedCount = saving.saved.length;
+    if (saving.failed.length > 0) note = `${String(saving.failed.length)} could not be saved.`;
+    return {
+      searched: result.searches, found: result.found.length,
+      existing: split.existing.filter((row) => row.productId !== platform.id).map((row) => ({ productId: row.productId, product: row.product })),
+      saved: saving.saved, failed: saving.failed, dropped: result.dropped.length, note: result.note ?? null,
+    };
+  } catch (cause) {
+    const message = cause instanceof Error ? cause.message : String(cause);
+    status = message.includes('daily AI limit') ? 'limit_reached' : 'failed';
+    note = message;
+    throw cause;
+  } finally {
+    if (runId !== null) {
+      await finishCheckRun(client, runId, {
+        status, linksChecked: 0, claimsChecked: 0, flagged: 0, searches: result?.searches ?? 0, productsFound: savedCount,
+        tokens: { input: result?.inputTokens ?? 0, output: result?.outputTokens ?? 0 }, note,
+      }).catch(() => undefined);
+    }
+  }
 }
 
 /**
