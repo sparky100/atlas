@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { Link } from 'react-router';
 import { claimCheckKey, claimCheckVerdictLabel, type ClaimCheckRow, type ClaimForCheck, type SourceCheckRow } from '../../contracts/catalogueAdmin';
 import { checkClaims, dismissClaimCheck, finishCheckRun, listClaimChecks, listClaimsForCheck, listSourceChecks, saveClaimChecks, startCheckRun } from '../../db/catalogueAdmin';
-import { CLAIM_CHECK_MAX_CLAIMS } from '../../tools/catalogueClaimCheck';
+import { checksToSave, CLAIM_CHECK_MAX_CLAIMS } from '../../tools/catalogueClaimCheck';
 import { supabase } from '../supabaseClient';
 import { formatDay } from './catalogueShared';
 import styles from './CatalogueAdmin.module.css';
@@ -49,10 +49,14 @@ export function CatalogueClaimChecks({ onRunRecorded }: { onRunRecorded?: () => 
     const byKey = new Map(checks.map((check) => [claimCheckKey(check), check]));
     const goneLinks = new Set(linkChecks.filter((check) => check.result === 'gone').map((check) => check.url));
     const current = claims.map((claim) => ({ claim, check: byKey.get(claimCheckKey(claim)) }));
-    const checked = current.filter((item) => item.check !== undefined);
-    const latest = checked.reduce<ClaimCheckRow | null>((best, item) => (item.check !== undefined && (best === null || item.check.checkedAt > best.checkedAt) ? item.check : best), null);
-    const due = current.filter((item) => !goneLinks.has(item.claim.sourceUrl) && (checkAgain || item.check === undefined)).map((item) => item.claim);
-    const toLookAt = checked
+    // A claim whose page could not be read (no model) was not checked, so it still counts as waiting for a check.
+    const checked = current.filter((item) => item.check?.model !== undefined && item.check.model !== null);
+    const latest = checked.reduce<ClaimCheckRow | null>((best, item) => {
+      const check = item.check;
+      return check !== undefined && (best === null || check.checkedAt > best.checkedAt) ? check : best;
+    }, null);
+    const due = current.filter((item) => !goneLinks.has(item.claim.sourceUrl) && (checkAgain || (item.check?.model ?? null) === null)).map((item) => item.claim);
+    const toLookAt = current
       .flatMap((item) => (item.check !== undefined && item.check.verdict !== 'supported' && item.check.dismissedAt === null ? [{ claim: item.claim, check: item.check }] : []))
       .sort((a, b) => b.check.checkedAt.localeCompare(a.check.checkedAt));
     return { checked: checked.length, latest, due, toLookAt };
@@ -79,14 +83,24 @@ export function CatalogueClaimChecks({ onRunRecorded }: { onRunRecorded?: () => 
         if (stopped()) { outcome = 'stopped'; setNotice(`Stopped after ${String(done)} of ${String(queue.length)} claims. The results so far are saved.`); break; }
         const batch = queue.slice(from, from + CLAIM_CHECK_MAX_CLAIMS);
         const results = await checkClaims(supabase, batch);
-        await saveClaimChecks(supabase, results);
-        flagged += results.filter((result) => result.verdict !== 'supported').length;
-        tokens.input += results.reduce((sum, result) => sum + result.inputTokens, 0);
-        tokens.output += results.reduce((sum, result) => sum + result.outputTokens, 0);
-        done += batch.length;
+        // A failed call to the AI is not a check: it is not saved, and the claim stays to be checked.
+        const real = checksToSave(results);
+        await saveClaimChecks(supabase, real);
+        flagged += real.filter((result) => result.verdict !== 'supported').length;
+        tokens.input += real.reduce((sum, result) => sum + result.inputTokens, 0);
+        tokens.output += real.reduce((sum, result) => sum + result.outputTokens, 0);
+        done += real.length;
         setProgress({ done, total: queue.length });
+        const aiFailure = results.find((result) => result.aiError !== undefined && result.aiError !== null)?.aiError ?? null;
+        if (aiFailure !== null && real.length === 0) {
+          // Every claim in this batch failed at the AI, so stop rather than send the rest into the same fault.
+          outcome = 'failed';
+          runNote = aiFailure;
+          setError(`${aiFailure} No claims were marked as checked, and the rest were not tried. ${done > 0 ? `The ${String(done)} claims checked before this are saved.` : ''}`.trim());
+          break;
+        }
       }
-      if (!stopped()) setNotice(`Checked ${String(queue.length)} claims.`);
+      if (!stopped() && outcome === 'finished') setNotice(`Checked ${String(done)} of ${String(queue.length)} claims.${done < queue.length ? ' The rest could not be checked by the AI this time and are still waiting.' : ''}`);
     } catch (cause) {
       outcome = 'failed';
       runNote = cause instanceof Error ? cause.message : String(cause);
@@ -151,14 +165,16 @@ export function CatalogueClaimChecks({ onRunRecorded }: { onRunRecorded?: () => 
           {view.toLookAt.map(({ claim, check }) => (
             <div key={claimCheckKey(check)} className={styles.queueClaim}>
               <p>
-                <strong>{claimCheckVerdictLabel(check.verdict)}</strong>: {claim.statement}
+                <strong>{check.model === null ? 'Not checked' : claimCheckVerdictLabel(check.verdict)}</strong>: {claim.statement}
               </p>
               <small>
                 <Link to={`/platform-admin/catalogue/products/${claim.productId}`}>{claim.product}</Link> ({claim.vendor}) · <a href={claim.sourceUrl} target="_blank" rel="noopener noreferrer">open the source</a>
               </small>
               {check.quote !== null && <small data-testid="claim-check-quote">The page says: “{check.quote}”</small>}
               {check.note !== null && <small>{check.note}</small>}
-              <small>Checked by the AI{check.model === null ? '' : ` (${check.model})`}, {formatDay(check.checkedAt)}. Not checked by a person.</small>
+              <small>{check.model === null
+                ? `No check was completed (${formatDay(check.checkedAt)}). Nothing was decided about this claim.`
+                : `Checked by the AI (${check.model}), ${formatDay(check.checkedAt)}. Not checked by a person.`}</small>
               <div className={styles.actions}>
                 <button type="button" onClick={() => { void clear(check); }} disabled={clearing !== null || running}>I looked: it still stands</button>
               </div>

@@ -490,3 +490,21 @@ Step C2 of platforms and components.
   claims marked as found by the Researcher. Modules already in the library are
   shown and left as they are.
 - No schema change. The run is recorded like any other find run.
+
+## Amendment, 28 November 2026: a failed check is not a check
+
+A first real claim run saved 143 results as "Can't tell, the AI could not be
+reached" and showed them as "Checked by the AI". The page had been read; every
+call to the AI had failed, and the reason was thrown away.
+
+- A failed call to the AI now returns `aiError` with a plain reason (key
+  refused, model unknown, rate limit, provider problem). It is not saved, so the
+  claim stays unchecked, and a batch that all fails stops the run (on demand
+  and monthly) instead of sending the rest into the same fault.
+- A claim whose page could not be read is saved with no model and a note
+  starting "Not checked." and is shown as "Not checked", still waiting for a
+  check. "Can't tell" now means only that the AI read the page and it does not
+  say enough, or its quote could not be confirmed.
+- Early rows with the note "The AI could not be reached." are ignored when
+  listing and when choosing monthly work, so those claims count as unchecked
+  and a re-run replaces them. No schema change and no data was deleted.

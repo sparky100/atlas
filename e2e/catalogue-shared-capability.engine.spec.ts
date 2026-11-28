@@ -263,6 +263,43 @@ for (const viewport of [{ width: 1280, height: 800 }, { width: 390, height: 844 
 
 /** Step 5b-2: the Monthly check section shows the switch (stamped with who changed it) and the latest runs, monthly and manual. */
 for (const viewport of [{ width: 1280, height: 800 }, { width: 390, height: 844 }]) {
+  test(`a failed call to the AI is said plainly and is not saved as a check at ${String(viewport.width)}`, async ({ page }) => {
+    await page.setViewportSize(viewport);
+    const service = createServiceRoleClient(loadEnv());
+    const suffix = randomUUID().slice(0, 8);
+    const sourceUrl = `https://example.test/ai-down-${suffix}`;
+    const statement = `The vendor says this product works offline ${suffix}.`;
+    const zero = '00000000-0000-0000-0000-000000000000';
+    const productResult: { data: { id: string } | null; error: { message: string } | null } = await service.from('catalogue_products').insert({
+      code: `ai-down-${suffix}`, product: `AI down product ${suffix}`, vendor: `Vendor ${suffix}`, summary: 'Used to check a failed AI call.', created_by: zero, updated_by: zero,
+    }).select('id').single();
+    if (productResult.error || !productResult.data) throw new Error(`ai-down seed: ${productResult.error?.message ?? 'no row'}`);
+    const productId = productResult.data.id;
+    const seeded = await service.from('catalogue_product_claims').insert({ product_id: productId, position: 1, kind: 'functional', statement, source_url: sourceUrl, source_date: '2026-11-01' });
+    if (seeded.error) throw new Error(`ai-down seed: ${seeded.error.message}`);
+
+    await page.route('**/functions/v1/catalogue-claim-check', async (route) => {
+      const cors = { 'access-control-allow-origin': '*', 'access-control-allow-headers': '*', 'access-control-allow-methods': 'POST, OPTIONS' };
+      if (route.request().method() === 'OPTIONS') { await route.fulfill({ status: 200, headers: cors, body: 'ok' }); return; }
+      const body = JSON.parse(route.request().postData() ?? '{}') as { claims: { productId: string; sourceUrl: string; statement: string }[] };
+      const reason = 'The AI provider refused the key (status 401).';
+      await route.fulfill({
+        status: 200, headers: { ...cors, 'content-type': 'application/json' },
+        body: JSON.stringify({ status: 'ok', results: body.claims.map((claim) => ({ ...claim, verdict: 'cant_tell', quote: null, note: `Not checked. ${reason}`, model: null, inputTokens: 0, outputTokens: 0, aiError: reason })) }),
+      });
+    });
+
+    await signUpAdmin(page);
+    await page.goto('/platform-admin/catalogue/review');
+    await page.getByRole('button', { name: /Check claims against their sources/ }).click();
+    await expect(page.getByTestId('claim-checks').getByRole('alert')).toContainText('The AI provider refused the key (status 401).');
+    await expect(page.getByTestId('claim-checks').getByRole('alert')).toContainText('No claims were marked as checked');
+    await expect(page.getByRole('button', { name: /Check claims against their sources/ })).toBeEnabled();
+    const rows: { data: { statement: string }[] | null; error: { message: string } | null } = await service.from('catalogue_claim_checks').select('statement').eq('product_id', productId);
+    expect(rows.error).toBeNull();
+    expect(rows.data ?? []).toEqual([]);
+  });
+
   test(`the monthly check switch and the run history work at ${String(viewport.width)}`, async ({ page }) => {
     await page.setViewportSize(viewport);
     const service = createServiceRoleClient(loadEnv());
