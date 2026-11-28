@@ -221,10 +221,11 @@ export function CatalogueProductAdmin({ productId }: { productId: string | null 
   const waiting = detail?.claimReviews.filter((review) => review.reviewState !== 'reviewed').length ?? 0;
   const published = detail?.publication?.withdrawnAt === null;
   const upToDate = published && detail.publication?.unpublishedChanges === false;
+  const isPlatform = (detail?.components.length ?? 0) > 0;
   const blocked = detail === null ? ''
     : dirty ? 'Save your changes first.'
     : waiting > 0 ? `${String(waiting)} claim${waiting === 1 ? ' is' : 's are'} waiting for review. Review ${waiting === 1 ? 'it' : 'them'} before publishing.`
-    : detail.claimReviews.length === 0 || detail.claimReviews.length > 8 ? 'A published product needs 1 to 8 claims.'
+    : (detail.claimReviews.length === 0 && !isPlatform) || detail.claimReviews.length > 8 ? 'A published product needs 1 to 8 claims.'
     : linkCount === 0 && detail.components.length === 0 ? 'Add at least one capability link before publishing, or make this the platform of products that have them.'
     : upToDate ? 'This revision is already published.' : '';
   const claimTotal = detail?.claimReviews.length ?? 0;
@@ -245,7 +246,7 @@ export function CatalogueProductAdmin({ productId }: { productId: string | null 
         {detail === null ? <p>Not saved yet. Save the product to see where it stands.</p> : (
           <dl>
             <div><dt>Publication</dt><dd data-testid="status-publication">{publicationStatusText(detail.publication)}</dd></div>
-            <div><dt>Claims</dt><dd data-testid="status-claims">{claimTotal === 0 ? 'No claims yet' : `${String(claimTotal - waiting)} of ${String(claimTotal)} reviewed${waiting > 0 ? `, ${String(waiting)} waiting for review` : ''}`}</dd></div>
+            <div><dt>Claims</dt><dd data-testid="status-claims">{claimTotal === 0 ? (isPlatform ? 'None needed on a platform. Claims sit on its components.' : 'No claims yet') : `${String(claimTotal - waiting)} of ${String(claimTotal)} reviewed${waiting > 0 ? `, ${String(waiting)} waiting for review` : ''}`}</dd></div>
             <div><dt>Capabilities</dt><dd data-testid="status-links">{detail.components.length > 0 ? `A platform with ${String(detail.components.length)} component${detail.components.length === 1 ? '' : 's'}. Capabilities are linked on its components.` : linkCount === 0 ? 'No capability linked yet' : `Linked to ${String(linkCount)} capabilit${linkCount === 1 ? 'y' : 'ies'}`}</dd></div>
             <div><dt>Next</dt><dd data-testid="status-next">{blocked !== '' ? <a href="#publication-section">{blocked}</a> : 'Ready to publish.'}</dd></div>
           </dl>
@@ -402,7 +403,7 @@ export function CatalogueProductAdmin({ productId }: { productId: string | null 
       {detail === null && <p>Save the product first. Publishing needs every claim reviewed and at least one capability link.</p>}
 
       <h2>Claims ({content.claims.length})</h2>
-      <p>A claim is dated vendor evidence with an HTTPS source. A catalogue entry needs 1-8 claims, and every claim must be reviewed before the product can be published. Anyone with admin rights can review, including the person who entered the claim. Names and dates are recorded and shown to platform admins only.</p>
+      <p>A claim is dated vendor evidence with an HTTPS source. A catalogue entry needs 1-8 claims (a platform needs none, because its claims sit on its components), and every claim must be reviewed before the product can be published. Anyone with admin rights can review, including the person who entered the claim. Names and dates are recorded and shown to platform admins only.</p>
       <div className={styles.cards}>
         {content.claims.map((claim, index) => {
           const saved = detail?.content.claims.find((candidate) => sameClaimText(candidate, claim));

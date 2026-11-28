@@ -278,6 +278,23 @@ describe('platform product catalogue, real database', () => {
       expect(other.join(' ')).toContain('needs 1-10 capability links that apply to this capability set');
     });
 
+    it('publishes a platform with no claims once one of its components is published', async () => {
+      const platformId = (await saveCatalogueProduct(admin.client, null, 0, {
+        code: `test-platform-${suffix}`, product: `Platform ${suffix}`, vendor: 'Test vendor', summary: 'A platform with no claims of its own.', capabilities: [], claims: [],
+      })).productId;
+      const partId = (await saveCatalogueProduct(admin.client, null, 0, {
+        code: `test-module-${suffix}`, product: `Module ${suffix}`, vendor: 'Test vendor', summary: 'A module of the platform.', partOfProductId: platformId,
+        capabilities: [{ capabilityMapId: retailMapId, capabilityCode: '1', capabilityName: 'Retail capability', howItSupports: 'Supports retail' }],
+        claims: [{ ...claim, review: true }],
+      })).productId;
+      const platform = await readCatalogueProduct(admin.client, platformId);
+      await expect(saveCatalogueProduct(admin.client, platformId, platform.product.edit_revision, { ...platform.content, publication: { action: 'publish' } })).rejects.toThrow(/components is published/);
+      const part = await readCatalogueProduct(admin.client, partId);
+      expect((await saveCatalogueProduct(admin.client, partId, part.product.edit_revision, { ...part.content, publication: { action: 'publish' } })).published).toBe(1);
+      const again = await readCatalogueProduct(admin.client, platformId);
+      expect((await saveCatalogueProduct(admin.client, platformId, again.product.edit_revision, { ...again.content, publication: { action: 'publish' } })).published).toBe(1);
+    });
+
     it('does not let another signed-in user read or write shared links', async () => {
       const read = await outside.client.from('catalogue_product_general_links').select('product_id');
       expect(read.error).toBeNull();

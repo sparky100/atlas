@@ -521,3 +521,17 @@ tools (monthly check, check links and claims, find products, find products for
 a set). The first block with something waiting opens, and an empty block is
 dimmed and still opens, so a result message or the merged-products record stays
 reachable. No schema, function or permission change.
+
+## Amendment, 28 November 2026: a platform needs no claims
+
+Claims are dated vendor evidence for what a product does, and a platform does
+nothing itself: its claims and capability links sit on its components (rule M3).
+A platform with no claims of its own now publishes once at least one of its
+components is published; any claims it does carry still need 1 to 8 and review,
+and every other product is unchanged. Migration
+`20261128020000_catalogue_platform_needs_no_claims` replaces
+`save_catalogue_product` with the same signature, grants and caller check
+(platform admins only, fail-closed), so no new function and no new advisor
+finding. The product page shows "None needed on a platform. Claims sit on its
+components." Whether a component is published is checked by the database; the
+page names the reason if publishing is refused.

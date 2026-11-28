@@ -58,7 +58,7 @@ the admin editor, the catalogue reader, an exported document or a decision
 pack.
 
 All writes are platform-admin-only security-definer RPCs with optimistic
-`edit_revision` checks. Publication refuses fewer or more than 1-8 claims,
+`edit_revision` checks. Publication refuses fewer or more than 1-8 claims (a platform with components may have none, once one component is published),
 fewer or more than 1-10 links in the pinned set, a claim marked pending review,
 or a pinned set that is not published. Existing published versions and saved
 option citations are not rewritten. `catalogue_entries.product_id` points at

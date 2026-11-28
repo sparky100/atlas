@@ -95,6 +95,26 @@ describe('catalogue platforms and components, real database', () => {
     expect(published.published).toBe(1);
   });
 
+  it('publishes a platform with no claims only once one of its components is published, and refuses a user who is not a platform admin', async () => {
+    const platform = (await saveCatalogueProduct(admin.client, null, 0, content('p7', 'Seventh Platform', { claims: [] }))).productId;
+    const part = (await saveCatalogueProduct(admin.client, null, 0, content('c7', 'Seventh Module', {
+      partOfProductId: platform,
+      capabilities: [],
+      claims: [{ position: 1, kind: 'functional' as const, statement: 'The vendor describes it.', sourceUrl: 'https://example.test/platform', sourceDate: '2026-11-27', review: true }],
+    }))).productId;
+    ids.push(platform, part);
+    const before = await readCatalogueProduct(admin.client, platform);
+    // No claims and no published component yet: refused, and the reason is the component.
+    await expect(saveCatalogueProduct(admin.client, platform, before.product.edit_revision, { ...before.content, publication: { action: 'publish' } })).rejects.toThrow(/components is published/i);
+    // A product that is not a platform still needs its claims.
+    const lone = (await saveCatalogueProduct(admin.client, null, 0, content('l7', 'Lone Product', { claims: [] }))).productId;
+    ids.push(lone);
+    const loneDetail = await readCatalogueProduct(admin.client, lone);
+    await expect(saveCatalogueProduct(admin.client, lone, loneDetail.product.edit_revision, { ...loneDetail.content, publication: { action: 'publish' } })).rejects.toThrow(/1-8 claims/i);
+    // Someone signed in from another organisation cannot publish it, whatever its state.
+    await expect(saveCatalogueProduct(outside.client, platform, before.product.edit_revision, { ...before.content, publication: { action: 'publish' } })).rejects.toThrow();
+  });
+
   it('refuses a signed-in user who is not a platform admin', async () => {
     const platform = (await saveCatalogueProduct(admin.client, null, 0, content('p6', 'Sixth Platform'))).productId;
     ids.push(platform);
