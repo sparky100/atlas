@@ -419,7 +419,7 @@ for (const viewport of [{ width: 1280, height: 800 }, { width: 390, height: 844 
     await result.getByRole('link', { name: `New product ${suffix}` }).click();
     await expect(page.getByLabel('Product', { exact: true })).toHaveValue(`New product ${suffix}`);
     // The queue lives on Waiting for review, not on Find and check.
-    await page.getByRole('link', { name: 'Waiting for review' }).click();
+    await page.getByRole('navigation', { name: 'Platform admin' }).getByRole('link', { name: 'Waiting for review' }).click();
     await openSection(page, 'claims');
     await expect(page.getByTestId('catalogue-review-queue')).toContainText(`New product ${suffix}`);
     await expect(page.getByTestId('catalogue-review-queue')).toContainText('Found by the Researcher');

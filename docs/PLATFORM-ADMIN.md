@@ -192,7 +192,7 @@ via a new admin-gated RPC, the same shape as the two `llm-proxy` RPCs below.
 On a product's page, **Publication** shows whether it is not published,
 published (revision, who approved, when) or published with unpublished
 changes. **Publish product** is offered when every claim is reviewed, the
-product has 1 to 8 claims and at least one capability link. Publishing freezes a
+product has 1 to 8 claims and at least one capability link. A platform needs no claims of its own, because claims sit on its components; it publishes once at least one component is published. Publishing freezes a
 revision; editing afterwards never changes it. **Withdraw from users** needs a
 written reason and keeps the revision readable. The products list shows each
 product's state and can show only those ready to publish. Until the reader
