@@ -480,6 +480,53 @@ for (const viewport of [{ width: 1280, height: 800 }, { width: 390, height: 844 
   });
 }
 
+/** Add a platform: one action from the Product catalogue adds the draft platform and starts the component search; adding it again opens what exists. */
+for (const viewport of [{ width: 1280, height: 800 }, { width: 390, height: 844 }]) {
+  test(`an admin adds a platform by name and its component search starts by itself at ${String(viewport.width)}`, async ({ page }) => {
+    await page.setViewportSize(viewport);
+    const tag = randomUUID().replace(/[^a-f]/g, '').padEnd(6, 'q').slice(0, 6) + (viewport.width === 1280 ? 'big' : 'small');
+    const vendor = `Addvend ${tag}`;
+    const platformName = `Addplat ${tag}`;
+    let searches = 0;
+    await page.route('**/functions/v1/catalogue-find-products', async (route) => {
+      const cors = { 'access-control-allow-origin': '*', 'access-control-allow-headers': '*', 'access-control-allow-methods': 'POST, OPTIONS' };
+      if (route.request().method() === 'OPTIONS') { await route.fulfill({ status: 200, headers: cors, body: 'ok' }); return; }
+      searches += 1;
+      await route.fulfill({
+        status: 200, headers: { ...cors, 'content-type': 'application/json' },
+        body: JSON.stringify({
+          status: 'ok', searches: 1, inputTokens: 1000, outputTokens: 200, model: 'test-model', note: null,
+          found: [{ product: `${platformName} Alpha`, vendor, summary: 'A module.', howItSupports: 'Does the first thing.', platform: platformName, claims: [{ kind: 'functional', sourceUrl: 'https://example.test/modules', statement: `${vendor} lists Alpha as a module of ${platformName}.` }] }],
+          dropped: [],
+        }),
+      });
+    });
+
+    await signUpAdmin(page);
+    await page.goto('/platform-admin/catalogue');
+    await page.getByTestId('add-platform').locator(':scope > summary').click();
+    await page.getByLabel('Platform name').fill(platformName);
+    await page.getByLabel('Vendor').fill(vendor);
+    await page.getByRole('button', { name: 'Add platform and find its components' }).click();
+    // The platform page opens and the search has started without another press.
+    await expect(page.getByTestId('find-components-outcome')).toContainText('1 module found, 0 already in the library, 1 added as drafts');
+    await expect(page.getByTestId('product-components')).toContainText(`${platformName} Alpha`);
+    expect(searches).toBe(1);
+
+    // Adding the same platform again finds it first (rule I1) and opens it; no second copy is made.
+    await page.goto('/platform-admin/catalogue');
+    await page.getByTestId('add-platform').locator(':scope > summary').click();
+    await page.getByLabel('Platform name').fill(platformName.toUpperCase());
+    await page.getByLabel('Vendor').fill(vendor);
+    await page.getByRole('button', { name: 'Add platform and find its components' }).click();
+    await expect(page.getByRole('heading', { name: platformName })).toBeVisible();
+    await page.goto('/platform-admin/catalogue');
+    await page.getByLabel('Find a product').fill(platformName);
+    await expect(page.getByTestId('platform-tag')).toHaveCount(1);
+    expect(await page.evaluate(() => document.documentElement.scrollWidth > document.documentElement.clientWidth + 1)).toBe(false);
+  });
+}
+
 test('finding products says so in words when web search is not switched on', async ({ page }) => {
   await page.setViewportSize({ width: 1280, height: 800 });
   const service = createServiceRoleClient(loadEnv());

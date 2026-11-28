@@ -22,6 +22,7 @@ import { useUnsavedChanges } from '../routes/platformAdmin/unsavedChanges';
 import { treeOrder, type CapabilitySetItem as Item } from './capabilitySetTree';
 import { useActingAdminName } from './useActingAdminName';
 import styles from './CapabilitySetAdmin.module.css';
+import { errorText } from './adminErrorText';
 
 const BASE = '/platform-admin/capability-sets';
 
@@ -75,7 +76,7 @@ export function CapabilitySetDraftAdmin({ draftId }: { draftId: string }) {
         setAlignments(loadedAlignments);
         setContent(found.content);
       } catch (cause) {
-        setLoadError(cause instanceof Error ? cause.message : String(cause));
+        setLoadError(errorText(cause));
       } finally {
         setLoading(false);
       }
@@ -92,7 +93,7 @@ export function CapabilitySetDraftAdmin({ draftId }: { draftId: string }) {
 
   const run = async (action: () => Promise<void>) => {
     setBusy(true); setError(''); setNotice('');
-    try { await action(); } catch (cause) { setError(cause instanceof Error ? cause.message : String(cause)); }
+    try { await action(); } catch (cause) { setError(errorText(cause)); }
     finally { setBusy(false); }
   };
   const change = (next: CapabilityMapContent) => { setContent(next); setIssues(null); };

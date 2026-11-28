@@ -6,6 +6,7 @@ import { duplicateCandidates } from '../../tools/catalogueResultActions';
 import { supabase } from '../supabaseClient';
 import { formatDay, publicationLabelText } from './catalogueShared';
 import styles from './CatalogueAdmin.module.css';
+import { errorText } from './adminErrorText';
 
 type MergedRow = ProductMergeRow & { mergedName: string; keptName: string; vendor: string };
 
@@ -39,7 +40,7 @@ export function CatalogueDuplicates({ onChanged, onCount }: { onChanged?: () => 
   useEffect(() => {
     void Promise.all([listCatalogueProducts(supabase), listMergedProducts(supabase)])
       .then(([nextProducts, nextMerged]) => { setProducts(nextProducts); setMerged(nextMerged); })
-      .catch((cause: unknown) => { setError(cause instanceof Error ? cause.message : String(cause)); })
+      .catch((cause: unknown) => { setError(errorText(cause)); })
       .finally(() => { setLoading(false); });
   }, []);
 
@@ -58,7 +59,7 @@ export function CatalogueDuplicates({ onChanged, onCount }: { onChanged?: () => 
       setConfirm(null);
       onChanged?.();
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : String(cause));
+      setError(errorText(cause));
     } finally {
       await load().catch(() => undefined);
       setBusy(false);

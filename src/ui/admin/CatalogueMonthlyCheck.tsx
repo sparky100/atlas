@@ -4,6 +4,7 @@ import { getCheckSchedule, listCheckRuns, setCheckSchedule } from '../../db/cata
 import { supabase } from '../supabaseClient';
 import { checkRunSentence, formatDay } from './catalogueShared';
 import styles from './CatalogueAdmin.module.css';
+import { errorText } from './adminErrorText';
 
 /**
  * The "Monthly check" section of Waiting for review (step 5b-2): the on/off
@@ -26,7 +27,7 @@ export function CatalogueMonthlyCheck({ refreshKey }: { refreshKey: number }) {
         setRuns(nextRuns);
         setError('');
       } catch (cause) {
-        setError(cause instanceof Error ? cause.message : String(cause));
+        setError(errorText(cause));
       } finally {
         setLoading(false);
       }
@@ -39,7 +40,7 @@ export function CatalogueMonthlyCheck({ refreshKey }: { refreshKey: number }) {
       await setCheckSchedule(supabase, enabled);
       setSchedule(await getCheckSchedule(supabase));
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : String(cause));
+      setError(errorText(cause));
     } finally {
       setBusy(false);
     }

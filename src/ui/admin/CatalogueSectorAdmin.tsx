@@ -13,6 +13,7 @@ import { Text } from '../components/Text/Text';
 import { supabase } from '../supabaseClient';
 import { currentCatalogueVersion, entriesNotYetPublished, sectorLabel } from './catalogueShared';
 import styles from './CatalogueAdmin.module.css';
+import { errorText } from './adminErrorText';
 
 const BASE = '/platform-admin/catalogue';
 
@@ -31,7 +32,7 @@ async function readSectorState(sector: string): Promise<SectorState> {
     const [entries, published] = await Promise.all([listCatalogueEntries(supabase, current.id), listPublishedProductNames(supabase)]);
     return { versions, onlyHere: entriesNotYetPublished(entries, published).map((entry) => entry.product), checkError: '' };
   } catch (cause) {
-    return { versions, onlyHere: null, checkError: cause instanceof Error ? cause.message : String(cause) };
+    return { versions, onlyHere: null, checkError: errorText(cause) };
   }
 }
 
@@ -63,7 +64,7 @@ export function CatalogueSectorAdmin({ sector }: { sector: string }) {
     if (!validSector) return;
     void readSectorState(sector)
       .then(apply)
-      .catch((cause: unknown) => { setLoadError(cause instanceof Error ? cause.message : String(cause)); })
+      .catch((cause: unknown) => { setLoadError(errorText(cause)); })
       .finally(() => { setLoading(false); });
   }, [validSector, sector, apply]);
 
@@ -80,7 +81,7 @@ export function CatalogueSectorAdmin({ sector }: { sector: string }) {
         apply(await readSectorState(sector));
         setNotice(`Withdrew ${sectorLabel(current.sector)} v${String(current.version)}.`);
       } catch (cause) {
-        setError(cause instanceof Error ? cause.message : String(cause));
+        setError(errorText(cause));
       } finally {
         setBusy(false);
       }

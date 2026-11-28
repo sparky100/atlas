@@ -1,10 +1,11 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Link } from 'react-router';
+import { Link, useNavigate } from 'react-router';
 import type { CatalogueProductSummary } from '../../contracts/catalogueAdmin';
-import { listCatalogueProducts } from '../../db/catalogueAdmin';
+import { addPlatform, listCatalogueProducts } from '../../db/catalogueAdmin';
 import { LinkButton } from '../components/Button/LinkButton';
 import { Loading } from '../components/Loading/Loading';
 import { supabase } from '../supabaseClient';
+import { errorText } from './adminErrorText';
 import { publicationLabelText } from './catalogueShared';
 import styles from './CatalogueAdmin.module.css';
 
@@ -18,11 +19,15 @@ export function CatalogueProductsAdmin() {
   const [readyOnly, setReadyOnly] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const navigate = useNavigate();
+  const [platformName, setPlatformName] = useState('');
+  const [platformVendor, setPlatformVendor] = useState('');
+  const [adding, setAdding] = useState(false);
 
   useEffect(() => {
     void listCatalogueProducts(supabase)
       .then(setProducts)
-      .catch((cause: unknown) => { setError(cause instanceof Error ? cause.message : String(cause)); })
+      .catch((cause: unknown) => { setError(errorText(cause)); })
       .finally(() => { setLoading(false); });
   }, []);
 
@@ -49,6 +54,25 @@ export function CatalogueProductsAdmin() {
         <span>{String(filtered.length)} shown</span>
         <LinkButton variant="secondary" to="/platform-admin/catalogue/products/new">New product</LinkButton>
       </div>
+      <details className={styles.section} data-testid="add-platform">
+        <summary>
+          <span className={styles.sectionTitle}>Add a platform</span>
+          <span className={styles.sectionHint}>Enter its name and vendor. It is added as a draft and the Researcher then searches for its components.</span>
+        </summary>
+        <form className={styles.sectionBody} onSubmit={(event) => {
+          event.preventDefault();
+          setAdding(true); setError('');
+          void addPlatform(supabase, platformVendor, platformName)
+            // A platform already in the library is opened, not copied (rule I1), and its search starts there.
+            .then((result) => navigate(`/platform-admin/catalogue/products/${result.platformId}`, { state: { findComponents: true } }))
+            .catch((cause: unknown) => { setError(errorText(cause)); })
+            .finally(() => { setAdding(false); });
+        }}>
+          <label>Platform name <input value={platformName} onChange={(event) => { setPlatformName(event.target.value); }} placeholder="SAP S/4HANA Utilities" /></label>
+          <label>Vendor <input value={platformVendor} onChange={(event) => { setPlatformVendor(event.target.value); }} placeholder="SAP" /></label>
+          <button type="submit" disabled={adding || platformName.trim() === '' || platformVendor.trim() === ''}>{adding ? 'Adding…' : 'Add platform and find its components'}</button>
+        </form>
+      </details>
       {waiting > 0 && (
         <p role="status">
           {String(waiting)} claim{waiting === 1 ? ' is' : 's are'} waiting for review. <Link to="/platform-admin/catalogue/review">Review them</Link>

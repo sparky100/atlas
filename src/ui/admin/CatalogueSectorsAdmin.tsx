@@ -6,6 +6,7 @@ import { Loading } from '../components/Loading/Loading';
 import { supabase } from '../supabaseClient';
 import { currentCatalogueVersion, sectorLabel } from './catalogueShared';
 import styles from './CatalogueAdmin.module.css';
+import { errorText } from './adminErrorText';
 
 /**
  * `/platform-admin/catalogue/sectors` — every sector's catalogue standing:
@@ -19,7 +20,7 @@ export function CatalogueSectorsAdmin() {
   useEffect(() => {
     void listCatalogueVersions(supabase)
       .then(setVersions)
-      .catch((cause: unknown) => { setError(cause instanceof Error ? cause.message : String(cause)); })
+      .catch((cause: unknown) => { setError(errorText(cause)); })
       .finally(() => { setLoading(false); });
   }, []);
 

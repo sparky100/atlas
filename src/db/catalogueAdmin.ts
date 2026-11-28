@@ -661,6 +661,24 @@ async function createDraftPlatform(client: Client, vendor: string, name: string,
   return saved.productId;
 }
 
+/**
+ * Add a platform by name and vendor: search the library first (rule I1) and, when
+ * it is already there, say so and add nothing. Otherwise add it as a draft with
+ * no links and no claims, through the guarded save, so the server records who
+ * and when.
+ */
+export async function addPlatform(client: Client, vendor: string, name: string): Promise<{ platformId: UUID; existing: boolean; product: string }> {
+  const cleanVendor = vendor.trim();
+  const cleanName = name.trim();
+  if (cleanVendor === '' || cleanName === '') throw new Error('Enter the platform name and its vendor.');
+  const library = await listCatalogueProducts(client);
+  const key = nameMatchKey(cleanVendor, cleanName);
+  const found = library.find((row) => nameMatchKey(row.vendor, row.product) === key);
+  if (found) return { platformId: found.id, existing: true, product: found.product };
+  const platformId = await createDraftPlatform(client, cleanVendor, cleanName, new Set(library.map((row) => row.code)));
+  return { platformId, existing: false, product: cleanName };
+}
+
 export async function acceptPlatformSuggestion(
   client: Client,
   suggestion: PlatformSuggestion,

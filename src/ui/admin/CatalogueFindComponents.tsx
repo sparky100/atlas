@@ -1,9 +1,10 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router';
 import { findComponentsOfPlatform, finishCheckRun, listLibraryProductKeys, saveFoundComponents, startCheckRun } from '../../db/catalogueAdmin';
 import { nameMatchKey, splitByLibrary, type FindResult } from '../../tools/catalogueFindProducts';
 import { supabase } from '../supabaseClient';
 import styles from './CatalogueAdmin.module.css';
+import { errorText } from './adminErrorText';
 
 const BASE = '/platform-admin/catalogue';
 
@@ -25,7 +26,7 @@ interface Outcome {
  * links yet. Modules already in the library are shown and left as they are.
  * Nothing is published. Only the platform's name and vendor are sent.
  */
-export function CatalogueFindComponents({ platform, disabled, onChanged }: { platform: { id: string; product: string; vendor: string }; disabled: boolean; onChanged: () => void }) {
+export function CatalogueFindComponents({ platform, disabled, onChanged, autoRun = false }: { platform: { id: string; product: string; vendor: string }; disabled: boolean; onChanged: () => void; autoRun?: boolean }) {
   const [running, setRunning] = useState(false);
   const [error, setError] = useState('');
   const [outcome, setOutcome] = useState<Outcome | null>(null);
@@ -54,7 +55,7 @@ export function CatalogueFindComponents({ platform, disabled, onChanged }: { pla
       if (saving.failed.length > 0) note = `${String(saving.failed.length)} could not be saved.`;
       if (savedCount > 0) onChanged();
     } catch (cause) {
-      const message = cause instanceof Error ? cause.message : String(cause);
+      const message = errorText(cause);
       status = message.includes('daily AI limit') ? 'limit_reached' : 'failed';
       note = message;
       setError(`${message} Nothing was added.`);
@@ -68,6 +69,13 @@ export function CatalogueFindComponents({ platform, disabled, onChanged }: { pla
       setRunning(false);
     }
   };
+
+  // "Add a platform" lands here and starts the search once, so one action does both.
+  const started = useRef(false);
+  useEffect(() => {
+    if (autoRun && !disabled && !started.current) { started.current = true; void run(); }
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- start once, when the page first allows it
+  }, [autoRun, disabled]);
 
   return (
     <div data-testid="find-components">

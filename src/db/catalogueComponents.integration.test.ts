@@ -8,7 +8,7 @@ import { randomUUID } from 'node:crypto';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { createServiceRoleClient, createSupabaseClient, type Client } from './client';
 import { loadEnv } from './env';
-import { listCatalogueProducts, readCatalogueProduct, saveCatalogueProduct } from './catalogueAdmin';
+import { addPlatform, listCatalogueProducts, readCatalogueProduct, saveCatalogueProduct } from './catalogueAdmin';
 
 const env = loadEnv();
 const service = createServiceRoleClient(env);
@@ -113,6 +113,21 @@ describe('catalogue platforms and components, real database', () => {
     await expect(saveCatalogueProduct(admin.client, lone, loneDetail.product.edit_revision, { ...loneDetail.content, publication: { action: 'publish' } })).rejects.toThrow(/1-8 claims/i);
     // Someone signed in from another organisation cannot publish it, whatever its state.
     await expect(saveCatalogueProduct(outside.client, platform, before.product.edit_revision, { ...before.content, publication: { action: 'publish' } })).rejects.toThrow();
+  });
+
+  it('adds a platform by name once, and finds it again by a differently written name', async () => {
+    const vendor = `Addvendor ${suffix}`;
+    const first = await addPlatform(admin.client, vendor, `Addplatform ${suffix}`);
+    ids.push(first.platformId);
+    expect(first.existing).toBe(false);
+    const detail = await readCatalogueProduct(admin.client, first.platformId);
+    expect(detail.content.claims).toEqual([]);
+    expect(detail.content.capabilities).toEqual([]);
+    const again = await addPlatform(admin.client, vendor.toUpperCase(), `  ADDPLATFORM ${suffix}  `);
+    expect(again.existing).toBe(true);
+    expect(again.platformId).toBe(first.platformId);
+    await expect(addPlatform(admin.client, '', 'No vendor')).rejects.toThrow(/name and its vendor/);
+    await expect(addPlatform(outside.client, vendor, `Outside ${suffix}`)).rejects.toThrow();
   });
 
   it('refuses a signed-in user who is not a platform admin', async () => {

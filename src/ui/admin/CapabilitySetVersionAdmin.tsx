@@ -14,6 +14,7 @@ import { supabase } from '../supabaseClient';
 import { CapabilitySetPreview } from './CapabilitySetPreview';
 import { contentForNewDraft } from './referenceMapDraft';
 import styles from './CapabilitySetAdmin.module.css';
+import { errorText } from './adminErrorText';
 
 const BASE = '/platform-admin/capability-sets';
 
@@ -47,7 +48,7 @@ export function CapabilitySetVersionAdmin({ mapId }: { mapId: string }) {
         setMap(found);
         setContent(loaded);
       } catch (cause) {
-        setLoadError(cause instanceof Error ? cause.message : String(cause));
+        setLoadError(errorText(cause));
       } finally {
         setLoading(false);
       }
@@ -73,7 +74,7 @@ export function CapabilitySetVersionAdmin({ mapId }: { mapId: string }) {
         const id = await createReferenceMapDraft(supabase, map.sector, nextVersion, map.id, initial);
         void navigate(`${BASE}/drafts/${id}`);
       } catch (cause) {
-        setError(cause instanceof Error ? cause.message : String(cause));
+        setError(errorText(cause));
       } finally {
         setBusy(false);
       }
