@@ -22,7 +22,7 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.115.0';
 import { corsHeaders } from '../../_shared/cors.ts';
 import type { PageResponse } from '../../../../src/tools/catalogueClaimCheck.ts';
 import {
-  FIND_DAILY_TOKEN_LIMIT, FIND_DEFAULT_MODEL, FIND_MAX_COMPONENTS, FIND_MAX_COMPONENT_SEARCHES, FIND_MAX_SEARCHES, FIND_SYSTEM, FIND_WEB_SEARCH_TOOL,
+  FIND_DAILY_TOKEN_LIMIT, FIND_DEFAULT_MODEL, FIND_MAX_COMPONENTS, FIND_MAX_COMPONENT_SEARCHES, FIND_MAX_PLATFORMS, FIND_PLATFORMS_SYSTEM, findPlatformsRequestSchema, findPlatformsUserMessage, FIND_MAX_SEARCHES, FIND_SYSTEM, FIND_WEB_SEARCH_TOOL,
   FIND_COMPONENTS_SYSTEM, asComponentsOf, findComponentsRequestSchema, findComponentsUserMessage, findRequestSchema, findUserMessage, keepComponents, parseFindAnswer, verifyCandidates,
 } from '../../../../src/tools/catalogueFindProducts.ts';
 
@@ -174,10 +174,12 @@ Deno.serve(async (req: Request) => {
   try { body = await req.json(); } catch { return jsonResponse({ status: 'error', message: 'Invalid JSON.' }, 400); }
   const parsedCapability = findRequestSchema.safeParse(body);
   const parsedComponents = parsedCapability.success ? null : findComponentsRequestSchema.safeParse(body);
+  const parsedPlatforms = parsedCapability.success || parsedComponents?.success === true ? null : findPlatformsRequestSchema.safeParse(body);
   const capabilityRequest = parsedCapability.success ? parsedCapability.data : null;
   const componentsRequest = parsedComponents?.success === true ? parsedComponents.data : null;
-  if (capabilityRequest === null && componentsRequest === null) {
-    return jsonResponse({ status: 'error', message: 'Send the capability name, its definition and the sector, or a platform name and its vendor.' }, 400);
+  const platformsRequest = parsedPlatforms?.success === true ? parsedPlatforms.data : null;
+  if (capabilityRequest === null && componentsRequest === null && platformsRequest === null) {
+    return jsonResponse({ status: 'error', message: 'Send the capability name, its definition and the sector, a platform name and its vendor, or a sector.' }, 400);
   }
 
   // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment -- Deno runtime, no shared type-checking with src/.
@@ -200,14 +202,14 @@ Deno.serve(async (req: Request) => {
     const model = Deno.env.get('CATALOGUE_FIND_MODEL') || FIND_DEFAULT_MODEL;
     let answer: Awaited<ReturnType<typeof search>>;
     try {
-      answer = capabilityRequest !== null
-        ? await search(apiKey, model, FIND_SYSTEM, findUserMessage(capabilityRequest))
-        : await search(apiKey, model, FIND_COMPONENTS_SYSTEM, findComponentsUserMessage(componentsRequest as NonNullable<typeof componentsRequest>), { searches: FIND_MAX_COMPONENT_SEARCHES, maxTokens: 16000 });
+      if (capabilityRequest !== null) answer = await search(apiKey, model, FIND_SYSTEM, findUserMessage(capabilityRequest));
+      else if (platformsRequest !== null) answer = await search(apiKey, model, FIND_PLATFORMS_SYSTEM, findPlatformsUserMessage(platformsRequest), { searches: FIND_MAX_SEARCHES, maxTokens: 12000 });
+      else answer = await search(apiKey, model, FIND_COMPONENTS_SYSTEM, findComponentsUserMessage(componentsRequest as NonNullable<typeof componentsRequest>), { searches: FIND_MAX_COMPONENT_SEARCHES, maxTokens: 16000 });
     } catch (cause) {
       if (cause instanceof WebSearchOff) return jsonResponse({ status: 'error', code: 'web_search_off', message: 'Web search is not switched on for the platform AI account. Nothing was searched.' }, 503);
       return jsonResponse({ status: 'error', message: 'The AI could not be reached, so no products were found.' }, 502);
     }
-    const candidates = parseFindAnswer(answer.text, componentsRequest === null ? undefined : FIND_MAX_COMPONENTS);
+    const candidates = parseFindAnswer(answer.text, platformsRequest !== null ? FIND_MAX_PLATFORMS : componentsRequest === null ? undefined : FIND_MAX_COMPONENTS);
     if (candidates === null) {
       return jsonResponse({ status: 'ok', found: [], dropped: [], searches: answer.searches, inputTokens: answer.inputTokens, outputTokens: answer.outputTokens, model, note: "The AI's answer could not be read." }, 200);
     }

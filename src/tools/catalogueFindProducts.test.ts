@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { PageResponse } from './catalogueClaimCheck';
-import { FIND_MAX_COMPONENTS, FIND_COMPONENTS_SYSTEM, findComponentsRequestSchema, findComponentsUserMessage, asComponentsOf, foundComponentContent, keepComponents, parseFindAnswer, productCode, splitByLibrary, verifyCandidates, type Candidate } from './catalogueFindProducts';
+import { FIND_MAX_PLATFORMS, FIND_PLATFORMS_SYSTEM, findPlatformsRequestSchema, findPlatformsUserMessage, findRequestSchema, FIND_MAX_COMPONENTS, FIND_COMPONENTS_SYSTEM, findComponentsRequestSchema, findComponentsUserMessage, asComponentsOf, foundComponentContent, keepComponents, parseFindAnswer, productCode, splitByLibrary, verifyCandidates, type Candidate } from './catalogueFindProducts';
 
 const PAGE = 'Acme Meter Hub collects and validates half-hourly smart meter reads from every supplier. It runs as a hosted service.';
 
@@ -56,6 +56,24 @@ describe('a components search', () => {
   it('bounds the known-names list', () => {
     const names = Array.from({ length: 61 }, (_, i) => `M${String(i)}`);
     expect(findComponentsRequestSchema.safeParse({ platformName: 'X', vendor: 'Y', alreadyKnown: names }).success).toBe(false);
+  });
+});
+
+describe('a sector platforms search', () => {
+  it('takes only a sector, so it cannot be mistaken for the other requests', () => {
+    expect(findPlatformsRequestSchema.safeParse({ sector: 'electricity network' }).success).toBe(true);
+    expect(findPlatformsRequestSchema.safeParse({ sector: 'x', platformName: 'P' }).success).toBe(false);
+    expect(findRequestSchema.safeParse({ sector: 'x' }).success).toBe(false);
+    expect(findComponentsRequestSchema.safeParse({ sector: 'x' }).success).toBe(false);
+  });
+  it('asks for whole platforms, with the limit stated and no unfilled placeholders', () => {
+    expect(FIND_PLATFORMS_SYSTEM).not.toContain('${');
+    expect(FIND_PLATFORMS_SYSTEM).toContain(`At most ${String(FIND_MAX_PLATFORMS)} platforms`);
+    expect(findPlatformsUserMessage({ sector: 'electricity network' })).toContain('Sector: electricity network');
+  });
+  it('caps the answer at the platform limit', () => {
+    const many = Array.from({ length: 30 }, (_, i) => candidate({ product: `P${String(i)}` }));
+    expect(parseFindAnswer(JSON.stringify({ products: many }), FIND_MAX_PLATFORMS)).toHaveLength(FIND_MAX_PLATFORMS);
   });
 });
 
