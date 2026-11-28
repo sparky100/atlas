@@ -1,5 +1,6 @@
 import { useCallback, useState, type ReactNode } from 'react';
 import { CatalogueClaimChecks } from './CatalogueClaimChecks';
+import { CatalogueCoverage } from './CatalogueCoverage';
 import { CatalogueFindPlatforms } from './CatalogueFindPlatforms';
 import { CatalogueFindProducts } from './CatalogueFindProducts';
 import { CatalogueMonthlyCheck } from './CatalogueMonthlyCheck';
@@ -36,6 +37,8 @@ export function CatalogueTools() {
             <CatalogueClaimChecks part="run" onRunRecorded={recordRun} />
           </>
         ))}
+        {block('coverage', 'Coverage by sector', 'Which capabilities of a set have a published product, which have only drafts, and which have none.',
+          <CatalogueCoverage />)}
         {block('find-platforms', 'Find the main platforms for a sector', 'Start from the platforms a sector runs, then find their modules. You choose which to add; everything found is a draft.',
           <CatalogueFindPlatforms onRunRecorded={recordRun} />)}
         {block('find-products', 'Find new products', 'Search the public web for products that meet a capability. Every product found is a draft for a person to review.',

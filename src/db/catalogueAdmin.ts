@@ -42,6 +42,7 @@ import {
 } from '../contracts/catalogueAdmin';
 import { claimCheckResultSchema, type ClaimCheckResult } from '../tools/catalogueClaimCheck';
 import { proposalKey, type LinkProposal, type ProductLinkRow, type ProposalProduct, type RejectedLinkRow } from '../tools/catalogueLinkProposals';
+import { buildCoverage, type CoverageInput } from '../tools/catalogueCoverage';
 import { suggestPlatforms, type PlatformSuggestion } from '../tools/cataloguePlatformSuggestions';
 import { findResultSchema, foundComponentContent, foundProductContent, nameMatchKey, type FindComponentsRequest, type FindPlatformsRequest, splitByLibrary, productCode, type FindRequest, type FindResult, type FoundProduct } from '../tools/catalogueFindProducts';
 import type { Client } from './client';
@@ -1237,6 +1238,59 @@ export async function saveFoundProducts(
     }
   }
   return { saved, failed, platformsCreated };
+}
+
+/** Read every row of a table in pages of 1,000, so a long list is never sent as a filter (rule 8). */
+async function readAllRows<T>(label: string, page: (from: number, to: number) => PromiseLike<{ data: T[] | null; error: { message: string } | null }>): Promise<T[]> {
+  const out: T[] = [];
+  const size = 1000;
+  for (let from = 0; ; from += size) {
+    const { data, error } = await page(from, from + size - 1);
+    if (error) throw new Error(`${label}: ${error.message}`);
+    out.push(...(data ?? []));
+    if ((data ?? []).length < size) break;
+  }
+  return out;
+}
+
+/**
+ * The coverage report for one capability set: what is counted and what is not
+ * is in `buildCoverage`. Reads only; merged products and platforms are left
+ * out, and a product is published when its newest revision is not withdrawn.
+ */
+export async function readSetCoverage(client: Client, mapId: UUID): Promise<ReturnType<typeof buildCoverage>> {
+  const sets = await listCapabilitySets(client);
+  const target = sets.find((set) => set.id === mapId);
+  if (!target) throw new Error('That capability set was not found.');
+  const items = await listCapabilitySetItems(client, mapId);
+  const merged = await mergedInto(client);
+  const productRows = await readAllRows<{ id: string; product: string; vendor: string; part_of_product_id: string | null }>('readSetCoverage products', (from, to) =>
+    client.from('catalogue_products').select('id,product,vendor,part_of_product_id').order('id').range(from, to));
+  const platformIds = new Set(productRows.flatMap((row) => (row.part_of_product_id === null ? [] : [row.part_of_product_id])));
+  const live = await readAllRows<{ product_id: string }>('readSetCoverage revisions', (from, to) =>
+    client.from('catalogue_product_revisions').select('product_id').is('withdrawn_at', null).is('superseded_at', null).order('product_id').range(from, to));
+  const publishedIds = new Set(live.map((row) => row.product_id));
+  const products = new Map<string, { id: string; product: string; vendor: string; published: boolean }>();
+  for (const row of productRows) {
+    if (merged.has(row.id) || platformIds.has(row.id)) continue;
+    products.set(row.id, { id: row.id, product: row.product, vendor: row.vendor, published: publishedIds.has(row.id) });
+  }
+  const sectorLinks = await readAllRows<{ product_id: string; capability_map_id: string; capability_code: string }>('readSetCoverage links', (from, to) =>
+    client.from('catalogue_product_capabilities').select('product_id,capability_map_id,capability_code').order('product_id').order('capability_map_id').order('capability_code').range(from, to));
+  const generalLinks = await readAllRows<{ product_id: string; capability_id: string }>('readSetCoverage shared links', (from, to) =>
+    client.from('catalogue_product_general_links').select('product_id,capability_id').order('product_id').order('capability_id').range(from, to));
+  const refLinks = await readAllRows<{ map_item_id: string; capability_id: string }>('readSetCoverage identities', (from, to) =>
+    client.from('reference_map_item_links').select('map_item_id,capability_id').order('map_item_id').range(from, to));
+  const itemIds = new Set(items.map((item) => item.id));
+  const input: CoverageInput = {
+    items: items.map((item) => ({ id: item.id, code: item.code, name: item.name, parentCode: item.parentCode, level: item.level })),
+    sectorMapIds: new Set(sets.filter((set) => set.sector === target.sector).map((set) => set.id)),
+    sectorLinks: sectorLinks.map((row) => ({ productId: row.product_id, mapId: row.capability_map_id, code: row.capability_code })),
+    generalLinks: generalLinks.map((row) => ({ productId: row.product_id, capabilityId: row.capability_id })),
+    itemCapability: new Map(refLinks.filter((row) => itemIds.has(row.map_item_id)).map((row) => [row.map_item_id, row.capability_id])),
+    products,
+  };
+  return buildCoverage(input);
 }
 
 /** Everything the link proposals are worked out from: the library's products, every capability link they have, and the pairs a person rejected. Read in pages of 1,000 rows. */

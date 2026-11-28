@@ -497,6 +497,50 @@ for (const viewport of [{ width: 1280, height: 800 }, { width: 390, height: 844 
 }
 
 /**
+ * Coverage by sector. Reads only, so nothing is faked: a seeded set with one capability linked to a draft product and one with none
+ * must say "Draft only" and "No product" and total them. (The published state is covered by the unit tests.)
+ */
+for (const viewport of [{ width: 1280, height: 800 }, { width: 390, height: 844 }]) {
+  test(`an admin sees which capabilities of a set have a product at ${String(viewport.width)}`, async ({ page }) => {
+    await page.setViewportSize(viewport);
+    const service = createServiceRoleClient(loadEnv());
+    const suffix = randomUUID().replace(/[^a-f]/g, '').padEnd(6, 'q').slice(0, 6) + (viewport.width === 1280 ? 'big' : 'small');
+    const zero = '00000000-0000-0000-0000-000000000000';
+    // A code no other run uses, because links count across every version of the sector's set.
+    const area = String(10000 + (Number.parseInt(randomUUID().slice(0, 5), 16) % 80000));
+    const mapId = randomUUID();
+    const productId = randomUUID();
+    const checked = (result: { error: { message: string } | null }) => { if (result.error) throw new Error(`coverage seed: ${result.error.message}`); };
+    checked(await service.from('capability_maps').insert({ id: mapId, sector: 'utility', version: 500000 + (Number.parseInt(randomUUID().slice(0, 5), 16) % 90000), status: 'draft', title: `Coverage test set ${suffix}`, summary: 'Coverage test set', source_description: 'Playwright seed.' }));
+    checked(await service.from('capability_map_items').insert([
+      { id: randomUUID(), map_id: mapId, code: area, parent_code: null, name: `Coverage area ${suffix}`, description: 'Area.', level: 1, item_order: 10 },
+      { id: randomUUID(), map_id: mapId, code: `${area}.1`, parent_code: area, name: `Covered capability ${suffix}`, description: 'Has a draft product.', level: 2, item_order: 10 },
+      { id: randomUUID(), map_id: mapId, code: `${area}.2`, parent_code: area, name: `Gap capability ${suffix}`, description: 'Has none.', level: 2, item_order: 20 },
+    ]));
+    checked(await service.from('capability_maps').update({ status: 'published', published_at: new Date().toISOString() }).eq('id', mapId));
+    checked(await service.from('catalogue_products').insert({ id: productId, code: `cov-${suffix}`, product: `Coverage product ${suffix}`, vendor: `Covvend ${suffix}`, summary: 'A draft product.', created_by: zero, updated_by: zero }));
+    checked(await service.from('catalogue_product_capabilities').insert({ product_id: productId, capability_map_id: mapId, capability_code: `${area}.1`, capability_name: `Covered capability ${suffix}`, how_it_supports: 'It does.' }));
+
+    await signUpAdmin(page);
+    await page.goto('/platform-admin/catalogue/tools');
+    await openSection(page, 'coverage');
+    const section = page.getByTestId('coverage');
+    await section.getByLabel('Capability set').selectOption(mapId);
+    await expect(section.getByTestId('coverage-summary')).toContainText('0 of 3 capabilities have a published product, 1 have only drafts, 2 have none.');
+    const group = section.getByTestId(`coverage-group-${area}`);
+    await expect(group).toContainText(`${area} Coverage area ${suffix}: 0 of 3 with a published product, 1 draft only, 2 with none`);
+    await group.locator(':scope > summary').click();
+    await expect(group).toContainText(`Covered capability ${suffix}: Draft only (1)`);
+    await expect(group.getByRole('link', { name: `Coverage product ${suffix}` })).toBeVisible();
+    await expect(group).toContainText(`Gap capability ${suffix}: No product`);
+    await section.getByRole('checkbox', { name: 'Show gaps only' }).check();
+    await expect(section.getByTestId('coverage-row').filter({ hasText: `Gap capability ${suffix}` })).toHaveCount(1);
+    expect(await page.evaluate(() => document.documentElement.scrollWidth > document.documentElement.clientWidth + 1)).toBe(false);
+    await page.screenshot({ path: `test-results/catalogue-coverage-${String(viewport.width)}.png`, fullPage: true });
+  });
+}
+
+/**
  * Find components of a platform. The function answer is faked (a mocked AI shows nothing about AI quality); the library check,
  * saving components as drafts under the platform with no capability links, and the run record are real.
  */
