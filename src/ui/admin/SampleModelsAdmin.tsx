@@ -7,6 +7,7 @@ import { Loading } from '../components/Loading/Loading';
 import { Text } from '../components/Text/Text';
 import { supabase } from '../supabaseClient';
 import styles from './SampleModelAdmin.module.css';
+import { errorText } from './adminErrorText';
 
 const dateFormat = new Intl.DateTimeFormat('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
 
@@ -19,7 +20,7 @@ export function SampleModelsAdmin() {
   useEffect(() => {
     void listSampleModelsForAdmin(supabase)
       .then(setSamples)
-      .catch((cause: unknown) => { setError(cause instanceof Error ? cause.message : String(cause)); })
+      .catch((cause: unknown) => { setError(errorText(cause)); })
       .finally(() => { setLoading(false); });
   }, []);
 

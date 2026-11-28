@@ -9,6 +9,7 @@ import { Loading } from '../components/Loading/Loading';
 import { Text } from '../components/Text/Text';
 import { supabase } from '../supabaseClient';
 import styles from './SampleModelAdmin.module.css';
+import { errorText } from './adminErrorText';
 
 const BASE = '/platform-admin/sample-models';
 const dateFormat = new Intl.DateTimeFormat('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
@@ -40,13 +41,13 @@ export function SampleModelAdmin({ slug }: { slug: string }) {
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect -- refresh sets state only after its awaited reads.
     void refresh()
-      .catch((cause: unknown) => { setLoadError(cause instanceof Error ? cause.message : String(cause)); })
+      .catch((cause: unknown) => { setLoadError(errorText(cause)); })
       .finally(() => { setLoading(false); });
   }, [refresh]);
 
   const run = async (action: () => Promise<void>) => {
     setBusy(true); setError(''); setNotice('');
-    try { await action(); } catch (cause) { setError(cause instanceof Error ? cause.message : String(cause)); }
+    try { await action(); } catch (cause) { setError(errorText(cause)); }
     finally { setBusy(false); }
   };
 

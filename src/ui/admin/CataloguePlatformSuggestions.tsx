@@ -4,6 +4,7 @@ import { acceptPlatformSuggestion, listPlatformSuggestions, rejectPlatformSugges
 import type { PlatformSuggestion } from '../../tools/cataloguePlatformSuggestions';
 import { supabase } from '../supabaseClient';
 import styles from './CatalogueAdmin.module.css';
+import { errorText } from './adminErrorText';
 
 const suggestionKey = (suggestion: PlatformSuggestion) => `${suggestion.vendor}|${suggestion.platformKey}`;
 
@@ -30,7 +31,7 @@ export function CataloguePlatformSuggestions({ onChanged, onCount }: { onChanged
   useEffect(() => {
     void listPlatformSuggestions(supabase)
       .then(setSuggestions)
-      .catch((cause: unknown) => { setError(cause instanceof Error ? cause.message : String(cause)); })
+      .catch((cause: unknown) => { setError(errorText(cause)); })
       .finally(() => { setLoading(false); });
   }, []);
 
@@ -44,7 +45,7 @@ export function CataloguePlatformSuggestions({ onChanged, onCount }: { onChanged
       setNotice(await work());
       onChanged?.();
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : String(cause));
+      setError(errorText(cause));
     } finally {
       await load().catch(() => undefined);
       setBusy(false);

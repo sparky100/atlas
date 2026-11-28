@@ -7,6 +7,7 @@ import { isKept, KEEP_FOR_NOW_DAYS, KEEP_OLD_ADDRESS_DAYS, movedLinkIsSameSite }
 import { supabase } from '../supabaseClient';
 import { formatDay } from './catalogueShared';
 import styles from './CatalogueAdmin.module.css';
+import { errorText } from './adminErrorText';
 
 const GROUPS: { result: Exclude<SourceCheckResult, 'works'>; title: string }[] = [
   { result: 'moved', title: 'Moved' },
@@ -62,7 +63,7 @@ export function CatalogueFlaggedLinks({ flagged, onChanged, onClaimsChecked }: {
       setNotice(await work());
       await onChanged();
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : String(cause));
+      setError(errorText(cause));
     } finally {
       setBusy(null);
     }

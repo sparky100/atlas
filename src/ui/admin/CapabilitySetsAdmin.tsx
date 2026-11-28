@@ -11,6 +11,7 @@ import { Loading } from '../components/Loading/Loading';
 import { supabase } from '../supabaseClient';
 import { contentForNewDraft } from './referenceMapDraft';
 import styles from './CapabilitySetAdmin.module.css';
+import { errorText } from './adminErrorText';
 
 const BASE = '/platform-admin/capability-sets';
 
@@ -37,7 +38,7 @@ export function CapabilitySetsAdmin() {
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect -- refresh sets state only after its awaited reads.
     void refresh()
-      .catch((cause: unknown) => { setError(cause instanceof Error ? cause.message : String(cause)); })
+      .catch((cause: unknown) => { setError(errorText(cause)); })
       .finally(() => { setLoading(false); });
   }, [refresh]);
 
@@ -52,7 +53,7 @@ export function CapabilitySetsAdmin() {
 
   const run = async (action: () => Promise<void>) => {
     setBusy(true); setError('');
-    try { await action(); } catch (cause) { setError(cause instanceof Error ? cause.message : String(cause)); }
+    try { await action(); } catch (cause) { setError(errorText(cause)); }
     finally { setBusy(false); }
   };
 

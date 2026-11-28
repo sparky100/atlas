@@ -30,6 +30,7 @@ import { supabase } from '../supabaseClient';
 import { CatalogueFindComponents } from './CatalogueFindComponents';
 import { claimCheckSentence, claimStatusText, emptyProduct, isGeneralCapabilityCode, publicationStatusText, sameClaimText, sectorLabel, setLabel, sourceCheckSentence } from './catalogueShared';
 import styles from './CatalogueAdmin.module.css';
+import { errorText } from './adminErrorText';
 
 const BASE = '/platform-admin/catalogue';
 const CLAIM_KINDS = ['functional', 'deployment', 'licensing_model', 'support_end', 'integration'] as const;
@@ -86,7 +87,7 @@ export function CatalogueProductAdmin({ productId }: { productId: string | null 
         setPlatformChoices(await listCatalogueProducts(supabase).then((rows) => rows.filter((row) => row.partOfProductId === null && row.id !== productId).map((row) => ({ id: row.id, product: row.product, vendor: row.vendor })), () => []));
         setClaimChecks(await listClaimChecks(supabase).then((rows) => new Map(rows.map((row) => [claimCheckKey(row), row])), () => null));
       } catch (cause) {
-        setLoadError(cause instanceof Error ? cause.message : String(cause));
+        setLoadError(errorText(cause));
       } finally {
         setLoading(false);
       }
@@ -108,7 +109,7 @@ export function CatalogueProductAdmin({ productId }: { productId: string | null 
 
   const run = async (action: () => Promise<void>) => {
     setBusy(true); setError(''); setNotice('');
-    try { await action(); } catch (cause) { setError(cause instanceof Error ? cause.message : String(cause)); }
+    try { await action(); } catch (cause) { setError(errorText(cause)); }
     finally { setBusy(false); }
   };
 
