@@ -75,7 +75,7 @@ for (const viewport of [{ width: 1280, height: 800 }, { width: 390, height: 844 
     await expect(page.getByTestId('claim-status')).toContainText('Waiting for review');
 
     // The same claim shows in the queue, reached from the admin navigation, and is reviewed from there.
-    await page.getByRole('link', { name: 'Waiting for review' }).click();
+    await page.getByRole('navigation', { name: 'Platform admin' }).getByRole('link', { name: 'Waiting for review' }).click();
     await expect(page.getByRole('heading', { name: 'Waiting for review' })).toBeVisible();
     // The page settles first; the first block with something waiting opens (claims come first), and is opened here if not.
     await expect(page.getByTestId('catalogue-review-queue')).toHaveAttribute('data-ready', 'true');
