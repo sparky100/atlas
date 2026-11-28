@@ -296,6 +296,7 @@ export function CatalogueProductAdmin({ productId }: { productId: string | null 
       {detail !== null && detail.partOf === null && (
         <CatalogueFindComponents
           platform={{ id: detail.product.id, product: detail.product.product, vendor: detail.product.vendor }}
+          knownComponents={detail.components.map((c) => c.product)}
           disabled={dirty || busy}
           autoRun={findNow}
           onChanged={() => { void readCatalogueProduct(supabase, detail.product.id).then((next) => { setDetail(next); setContent(next.content); }, () => undefined); }}
