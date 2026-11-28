@@ -82,6 +82,11 @@ for (const viewport of [{ width: 1280, height: 800 }, { width: 390, height: 844 
     const claimsBlock = page.getByTestId('section-claims');
     if ((await claimsBlock.getAttribute('open')) === null) await claimsBlock.locator(':scope > summary').click();
     await expect(page.getByTestId('review-totals')).toContainText('to review');
+    // A count at the top opens its block and brings it into view.
+    await claimsBlock.locator(':scope > summary').click();
+    await expect(claimsBlock).not.toHaveAttribute('open', '');
+    await page.getByTestId('chip-claims').click();
+    await expect(claimsBlock).toHaveAttribute('open', '');
     const section = page.getByTestId('review-product').filter({ hasText: `Review test ${suffix}` });
     await expect(page.getByTestId('review-counts')).toContainText('on');
     // Each product is a closed card showing its name and how many claims wait; opening it shows the claims.

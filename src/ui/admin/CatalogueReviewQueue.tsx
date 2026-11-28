@@ -120,11 +120,11 @@ export function CatalogueReviewQueue() {
   return (
     <div className={styles.page} data-testid="catalogue-review-queue" data-ready={sections.ready ? 'true' : 'false'}>
       <ul className={styles.chips} data-testid="review-totals">
-        <li><strong>{count('claims')}</strong> claim{count('claims') === 1 ? '' : 's'} to review</li>
-        <li><strong>{count('look-at')}</strong> claim{count('look-at') === 1 ? '' : 's'} to look at</li>
-        <li><strong>{count('links')}</strong> source link{count('links') === 1 ? '' : 's'} to look at</li>
-        <li><strong>{count('duplicates')}</strong> possible duplicate{count('duplicates') === 1 ? '' : 's'}</li>
-        <li><strong>{count('platforms')}</strong> suggested platform{count('platforms') === 1 ? '' : 's'}</li>
+        <li><button type="button" className={styles.chipButton} data-testid="chip-claims" onClick={() => { sections.jumpTo('claims'); }}><strong>{count('claims')}</strong> claim{count('claims') === 1 ? '' : 's'} to review</button></li>
+        <li><button type="button" className={styles.chipButton} data-testid="chip-look-at" onClick={() => { sections.jumpTo('look-at'); }}><strong>{count('look-at')}</strong> claim{count('look-at') === 1 ? '' : 's'} to look at</button></li>
+        <li><button type="button" className={styles.chipButton} data-testid="chip-links" onClick={() => { sections.jumpTo('links'); }}><strong>{count('links')}</strong> source link{count('links') === 1 ? '' : 's'} to look at</button></li>
+        <li><button type="button" className={styles.chipButton} data-testid="chip-duplicates" onClick={() => { sections.jumpTo('duplicates'); }}><strong>{count('duplicates')}</strong> possible duplicate{count('duplicates') === 1 ? '' : 's'}</button></li>
+        <li><button type="button" className={styles.chipButton} data-testid="chip-platforms" onClick={() => { sections.jumpTo('platforms'); }}><strong>{count('platforms')}</strong> suggested platform{count('platforms') === 1 ? '' : 's'}</button></li>
       </ul>
       <div className={styles.sections}>
         {section('claims', 'Claims to review', 'Open the source, check the statement says what the vendor says, then mark it reviewed.', (
