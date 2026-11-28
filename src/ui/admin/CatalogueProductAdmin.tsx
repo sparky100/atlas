@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState, type MouseEvent } from 'react';
-import { Link, useNavigate } from 'react-router';
+import { Link, useLocation, useNavigate } from 'react-router';
 import type {
   CapabilitySetItem,
   CapabilitySetOption,
@@ -43,6 +43,7 @@ const today = () => new Date().toISOString().slice(0, 10);
  */
 export function CatalogueProductAdmin({ productId }: { productId: string | null }) {
   const navigate = useNavigate();
+  const findNow = (useLocation().state as { findComponents?: boolean } | null)?.findComponents === true;
   const [detail, setDetail] = useState<CatalogueProductDetail | null>(null);
   const [content, setContent] = useState<CatalogueProductContent | null>(null);
   const [sets, setSets] = useState<CapabilitySetOption[]>([]);
@@ -295,6 +296,7 @@ export function CatalogueProductAdmin({ productId }: { productId: string | null 
         <CatalogueFindComponents
           platform={{ id: detail.product.id, product: detail.product.product, vendor: detail.product.vendor }}
           disabled={dirty || busy}
+          autoRun={findNow}
           onChanged={() => { void readCatalogueProduct(supabase, detail.product.id).then((next) => { setDetail(next); setContent(next.content); }, () => undefined); }}
         />
       )}

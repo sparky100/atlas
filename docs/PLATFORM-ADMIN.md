@@ -193,6 +193,8 @@ On a product's page, **Publication** shows whether it is not published,
 published (revision, who approved, when) or published with unpublished
 changes. **Publish product** is offered when every claim is reviewed, the
 product has 1 to 8 claims and at least one capability link. A platform needs no claims of its own, because claims sit on its components; it publishes once at least one component is published. Publishing freezes a
+
+**Add a platform** (on the Product catalogue page) takes a name and a vendor. It searches the library first and opens the platform if it is already there (no second copy); otherwise it adds a draft platform with no links and no claims, and the Researcher's "Find components" search starts on the platform's page by itself. Each component is a draft with its claims waiting for review.
 revision; editing afterwards never changes it. **Withdraw from users** needs a
 written reason and keeps the revision readable. The products list shows each
 product's state and can show only those ready to publish. Until the reader
