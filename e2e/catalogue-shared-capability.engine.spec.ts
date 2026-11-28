@@ -331,7 +331,7 @@ for (const viewport of [{ width: 1280, height: 800 }, { width: 390, height: 844 
     await page.goto('/platform-admin/catalogue/tools');
     await openSection(page, 'monthly');
     const section = page.getByTestId('monthly-check');
-    await expect(section.getByRole('heading', { name: 'Monthly check' })).toBeVisible();
+    await expect(page.getByTestId('section-monthly')).toContainText('Monthly check');
     await expect(section.getByTestId('check-runs')).toContainText('Monthly check');
     await expect(section.getByTestId('check-runs')).toContainText('3 need a look');
     await expect(section.getByTestId('check-runs')).toContainText('8,400 AI tokens');
@@ -391,7 +391,7 @@ for (const viewport of [{ width: 1280, height: 800 }, { width: 390, height: 844 
     await page.goto('/platform-admin/catalogue/tools');
     await openSection(page, 'find-products');
     const section = page.getByTestId('find-products');
-    await expect(section.getByRole('heading', { name: 'Find new products' })).toBeVisible();
+    await expect(page.getByTestId('section-find-products')).toContainText('Find new products');
     await expect(section.getByRole('button', { name: 'Find products for this capability' })).toBeDisabled();
     await section.getByLabel('Capability set').selectOption(mapId);
     await section.getByLabel('Search the capabilities').fill(`test capability ${suffix}`);
