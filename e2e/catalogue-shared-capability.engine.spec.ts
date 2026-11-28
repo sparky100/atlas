@@ -641,6 +641,59 @@ for (const viewport of [{ width: 1280, height: 800 }, { width: 390, height: 844 
   });
 }
 
+/** Load your own research: a pasted table becomes draft products under a new draft platform; bad rows are named; loading it again adds nothing. Nothing is sent to an AI. */
+for (const viewport of [{ width: 1280, height: 800 }, { width: 390, height: 844 }]) {
+  test(`an admin loads their own research as drafts at ${String(viewport.width)}`, async ({ page }) => {
+    await page.setViewportSize(viewport);
+    const tag = randomUUID().replace(/[^a-f]/g, '').padEnd(6, 'q').slice(0, 6) + (viewport.width === 1280 ? 'big' : 'small');
+    const vendor = `Resvend ${tag}`;
+    const platformName = `Resplat ${tag}`;
+    let aiCalls = 0;
+    await page.route('**/functions/v1/catalogue-find-products', async (route) => { aiCalls += 1; await route.abort(); });
+    const table = [
+      'Platform\tVendor\tProduct or module\tSummary\tSource link\tQuoted sentence\tKind',
+      `${platformName}\t${vendor}\t${platformName} Billing\tBills customers.\thttps://example.test/billing\t${platformName} Billing produces accurate bills.\tfunctional`,
+      `${platformName}\t${vendor}\t${platformName} Billing\tBills customers.\thttps://example.test/billing-2\t${platformName} Billing handles smart meter data.\tfunctional`,
+      `${platformName}\t${vendor}\t${platformName} Field\tSends field crews.\thttps://example.test/field\t${platformName} Field schedules field crews.\t`,
+      `${platformName}\t${vendor}\t${platformName} Broken\tHas a bad link.\thttp://example.test/broken\tA sentence.\t`,
+    ].join('\n');
+
+    await signUpAdmin(page);
+    await page.goto('/platform-admin/catalogue/tools');
+    await openSection(page, 'load-research');
+    const section = page.getByTestId('load-research');
+    await expect(section.getByTestId('load-research-prompt')).toContainText('Never include prices', { useInnerText: false });
+    await section.getByTestId('load-research-text').fill(table);
+    await section.getByRole('button', { name: 'Check the rows' }).click();
+    await expect(section.getByTestId('load-research-problems')).toContainText(`Line 5 (${platformName} Broken): the source link is not a public https web address.`);
+    const fresh = section.getByTestId('load-research-new');
+    await expect(fresh).toContainText(`${platformName} Billing`);
+    await expect(fresh).toContainText('2 claims');
+    await expect(section).toContainText(`first adds ${platformName} as draft platform`);
+    await section.getByRole('button', { name: 'Load 2 as drafts' }).click();
+    const done = section.getByTestId('load-research-done');
+    await expect(done).toContainText(`${platformName} Field: draft, claims drafted by you, waiting for review.`);
+    await expect(done).toContainText(`Draft platforms added first: ${platformName}.`);
+    await page.screenshot({ path: `test-results/catalogue-load-research-${String(viewport.width)}.png`, fullPage: true });
+    expect(await page.evaluate(() => document.documentElement.scrollWidth > document.documentElement.clientWidth + 1)).toBe(false);
+
+    // Loading the same table again finds them first (rule I1) and adds nothing.
+    await section.getByTestId('load-research-text').fill(table);
+    await section.getByRole('button', { name: 'Check the rows' }).click();
+    await expect(section.getByTestId('load-research-existing')).toContainText(`${platformName} Billing`);
+    await expect(section.getByTestId('load-research-new')).toHaveCount(0);
+
+    // The modules sit under the new platform.
+    const { data: platformRow, error }: { data: { id: string } | null; error: { message: string } | null } =
+      await createServiceRoleClient(loadEnv()).from('catalogue_products').select('id').eq('product', platformName).single();
+    if (error || platformRow === null) throw new Error(`load-research: ${error?.message ?? 'platform not found'}`);
+    await page.goto(`/platform-admin/catalogue/products/${platformRow.id}`);
+    await expect(page.getByTestId('product-components')).toContainText(`${platformName} Billing`);
+    await expect(page.getByTestId('product-components')).toContainText(`${platformName} Field`);
+    expect(aiCalls).toBe(0);
+  });
+}
+
 test('finding products says so in words when web search is not switched on', async ({ page }) => {
   await page.setViewportSize({ width: 1280, height: 800 });
   const service = createServiceRoleClient(loadEnv());

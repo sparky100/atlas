@@ -3,6 +3,7 @@ import { CatalogueClaimChecks } from './CatalogueClaimChecks';
 import { CatalogueCoverage } from './CatalogueCoverage';
 import { CatalogueFindPlatforms } from './CatalogueFindPlatforms';
 import { CatalogueFindProducts } from './CatalogueFindProducts';
+import { CatalogueLoadResearch } from './CatalogueLoadResearch';
 import { CatalogueMonthlyCheck } from './CatalogueMonthlyCheck';
 import { CatalogueSetProducts } from './CatalogueSetProducts';
 import { CatalogueSourceLinks } from './CatalogueSourceLinks';
@@ -43,6 +44,8 @@ export function CatalogueTools() {
           <CatalogueFindPlatforms onRunRecorded={recordRun} />)}
         {block('find-products', 'Find new products', 'Search the public web for products that meet a capability. Every product found is a draft for a person to review.',
           <CatalogueFindProducts onRunRecorded={recordRun} />)}
+        {block('load-research', 'Load your own research', 'Paste a table of products or modules you researched yourself, in a spreadsheet or an AI chat. New ones are added as drafts for review.',
+          <CatalogueLoadResearch />)}
         {block('set-products', 'Find products for a set', 'Propose links from products already in the library, and search for the capabilities that have none.',
           <CatalogueSetProducts onRunRecorded={recordRun} onChanged={() => undefined} />)}
       </div>
