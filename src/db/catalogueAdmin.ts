@@ -1111,7 +1111,11 @@ export async function findAndSaveComponents(
   let result: FindResult | null = null;
   let savedCount = 0;
   try {
-    result = await findComponentsOfPlatform(client, { platformName: platform.product, vendor: platform.vendor, alreadyKnown: knownComponents.slice(0, 60) });
+    result = await findComponentsOfPlatform(client, {
+      platformName: platform.product, vendor: platform.vendor,
+      // Names already known are sent only when there are some, so a first search sends just the platform and vendor.
+      ...(knownComponents.length > 0 ? { alreadyKnown: knownComponents.slice(0, 60) } : {}),
+    });
     const library = await listLibraryProductKeys(client);
     const split = splitByLibrary(result.found, library.map((row) => ({ id: row.id, vendor: row.vendor, product: row.product })));
     // The platform's own name is not one of its components.
