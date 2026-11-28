@@ -262,7 +262,7 @@ export async function readCatalogueProduct(client: Client, productId: UUID): Pro
     publication: revision.data ? publicationState(revision.data, row.edit_revision) : null,
     partOf,
     // A product merged into another is a record, not a component, so it is left out here as it is in the list.
-    components: (componentRows.data ?? []).filter((component: { id: string }) => !mergedIds.has(component.id)),
+    components: componentRows.data.filter((component: { id: string }) => !mergedIds.has(component.id)),
   };
 }
 
