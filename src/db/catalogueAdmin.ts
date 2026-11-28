@@ -45,6 +45,7 @@ import { proposalKey, type LinkProposal, type ProductLinkRow, type ProposalProdu
 import { buildCoverage, type CoverageInput } from '../tools/catalogueCoverage';
 import { suggestPlatforms, type PlatformSuggestion } from '../tools/cataloguePlatformSuggestions';
 import { findResultSchema, foundComponentContent, foundProductContent, nameMatchKey, type FindComponentsRequest, type FindPlatformsRequest, splitByLibrary, productCode, type FindRequest, type FindResult, type FoundProduct } from '../tools/catalogueFindProducts';
+import { researchContent, type ResearchItem } from '../tools/catalogueResearchImport';
 import type { Client } from './client';
 import { queryInChunks } from './inFilterLimit';
 
@@ -1242,6 +1243,68 @@ export async function saveFoundProducts(
     }
   }
   return { saved, failed, platformsCreated };
+}
+
+/**
+ * Load an admin's own research as drafts. The library is read again first so
+ * nothing already there is created twice (rule I1); a product already in the
+ * library is left as it is. Missing platforms are added first as drafts, then
+ * each product or component through the one guarded save, so the server records
+ * who and when, and every claim waits for review. A row that fails is skipped
+ * and named; nothing is published.
+ */
+export async function loadResearch(
+  client: Client,
+  items: readonly ResearchItem[],
+  today: string,
+): Promise<{ saved: { productId: UUID; product: string }[]; skipped: string[]; failed: { product: string; message: string }[]; platformsCreated: string[] }> {
+  const library = await listLibraryProductKeys(client);
+  const regrouped = new Map(library.map((row) => [nameMatchKey(row.vendor, row.product), row.id]));
+  const taken = new Set(library.map((row) => row.code));
+  const saved: { productId: UUID; product: string }[] = [];
+  const skipped: string[] = [];
+  const failed: { product: string; message: string }[] = [];
+  const platformsCreated: string[] = [];
+  const toSave = items.filter((item) => {
+    if (regrouped.has(item.key)) { skipped.push(item.product); return false; }
+    return true;
+  });
+  // Platforms first, including a platform loaded as its own row, so its components can point at it.
+  const ownKeys = new Set(toSave.map((item) => item.key));
+  const platformIds = new Map<string, UUID>();
+  const ordered = [...toSave].sort((a, b) => Number(a.platform !== null) - Number(b.platform !== null));
+  for (const item of ordered) {
+    let platformId: UUID | null = null;
+    if (item.platform !== null) {
+      const key = nameMatchKey(item.vendor, item.platform);
+      platformId = platformIds.get(key) ?? regrouped.get(key) ?? null;
+      if (platformId === null && !ownKeys.has(key)) {
+        try {
+          platformId = await createDraftPlatform(client, item.vendor, item.platform, taken);
+          taken.add(productCode(item.vendor, item.platform, taken));
+          platformIds.set(key, platformId);
+          platformsCreated.push(item.platform);
+        } catch (cause) {
+          failed.push({ product: item.product, message: `Its platform ${item.platform} could not be added: ${cause instanceof Error ? cause.message : String(cause)}` });
+          continue;
+        }
+      }
+      if (platformId === null) {
+        failed.push({ product: item.product, message: `Its platform ${item.platform} was not saved, so it was not loaded.` });
+        continue;
+      }
+    }
+    const content = researchContent(item, platformId, taken, today);
+    taken.add(content.code);
+    try {
+      const result = await saveCatalogueProduct(client, null, 0, content);
+      saved.push({ productId: result.productId, product: item.product });
+      platformIds.set(item.key, result.productId);
+    } catch (cause) {
+      failed.push({ product: item.product, message: cause instanceof Error ? cause.message : String(cause) });
+    }
+  }
+  return { saved, skipped, failed, platformsCreated };
 }
 
 /** Read every row of a table in pages of 1,000, so a long list is never sent as a filter (rule 8). */
